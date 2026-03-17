@@ -1,0 +1,101 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<Configurations>Debug;Release</Configurations>
+		<TargetFramework>net48</TargetFramework>
+		<EnableCsiiPostProcessor Condition="'$(EnableCsiiPostProcessor)' == ''">false</EnableCsiiPostProcessor>
+	
+		<!--The file where mod information which is required for publishing mod on PDX mods are stored-->
+		<PublishConfigurationPath>Properties\PublishConfiguration.xml</PublishConfigurationPath>
+		<CsiiToolPath>$([System.Environment]::GetEnvironmentVariable('CSII_TOOLPATH'))</CsiiToolPath>
+		<CsiiToolPath Condition="'$(CsiiToolPath)' == ''">$([System.Environment]::GetEnvironmentVariable('CSII_TOOLPATH', 'EnvironmentVariableTarget.User'))</CsiiToolPath>
+	</PropertyGroup>
+	
+	<!--Imports must be after PropertyGroup block-->
+	<Import Project="$(CsiiToolPath)\Mod.props" />
+	<Import Project="$(CsiiToolPath)\Mod.targets" />
+
+	<ItemGroup>
+		<Reference Include="Game">
+			<Private>false</Private>
+		</Reference>
+		<Reference Include="Colossal.Core">
+			<Private>false</Private>
+		</Reference>
+		<Reference Include="Colossal.Logging">
+			<Private>false</Private>
+		</Reference>
+		<Reference Include="Colossal.IO.AssetDatabase">
+			<Private>false</Private>
+		</Reference>
+		<Reference Include="Colossal.UI">
+			<Private>false</Private>
+		</Reference>
+		<Reference Include="Colossal.UI.Binding">
+			<Private>false</Private>
+		</Reference>
+		<Reference Include="Colossal.Localization">
+			<Private>false</Private>
+		</Reference>
+		<Reference Include="Colossal.Mathematics">
+			<Private>false</Private>
+		</Reference>
+		<Reference Include="Colossal.PSI.Common">
+			<Private>false</Private>
+		</Reference>
+		<Reference Include="Unity.InputSystem">
+			<Private>false</Private>
+		</Reference>
+		<Reference Include="UnityEngine.CoreModule">
+			<Private>false</Private>
+		</Reference>
+		<Reference Include="Unity.RenderPipelines.Core.Runtime">
+			<Private>false</Private>
+		</Reference>
+		<Reference Include="Unity.Burst">
+			<Private>false</Private>
+		</Reference>
+		<Reference Include="Unity.Collections">
+			<Private>false</Private>
+		</Reference>
+		<Reference Include="Unity.Entities">
+			<Private>false</Private>
+		</Reference>
+		<Reference Include="Unity.Mathematics">
+			<Private>false</Private>
+		</Reference>
+	</ItemGroup>
+
+	<ItemGroup>
+		<None Include="$(ModPropsFile)" Link="Properties\Mod.props" />
+		<None Include="$(ModTargetsFile)" Link="Properties\Mod.targets" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Lib.Harmony" Version="2.4.2" />
+	</ItemGroup>
+
+	<ItemGroup Condition="!Exists('$(EntityPackagePath)')">
+		<Analyzer Remove="$(EntityPackagePath)\SystemGenerator.SystemAPI.dll" />
+		<Analyzer Remove="$(EntityPackagePath)\SystemGenerator.dll" />
+		<Analyzer Remove="$(EntityPackagePath)\SystemGenerator.SystemAPI.QueryBuilder.dll" />
+		<Analyzer Remove="$(EntityPackagePath)\SystemGenerator.LambdaJobs.dll" />
+		<Analyzer Remove="$(EntityPackagePath)\SystemGenerator.Common.dll" />
+		<Analyzer Remove="$(EntityPackagePath)\SystemGenerator.SystemAPI.Query.dll" />
+		<Analyzer Remove="$(EntityPackagePath)\SystemGenerator.EntityQueryBulkOperations.dll" />
+		<Analyzer Remove="$(EntityPackagePath)\AspectGenerator.dll" />
+		<Analyzer Remove="$(EntityPackagePath)\Common.dll" />
+		<Analyzer Remove="$(EntityPackagePath)\JobEntityGenerator.dll" />
+		<Analyzer Remove="$(EntityPackagePath)\Unity.Entities.Analyzer.dll" />
+		<Analyzer Remove="$(EntityPackagePath)\Unity.Entities.Analyzer.CodeFixes.dll" />
+	</ItemGroup>
+
+	<Target Name="CheckEntityPackagePath" Condition="Exists('$(EntityPackagePath)')" />
+
+	<Target Name="RunModPostProcessor" AfterTargets="AfterBuild" Condition="'$(NeedBuild)' and '$(EnableCsiiPostProcessor)' == 'true'">
+		<Error Condition="!Exists('$(ModPostProcessorFullPath)')" Text="Post processor not found, please check the path: $(ModPostProcessorFullPath)" />
+		<Message Text="Run post processor: $(ModPostProcessorArgs)" Importance="high" />
+		<Exec Command="$(ModPostProcessorArgs)" LogStandardErrorAsError="true" />
+	</Target>
+
+</Project>
