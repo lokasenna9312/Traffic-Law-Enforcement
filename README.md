@@ -144,7 +144,7 @@ msbuild '.\Traffic Law Enforcement\Traffic Law Enforcement.csproj' /restore /t:B
 
 배포 대상 경로:
 
-`%LocalLow%\Colossal Order\Cities Skylines II\Mods\Traffic Law Enforcement`
+`%USERPROFILE%\AppData\LocalLow\Colossal Order\Cities Skylines II\Mods\Traffic Law Enforcement`
 
 실행 예:
 
