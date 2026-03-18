@@ -13,6 +13,7 @@ bld/
 
 # Visual Studio
 .vs/
+.vscode/
 *.suo
 *.user
 *.userosscache
