@@ -69,6 +69,14 @@ namespace Traffic_Law_Enforcement
                     EntityManager.RemoveComponent<PublicTransportLaneViolation>(m_ViolationQuery);
                 }
 
+                TrafficLawEnforcementStatistics disabledStats = EntityManager.GetComponentData<TrafficLawEnforcementStatistics>(m_StatisticsEntity);
+                if (disabledStats.m_ActivePublicTransportLaneViolatorCount != 0)
+                {
+                    disabledStats.m_ActivePublicTransportLaneViolatorCount = 0;
+                    EntityManager.SetComponentData(m_StatisticsEntity, disabledStats);
+                }
+                EnforcementTelemetry.SetStatistics(disabledStats);
+
                 m_HasEvaluated = false;
                 m_LastEnforcementEnabled = false;
                 return;
@@ -94,11 +102,18 @@ namespace Traffic_Law_Enforcement
                 EvaluateQuery(m_ChangedCarQuery, settings, ref statistics, ref statisticsChanged);
             }
 
+            int activeViolatorCount = m_ViolationQuery.CalculateEntityCount();
+            if (statistics.m_ActivePublicTransportLaneViolatorCount != activeViolatorCount)
+            {
+                statistics.m_ActivePublicTransportLaneViolatorCount = activeViolatorCount;
+                statisticsChanged = true;
+            }
+
             if (statisticsChanged)
             {
                 EntityManager.SetComponentData(m_StatisticsEntity, statistics);
-                EnforcementTelemetry.SetStatistics(statistics);
             }
+            EnforcementTelemetry.SetStatistics(statistics);
 
             m_HasEvaluated = true;
             m_LastEnforcementEnabled = true;

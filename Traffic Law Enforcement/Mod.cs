@@ -50,7 +50,6 @@ namespace Traffic_Law_Enforcement
             updateSystem.UpdateAfter<LaneTransitionViolationSystem, VehicleLaneHistorySystem>(SystemUpdatePhase.GameSimulation);
             updateSystem.UpdateAfter<EnforcementFineMoneySystem, PublicTransportLaneViolationSystem>(SystemUpdatePhase.GameSimulation);
             updateSystem.UpdateAfter<EnforcementFineMoneySystem, LaneTransitionViolationSystem>(SystemUpdatePhase.GameSimulation);
-            updateSystem.UpdateAfter<PublicTransportLaneEnforcementOutputSystem, PublicTransportLaneViolationSystem>(SystemUpdatePhase.GameSimulation);
         }
 
         public void OnDispose()
