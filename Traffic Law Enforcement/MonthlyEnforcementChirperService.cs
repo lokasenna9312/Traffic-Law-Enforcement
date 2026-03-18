@@ -10,6 +10,7 @@ namespace Traffic_Law_Enforcement
     public struct MonthlyEnforcementTrackingState
     {
         public long m_MonthIndex;
+        public int m_TotalPathRequestCount;
         public int m_PublicTransportLaneCount;
         public int m_MidBlockCrossingCount;
         public int m_IntersectionMovementCount;
@@ -24,6 +25,7 @@ namespace Traffic_Law_Enforcement
 
         public MonthlyEnforcementTrackingState(
             long monthIndex,
+            int totalPathRequestCount,
             int publicTransportLaneCount,
             int midBlockCrossingCount,
             int intersectionMovementCount,
@@ -37,6 +39,7 @@ namespace Traffic_Law_Enforcement
             int intersectionMovementAvoidedEventCount)
         {
             m_MonthIndex = monthIndex;
+            m_TotalPathRequestCount = totalPathRequestCount;
             m_PublicTransportLaneCount = publicTransportLaneCount;
             m_MidBlockCrossingCount = midBlockCrossingCount;
             m_IntersectionMovementCount = intersectionMovementCount;
@@ -54,6 +57,7 @@ namespace Traffic_Law_Enforcement
     public struct MonthlyEnforcementReport
     {
         public long m_MonthIndex;
+        public int m_TotalPathRequestCount;
         public int m_PublicTransportLaneCount;
         public int m_MidBlockCrossingCount;
         public int m_IntersectionMovementCount;
@@ -68,6 +72,7 @@ namespace Traffic_Law_Enforcement
 
         public MonthlyEnforcementReport(
             long monthIndex,
+            int totalPathRequestCount,
             int publicTransportLaneCount,
             int midBlockCrossingCount,
             int intersectionMovementCount,
@@ -81,6 +86,7 @@ namespace Traffic_Law_Enforcement
             int intersectionMovementAvoidedEventCount)
         {
             m_MonthIndex = monthIndex;
+            m_TotalPathRequestCount = totalPathRequestCount;
             m_PublicTransportLaneCount = publicTransportLaneCount;
             m_MidBlockCrossingCount = midBlockCrossingCount;
             m_IntersectionMovementCount = intersectionMovementCount;
@@ -200,6 +206,7 @@ namespace Traffic_Law_Enforcement
 
             report = new MonthlyEnforcementReport(
                 s_TrackingState.m_MonthIndex,
+                ClampToNonNegative(totals.TotalPathRequestCount - s_TrackingState.m_TotalPathRequestCount),
                 ClampToNonNegative(EnforcementTelemetry.PublicTransportLaneViolationCount - s_TrackingState.m_PublicTransportLaneCount),
                 ClampToNonNegative(EnforcementTelemetry.MidBlockCrossingViolationCount - s_TrackingState.m_MidBlockCrossingCount),
                 ClampToNonNegative(EnforcementTelemetry.IntersectionMovementViolationCount - s_TrackingState.m_IntersectionMovementCount),
@@ -219,18 +226,32 @@ namespace Traffic_Law_Enforcement
 
         public static MonthlyEnforcementReport BuildCurrentPeriodPreview()
         {
-            if (!s_HasTrackingState)
+            if (!EnforcementGameTime.IsInitialized)
             {
                 return default;
             }
 
-            return CreateDeltaReport(s_TrackingState);
+            RollingWindowSnapshot snapshot = EnforcementPolicyImpactService.GetRollingWindowSnapshot();
+            return new MonthlyEnforcementReport(
+                EnforcementGameTime.GetMonthIndex(GetCurrentPeriodStartMonthTicks(EnforcementGameTime.CurrentTimestampMonthTicks)),
+                snapshot.TotalPathRequestCount,
+                snapshot.PublicTransportLaneActualCount,
+                snapshot.MidBlockCrossingActualCount,
+                snapshot.IntersectionMovementActualCount,
+                snapshot.TotalFineAmount,
+                snapshot.TotalAvoidedPathCount,
+                snapshot.PublicTransportLaneFineAmount,
+                snapshot.MidBlockCrossingFineAmount,
+                snapshot.IntersectionMovementFineAmount,
+                snapshot.PublicTransportLaneAvoidedEventCount,
+                snapshot.MidBlockCrossingAvoidedEventCount,
+                snapshot.IntersectionMovementAvoidedEventCount);
         }
 
-        public static long GetTrackingPeriodStartMonthTicks()
+        public static long GetCurrentPeriodStartMonthTicks(long currentTimestampMonthTicks)
         {
-            return s_HasTrackingState
-                ? EnforcementGameTime.GetMonthTickAtMonthIndex(s_TrackingState.m_MonthIndex)
+            return currentTimestampMonthTicks > 0L
+                ? System.Math.Max(0L, currentTimestampMonthTicks - EnforcementGameTime.CurrentMonthTicksPerMonth)
                 : 0L;
         }
 
@@ -310,6 +331,7 @@ namespace Traffic_Law_Enforcement
 
             return new MonthlyEnforcementTrackingState(
                 currentMonthIndex,
+                totals.TotalPathRequestCount,
                 EnforcementTelemetry.PublicTransportLaneViolationCount,
                 EnforcementTelemetry.MidBlockCrossingViolationCount,
                 EnforcementTelemetry.IntersectionMovementViolationCount,
@@ -329,6 +351,7 @@ namespace Traffic_Law_Enforcement
 
             return new MonthlyEnforcementReport(
                 trackingState.m_MonthIndex,
+                ClampToNonNegative(totals.TotalPathRequestCount - trackingState.m_TotalPathRequestCount),
                 ClampToNonNegative(EnforcementTelemetry.PublicTransportLaneViolationCount - trackingState.m_PublicTransportLaneCount),
                 ClampToNonNegative(EnforcementTelemetry.MidBlockCrossingViolationCount - trackingState.m_MidBlockCrossingCount),
                 ClampToNonNegative(EnforcementTelemetry.IntersectionMovementViolationCount - trackingState.m_IntersectionMovementCount),
@@ -360,6 +383,7 @@ namespace Traffic_Law_Enforcement
         private static bool TrackingStatesEqual(MonthlyEnforcementTrackingState left, MonthlyEnforcementTrackingState right)
         {
             return left.m_MonthIndex == right.m_MonthIndex
+                && left.m_TotalPathRequestCount == right.m_TotalPathRequestCount
                 && left.m_PublicTransportLaneCount == right.m_PublicTransportLaneCount
                 && left.m_MidBlockCrossingCount == right.m_MidBlockCrossingCount
                 && left.m_IntersectionMovementCount == right.m_IntersectionMovementCount

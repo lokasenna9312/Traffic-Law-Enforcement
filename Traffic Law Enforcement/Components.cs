@@ -38,7 +38,13 @@ namespace Traffic_Law_Enforcement
         public Entity m_LastSourceLane;
         public Entity m_LastTargetLane;
         public int m_LastAccessIndex;
+        public byte m_LastEvaluationResult;
+        public byte m_LastTransitionFamily;
         public byte m_AwaitingPathRefresh;
+    }
+
+    public struct CenterlineAccessOriginWatch : IComponentData
+    {
     }
 
     public struct TrafficLawEnforcementStatistics : IComponentData

@@ -71,9 +71,9 @@ namespace Traffic_Law_Enforcement
             m_OriginalPathfindCarDataLookup.Update(this);
 
             int prefabCount = m_PathfindCarDataQuery.CalculateEntityCount();
-            bool enforcementEnabled = Mod.IsEnforcementEnabled;
-            int midBlockPenalty = enforcementEnabled ? EnforcementPenaltyService.GetMidBlockCrossingFine() : 0;
-            int intersectionPenalty = enforcementEnabled ? EnforcementPenaltyService.GetIntersectionMovementFine() : 0;
+            bool enforcementEnabled = Mod.IsMidBlockCrossingEnforcementEnabled || Mod.IsIntersectionMovementEnforcementEnabled;
+            int midBlockPenalty = Mod.IsMidBlockCrossingEnforcementEnabled ? EnforcementPenaltyService.GetMidBlockCrossingFine() : 0;
+            int intersectionPenalty = Mod.IsIntersectionMovementEnforcementEnabled ? EnforcementPenaltyService.GetIntersectionMovementFine() : 0;
 
             bool needsApply =
                 !m_HasApplied ||

@@ -23,7 +23,7 @@ namespace Traffic_Law_Enforcement
 
         protected override void OnUpdate()
         {
-            if (!Mod.IsEnforcementEnabled || !EnforcementGameTime.IsInitialized)
+            if (!Mod.IsPublicTransportLaneEnforcementEnabled || !EnforcementGameTime.IsInitialized)
             {
                 return;
             }

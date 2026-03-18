@@ -1,5 +1,9 @@
 using Game;
+using Game.Net;
+using Game.Pathfind;
 using Game.Simulation;
+using Game.Vehicles;
+using Unity.Collections;
 using Unity.Entities;
 using UnityEngine;
 
@@ -108,11 +112,24 @@ namespace Traffic_Law_Enforcement
     public class EnforcementGameTimeSystem : GameSystemBase
     {
         private TimeSystem m_TimeSystem;
+        private EntityQuery m_ActiveTrafficQuery;
+        private ComponentLookup<EdgeLane> m_EdgeLaneData;
+        private ComponentLookup<CarLane> m_CarLaneData;
+        private ComponentLookup<ParkingLane> m_ParkingLaneData;
+        private ComponentLookup<GarageLane> m_GarageLaneData;
 
         protected override void OnCreate()
         {
             base.OnCreate();
             m_TimeSystem = World.GetOrCreateSystemManaged<TimeSystem>();
+            m_ActiveTrafficQuery = GetEntityQuery(
+                ComponentType.ReadOnly<Car>(),
+                ComponentType.ReadOnly<CarCurrentLane>(),
+                ComponentType.ReadOnly<PathOwner>());
+            m_EdgeLaneData = GetComponentLookup<EdgeLane>(true);
+            m_CarLaneData = GetComponentLookup<CarLane>(true);
+            m_ParkingLaneData = GetComponentLookup<ParkingLane>(true);
+            m_GarageLaneData = GetComponentLookup<GarageLane>(true);
         }
 
         protected override void OnUpdate()
@@ -123,8 +140,78 @@ namespace Traffic_Law_Enforcement
             }
 
             EnforcementPolicyImpactService.UpdateTrackingForCurrentMonth();
+
+            if (EnforcementPolicyImpactService.NeedsInitialPathRequestSeed() &&
+                EnforcementPolicyImpactService.TrySeedInitialPathRequestsFromActiveTraffic(CountActiveRoadTrafficVehicles()))
+            {
+                EnforcementPolicyImpactService.UpdateTrackingForCurrentMonth();
+            }
+
             EnforcementPenaltyService.LogRepeatPolicySummaryIfChanged();
             EnforcementTelemetry.PruneExpiredViolationTimestamps();
+        }
+
+        private int CountActiveRoadTrafficVehicles()
+        {
+            m_EdgeLaneData.Update(this);
+            m_CarLaneData.Update(this);
+            m_ParkingLaneData.Update(this);
+            m_GarageLaneData.Update(this);
+
+            NativeArray<CarCurrentLane> currentLanes = m_ActiveTrafficQuery.ToComponentDataArray<CarCurrentLane>(Allocator.Temp);
+            try
+            {
+                int activeRoadTrafficCount = 0;
+                int nullLaneCount = 0;
+                int missingEdgeLaneCount = 0;
+                int missingCarLaneCount = 0;
+                int parkingLaneCount = 0;
+                int garageLaneCount = 0;
+                for (int index = 0; index < currentLanes.Length; index += 1)
+                {
+                    Entity lane = currentLanes[index].m_Lane;
+                    if (lane == Entity.Null)
+                    {
+                        nullLaneCount += 1;
+                        continue;
+                    }
+
+                    if (!m_EdgeLaneData.HasComponent(lane))
+                    {
+                        missingEdgeLaneCount += 1;
+                        continue;
+                    }
+
+                    if (!m_CarLaneData.HasComponent(lane))
+                    {
+                        missingCarLaneCount += 1;
+                        continue;
+                    }
+
+                    if (m_ParkingLaneData.HasComponent(lane))
+                    {
+                        parkingLaneCount += 1;
+                        continue;
+                    }
+
+                    if (m_GarageLaneData.HasComponent(lane))
+                    {
+                        garageLaneCount += 1;
+                        continue;
+                    }
+
+                    activeRoadTrafficCount += 1;
+                }
+
+                Mod.log.Info(
+                    $"Initial path-request seed candidate scan: candidates={currentLanes.Length}, includedRoadTraffic={activeRoadTrafficCount}, excludedNullLane={nullLaneCount}, excludedMissingEdgeLane={missingEdgeLaneCount}, excludedMissingCarLane={missingCarLaneCount}, excludedParkingLane={parkingLaneCount}, excludedGarageLane={garageLaneCount}");
+
+                return activeRoadTrafficCount;
+            }
+            finally
+            {
+                currentLanes.Dispose();
+            }
         }
     }
 }

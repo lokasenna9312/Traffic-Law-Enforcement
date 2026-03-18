@@ -38,7 +38,9 @@ namespace Traffic_Law_Enforcement
 
         private void LogChanges(string inGameTimeLabel, LoggedSettingsSnapshot previous, LoggedSettingsSnapshot current)
         {
-            LogChange(inGameTimeLabel, nameof(Setting.EnableEnforcement), previous.Gameplay.EnableEnforcement, current.Gameplay.EnableEnforcement);
+            LogChange(inGameTimeLabel, nameof(Setting.EnablePublicTransportLaneEnforcement), previous.Gameplay.EnablePublicTransportLaneEnforcement, current.Gameplay.EnablePublicTransportLaneEnforcement);
+            LogChange(inGameTimeLabel, nameof(Setting.EnableMidBlockCrossingEnforcement), previous.Gameplay.EnableMidBlockCrossingEnforcement, current.Gameplay.EnableMidBlockCrossingEnforcement);
+            LogChange(inGameTimeLabel, nameof(Setting.EnableIntersectionMovementEnforcement), previous.Gameplay.EnableIntersectionMovementEnforcement, current.Gameplay.EnableIntersectionMovementEnforcement);
             LogChange(inGameTimeLabel, nameof(Setting.EnableEstimatedRerouteLogging), previous.EnableEstimatedRerouteLogging, current.EnableEstimatedRerouteLogging);
             LogChange(inGameTimeLabel, nameof(Setting.EnableEnforcementEventLogging), previous.EnableEnforcementEventLogging, current.EnableEnforcementEventLogging);
             LogChange(inGameTimeLabel, nameof(Setting.EnableAllowedType3PublicTransportLaneUsageLogging), previous.EnableAllowedType3PublicTransportLaneUsageLogging, current.EnableAllowedType3PublicTransportLaneUsageLogging);
@@ -166,7 +168,9 @@ namespace Traffic_Law_Enforcement
             public string ToLogString()
             {
                 StringBuilder builder = new StringBuilder(512);
-                Append(builder, nameof(Setting.EnableEnforcement), Gameplay.EnableEnforcement);
+                Append(builder, nameof(Setting.EnablePublicTransportLaneEnforcement), Gameplay.EnablePublicTransportLaneEnforcement);
+                Append(builder, nameof(Setting.EnableMidBlockCrossingEnforcement), Gameplay.EnableMidBlockCrossingEnforcement);
+                Append(builder, nameof(Setting.EnableIntersectionMovementEnforcement), Gameplay.EnableIntersectionMovementEnforcement);
                 Append(builder, nameof(Setting.EnableEstimatedRerouteLogging), EnableEstimatedRerouteLogging);
                 Append(builder, nameof(Setting.EnableEnforcementEventLogging), EnableEnforcementEventLogging);
                 Append(builder, nameof(Setting.EnableAllowedType3PublicTransportLaneUsageLogging), EnableAllowedType3PublicTransportLaneUsageLogging);

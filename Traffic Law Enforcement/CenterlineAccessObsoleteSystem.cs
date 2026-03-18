@@ -15,16 +15,29 @@ namespace Traffic_Law_Enforcement
     public class CenterlineAccessObsoleteSystem : GameSystemBase
     {
         private const int MaxStructureSampleLogs = 64;
+        private const int ContextSummaryLogInterval = 512;
+        private const byte EvaluationNone = 0;
+        private const byte EvaluationNoAccessTransition = 1;
+        private const byte EvaluationCleanAccessTransition = 2;
+        private const byte EvaluationInvalidatedAccessTransition = 3;
+        private const byte TransitionFamilyNone = 0;
+        private const byte TransitionFamilyParkingLaneIngress = 1;
+        private const byte TransitionFamilyGarageLaneIngress = 2;
+        private const byte TransitionFamilyParkingConnectionIngress = 3;
+        private const byte TransitionFamilyBuildingServiceIngress = 4;
+        private const byte TransitionFamilyIllegalEgress = 5;
 
         private EntityQuery m_VehicleQuery;
         private EntityQuery m_CurrentLaneChangedQuery;
         private EntityQuery m_NavigationLaneChangedQuery;
+        private EntityQuery m_AccessOriginWatchQuery;
         private BufferLookup<CarNavigationLane> m_NavigationLaneData;
         private ComponentLookup<CarCurrentLane> m_CurrentLaneData;
         private ComponentLookup<PathOwner> m_PathOwnerData;
         private ComponentLookup<Owner> m_OwnerData;
         private ComponentLookup<PrefabRef> m_PrefabRefData;
         private ComponentLookup<Car> m_CarData;
+        private ComponentLookup<CenterlineAccessOriginWatch> m_AccessOriginWatchData;
         private ComponentLookup<CenterlineAccessObsoleteState> m_ObsoleteStateData;
         private ComponentLookup<CarLane> m_CarLaneData;
         private ComponentLookup<EdgeLane> m_EdgeLaneData;
@@ -34,6 +47,13 @@ namespace Traffic_Law_Enforcement
         private readonly HashSet<Entity> m_CandidateVehicles = new HashSet<Entity>();
         private readonly HashSet<string> m_StructureSampleSignatures = new HashSet<string>();
         private PrefabSystem m_PrefabSystem;
+        private int m_TotalInvalidationCount;
+        private int m_CustomCurrentContextInvalidationCount;
+        private int m_PedestrianStreetCurrentContextInvalidationCount;
+        private int m_MediumRoadCurrentContextInvalidationCount;
+        private int m_PublicTransportLaneCurrentContextInvalidationCount;
+        private int m_CustomPedestrianOrPublicTransportCurrentContextInvalidationCount;
+        private int m_LastContextSummaryLoggedTotal;
 
         protected override void OnCreate()
         {
@@ -55,12 +75,19 @@ namespace Traffic_Law_Enforcement
                 ComponentType.ReadOnly<PathOwner>(),
                 ComponentType.ReadOnly<CarNavigationLane>());
             m_NavigationLaneChangedQuery.SetChangedVersionFilter(ComponentType.ReadOnly<CarNavigationLane>());
+            m_AccessOriginWatchQuery = GetEntityQuery(
+                ComponentType.ReadOnly<Car>(),
+                ComponentType.ReadOnly<CarCurrentLane>(),
+                ComponentType.ReadOnly<PathOwner>(),
+                ComponentType.ReadOnly<CarNavigationLane>(),
+                ComponentType.ReadOnly<CenterlineAccessOriginWatch>());
             m_NavigationLaneData = GetBufferLookup<CarNavigationLane>(true);
             m_CurrentLaneData = GetComponentLookup<CarCurrentLane>(true);
             m_PathOwnerData = GetComponentLookup<PathOwner>(true);
             m_OwnerData = GetComponentLookup<Owner>(true);
             m_PrefabRefData = GetComponentLookup<PrefabRef>(true);
             m_CarData = GetComponentLookup<Car>(true);
+            m_AccessOriginWatchData = GetComponentLookup<CenterlineAccessOriginWatch>();
             m_ObsoleteStateData = GetComponentLookup<CenterlineAccessObsoleteState>();
             m_CarLaneData = GetComponentLookup<CarLane>(true);
             m_EdgeLaneData = GetComponentLookup<EdgeLane>(true);
@@ -73,7 +100,7 @@ namespace Traffic_Law_Enforcement
 
         protected override void OnUpdate()
         {
-            if (!Mod.IsEnforcementEnabled)
+            if (!Mod.IsMidBlockCrossingEnforcementEnabled)
             {
                 return;
             }
@@ -84,6 +111,7 @@ namespace Traffic_Law_Enforcement
             m_OwnerData.Update(this);
             m_PrefabRefData.Update(this);
             m_CarData.Update(this);
+            m_AccessOriginWatchData.Update(this);
             m_ObsoleteStateData.Update(this);
             m_CarLaneData.Update(this);
             m_EdgeLaneData.Update(this);
@@ -94,6 +122,7 @@ namespace Traffic_Law_Enforcement
             m_CandidateVehicles.Clear();
             CollectCandidateVehicles(m_CurrentLaneChangedQuery);
             CollectCandidateVehicles(m_NavigationLaneChangedQuery);
+            CollectCandidateVehicles(m_AccessOriginWatchQuery);
 
             try
             {
@@ -111,6 +140,8 @@ namespace Traffic_Law_Enforcement
                         continue;
                     }
 
+                    SyncAccessOriginWatch(vehicle, currentLane.m_Lane);
+
                     ResetDuplicateSuppressionIfPathChanged(vehicle, pathOwner);
 
                     if ((pathOwner.m_State & (PathFlags.Pending | PathFlags.Obsolete)) != 0)
@@ -123,24 +154,40 @@ namespace Traffic_Law_Enforcement
                         continue;
                     }
 
-                    if (!TryGetIllegalPlannedAccessTransition(currentLane.m_Lane, navigationLanes, out Entity sourceLane, out Entity targetLane, out int transitionIndex, out string transitionKind, out string reason))
+                    if (!TryGetFirstPlannedAccessTransition(currentLane.m_Lane, navigationLanes, out Entity sourceLane, out Entity targetLane, out int transitionIndex, out string transitionKind))
+                    {
+                        if (!ShouldSuppressObservedSnapshot(vehicle, currentLane.m_Lane, Entity.Null, Entity.Null, -1, EvaluationNoAccessTransition, TransitionFamilyNone))
+                        {
+                            RecordObservedSnapshot(vehicle, currentLane.m_Lane, Entity.Null, Entity.Null, -1, EvaluationNoAccessTransition, TransitionFamilyNone);
+                        }
+
+                        continue;
+                    }
+
+                    bool illegalTransition = IsIllegalIngress(sourceLane, targetLane, out string reason) || IsIllegalEgress(sourceLane, targetLane, out reason);
+                    byte evaluationResult = illegalTransition ? EvaluationInvalidatedAccessTransition : EvaluationCleanAccessTransition;
+                    byte transitionFamily = GetTransitionFamily(sourceLane, targetLane, evaluationResult);
+                    if (ShouldSuppressObservedSnapshot(vehicle, currentLane.m_Lane, sourceLane, targetLane, transitionIndex, evaluationResult, transitionFamily))
                     {
                         continue;
                     }
 
-                    if (ShouldSuppressDuplicateInvalidation(vehicle, currentLane.m_Lane, sourceLane, targetLane, transitionIndex))
+                    if (!illegalTransition)
                     {
+                        RecordObservedSnapshot(vehicle, currentLane.m_Lane, sourceLane, targetLane, transitionIndex, evaluationResult, transitionFamily);
                         continue;
                     }
 
                     pathOwner.m_State |= PathFlags.Obsolete;
                     EntityManager.SetComponentData(vehicle, pathOwner);
-                    RecordInvalidationSnapshot(vehicle, currentLane.m_Lane, sourceLane, targetLane, transitionIndex);
+                    RecordObservedSnapshot(vehicle, currentLane.m_Lane, sourceLane, targetLane, transitionIndex, evaluationResult, transitionFamily);
+                    RecordInvalidationContext(currentLane.m_Lane);
 
                     if (EnforcementLoggingPolicy.ShouldLogEnforcementEvents())
                     {
                         Mod.log.Info($"Planned center-line access route invalidated: vehicle={vehicle}, fromLane={sourceLane}, toLane={targetLane}, accessIndex={transitionIndex}, transition={transitionKind}, reason={reason}");
                         LogStructureSample(vehicle, currentLane.m_Lane, sourceLane, targetLane, transitionIndex, transitionKind, reason);
+                        LogInvalidationContextSummaryIfNeeded();
                     }
                 }
             }
@@ -165,13 +212,31 @@ namespace Traffic_Law_Enforcement
             }
         }
 
-        private bool TryGetIllegalPlannedAccessTransition(Entity currentLane, DynamicBuffer<CarNavigationLane> navigationLanes, out Entity sourceLane, out Entity targetLane, out int transitionIndex, out string transitionKind, out string reason)
+        private void SyncAccessOriginWatch(Entity vehicle, Entity currentLane)
+        {
+            bool shouldWatch = IsAccessOrigin(currentLane);
+            bool isWatching = m_AccessOriginWatchData.HasComponent(vehicle);
+
+            if (shouldWatch == isWatching)
+            {
+                return;
+            }
+
+            if (shouldWatch)
+            {
+                EntityManager.AddComponent<CenterlineAccessOriginWatch>(vehicle);
+                return;
+            }
+
+            EntityManager.RemoveComponent<CenterlineAccessOriginWatch>(vehicle);
+        }
+
+        private bool TryGetFirstPlannedAccessTransition(Entity currentLane, DynamicBuffer<CarNavigationLane> navigationLanes, out Entity sourceLane, out Entity targetLane, out int transitionIndex, out string transitionKind)
         {
             sourceLane = currentLane;
             targetLane = Entity.Null;
             transitionIndex = -1;
             transitionKind = null;
-            reason = null;
 
             for (int index = 0; index < navigationLanes.Length; index++)
             {
@@ -187,15 +252,10 @@ namespace Traffic_Law_Enforcement
                     continue;
                 }
 
-                if (IsIllegalIngress(sourceLane, nextLane, out reason) || IsIllegalEgress(sourceLane, nextLane, out reason))
-                {
-                    targetLane = nextLane;
-                    transitionIndex = index;
-                    transitionKind = DescribeTransitionKind(sourceLane, nextLane);
-                    return true;
-                }
-
-                return false;
+                targetLane = nextLane;
+                transitionIndex = index;
+                transitionKind = DescribeTransitionKind(sourceLane, nextLane);
+                return true;
             }
 
             return false;
@@ -214,6 +274,12 @@ namespace Traffic_Law_Enforcement
             string currentOwnerChain = DescribeOwnerChain(currentLane);
             string sourceOwnerChain = DescribeOwnerChain(sourceLane);
             string targetOwnerChain = DescribeOwnerChain(targetLane);
+            Entity accessLane = IsAccessOrigin(sourceLane) ? sourceLane : targetLane;
+            Entity roadLane = accessLane == sourceLane ? targetLane : sourceLane;
+            string accessLaneShape = DescribeLaneShape(accessLane);
+            string roadLaneShape = DescribeLaneShape(roadLane);
+            string accessOwnerChain = DescribeOwnerChain(accessLane);
+            string roadOwnerChain = DescribeOwnerChain(roadLane);
             string signature = $"{transitionKind}|{currentLaneShape}|{sourceLaneShape}|{targetLaneShape}|{currentOwnerChain}|{sourceOwnerChain}|{targetOwnerChain}";
             if (!m_StructureSampleSignatures.Add(signature))
             {
@@ -222,9 +288,63 @@ namespace Traffic_Law_Enforcement
 
             Mod.log.Info(
                 $"Centerline access structure sample: vehicle={vehicle}, accessIndex={transitionIndex}, transition={transitionKind}, reason={reason}, " +
+                $"accessLane={accessLane}, accessShape={accessLaneShape}, accessOwnerChain={accessOwnerChain}, " +
+                $"roadLane={roadLane}, roadShape={roadLaneShape}, roadOwnerChain={roadOwnerChain}, " +
                 $"currentLane={currentLane}, currentShape={currentLaneShape}, currentOwnerChain={currentOwnerChain}, " +
                 $"sourceLane={sourceLane}, sourceShape={sourceLaneShape}, sourceOwnerChain={sourceOwnerChain}, " +
                 $"targetLane={targetLane}, targetShape={targetLaneShape}, targetOwnerChain={targetOwnerChain}");
+        }
+
+        private void RecordInvalidationContext(Entity currentLane)
+        {
+            m_TotalInvalidationCount += 1;
+
+            bool customCurrentContext = CurrentContextContainsPrefab(currentLane, IsWorkshopStyleCustomPrefabName);
+            bool pedestrianStreetCurrentContext = CurrentContextContainsPrefab(currentLane, IsPedestrianStreetPrefabName);
+            bool mediumRoadCurrentContext = CurrentContextContainsPrefab(currentLane, IsMediumRoadPrefabName);
+            bool publicTransportLaneCurrentContext = IsPublicTransportLaneContext(currentLane);
+
+            if (customCurrentContext)
+            {
+                m_CustomCurrentContextInvalidationCount += 1;
+            }
+
+            if (pedestrianStreetCurrentContext)
+            {
+                m_PedestrianStreetCurrentContextInvalidationCount += 1;
+            }
+
+            if (mediumRoadCurrentContext)
+            {
+                m_MediumRoadCurrentContextInvalidationCount += 1;
+            }
+
+            if (publicTransportLaneCurrentContext)
+            {
+                m_PublicTransportLaneCurrentContextInvalidationCount += 1;
+            }
+
+            if (customCurrentContext || pedestrianStreetCurrentContext || publicTransportLaneCurrentContext)
+            {
+                m_CustomPedestrianOrPublicTransportCurrentContextInvalidationCount += 1;
+            }
+        }
+
+        private void LogInvalidationContextSummaryIfNeeded()
+        {
+            if (m_TotalInvalidationCount == 0 || m_TotalInvalidationCount - m_LastContextSummaryLoggedTotal < ContextSummaryLogInterval)
+            {
+                return;
+            }
+
+            m_LastContextSummaryLoggedTotal = m_TotalInvalidationCount;
+            Mod.log.Info(
+                $"Centerline invalidation context totals: total={m_TotalInvalidationCount}, " +
+                $"customCurrent={m_CustomCurrentContextInvalidationCount} ({FormatPercent(m_CustomCurrentContextInvalidationCount, m_TotalInvalidationCount)}), " +
+                $"pedestrianStreetCurrent={m_PedestrianStreetCurrentContextInvalidationCount} ({FormatPercent(m_PedestrianStreetCurrentContextInvalidationCount, m_TotalInvalidationCount)}), " +
+                $"mediumRoadCurrent={m_MediumRoadCurrentContextInvalidationCount} ({FormatPercent(m_MediumRoadCurrentContextInvalidationCount, m_TotalInvalidationCount)}), " +
+                $"publicTransportLaneCurrent={m_PublicTransportLaneCurrentContextInvalidationCount} ({FormatPercent(m_PublicTransportLaneCurrentContextInvalidationCount, m_TotalInvalidationCount)}), " +
+                $"customOrPedestrianOrPublicTransportCurrent={m_CustomPedestrianOrPublicTransportCurrentContextInvalidationCount} ({FormatPercent(m_CustomPedestrianOrPublicTransportCurrentContextInvalidationCount, m_TotalInvalidationCount)})");
         }
 
         private string DescribeLaneShape(Entity lane)
@@ -309,6 +429,42 @@ namespace Traffic_Law_Enforcement
                 : prefabRef.m_Prefab.ToString();
         }
 
+        private bool CurrentContextContainsPrefab(Entity entity, System.Func<string, bool> match)
+        {
+            if (entity == Entity.Null)
+            {
+                return false;
+            }
+
+            Entity current = entity;
+            for (int depth = 0; depth < 8 && current != Entity.Null; depth += 1)
+            {
+                if (match(TryGetPrefabName(current)))
+                {
+                    return true;
+                }
+
+                if (!m_OwnerData.TryGetComponent(current, out Owner owner) || owner.m_Owner == Entity.Null || owner.m_Owner == current)
+                {
+                    break;
+                }
+
+                current = owner.m_Owner;
+            }
+
+            return false;
+        }
+
+        private bool IsPublicTransportLaneContext(Entity currentLane)
+        {
+            if (TryGetPrefabName(currentLane) == "Public Transport Lane 3 - Tram")
+            {
+                return true;
+            }
+
+            return CurrentContextContainsPrefab(currentLane, IsPublicTransportRoadPrefabName);
+        }
+
         private static bool IsRoadBuilderPrefabName(string prefabName)
         {
             if (string.IsNullOrEmpty(prefabName))
@@ -319,6 +475,49 @@ namespace Traffic_Law_Enforcement
             return prefabName.IndexOf("Road Builder", System.StringComparison.OrdinalIgnoreCase) >= 0 ||
                 prefabName.IndexOf("RB ", System.StringComparison.OrdinalIgnoreCase) >= 0 ||
                 prefabName.IndexOf("Made with Road Builder", System.StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        private static bool IsWorkshopStyleCustomPrefabName(string prefabName)
+        {
+            if (string.IsNullOrEmpty(prefabName))
+            {
+                return false;
+            }
+
+            return prefabName.Length > 17 &&
+                prefabName[0] == 'r' &&
+                prefabName.EndsWith("-76561198005833464", System.StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool IsPedestrianStreetPrefabName(string prefabName)
+        {
+            return string.Equals(prefabName, "Pedestrian Street", System.StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool IsMediumRoadPrefabName(string prefabName)
+        {
+            return string.Equals(prefabName, "Medium Road", System.StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool IsPublicTransportRoadPrefabName(string prefabName)
+        {
+            if (string.IsNullOrEmpty(prefabName))
+            {
+                return false;
+            }
+
+            return prefabName.IndexOf("Public Transport", System.StringComparison.OrdinalIgnoreCase) >= 0 ||
+                prefabName.IndexOf("Tram", System.StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        private static string FormatPercent(int numerator, int denominator)
+        {
+            if (denominator <= 0)
+            {
+                return "0.0%";
+            }
+
+            return ((100.0 * numerator) / denominator).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) + "%";
         }
 
         private void ResetDuplicateSuppressionIfPathChanged(Entity vehicle, PathOwner pathOwner)
@@ -337,29 +536,43 @@ namespace Traffic_Law_Enforcement
             m_ObsoleteStateData[vehicle] = state;
         }
 
-        private bool ShouldSuppressDuplicateInvalidation(Entity vehicle, Entity currentLane, Entity sourceLane, Entity targetLane, int transitionIndex)
+        private bool ShouldSuppressObservedSnapshot(Entity vehicle, Entity currentLane, Entity sourceLane, Entity targetLane, int transitionIndex, byte evaluationResult, byte transitionFamily)
         {
-            if (!m_ObsoleteStateData.TryGetComponent(vehicle, out CenterlineAccessObsoleteState state) || state.m_AwaitingPathRefresh == 0)
+            if (!m_ObsoleteStateData.TryGetComponent(vehicle, out CenterlineAccessObsoleteState state))
             {
                 return false;
+            }
+
+            if (evaluationResult == EvaluationInvalidatedAccessTransition)
+            {
+                bool sameInvalidationFamily = state.m_LastEvaluationResult == EvaluationInvalidatedAccessTransition &&
+                    state.m_LastTransitionFamily == transitionFamily &&
+                    transitionFamily != TransitionFamilyNone &&
+                    (state.m_LastSourceLane == sourceLane || state.m_LastCurrentLane == currentLane);
+
+                if (!sameInvalidationFamily)
+                {
+                    return false;
+                }
+
+                return state.m_AwaitingPathRefresh != 0;
             }
 
             bool sameSnapshot = state.m_LastCurrentLane == currentLane &&
                 state.m_LastSourceLane == sourceLane &&
                 state.m_LastTargetLane == targetLane &&
-                state.m_LastAccessIndex == transitionIndex;
+                state.m_LastAccessIndex == transitionIndex &&
+                state.m_LastEvaluationResult == evaluationResult;
 
-            if (sameSnapshot)
+            if (!sameSnapshot)
             {
-                return true;
+                return false;
             }
 
-            state.m_AwaitingPathRefresh = 0;
-            m_ObsoleteStateData[vehicle] = state;
-            return false;
+            return true;
         }
 
-        private void RecordInvalidationSnapshot(Entity vehicle, Entity currentLane, Entity sourceLane, Entity targetLane, int transitionIndex)
+        private void RecordObservedSnapshot(Entity vehicle, Entity currentLane, Entity sourceLane, Entity targetLane, int transitionIndex, byte evaluationResult, byte transitionFamily)
         {
             CenterlineAccessObsoleteState state = m_ObsoleteStateData.TryGetComponent(vehicle, out CenterlineAccessObsoleteState existingState)
                 ? existingState
@@ -369,7 +582,9 @@ namespace Traffic_Law_Enforcement
             state.m_LastSourceLane = sourceLane;
             state.m_LastTargetLane = targetLane;
             state.m_LastAccessIndex = transitionIndex;
-            state.m_AwaitingPathRefresh = 1;
+            state.m_LastEvaluationResult = evaluationResult;
+            state.m_LastTransitionFamily = transitionFamily;
+            state.m_AwaitingPathRefresh = evaluationResult == EvaluationInvalidatedAccessTransition ? (byte)1 : (byte)0;
 
             if (m_ObsoleteStateData.HasComponent(vehicle))
             {
@@ -384,6 +599,46 @@ namespace Traffic_Law_Enforcement
         private bool IsAccessTransition(Entity sourceLane, Entity targetLane)
         {
             return IsAccessOrigin(sourceLane) || IsAccessTarget(targetLane);
+        }
+
+        private byte GetTransitionFamily(Entity sourceLane, Entity targetLane, byte evaluationResult)
+        {
+            if (evaluationResult != EvaluationInvalidatedAccessTransition)
+            {
+                return TransitionFamilyNone;
+            }
+
+            if (IsAccessOrigin(sourceLane))
+            {
+                return TransitionFamilyIllegalEgress;
+            }
+
+            if (m_ParkingLaneData.HasComponent(targetLane))
+            {
+                return TransitionFamilyParkingLaneIngress;
+            }
+
+            if (m_GarageLaneData.HasComponent(targetLane))
+            {
+                return TransitionFamilyGarageLaneIngress;
+            }
+
+            if (!m_ConnectionLaneData.TryGetComponent(targetLane, out ConnectionLane connectionLane))
+            {
+                return TransitionFamilyNone;
+            }
+
+            if ((connectionLane.m_Flags & ConnectionLaneFlags.Parking) != 0)
+            {
+                return TransitionFamilyParkingConnectionIngress;
+            }
+
+            if ((connectionLane.m_Flags & ConnectionLaneFlags.Road) == 0)
+            {
+                return TransitionFamilyBuildingServiceIngress;
+            }
+
+            return TransitionFamilyNone;
         }
 
         private string DescribeTransitionKind(Entity sourceLane, Entity targetLane)

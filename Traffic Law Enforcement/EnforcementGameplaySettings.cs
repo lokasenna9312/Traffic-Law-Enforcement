@@ -2,7 +2,9 @@ namespace Traffic_Law_Enforcement
 {
     public struct EnforcementGameplaySettingsState
     {
-        public bool EnableEnforcement;
+        public bool EnablePublicTransportLaneEnforcement;
+        public bool EnableMidBlockCrossingEnforcement;
+        public bool EnableIntersectionMovementEnforcement;
 
         public bool AllowRoadPublicTransportVehicles;
         public bool AllowTaxis;
@@ -46,7 +48,9 @@ namespace Traffic_Law_Enforcement
         {
             return new EnforcementGameplaySettingsState
             {
-                EnableEnforcement = true,
+                EnablePublicTransportLaneEnforcement = true,
+                EnableMidBlockCrossingEnforcement = true,
+                EnableIntersectionMovementEnforcement = true,
                 AllowRoadPublicTransportVehicles = true,
                 AllowTaxis = true,
                 AllowPoliceCars = true,
@@ -80,6 +84,11 @@ namespace Traffic_Law_Enforcement
                 IntersectionMovementRepeatThreshold = 2,
                 IntersectionMovementRepeatMultiplierPercent = 150,
             };
+        }
+
+        public bool HasAnyEnforcementEnabled()
+        {
+            return EnablePublicTransportLaneEnforcement || EnableMidBlockCrossingEnforcement || EnableIntersectionMovementEnforcement;
         }
 
         public BusLaneVehicleCategory GetEnabledBusLaneCategories()

@@ -38,7 +38,7 @@ namespace Traffic_Law_Enforcement
             m_TypeLookups.Update(this);
             EnforcementGameplaySettingsState settings = EnforcementGameplaySettingsService.Current;
 
-            bool enforcementEnabled = Mod.IsEnforcementEnabled;
+            bool enforcementEnabled = Mod.IsPublicTransportLaneEnforcementEnabled;
             if (!enforcementEnabled)
             {
                 RestoreTrackedVehicles();

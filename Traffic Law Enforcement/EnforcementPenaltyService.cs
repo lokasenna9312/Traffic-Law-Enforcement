@@ -42,11 +42,6 @@ namespace Traffic_Law_Enforcement
 
         public static int ApplyRepeatOffenderPenalty(string kind, int baseFine, int vehicleId)
         {
-            if (!Mod.IsEnforcementEnabled)
-            {
-                return baseFine;
-            }
-
             RepeatOffenderPolicy policy = GetRepeatOffenderPolicy(kind);
             if (!policy.Enabled)
             {
@@ -113,7 +108,7 @@ namespace Traffic_Law_Enforcement
 
         private static void RecordViolation(string kind, Entity vehicle, Entity lane, int fineAmount, string reason)
         {
-            if (!Mod.IsEnforcementEnabled)
+            if (!IsEnforcementKindEnabled(kind))
             {
                 return;
             }
@@ -154,6 +149,21 @@ namespace Traffic_Law_Enforcement
                         settings.IntersectionMovementRepeatMultiplierPercent);
                 default:
                     return default;
+            }
+        }
+
+        private static bool IsEnforcementKindEnabled(string kind)
+        {
+            switch (kind)
+            {
+                case EnforcementKinds.PublicTransportLane:
+                    return Mod.IsPublicTransportLaneEnforcementEnabled;
+                case EnforcementKinds.MidBlockCrossing:
+                    return Mod.IsMidBlockCrossingEnforcementEnabled;
+                case EnforcementKinds.IntersectionMovement:
+                    return Mod.IsIntersectionMovementEnforcementEnabled;
+                default:
+                    return false;
             }
         }
 

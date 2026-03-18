@@ -69,7 +69,7 @@ namespace Traffic_Law_Enforcement
 
             try
             {
-                if (!Mod.IsEnforcementEnabled)
+                if (!Mod.IsMidBlockCrossingEnforcementEnabled && !Mod.IsIntersectionMovementEnforcementEnabled)
                 {
                     for (int index = 0; index < vehicles.Length; index++)
                     {

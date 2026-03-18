@@ -221,15 +221,8 @@ namespace Traffic_Law_Enforcement
         {
             failureReason = null;
 
-            if (!MonthlyEnforcementChirperService.TryGetTrackingState(out _))
-            {
-                failureReason = "monthly tracking state is unavailable";
-                Mod.log.Info($"Monthly chirper manual preview skipped. reason={failureReason}");
-                return false;
-            }
-
             MonthlyEnforcementReport previewReport = MonthlyEnforcementChirperService.BuildCurrentPeriodPreview();
-            long periodStart = MonthlyEnforcementChirperService.GetTrackingPeriodStartMonthTicks();
+            long periodStart = MonthlyEnforcementChirperService.GetCurrentPeriodStartMonthTicks(currentTimestampMonthTicks);
             long periodEnd = currentTimestampMonthTicks;
 
             bool updatedLocalization = EnsurePreviewAssets(previewReport, periodStart, periodEnd, out Entity triggerEntity);
@@ -494,9 +487,15 @@ namespace Traffic_Law_Enforcement
                 return;
             }
 
+            localeId = NormalizeLocaleId(localeId);
+
             try
             {
                 localizationManager.RemoveSource(localeId, source);
+            }
+            catch (NullReferenceException)
+            {
+                // During world teardown the localization manager can already be partially disposed.
             }
             catch (Exception ex)
             {
@@ -518,10 +517,10 @@ namespace Traffic_Law_Enforcement
         {
             return
                 $"Traffic enforcement report for {FormatEnglishPeriodPoint(periodStartMonthTicks)} to {FormatEnglishPeriodPoint(periodEndMonthTicks)}: {report.TotalViolationCount} violations.\n" +
-                $"Total violation rate: {FormatViolationRate(report.TotalViolationCount, report.m_TotalAvoidedPathCount)}. Total fines: {FormatMoney(report.m_TotalFineAmount)}\u20A1.\n" +
-                $"PT-lane: {FormatViolationRate(report.m_PublicTransportLaneCount, report.m_PublicTransportLaneAvoidedEventCount)}, fines {FormatMoney(report.m_PublicTransportLaneFineAmount)}\u20A1.\n" +
-                $"Mid-block: {FormatViolationRate(report.m_MidBlockCrossingCount, report.m_MidBlockCrossingAvoidedEventCount)}, fines {FormatMoney(report.m_MidBlockCrossingFineAmount)}\u20A1.\n" +
-                $"Intersection: {FormatViolationRate(report.m_IntersectionMovementCount, report.m_IntersectionMovementAvoidedEventCount)}, fines {FormatMoney(report.m_IntersectionMovementFineAmount)}\u20A1.";
+                $"Total violation rate: {FormatViolationRate(report.TotalViolationCount, report.m_TotalPathRequestCount)}. Total suppression failure rate: {FormatSuppressionFailureRate(report.TotalViolationCount, report.m_TotalAvoidedPathCount)}. Total fines: {FormatMoney(report.m_TotalFineAmount)}\u20A1.\n" +
+                $"PT-lane: violation rate {FormatViolationRate(report.m_PublicTransportLaneCount, report.m_TotalPathRequestCount)}, suppression failure rate {FormatSuppressionFailureRate(report.m_PublicTransportLaneCount, report.m_PublicTransportLaneAvoidedEventCount)}, fines {FormatMoney(report.m_PublicTransportLaneFineAmount)}\u20A1.\n" +
+                $"Mid-block: violation rate {FormatViolationRate(report.m_MidBlockCrossingCount, report.m_TotalPathRequestCount)}, suppression failure rate {FormatSuppressionFailureRate(report.m_MidBlockCrossingCount, report.m_MidBlockCrossingAvoidedEventCount)}, fines {FormatMoney(report.m_MidBlockCrossingFineAmount)}\u20A1.\n" +
+                $"Intersection: violation rate {FormatViolationRate(report.m_IntersectionMovementCount, report.m_TotalPathRequestCount)}, suppression failure rate {FormatSuppressionFailureRate(report.m_IntersectionMovementCount, report.m_IntersectionMovementAvoidedEventCount)}, fines {FormatMoney(report.m_IntersectionMovementFineAmount)}\u20A1.";
         }
 
         private static string BuildKoreanMessageLegacy(MonthlyEnforcementReport report, long periodStartMonthTicks, long periodEndMonthTicks)
@@ -547,10 +546,10 @@ namespace Traffic_Law_Enforcement
         {
             return
                 $"{FormatKoreanPeriodText(periodStartMonthTicks)}부터 {FormatKoreanPeriodText(periodEndMonthTicks)}까지 교통법규 단속 보고입니다. 총 위반 적발 {report.TotalViolationCount}건.\n" +
-                $"전체 위반율: {FormatViolationRate(report.TotalViolationCount, report.m_TotalAvoidedPathCount)}. 총 벌금: {FormatMoney(report.m_TotalFineAmount)}\u20A1.\n" +
-                $"대중교통 전용차선: {FormatViolationRate(report.m_PublicTransportLaneCount, report.m_PublicTransportLaneAvoidedEventCount)}, 벌금 {FormatMoney(report.m_PublicTransportLaneFineAmount)}\u20A1.\n" +
-                $"중앙선 침범: {FormatViolationRate(report.m_MidBlockCrossingCount, report.m_MidBlockCrossingAvoidedEventCount)}, 벌금 {FormatMoney(report.m_MidBlockCrossingFineAmount)}\u20A1.\n" +
-                $"교차로 통행규칙 위반: {FormatViolationRate(report.m_IntersectionMovementCount, report.m_IntersectionMovementAvoidedEventCount)}, 벌금 {FormatMoney(report.m_IntersectionMovementFineAmount)}\u20A1.";
+                $"전체 위반율: {FormatViolationRate(report.TotalViolationCount, report.m_TotalPathRequestCount)}. 전체 억제 실패율: {FormatSuppressionFailureRate(report.TotalViolationCount, report.m_TotalAvoidedPathCount)}. 총 벌금: {FormatMoney(report.m_TotalFineAmount)}\u20A1.\n" +
+                $"대중교통 전용차선: 위반율 {FormatViolationRate(report.m_PublicTransportLaneCount, report.m_TotalPathRequestCount)}, 억제 실패율 {FormatSuppressionFailureRate(report.m_PublicTransportLaneCount, report.m_PublicTransportLaneAvoidedEventCount)}, 벌금 {FormatMoney(report.m_PublicTransportLaneFineAmount)}\u20A1.\n" +
+                $"중앙선 침범: 위반율 {FormatViolationRate(report.m_MidBlockCrossingCount, report.m_TotalPathRequestCount)}, 억제 실패율 {FormatSuppressionFailureRate(report.m_MidBlockCrossingCount, report.m_MidBlockCrossingAvoidedEventCount)}, 벌금 {FormatMoney(report.m_MidBlockCrossingFineAmount)}\u20A1.\n" +
+                $"교차로 통행규칙 위반: 위반율 {FormatViolationRate(report.m_IntersectionMovementCount, report.m_TotalPathRequestCount)}, 억제 실패율 {FormatSuppressionFailureRate(report.m_IntersectionMovementCount, report.m_IntersectionMovementAvoidedEventCount)}, 벌금 {FormatMoney(report.m_IntersectionMovementFineAmount)}\u20A1.";
         }
 
         private static string FormatKoreanPeriodText(long monthTicks)
@@ -563,10 +562,10 @@ namespace Traffic_Law_Enforcement
         {
             return
                 FormatLocalizedText(kReportHeaderFormatLocaleId, "Traffic enforcement report for {0} to {1}: {2} violations.", FormatPeriodPoint(periodStartMonthTicks), FormatPeriodPoint(periodEndMonthTicks), report.TotalViolationCount) + "\n" +
-                FormatLocalizedText(kTotalLineFormatLocaleId, "Total: violation rate {0}, fines {1}\u20A1.", FormatViolationRate(report.TotalViolationCount, report.m_TotalAvoidedPathCount), FormatMoney(report.m_TotalFineAmount)) + "\n" +
-                FormatLocalizedText(kPublicTransportLaneLineFormatLocaleId, "PT-lane: violation rate {0}, fines {1}\u20A1.", FormatViolationRate(report.m_PublicTransportLaneCount, report.m_PublicTransportLaneAvoidedEventCount), FormatMoney(report.m_PublicTransportLaneFineAmount)) + "\n" +
-                FormatLocalizedText(kMidBlockLineFormatLocaleId, "Mid-block: violation rate {0}, fines {1}\u20A1.", FormatViolationRate(report.m_MidBlockCrossingCount, report.m_MidBlockCrossingAvoidedEventCount), FormatMoney(report.m_MidBlockCrossingFineAmount)) + "\n" +
-                FormatLocalizedText(kIntersectionLineFormatLocaleId, "Intersection: violation rate {0}, fines {1}\u20A1.", FormatViolationRate(report.m_IntersectionMovementCount, report.m_IntersectionMovementAvoidedEventCount), FormatMoney(report.m_IntersectionMovementFineAmount));
+                FormatLocalizedText(kTotalLineFormatLocaleId, "Total: violation rate {0}, suppression failure rate {1}, fines {2}\u20A1.", FormatViolationRate(report.TotalViolationCount, report.m_TotalPathRequestCount), FormatSuppressionFailureRate(report.TotalViolationCount, report.m_TotalAvoidedPathCount), FormatMoney(report.m_TotalFineAmount)) + "\n" +
+                FormatLocalizedText(kPublicTransportLaneLineFormatLocaleId, "PT-lane: violation rate {0}, suppression failure rate {1}, fines {2}\u20A1.", FormatViolationRate(report.m_PublicTransportLaneCount, report.m_TotalPathRequestCount), FormatSuppressionFailureRate(report.m_PublicTransportLaneCount, report.m_PublicTransportLaneAvoidedEventCount), FormatMoney(report.m_PublicTransportLaneFineAmount)) + "\n" +
+                FormatLocalizedText(kMidBlockLineFormatLocaleId, "Mid-block: violation rate {0}, suppression failure rate {1}, fines {2}\u20A1.", FormatViolationRate(report.m_MidBlockCrossingCount, report.m_TotalPathRequestCount), FormatSuppressionFailureRate(report.m_MidBlockCrossingCount, report.m_MidBlockCrossingAvoidedEventCount), FormatMoney(report.m_MidBlockCrossingFineAmount)) + "\n" +
+                FormatLocalizedText(kIntersectionLineFormatLocaleId, "Intersection: violation rate {0}, suppression failure rate {1}, fines {2}\u20A1.", FormatViolationRate(report.m_IntersectionMovementCount, report.m_TotalPathRequestCount), FormatSuppressionFailureRate(report.m_IntersectionMovementCount, report.m_IntersectionMovementAvoidedEventCount), FormatMoney(report.m_IntersectionMovementFineAmount));
         }
 
         private static string FormatPeriodPoint(long monthTicks)
@@ -584,13 +583,28 @@ namespace Traffic_Law_Enforcement
 
         private static string FormatViolationRate(int finedViolationCount, int avoidedPathCount)
         {
+            if (avoidedPathCount <= 0)
+            {
+                return FormatZeroPercent();
+            }
+
+            return (100d * finedViolationCount / avoidedPathCount).ToString("0.0", GetActiveCulture()) + "%";
+        }
+
+        private static string FormatSuppressionFailureRate(int finedViolationCount, int avoidedPathCount)
+        {
             int denominator = finedViolationCount + avoidedPathCount;
             if (denominator <= 0)
             {
-                return LocalizeText(kNoRateLocaleId, "n/a");
+                return FormatZeroPercent();
             }
 
             return (100d * finedViolationCount / denominator).ToString("0.0", GetActiveCulture()) + "%";
+        }
+
+        private static string FormatZeroPercent()
+        {
+            return 0d.ToString("0.0", GetActiveCulture()) + "%";
         }
 
         private static string FormatMoney(int amount)

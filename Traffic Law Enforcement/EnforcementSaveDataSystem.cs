@@ -8,7 +8,7 @@ namespace Traffic_Law_Enforcement
 {
     public class EnforcementSaveDataSystem : GameSystemBase, IDefaultSerializable, ISerializable, IPreDeserialize, IPostDeserialize
     {
-        private const int kSerializationVersion = 3;
+        private const int kSerializationVersion = 6;
 
         private EntityQuery m_StatisticsQuery;
         private EntityQuery m_PublicTransportLaneViolationQuery;
@@ -115,6 +115,7 @@ namespace Traffic_Law_Enforcement
             if (hasTrackingState)
             {
                 writer.Write(trackingState.m_MonthIndex);
+                writer.Write(trackingState.m_TotalPathRequestCount);
                 writer.Write(trackingState.m_PublicTransportLaneCount);
                 writer.Write(trackingState.m_MidBlockCrossingCount);
                 writer.Write(trackingState.m_IntersectionMovementCount);
@@ -133,6 +134,7 @@ namespace Traffic_Law_Enforcement
             foreach (MonthlyEnforcementReport report in reports)
             {
                 writer.Write(report.m_MonthIndex);
+                writer.Write(report.m_TotalPathRequestCount);
                 writer.Write(report.m_PublicTransportLaneCount);
                 writer.Write(report.m_MidBlockCrossingCount);
                 writer.Write(report.m_IntersectionMovementCount);
@@ -151,6 +153,7 @@ namespace Traffic_Law_Enforcement
             if (hasPolicyImpactTrackingState)
             {
                 writer.Write(policyImpactTrackingState.m_MonthIndex);
+                writer.Write(policyImpactTrackingState.m_TotalPathRequestCount);
                 writer.Write(policyImpactTrackingState.m_TotalActualPathCount);
                 writer.Write(policyImpactTrackingState.m_TotalAvoidedPathCount);
                 writer.Write(policyImpactTrackingState.m_TotalFineAmount);
@@ -166,6 +169,7 @@ namespace Traffic_Law_Enforcement
             }
 
             EnforcementPolicyImpactService.PersistentTotalsSnapshot totals = EnforcementPolicyImpactService.GetPersistentTotalsSnapshot();
+            writer.Write(totals.TotalPathRequestCount);
             writer.Write(totals.TotalActualPathCount);
             writer.Write(totals.TotalAvoidedPathCount);
             writer.Write(totals.TotalFineAmount);
@@ -178,18 +182,44 @@ namespace Traffic_Law_Enforcement
             writer.Write(totals.PublicTransportLaneAvoidedEventCount);
             writer.Write(totals.MidBlockCrossingAvoidedEventCount);
             writer.Write(totals.IntersectionMovementAvoidedEventCount);
+
+            IReadOnlyCollection<PathRequestEvent> pathRequestEvents = EnforcementPolicyImpactService.GetPathRequestEventSnapshot();
+            writer.Write(pathRequestEvents.Count);
+            foreach (PathRequestEvent entry in pathRequestEvents)
+            {
+                writer.Write(entry.TimestampMonthTicks);
+            }
+
+            IReadOnlyCollection<ActualViolationEvent> actualViolationEvents = EnforcementPolicyImpactService.GetActualViolationEventSnapshot();
+            writer.Write(actualViolationEvents.Count);
+            foreach (ActualViolationEvent entry in actualViolationEvents)
+            {
+                writer.Write(entry.TimestampMonthTicks);
+                writer.Write(entry.Kind);
+                writer.Write(entry.FineAmount);
+            }
+
+            IReadOnlyCollection<AvoidedRerouteEvent> avoidedRerouteEvents = EnforcementPolicyImpactService.GetAvoidedRerouteEventSnapshot();
+            writer.Write(avoidedRerouteEvents.Count);
+            foreach (AvoidedRerouteEvent entry in avoidedRerouteEvents)
+            {
+                writer.Write(entry.TimestampMonthTicks);
+                writer.Write(entry.AvoidedPublicTransportLanePenalty);
+                writer.Write(entry.AvoidedMidBlockPenalty);
+                writer.Write(entry.AvoidedIntersectionPenalty);
+            }
         }
 
         public void Deserialize<TReader>(TReader reader) where TReader : IReader
         {
             reader.Read(out int version);
-            if (version != kSerializationVersion)
+            if (version != 3 && version != 4 && version != 5 && version != kSerializationVersion)
             {
                 Mod.log.Info($"Unsupported enforcement save-data version {version}. Falling back to defaults.");
                 return;
             }
 
-            EnforcementGameplaySettingsState gameplaySettings = ReadGameplaySettings(reader);
+            EnforcementGameplaySettingsState gameplaySettings = ReadGameplaySettings(reader, version);
 
             TrafficLawEnforcementStatistics statistics = default;
             reader.Read(out statistics.m_PublicTransportLaneViolationCount);
@@ -242,11 +272,17 @@ namespace Traffic_Law_Enforcement
                 fineIncomeEvents.Add(new EnforcementBudgetUIService.FineIncomeEvent(timestampMonthTicks, amount, kind));
             }
 
+            bool migratedLegacyPathRequestTracking = version < 4;
             MonthlyEnforcementTrackingState? trackingState = null;
             reader.Read(out bool hasTrackingState);
             if (hasTrackingState)
             {
                 reader.Read(out long monthIndex);
+                int trackingTotalPathRequestCount = 0;
+                if (version >= 4)
+                {
+                    reader.Read(out trackingTotalPathRequestCount);
+                }
                 reader.Read(out int publicTransportLaneCount);
                 reader.Read(out int midBlockCrossingCount);
                 reader.Read(out int intersectionMovementCount);
@@ -260,6 +296,7 @@ namespace Traffic_Law_Enforcement
                 reader.Read(out int trackingIntersectionMovementAvoidedEventCount);
                 trackingState = new MonthlyEnforcementTrackingState(
                     monthIndex,
+                    trackingTotalPathRequestCount,
                     publicTransportLaneCount,
                     midBlockCrossingCount,
                     intersectionMovementCount,
@@ -271,6 +308,11 @@ namespace Traffic_Law_Enforcement
                     trackingPublicTransportLaneAvoidedEventCount,
                     trackingMidBlockCrossingAvoidedEventCount,
                     trackingIntersectionMovementAvoidedEventCount);
+
+                if (migratedLegacyPathRequestTracking || HasInconsistentPathRequestTracking(trackingState.Value.m_TotalPathRequestCount, trackingState.Value.m_PublicTransportLaneCount + trackingState.Value.m_MidBlockCrossingCount + trackingState.Value.m_IntersectionMovementCount, trackingState.Value.m_TotalAvoidedPathCount, trackingState.Value.m_TotalFineAmount))
+                {
+                    trackingState = null;
+                }
             }
 
             List<MonthlyEnforcementReport> reports = new List<MonthlyEnforcementReport>();
@@ -278,6 +320,11 @@ namespace Traffic_Law_Enforcement
             for (int index = 0; index < reportCount; index += 1)
             {
                 reader.Read(out long monthIndex);
+                int reportTotalPathRequestCount = 0;
+                if (version >= 4)
+                {
+                    reader.Read(out reportTotalPathRequestCount);
+                }
                 reader.Read(out int publicTransportLaneCount);
                 reader.Read(out int midBlockCrossingCount);
                 reader.Read(out int intersectionMovementCount);
@@ -291,6 +338,7 @@ namespace Traffic_Law_Enforcement
                 reader.Read(out int reportIntersectionMovementAvoidedEventCount);
                 reports.Add(new MonthlyEnforcementReport(
                     monthIndex,
+                    reportTotalPathRequestCount,
                     publicTransportLaneCount,
                     midBlockCrossingCount,
                     intersectionMovementCount,
@@ -305,6 +353,7 @@ namespace Traffic_Law_Enforcement
             }
 
             EnforcementPolicyImpactTrackingState? policyImpactTrackingState = null;
+            int totalPathRequestCount = 0;
             int totalActualPathCount = 0;
             int totalAvoidedPathCount = 0;
             int totalPolicyImpactFineAmount = 0;
@@ -322,6 +371,11 @@ namespace Traffic_Law_Enforcement
             if (hasPolicyImpactTrackingState)
             {
                 reader.Read(out long policyImpactMonthIndex);
+                int trackingTotalPathRequestCount = 0;
+                if (version >= 4)
+                {
+                    reader.Read(out trackingTotalPathRequestCount);
+                }
                 reader.Read(out int trackingTotalActualPathCount);
                 reader.Read(out int trackingTotalAvoidedPathCount);
                 reader.Read(out int trackingTotalFineAmount);
@@ -336,6 +390,7 @@ namespace Traffic_Law_Enforcement
                 reader.Read(out int trackingIntersectionMovementAvoidedEventCount);
                 policyImpactTrackingState = new EnforcementPolicyImpactTrackingState(
                     policyImpactMonthIndex,
+                    trackingTotalPathRequestCount,
                     trackingTotalActualPathCount,
                     trackingTotalAvoidedPathCount,
                     trackingTotalFineAmount,
@@ -348,8 +403,17 @@ namespace Traffic_Law_Enforcement
                     trackingPublicTransportLaneAvoidedEventCount,
                     trackingMidBlockCrossingAvoidedEventCount,
                     trackingIntersectionMovementAvoidedEventCount);
+
+                if (migratedLegacyPathRequestTracking || HasInconsistentPathRequestTracking(policyImpactTrackingState.Value.m_TotalPathRequestCount, policyImpactTrackingState.Value.m_TotalActualPathCount, policyImpactTrackingState.Value.m_TotalAvoidedPathCount, policyImpactTrackingState.Value.m_TotalFineAmount))
+                {
+                    policyImpactTrackingState = null;
+                }
             }
 
+            if (version >= 4)
+            {
+                reader.Read(out totalPathRequestCount);
+            }
             reader.Read(out totalActualPathCount);
             reader.Read(out totalAvoidedPathCount);
             reader.Read(out totalPolicyImpactFineAmount);
@@ -363,12 +427,45 @@ namespace Traffic_Law_Enforcement
             reader.Read(out midBlockCrossingAvoidedEventCount);
             reader.Read(out intersectionMovementAvoidedEventCount);
 
+            List<PathRequestEvent> pathRequestEvents = new List<PathRequestEvent>();
+            List<ActualViolationEvent> actualViolationEvents = new List<ActualViolationEvent>();
+            List<AvoidedRerouteEvent> avoidedRerouteEvents = new List<AvoidedRerouteEvent>();
+            if (version >= 5)
+            {
+                reader.Read(out int pathRequestEventCount);
+                for (int index = 0; index < pathRequestEventCount; index += 1)
+                {
+                    reader.Read(out long timestampMonthTicks);
+                    pathRequestEvents.Add(new PathRequestEvent(timestampMonthTicks));
+                }
+
+                reader.Read(out int actualViolationEventCount);
+                for (int index = 0; index < actualViolationEventCount; index += 1)
+                {
+                    reader.Read(out long timestampMonthTicks);
+                    reader.Read(out string kind);
+                    reader.Read(out int fineAmount);
+                    actualViolationEvents.Add(new ActualViolationEvent(timestampMonthTicks, kind, fineAmount));
+                }
+
+                reader.Read(out int avoidedRerouteEventCount);
+                for (int index = 0; index < avoidedRerouteEventCount; index += 1)
+                {
+                    reader.Read(out long timestampMonthTicks);
+                    reader.Read(out bool avoidedPublicTransportLanePenalty);
+                    reader.Read(out bool avoidedMidBlockPenalty);
+                    reader.Read(out bool avoidedIntersectionPenalty);
+                    avoidedRerouteEvents.Add(new AvoidedRerouteEvent(timestampMonthTicks, avoidedPublicTransportLanePenalty, avoidedMidBlockPenalty, avoidedIntersectionPenalty));
+                }
+            }
+
             EnforcementGameplaySettingsService.Apply(gameplaySettings);
             EnforcementTelemetry.LoadPersistentData(statistics, totalFineAmount, vehicleFineTotals, vehicleViolationCounts, records, timestamps);
             EnforcementBudgetUIService.LoadPersistentData(fineIncomeEvents);
             MonthlyEnforcementChirperService.LoadPersistentData(trackingState, reports);
             EnforcementPolicyImpactService.LoadPersistentData(
                 policyImpactTrackingState,
+                totalPathRequestCount,
                 totalActualPathCount,
                 totalAvoidedPathCount,
                 totalPolicyImpactFineAmount,
@@ -380,7 +477,10 @@ namespace Traffic_Law_Enforcement
                 intersectionMovementFineAmount,
                 publicTransportLaneAvoidedEventCount,
                 midBlockCrossingAvoidedEventCount,
-                intersectionMovementAvoidedEventCount);
+                intersectionMovementAvoidedEventCount,
+                pathRequestEvents,
+                actualViolationEvents,
+                avoidedRerouteEvents);
 
             m_HasDeserializedData = true;
             m_ShouldClearLegacyRuntimeState = false;
@@ -442,9 +542,16 @@ namespace Traffic_Law_Enforcement
             EnforcementFineMoneyService.ClearPendingCharges();
         }
 
+        private static bool HasInconsistentPathRequestTracking(int totalPathRequestCount, int totalViolationCount, int totalAvoidedPathCount, int totalFineAmount)
+        {
+            return totalPathRequestCount <= 0 && (totalViolationCount > 0 || totalAvoidedPathCount > 0 || totalFineAmount > 0);
+        }
+
         private static void WriteGameplaySettings<TWriter>(TWriter writer, EnforcementGameplaySettingsState state) where TWriter : IWriter
         {
-            writer.Write(state.EnableEnforcement);
+            writer.Write(state.EnablePublicTransportLaneEnforcement);
+            writer.Write(state.EnableMidBlockCrossingEnforcement);
+            writer.Write(state.EnableIntersectionMovementEnforcement);
             writer.Write(state.AllowRoadPublicTransportVehicles);
             writer.Write(state.AllowTaxis);
             writer.Write(state.AllowPoliceCars);
@@ -479,10 +586,23 @@ namespace Traffic_Law_Enforcement
             writer.Write(state.IntersectionMovementRepeatMultiplierPercent);
         }
 
-        private static EnforcementGameplaySettingsState ReadGameplaySettings<TReader>(TReader reader) where TReader : IReader
+        private static EnforcementGameplaySettingsState ReadGameplaySettings<TReader>(TReader reader, int version) where TReader : IReader
         {
             EnforcementGameplaySettingsState state = default;
-            reader.Read(out state.EnableEnforcement);
+            if (version >= 6)
+            {
+                reader.Read(out state.EnablePublicTransportLaneEnforcement);
+                reader.Read(out state.EnableMidBlockCrossingEnforcement);
+                reader.Read(out state.EnableIntersectionMovementEnforcement);
+            }
+            else
+            {
+                reader.Read(out bool enableEnforcement);
+                state.EnablePublicTransportLaneEnforcement = enableEnforcement;
+                state.EnableMidBlockCrossingEnforcement = enableEnforcement;
+                state.EnableIntersectionMovementEnforcement = enableEnforcement;
+            }
+
             reader.Read(out state.AllowRoadPublicTransportVehicles);
             reader.Read(out state.AllowTaxis);
             reader.Read(out state.AllowPoliceCars);

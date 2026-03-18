@@ -61,7 +61,7 @@ namespace Traffic_Law_Enforcement
         {
             EnforcementGameplaySettingsState settings = EnforcementGameplaySettingsService.Current;
 
-            bool enforcementEnabled = Mod.IsEnforcementEnabled;
+            bool enforcementEnabled = Mod.IsPublicTransportLaneEnforcementEnabled;
             if (!enforcementEnabled)
             {
                 if (!m_ViolationQuery.IsEmptyIgnoreFilter)
