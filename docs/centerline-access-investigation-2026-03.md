@@ -92,13 +92,13 @@ Important observed behavior:
 
 This makes it a strong hook for invalidating bad planned routes before the vehicle completes the maneuver.
 
-### 5. The mod now patches `ValidateParkingSpace` for illegal planned parking ingress
+### 5. Planned: patch `ValidateParkingSpace` for illegal planned parking ingress
 
-Relevant mod code:
+Planned mod code (design only; not yet implemented in the current `Traffic Law Enforcement` sources as of 2026‑03):
 
-- [Traffic Law Enforcement/VehicleUtilsPatches.cs](../Traffic%20Law%20Enforcement/VehicleUtilsPatches.cs)
+- (planned) [Traffic Law Enforcement/VehicleUtilsPatches.cs](../Traffic%20Law%20Enforcement/VehicleUtilsPatches.cs)
 
-The current patch now marks the route obsolete when all of the following are true:
+A future patch is intended to mark the route obsolete when all of the following are true:
 
 - the planned route includes a future parking-target lane,
 - the approach lane is a road edge/car lane,
@@ -108,7 +108,7 @@ The current patch now marks the route obsolete when all of the following are tru
   - a garage lane,
   - a parking-flagged connection lane.
 
-This means the current build can now invalidate some illegal planned center-line crossings before execution.
+If implemented, this would allow the mod to invalidate some illegal planned center-line crossings before execution, instead of reacting only after an illegal transition occurs.
 
 ### 6. Generic service-building access does appear in planned navigation, but not as `ParkingSpace`
 
