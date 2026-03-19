@@ -2,7 +2,7 @@
 
 ## Description
 
-This is a traffic law enforcement mod for Cities: Skylines II. It detects and penalizes unauthorized use of public transport lanes, mid-block median crossing (new), and intersection direction violations. Fine revenue is reflected in the budget UI. The mod includes repeat violation weighting, monthly reports, debug UI, and persistent save data.
+This is a traffic law enforcement mod for Cities: Skylines II. It detects and penalizes unauthorized use of public transport lanes, mid-block median crossing, and intersection direction violations. Fine revenue is reflected in the budget UI. The mod includes repeat violation weighting, monthly reports, debug UI, and persistent save data.
 
 ### Key Features
 
@@ -78,7 +78,7 @@ Follows Paradox Mods license policy.
 
 ## 한국어 설명
 
-Cities: Skylines II용 교통 법규 단속 모드입니다. 대중교통 전용 차로 무단 주행, 도로 중간 중앙선 횡단(신규), 교차로 진입 방향 위반을 감지하고 벌금을 부과합니다. 벌금 수입은 예산 UI에 반영되며, 반복 위반 가중치, 월간 리포트, 디버그 UI, 저장 데이터 유지 기능도 포함합니다.
+Cities: Skylines II용 교통 법규 단속 모드입니다. 대중교통 전용 차로 무단 주행, 도로 중간 중앙선 횡단, 교차로 진입 방향 위반을 감지하고 벌금을 부과합니다. 벌금 수입은 예산 UI에 반영되며, 반복 위반 가중치, 월간 리포트, 디버그 UI, 저장 데이터 유지 기능도 포함합니다.
 
 ### 주요 기능
 
