@@ -1,27 +1,139 @@
 ﻿<Publish>
 	<!--Id must be set in order to update existed mod. it is not required for publishing mod for the first time-->
-	<ModId Value="" />
+	<ModId Value="138258" />
 	<!--Name of the mod to display to players-->
-	<DisplayName Value="Traffic_Law_Enforcement" />
+	<DisplayName Value="[BETA] Traffic Law Enforcement" />
 	<!--Short description of the mod-->
-	<ShortDescription Value="Makes law enforcement to traffic offenders available." />
+	<ShortDescription Value="Penalizes traffic offenders and encourages drivers to comply with traffic laws." />
 	<!--Long description of the mod. Single line or multi line. Supports minimal markdown subset-->
 	<!--LongDescription Value="This mod enforces traffic laws by penalizing, 1. U-turning at the midst of road, 2. improper lane usage at intersections, 3. private vehicles' using public transport lanes, 4. blocking intersections. More violation types will be added in future updates." /-->
-	<LongDescription>
-This mod enforces traffic laws by penalizing, 1. U-turning at the midst of road, 2. improper lane usage at intersections, 3. private vehicles' using public transport lanes, 4. blocking intersections. More violation types will be added in future updates.
-	</LongDescription>
+<LongDescription>
+My first CSL2 mod, created with extensive help from GPT-5.4 in Visual Studio Code.
+
+Visual Studio Code의 GPT-5.4에게서 많은 도움을 받아 만든 저의 첫 번째 시스카2 모드입니다.
+
+## Language Info
+
+Version 1.0.0 supports English and Korean.
+
+1.0.0 기준 영어와 한국어를 지원합니다.
+
+## English Introduction
+
+### 1. Main Features
+
+As of version 1.0.0, this mod discourages drivers from committing the following three types of traffic law violations by imposing fines and increasing the cost of the affected routes.
+
+- **Illegal center line crossing:** Making a U-turn where U-turns are not permitted; crossing the center line to enter a parking lot or service building on the opposite side of the road; and crossing the center line when leaving such a building to enter a lane on the opposite side.
+- **Intersection rule violations:** Traveling in a direction that is not permitted at an intersection. (Example: making a left turn from a lane where left turns are not allowed.)
+- **PT lane violations:** Using a PT (public transport) lane with a vehicle that is not permitted to enter PT lanes.
+
+Repeat offenders are subject to higher fines.
+
+(The criteria for determining how many violations within what period make someone a repeat offender can be configured in the mod settings window.)
+
+In addition, if a vehicle that is not permitted to enter PT lanes is found in a PT lane, that vehicle will recalculate its route at regular intervals.
+
+(Default: 0.01 in-game days)
+
+### 2. Interface
+
+Fine revenue can be viewed in the Budget panel.
+
+Once per in-game month, and also when the corresponding button is pressed in the mod options, a Chirper message reports the traffic enforcement results from the past month.
+
+### 3. Mod Option Settings
+
+The following options can be configured either for the currently loaded save file or for all future save files to which this mod will be applied.
+
+- Whether to enforce each type of traffic law violation
+- Whether each vehicle type is allowed to enter PT lanes
+- How often a vehicle that is not permitted to enter PT lanes should recalculate its route after entering a PT lane
+- The fine amount for each type of traffic law violation
+- The repeat offender threshold for the same type of traffic law violation within a certain period
+
+### 4. Technical Implementation Notes
+
+- This mod does not completely prevent traffic law violations. Instead, it works by applying penalties to routes that would involve such violations.
+- I coded the mod so that traffic law enforcement records are stored in each save file, but this feature has not yet been thoroughly tested.
+- Because the mod works by monitoring traffic that is expected to violate traffic laws and applying penalties accordingly, it may cause performance degradation.
+- I coded the mod so that the budget of the household or company that owns a fined vehicle is actually reduced. However, due to my limited development experience, I have not been able to thoroughly verify whether this is fully reflected in practice.
+
+### 5. Desired Improvements and Additional Features
+
+- I wanted to penalize drivers who stop in intersections, but I could not implement that feature because of my limited coding skills.
+- I would like serious habitual traffic offenders to face harsher penalties, such as having their driver's licenses suspended or revoked, or even being sent to jail, but I could not implement that either because of my limited coding skills.
+
+## 한국어 설명
+
+### 1. 주요 기능
+
+1.0.0 기준 이 모드는 다음의 3가지 교통법규 위반 행위에 대해서 벌금을 부과하고 해당 경로의 비용을 증가시킴으로써, 운전자들이 그러한 행위를 꺼리게 만듭니다.
+
+- **불법 중앙선 침입:** U턴이 허가되지 않은 곳에서 U턴을 하는 행위, 중앙선 반대편에 있는 주차장 또는 서비스 건물을 이용하기 위해 중앙선을 넘어 진입하는 행위, 그리고 그러한 건물에서 나오는 차량이 중앙선을 넘어 반대편 차선으로 진입하는 행위
+- **교차로 통행규칙 위반:** 교차로에서 허가되지 않은 방향으로 통행하는 행위 (예: 좌회전이 허가되지 않은 차선에서 좌회전하는 행위)
+- **대중교통 전용차선 침범:** 대중교통 전용차선 진입이 허가되지 않은 차량이 대중교통 전용차선을 이용하는 행위
+
+상습범의 경우 더 높은 액수의 벌금을 부과받습니다.
+
+(얼마의 기간 동안 몇 번 이상 교통법규를 위반한 자를 상습범으로 볼지는 모드 설정 창에서 설정할 수 있습니다.)
+
+또한, 대중교통 전용차선 진입이 허가되지 않은 차량이 대중교통 전용차선에 진입해 있을 경우, 일정 시간마다 해당 차량이 경로를 재설정하게 됩니다.
+
+(기본값: 인게임 0.01일)
+
+### 2. 인터페이스
+
+예산 창에서 벌금 수익을 볼 수 있습니다.
+
+게임 시간 1달에 1번씩, 그리고 모드 옵션에서 해당 버튼을 눌렀을 때 Chirper 메시지로 최근 1달간의 교통 단속 실적을 알려줍니다.
+
+### 3. 모드 옵션 설정
+
+다음의 옵션을 현재 로드한 세이브파일에 대해, 또는 앞으로 새로 이 모드를 적용할 모든 세이브파일에 대해 설정할 수 있습니다.
+
+- 각 종류의 교통법규 위반 행위를 단속할지 여부
+- 차량 종류별로 대중교통 전용차선 진입을 허가할지 여부
+- 대중교통 전용차선 진입이 허가되지 않은 차량이 대중교통 전용차선에 진입했을 때 얼마의 주기로 경로를 재설정할지
+- 각 종류의 교통법규 위반 행위에 부과되는 벌금 액수
+- 일정 기간 동안 같은 종류의 교통법규를 몇 번 위반했을 때 상습범으로 분류할지에 대한 기준
+
+### 4. 기술적 구현 사항
+
+- 이 모드는 교통법규 위반을 완벽히 막아주는 것이 아니라, 교통법규 위반에 해당하는 경로를 설정하는 데 페널티를 부과하는 방식으로 작동합니다.
+- 교통법규 위반 단속 실적은 각 세이브파일에 저장되도록 코딩했지만, 아직 충분히 테스트되지는 않았습니다.
+- 교통법규 위반이 예상되는 교통량을 감시하여 페널티를 부과하는 방식이기 때문에, 성능 저하가 발생할 수 있습니다.
+- 벌금이 부과된 차량을 소유한 가구 또는 업체의 예산이 실제로 줄어들도록 코딩했지만, 실제로 그 예산 감소가 충분히 반영되는지는 아직 철저하게 검증하지 못했습니다.
+
+### 5. 추가적으로 개선하거나 구현하고 싶은 사항
+
+- 교차로 안에서 정차하는 운전자들도 단속하도록 만들고 싶었지만, 제 코딩 실력이 부족해서 그 기능은 구현하지 못했습니다.
+- 심각한 상습 교통법규 위반자들에게는 더욱 강한 처벌(예: 운전면허 정지 또는 취소, 교도소 수감)을 적용하고 싶었지만, 그 기능 역시 제 코딩 실력이 부족해서 구현하지 못했습니다.
+
+## Special Thanks
+
+[AnotherFireFox](https://mods.paradoxplaza.com/authors/AnotherFireFox), who taught me how to make a CSL2 mod from start to finish.
+</LongDescription>
 	<!--Thumbnail-->
-	<Thumbnail Value="Properties/Thumbnail.png" />
+	<Thumbnail Value="Properties/Thumbnail.jpg" />
 	<!--Screenshot, can be set multiple times-->
-	<Screenshot Value="" />
+	<Screenshot Value="Properties/Screenshots/01" />
+	<Screenshot Value="Properties/Screenshots/02" />
+	<Screenshot Value="Properties/Screenshots/03" />
+	<Screenshot Value="Properties/Screenshots/04" />
+	<Screenshot Value="Properties/Screenshots/05" />
+	<Screenshot Value="Properties/Screenshots/06" />
+	<Screenshot Value="Properties/Screenshots/07" />
+	<Screenshot Value="Properties/Screenshots/08" />
+	<Screenshot Value="Properties/Screenshots/09" />
 	<!--Tag, can be set multiple times-->
 	<Tag Value="" />
 	<!--Link to the forum post where the mod can be discussed-->
-	<ForumLink Value="" />
+	<ForumLink Value="https://forum.paradoxplaza.com/forum/threads/traffic-law-enforcement.1909882/" />
 	<!--Version of the mod-->
-	<ModVersion Value="1.0" />
+	<ModVersion Value="1.0.0" />
 	<!--Recommended version of the base game to use the mod-->
-	<GameVersion Value="1.0.*" />
+	<GameVersion Value="1.5.6f1" />
 	<!--Dependency for the mod, can be set multiple times-->
 	<Dependency Id="" />
 	<!--Required DLC, can be set multiple times. Supported values are "Landmark Buildings", "San Fransisco Set", "Beach Properties", "Urban Promenades", "Modern Architecture"-->
@@ -31,7 +143,11 @@ This mod enforces traffic laws by penalizing, 1. U-turning at the midst of road,
 	<!--<ChangeLog>
 	</ChangeLog>-->
 	<!--External link, can be set multiple times. supported types are "discord", "github", "youtube", "twitch", "x", "paypal", "patreon", "buymeacoffee", "kofi", "crowdin", "gitlab", "gofundme"-->
-	<ExternalLink Type="" Url="" />
+	<ExternalLink Type="github" Url="https://github.com/lokasenna9312/Traffic-Law-Enforcement/" />
+	<ExternalLink Type="discord" Url="https://discord.com/channels/1024242828114673724/1484043147662069851" />
+	<ExternalLink Type="kofi" Url="https://ko-fi.com/pecuts_solentis" />
+	<ExternalLink Type="patreon" Url="https://www.patreon.com/c/PectusSolentis" />
+	<ExternalLink Type="paypal" Url="https://www.paypal.com/donate?hosted_button_id=XXXXXXXXXXXX" />
 	<!--Supported values Public, Private, Unlisted-->
 	<AccessLevel Value="Public" />
 </Publish>

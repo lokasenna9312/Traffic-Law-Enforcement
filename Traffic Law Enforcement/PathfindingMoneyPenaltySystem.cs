@@ -34,7 +34,7 @@ namespace Traffic_Law_Enforcement
         }
     }
 
-    public class PathfindingMoneyPenaltySystem : GameSystemBase
+    public partial class PathfindingMoneyPenaltySystem : GameSystemBase
     {
         private EntityQuery m_PathfindCarDataQuery;
         private EntityQuery m_UncachedPathfindCarDataQuery;

@@ -7,7 +7,7 @@ using Entity = Unity.Entities.Entity;
 
 namespace Traffic_Law_Enforcement
 {
-    public class VehicleLaneHistorySystem : GameSystemBase
+    public partial class VehicleLaneHistorySystem : GameSystemBase
     {
         private EntityQuery m_CarQuery;
         private EntityQuery m_NewCarQuery;

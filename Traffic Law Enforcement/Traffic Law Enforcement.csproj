@@ -1,4 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
+	<PropertyGroup>
+		<NeedBuild Condition="'$(NeedBuild)' == ''">true</NeedBuild>
+	</PropertyGroup>
 
 	<PropertyGroup>
 		<Configurations>Debug;Release</Configurations>
@@ -9,59 +12,85 @@
 		<PublishConfigurationPath>Properties\PublishConfiguration.xml</PublishConfigurationPath>
 		<CsiiToolPath>$([System.Environment]::GetEnvironmentVariable('CSII_TOOLPATH'))</CsiiToolPath>
 		<CsiiToolPath Condition="'$(CsiiToolPath)' == ''">$([System.Environment]::GetEnvironmentVariable('CSII_TOOLPATH', 'EnvironmentVariableTarget.User'))</CsiiToolPath>
+		<ModPropsFile>$(CsiiToolPath)\Mod.props</ModPropsFile>
+		<ModTargetsFile>$(CsiiToolPath)\Mod.targets</ModTargetsFile>
+
+		<!-- Path to the text file containing your Paradox account credentials -->
+		<PDXAccountDataPath>$(MSBuildProjectDirectory)\.local\pdx_account.txt</PDXAccountDataPath>
+	</PropertyGroup>
+
+	<PropertyGroup>
+		<ModJsonAuthorResolved Condition="'$(ModJsonAuthorFromPublishMetadata)' != ''">$(ModJsonAuthorFromPublishMetadata)</ModJsonAuthorResolved>
+		<ModJsonAuthorResolved Condition="'$(ModJsonAuthorFromPublishMetadata)' == ''">Pectus Solentis</ModJsonAuthorResolved>
 	</PropertyGroup>
 	
-	<!--Imports must be after PropertyGroup block-->
-	<Import Project="$(CsiiToolPath)\Mod.props" />
-	<Import Project="$(CsiiToolPath)\Mod.targets" />
+	<!-- CS2 modding toolchain imports -->
+	<Import Project="$(ModPropsFile)" Condition="Exists('$(ModPropsFile)')" />
+	<Import Project="$(ModTargetsFile)" Condition="Exists('$(ModTargetsFile)')" />
 
 	<ItemGroup>
 		<Reference Include="Game">
+			<HintPath>C:\Program Files (x86)\Steam\steamapps\common\Cities Skylines II\Cities2_Data\Managed\Game.dll</HintPath>
 			<Private>false</Private>
 		</Reference>
 		<Reference Include="Colossal.Core">
+			<HintPath>C:\Program Files (x86)\Steam\steamapps\common\Cities Skylines II\Cities2_Data\Managed\Colossal.Core.dll</HintPath>
 			<Private>false</Private>
 		</Reference>
 		<Reference Include="Colossal.Logging">
+			<HintPath>C:\Program Files (x86)\Steam\steamapps\common\Cities Skylines II\Cities2_Data\Managed\Colossal.Logging.dll</HintPath>
 			<Private>false</Private>
 		</Reference>
 		<Reference Include="Colossal.IO.AssetDatabase">
+			<HintPath>C:\Program Files (x86)\Steam\steamapps\common\Cities Skylines II\Cities2_Data\Managed\Colossal.IO.AssetDatabase.dll</HintPath>
 			<Private>false</Private>
 		</Reference>
 		<Reference Include="Colossal.UI">
+			<HintPath>C:\Program Files (x86)\Steam\steamapps\common\Cities Skylines II\Cities2_Data\Managed\Colossal.UI.dll</HintPath>
 			<Private>false</Private>
 		</Reference>
 		<Reference Include="Colossal.UI.Binding">
+			<HintPath>C:\Program Files (x86)\Steam\steamapps\common\Cities Skylines II\Cities2_Data\Managed\Colossal.UI.Binding.dll</HintPath>
 			<Private>false</Private>
 		</Reference>
 		<Reference Include="Colossal.Localization">
+			<HintPath>C:\Program Files (x86)\Steam\steamapps\common\Cities Skylines II\Cities2_Data\Managed\Colossal.Localization.dll</HintPath>
 			<Private>false</Private>
 		</Reference>
 		<Reference Include="Colossal.Mathematics">
+			<HintPath>C:\Program Files (x86)\Steam\steamapps\common\Cities Skylines II\Cities2_Data\Managed\Colossal.Mathematics.dll</HintPath>
 			<Private>false</Private>
 		</Reference>
 		<Reference Include="Colossal.PSI.Common">
+			<HintPath>C:\Program Files (x86)\Steam\steamapps\common\Cities Skylines II\Cities2_Data\Managed\Colossal.PSI.Common.dll</HintPath>
 			<Private>false</Private>
 		</Reference>
 		<Reference Include="Unity.InputSystem">
+			<HintPath>C:\Program Files (x86)\Steam\steamapps\common\Cities Skylines II\Cities2_Data\Managed\Unity.InputSystem.dll</HintPath>
 			<Private>false</Private>
 		</Reference>
 		<Reference Include="UnityEngine.CoreModule">
+			<HintPath>C:\Program Files (x86)\Steam\steamapps\common\Cities Skylines II\Cities2_Data\Managed\UnityEngine.CoreModule.dll</HintPath>
 			<Private>false</Private>
 		</Reference>
 		<Reference Include="Unity.RenderPipelines.Core.Runtime">
+			<HintPath>C:\Program Files (x86)\Steam\steamapps\common\Cities Skylines II\Cities2_Data\Managed\Unity.RenderPipelines.Core.Runtime.dll</HintPath>
 			<Private>false</Private>
 		</Reference>
 		<Reference Include="Unity.Burst">
+			<HintPath>C:\Program Files (x86)\Steam\steamapps\common\Cities Skylines II\Cities2_Data\Managed\Unity.Burst.dll</HintPath>
 			<Private>false</Private>
 		</Reference>
 		<Reference Include="Unity.Collections">
+			<HintPath>C:\Program Files (x86)\Steam\steamapps\common\Cities Skylines II\Cities2_Data\Managed\Unity.Collections.dll</HintPath>
 			<Private>false</Private>
 		</Reference>
 		<Reference Include="Unity.Entities">
+			<HintPath>C:\Program Files (x86)\Steam\steamapps\common\Cities Skylines II\Cities2_Data\Managed\Unity.Entities.dll</HintPath>
 			<Private>false</Private>
 		</Reference>
 		<Reference Include="Unity.Mathematics">
+			<HintPath>C:\Program Files (x86)\Steam\steamapps\common\Cities Skylines II\Cities2_Data\Managed\Unity.Mathematics.dll</HintPath>
 			<Private>false</Private>
 		</Reference>
 	</ItemGroup>
@@ -91,6 +120,40 @@
 	</ItemGroup>
 
 	<Target Name="CheckEntityPackagePath" Condition="Exists('$(EntityPackagePath)')" />
+
+	<Target Name="GenerateModJson" AfterTargets="AfterBuild" Condition="'$(NeedBuild)'">
+		<PropertyGroup>
+			<PublishConfigurationFullPathForBuild Condition="'$(PublishConfigurationPath)' != ''">$([System.IO.Path]::GetFullPath('$(PublishConfigurationPath)'))</PublishConfigurationFullPathForBuild>
+			<PublishConfigurationFullPathForBuild Condition="'$(PublishConfigurationPath)' == ''">$([System.IO.Path]::GetFullPath('Properties\PublishConfiguration.xml'))</PublishConfigurationFullPathForBuild>
+			<ModJsonOutputPath>$(OutDir)mod.json</ModJsonOutputPath>
+		</PropertyGroup>
+
+		<XmlPeek XmlInputPath="$(PublishConfigurationFullPathForBuild)" Query="/Publish/ModId/@Value">
+			<Output TaskParameter="Result" PropertyName="ModJsonId" />
+		</XmlPeek>
+		<XmlPeek XmlInputPath="$(PublishConfigurationFullPathForBuild)" Query="/Publish/ModVersion/@Value">
+			<Output TaskParameter="Result" PropertyName="ModJsonVersion" />
+		</XmlPeek>
+		<XmlPeek XmlInputPath="$(PublishConfigurationFullPathForBuild)" Query="/Publish/ModJsonAuthor/@Value">
+			<Output TaskParameter="Result" PropertyName="ModJsonAuthorFromPublishMetadata" />
+		</XmlPeek>
+
+		<PropertyGroup>
+			<ModJsonAuthorResolved Condition="'$(ModJsonAuthorFromPublishMetadata)' != ''">$(ModJsonAuthorFromPublishMetadata)</ModJsonAuthorResolved>
+			<ModJsonAuthorResolved Condition="'$(ModJsonAuthorFromPublishMetadata)' == ''">Pectus Solentis</ModJsonAuthorResolved>
+		</PropertyGroup>
+
+		<ItemGroup>
+			<ModJsonLines Include="{" />
+			<ModJsonLines Include="    &quot;id&quot;: &quot;$(ModJsonId)&quot;," />
+			<ModJsonLines Include="    &quot;author&quot;: &quot;$(ModJsonAuthorResolved)&quot;," />
+			<ModJsonLines Include="    &quot;version&quot;: &quot;$(ModJsonVersion)&quot;," />
+			<ModJsonLines Include="    &quot;dependencies&quot;: []" />
+			<ModJsonLines Include="}" />
+		</ItemGroup>
+
+		<WriteLinesToFile File="$(ModJsonOutputPath)" Lines="@(ModJsonLines)" Overwrite="true" />
+	</Target>
 
 	<Target Name="RunModPostProcessor" AfterTargets="AfterBuild" Condition="'$(NeedBuild)' and '$(EnableCsiiPostProcessor)' == 'true'">
 		<Error Condition="!Exists('$(ModPostProcessorFullPath)')" Text="Post processor not found, please check the path: $(ModPostProcessorFullPath)" />

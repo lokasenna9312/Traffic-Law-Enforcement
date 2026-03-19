@@ -12,7 +12,7 @@ using PrefabSystem = Game.Prefabs.PrefabSystem;
 
 namespace Traffic_Law_Enforcement
 {
-    public class CenterlineAccessObsoleteSystem : GameSystemBase
+    public partial class CenterlineAccessObsoleteSystem : GameSystemBase
     {
         private const int MaxStructureSampleLogs = 64;
         private const int ContextSummaryLogInterval = 512;
