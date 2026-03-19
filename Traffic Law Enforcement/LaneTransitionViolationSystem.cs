@@ -7,7 +7,7 @@ using Entity = Unity.Entities.Entity;
 
 namespace Traffic_Law_Enforcement
 {
-    public class LaneTransitionViolationSystem : GameSystemBase
+    public partial class LaneTransitionViolationSystem : GameSystemBase
     {
         private EntityQuery m_CarQuery;
         private EntityQuery m_ChangedTransitionQuery;
@@ -21,172 +21,75 @@ namespace Traffic_Law_Enforcement
         private ComponentLookup<ConnectionLane> m_ConnectionLaneData;
         private ComponentLookup<LaneTransitionAnalysisState> m_AnalysisStateData;
 
-        public void OnCreate(ref SystemState state)
+        protected override void OnCreate()
         {
-            m_CarQuery = state.GetEntityQuery(
+            base.OnCreate();
+            m_CarQuery = GetEntityQuery(
                 ComponentType.ReadOnly<Car>(),
                 ComponentType.ReadOnly<CarCurrentLane>(),
                 ComponentType.ReadOnly<VehicleLaneHistory>());
-            m_ChangedTransitionQuery = state.GetEntityQuery(
+            m_ChangedTransitionQuery = GetEntityQuery(
                 ComponentType.ReadOnly<Car>(),
                 ComponentType.ReadOnly<CarCurrentLane>(),
                 ComponentType.ReadOnly<VehicleLaneHistory>());
             m_ChangedTransitionQuery.SetChangedVersionFilter(ComponentType.ReadOnly<VehicleLaneHistory>());
-            m_StatisticsQuery = state.GetEntityQuery(ComponentType.ReadWrite<TrafficLawEnforcementStatistics>());
+            m_StatisticsQuery = GetEntityQuery(ComponentType.ReadWrite<TrafficLawEnforcementStatistics>());
             if (m_StatisticsQuery.IsEmptyIgnoreFilter)
             {
-                m_StatisticsEntity = state.EntityManager.CreateEntity();
-                state.EntityManager.AddComponentData(m_StatisticsEntity, default(TrafficLawEnforcementStatistics));
+                m_StatisticsEntity = EntityManager.CreateEntity();
+                EntityManager.AddComponentData(m_StatisticsEntity, default(TrafficLawEnforcementStatistics));
             }
             else
             {
                 m_StatisticsEntity = m_StatisticsQuery.GetSingletonEntity();
             }
-            m_CarData = state.GetComponentLookup<Car>(true);
-            m_CarLaneData = state.GetComponentLookup<CarLane>(true);
-            m_EdgeLaneData = state.GetComponentLookup<EdgeLane>(true);
-            m_ParkingLaneData = state.GetComponentLookup<ParkingLane>(true);
-            m_GarageLaneData = state.GetComponentLookup<GarageLane>(true);
-            m_ConnectionLaneData = state.GetComponentLookup<ConnectionLane>(true);
-            m_AnalysisStateData = state.GetComponentLookup<LaneTransitionAnalysisState>();
-            state.RequireForUpdate(m_CarQuery);
+            m_CarData = GetComponentLookup<Car>(true);
+            m_CarLaneData = GetComponentLookup<CarLane>(true);
+            m_EdgeLaneData = GetComponentLookup<EdgeLane>(true);
+            m_ParkingLaneData = GetComponentLookup<ParkingLane>(true);
+            m_GarageLaneData = GetComponentLookup<GarageLane>(true);
+            m_ConnectionLaneData = GetComponentLookup<ConnectionLane>(true);
+            m_AnalysisStateData = GetComponentLookup<LaneTransitionAnalysisState>();
+            RequireForUpdate(m_CarQuery);
         }
 
-        [BurstCompile]
-        public void OnUpdate(ref SystemState state)
+        protected override void OnUpdate()
         {
-            m_CarData.Update(state);
-            m_CarLaneData.Update(state);
-            m_EdgeLaneData.Update(state);
-            m_ParkingLaneData.Update(state);
-            m_GarageLaneData.Update(state);
-            m_ConnectionLaneData.Update(state);
-            m_AnalysisStateData.Update(state);
+            m_CarData.Update(this);
+            m_CarLaneData.Update(this);
+            m_EdgeLaneData.Update(this);
+            m_ParkingLaneData.Update(this);
+            m_GarageLaneData.Update(this);
+            m_ConnectionLaneData.Update(this);
+            m_AnalysisStateData.Update(this);
 
-            var ecb = new EntityCommandBuffer(Allocator.Temp);
-            var eventBuffer = new NativeList<TransitionViolationEvent>(Allocator.Temp);
+            NativeArray<Entity> vehicles = m_ChangedTransitionQuery.ToEntityArray(Allocator.Temp);
+            NativeArray<CarCurrentLane> currentLanes = m_ChangedTransitionQuery.ToComponentDataArray<CarCurrentLane>(Allocator.Temp);
+            NativeArray<VehicleLaneHistory> histories = m_ChangedTransitionQuery.ToComponentDataArray<VehicleLaneHistory>(Allocator.Temp);
 
-            bool midBlockEnabled = Mod.IsMidBlockCrossingEnforcementEnabled;
-            bool intersectionEnabled = Mod.IsIntersectionMovementEnforcementEnabled;
-
-            if (!midBlockEnabled && !intersectionEnabled)
+            try
             {
-                new SyncAnalysisStateJob
+                if (!Mod.IsMidBlockCrossingEnforcementEnabled && !Mod.IsIntersectionMovementEnforcementEnabled)
                 {
-                    AnalysisStateLookup = m_AnalysisStateData,
-                    ECB = ecb.AsParallelWriter()
-                }.ScheduleParallel(m_ChangedTransitionQuery);
-                state.Dependency.Complete();
-                ecb.Playback(state.EntityManager);
-                ecb.Dispose();
-                return;
-            }
+                    for (int index = 0; index < vehicles.Length; index++)
+                    {
+                        SyncAnalysisState(vehicles[index], histories[index]);
+                    }
 
-            new TransitionDetectionJob
-            {
-                AnalysisStateLookup = m_AnalysisStateData,
-                CarLookup = m_CarData,
-                ECB = ecb.AsParallelWriter(),
-                EventBuffer = eventBuffer.AsParallelWriter(),
-                MidBlockEnabled = midBlockEnabled,
-                IntersectionEnabled = intersectionEnabled
-            }.ScheduleParallel(m_ChangedTransitionQuery);
-
-            state.Dependency.Complete();
-            ecb.Playback(state.EntityManager);
-            ecb.Dispose();
-
-            // Managed follow-up: process transition violation events
-            for (int i = 0; i < eventBuffer.Length; i++)
-            {
-                var ev = eventBuffer[i];
-                // Logging, penalty, string creation (managed)
-                EnforcementPenaltyService.RecordLaneTransitionViolation(ev.Vehicle, ev.ReasonCode);
-                EnforcementLoggingPolicy.RecordEnforcementEvent($"Lane transition violation: vehicle={ev.Vehicle}, reasonCode={ev.ReasonCode}");
-            }
-            eventBuffer.Dispose();
-        }
-
-        [BurstCompile]
-        private struct SyncAnalysisStateJob : IJobEntity
-        {
-            public ComponentLookup<LaneTransitionAnalysisState> AnalysisStateLookup;
-            public EntityCommandBuffer.ParallelWriter ECB;
-
-            public void Execute([EntityIndexInQuery] int index, Entity entity, in VehicleLaneHistory history)
-            {
-                LaneTransitionAnalysisState analysisState = default;
-                if (AnalysisStateLookup.TryGetComponent(entity, out LaneTransitionAnalysisState state))
-                    analysisState = state;
-
-                if (analysisState.m_LastProcessedLaneChangeCount == history.m_LaneChangeCount)
                     return;
+                }
 
-                analysisState.m_LastProcessedLaneChangeCount = history.m_LaneChangeCount;
-                if (AnalysisStateLookup.HasComponent(entity))
-                    ECB.SetComponent(index, entity, analysisState);
-                else
-                    ECB.AddComponent(index, entity, analysisState);
-            }
-        }
-
-        [BurstCompile]
-        private struct TransitionDetectionJob : IJobEntity
-        {
-            public ComponentLookup<LaneTransitionAnalysisState> AnalysisStateLookup;
-            [ReadOnly] public ComponentLookup<Car> CarLookup;
-            public EntityCommandBuffer.ParallelWriter ECB;
-            public NativeList<TransitionViolationEvent>.ParallelWriter EventBuffer;
-            public bool MidBlockEnabled;
-            public bool IntersectionEnabled;
-
-            public void Execute([EntityIndexInQuery] int index, Entity entity, in CarCurrentLane currentLane, in VehicleLaneHistory history)
-            {
-                LaneTransitionAnalysisState analysisState = default;
-                if (AnalysisStateLookup.TryGetComponent(entity, out LaneTransitionAnalysisState state))
-                    analysisState = state;
-                else
-                    ECB.AddComponent(index, entity, analysisState);
-
-                if (history.m_LaneChangeCount == analysisState.m_LastProcessedLaneChangeCount || history.m_PreviousLane == Entity.Null)
-                    return;
-
-                analysisState.m_LastProcessedLaneChangeCount = history.m_LaneChangeCount;
-                ECB.SetComponent(index, entity, analysisState);
-
-                if (CarLookup.TryGetComponent(entity, out Car car) && EmergencyVehiclePolicy.IsEmergencyVehicle(car))
-                    return;
-
-                // Violation detection logic (compact, no string)
-                byte reasonCode = 0;
-                if (MidBlockEnabled && TryDetectMidBlockCrossing(history))
-                    reasonCode = 1;
-                else if (IntersectionEnabled && TryDetectIntersectionViolation(history))
-                    reasonCode = 2;
-
-                if (reasonCode != 0)
+                for (int index = 0; index < vehicles.Length; index++)
                 {
-                    EventBuffer.Add(index, new TransitionViolationEvent { Vehicle = entity, ReasonCode = reasonCode });
+                    ProcessTransition(vehicles[index], currentLanes[index], histories[index]);
                 }
             }
-
-            private bool TryDetectMidBlockCrossing(VehicleLaneHistory history)
+            finally
             {
-                // ...existing detection logic...
-                return false;
+                vehicles.Dispose();
+                currentLanes.Dispose();
+                histories.Dispose();
             }
-
-            private bool TryDetectIntersectionViolation(VehicleLaneHistory history)
-            {
-                // ...existing detection logic...
-                return false;
-            }
-        }
-
-        private struct TransitionViolationEvent
-        {
-            public Entity Vehicle;
-            public byte ReasonCode;
         }
 
         private void SyncAnalysisState(Entity vehicle, VehicleLaneHistory history)

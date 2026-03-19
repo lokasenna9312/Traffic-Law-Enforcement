@@ -17,7 +17,7 @@ using UnityEngine;
 
 namespace Traffic_Law_Enforcement
 {
-    public class MonthlyEnforcementChirperSystem : GameSystemBase
+    public partial class MonthlyEnforcementChirperSystem : GameSystemBase
     {
         private const string kDefaultLocale = "en-US";
         private const string kSenderLocalizationId = "TrafficLawEnforcement.MonthlyChirperSender";

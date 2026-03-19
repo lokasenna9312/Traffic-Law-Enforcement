@@ -6,7 +6,7 @@ using Unity.Entities;
 
 namespace Traffic_Law_Enforcement
 {
-    public class EnforcementSaveDataSystem : GameSystemBase, IDefaultSerializable, ISerializable, IPreDeserialize, IPostDeserialize
+    public partial class EnforcementSaveDataSystem : GameSystemBase, IDefaultSerializable, ISerializable, IPreDeserialize, IPostDeserialize
     {
         private const int kSerializationVersion = 6;
 
