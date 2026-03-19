@@ -7,7 +7,8 @@ using Entity = Unity.Entities.Entity;
 
 namespace Traffic_Law_Enforcement
 {
-    public partial class PublicTransportLanePermissionSystem : GameSystemBase
+    [BurstCompile]
+    public partial struct PublicTransportLanePermissionSystem : ISystem
     {
         private EntityQuery m_AllCarsQuery;
         private EntityQuery m_ChangedCarQuery;
@@ -18,30 +19,37 @@ namespace Traffic_Law_Enforcement
         private bool m_LastEnforcementEnabled;
         private int m_LastSettingsMask;
 
-        protected override void OnCreate()
+        public void OnCreate(ref SystemState state)
         {
-            base.OnCreate();
-            m_AllCarsQuery = GetEntityQuery(ComponentType.ReadWrite<Car>());
-            m_ChangedCarQuery = GetEntityQuery(ComponentType.ReadWrite<Car>());
+            m_AllCarsQuery = state.GetEntityQuery(ComponentType.ReadWrite<Car>());
+            m_ChangedCarQuery = state.GetEntityQuery(ComponentType.ReadWrite<Car>());
             m_ChangedCarQuery.SetChangedVersionFilter(ComponentType.ReadOnly<Car>());
-            m_TrackedQuery = GetEntityQuery(
+            m_TrackedQuery = state.GetEntityQuery(
                 ComponentType.ReadWrite<Car>(),
                 ComponentType.ReadWrite<PublicTransportLanePermissionState>());
-            m_PathOwnerData = GetComponentLookup<PathOwner>();
-            m_TypeLookups = BusLaneVehicleTypeLookups.Create(this);
-            RequireForUpdate(m_AllCarsQuery);
+            m_PathOwnerData = state.GetComponentLookup<PathOwner>();
+            m_TypeLookups = BusLaneVehicleTypeLookups.Create(state);
+            state.RequireForUpdate(m_AllCarsQuery);
         }
 
-        protected override void OnUpdate()
+        [BurstCompile]
+        public void OnUpdate(ref SystemState state)
         {
-            m_PathOwnerData.Update(this);
-            m_TypeLookups.Update(this);
+            m_PathOwnerData.Update(state);
+            m_TypeLookups.Update(state);
             EnforcementGameplaySettingsState settings = EnforcementGameplaySettingsService.Current;
 
             bool enforcementEnabled = Mod.IsPublicTransportLaneEnforcementEnabled;
+            var ecb = new EntityCommandBuffer(Allocator.Temp);
             if (!enforcementEnabled)
             {
-                RestoreTrackedVehicles();
+                new RestoreTrackedVehiclesJob
+                {
+                    ECB = ecb.AsParallelWriter()
+                }.ScheduleParallel(m_TrackedQuery);
+                state.Dependency.Complete();
+                ecb.Playback(state.EntityManager);
+                ecb.Dispose();
                 m_HasEvaluated = false;
                 m_LastEnforcementEnabled = false;
                 return;
@@ -49,155 +57,106 @@ namespace Traffic_Law_Enforcement
 
             int settingsMask = BusLanePolicy.GetPermissionSettingsMask(settings);
             bool fullRefresh = !m_HasEvaluated || !m_LastEnforcementEnabled || settingsMask != m_LastSettingsMask;
-            EvaluateQuery(fullRefresh ? m_AllCarsQuery : m_ChangedCarQuery, settings);
+            var query = fullRefresh ? m_AllCarsQuery : m_ChangedCarQuery;
+            new EvaluatePermissionJob
+            {
+                Settings = settings,
+                TypeLookups = m_TypeLookups,
+                ECB = ecb.AsParallelWriter()
+            }.ScheduleParallel(query);
 
+            state.Dependency.Complete();
+            ecb.Playback(state.EntityManager);
+            ecb.Dispose();
             m_HasEvaluated = true;
             m_LastEnforcementEnabled = true;
             m_LastSettingsMask = settingsMask;
         }
 
-        private void EvaluateQuery(EntityQuery query, EnforcementGameplaySettingsState settings)
+        [BurstCompile]
+        private struct EvaluatePermissionJob : IJobEntity
         {
-            NativeArray<Entity> vehicles = query.ToEntityArray(Allocator.Temp);
-            NativeArray<Car> cars = query.ToComponentDataArray<Car>(Allocator.Temp);
+            public EnforcementGameplaySettingsState Settings;
+            public BusLaneVehicleTypeLookups TypeLookups;
+            public EntityCommandBuffer.ParallelWriter ECB;
 
-            try
+            public void Execute([EntityIndexInQuery] int index, Entity entity, ref Car car)
             {
-                for (int index = 0; index < vehicles.Length; index++)
+                bool hasState = SystemAPI.HasComponent<PublicTransportLanePermissionState>(entity);
+                PublicTransportLanePermissionState state = hasState
+                    ? SystemAPI.GetComponent<PublicTransportLanePermissionState>(entity)
+                    : default;
+                CarFlags originalMask = hasState
+                    ? state.m_OriginalPublicTransportLaneFlags
+                    : (car.m_Flags & BusLanePolicy.PublicTransportLanePermissionMask);
+
+                if (!BusLanePolicy.TryGetDesiredPermissionState(entity, car, Settings, ref TypeLookups, out _, out CarFlags desiredMask))
                 {
-                    EvaluateVehicle(vehicles[index], cars[index], settings);
-                }
-            }
-            finally
-            {
-                vehicles.Dispose();
-                cars.Dispose();
-            }
-        }
-
-        private void EvaluateVehicle(Entity vehicle, Car car, EnforcementGameplaySettingsState settings)
-        {
-            bool hasState = EntityManager.HasComponent<PublicTransportLanePermissionState>(vehicle);
-            PublicTransportLanePermissionState state = hasState
-                ? EntityManager.GetComponentData<PublicTransportLanePermissionState>(vehicle)
-                : default;
-            CarFlags originalMask = hasState
-                ? state.m_OriginalPublicTransportLaneFlags
-                : (car.m_Flags & BusLanePolicy.PublicTransportLanePermissionMask);
-
-            if (!BusLanePolicy.TryGetDesiredPermissionState(vehicle, car, settings, ref m_TypeLookups, out _, out CarFlags desiredMask))
-            {
-                if (hasState)
-                {
-                    RestoreVehicle(vehicle, car, state, removeState: true);
+                    if (hasState)
+                    {
+                        ECB.AddComponent(index, entity, state);
+                        ECB.RemoveComponent<PublicTransportLanePermissionState>(index, entity);
+                    }
+                    return;
                 }
 
-                return;
-            }
+                CarFlags currentMask = car.m_Flags & BusLanePolicy.PublicTransportLanePermissionMask;
+                bool emergencyActive = EmergencyVehiclePolicy.IsEmergencyVehicle(car);
+                bool emergencyTransition = hasState && state.m_EmergencyActive != (emergencyActive ? (byte)1 : (byte)0);
+                bool flagsChanged = currentMask != desiredMask;
 
-            CarFlags currentMask = car.m_Flags & BusLanePolicy.PublicTransportLanePermissionMask;
-            bool emergencyActive = EmergencyVehiclePolicy.IsEmergencyVehicle(car);
-            bool emergencyTransition = hasState && state.m_EmergencyActive != (emergencyActive ? (byte)1 : (byte)0);
-            bool flagsChanged = currentMask != desiredMask;
-
-            if (flagsChanged)
-            {
-                car.m_Flags = (car.m_Flags & ~BusLanePolicy.PublicTransportLanePermissionMask) | desiredMask;
-                EntityManager.SetComponentData(vehicle, car);
-            }
-
-            PublicTransportLanePermissionState updatedState = new PublicTransportLanePermissionState
-            {
-                m_OriginalPublicTransportLaneFlags = originalMask,
-                m_EmergencyActive = emergencyActive ? (byte)1 : (byte)0,
-            };
-
-            if (!hasState)
-            {
-                EntityManager.AddComponentData(vehicle, updatedState);
-            }
-            else if (!StatesEqual(state, updatedState))
-            {
-                EntityManager.SetComponentData(vehicle, updatedState);
-            }
-
-            if (flagsChanged || emergencyTransition)
-            {
-                MarkPathObsolete(vehicle);
-            }
-        }
-
-        private void RestoreTrackedVehicles()
-        {
-            if (m_TrackedQuery.IsEmptyIgnoreFilter)
-            {
-                return;
-            }
-
-            NativeArray<Entity> vehicles = m_TrackedQuery.ToEntityArray(Allocator.Temp);
-            NativeArray<Car> cars = m_TrackedQuery.ToComponentDataArray<Car>(Allocator.Temp);
-            NativeArray<PublicTransportLanePermissionState> states = m_TrackedQuery.ToComponentDataArray<PublicTransportLanePermissionState>(Allocator.Temp);
-
-            try
-            {
-                for (int index = 0; index < vehicles.Length; index++)
+                if (flagsChanged)
                 {
-                    RestoreVehicle(vehicles[index], cars[index], states[index], removeState: false);
+                    car.m_Flags = (car.m_Flags & ~BusLanePolicy.PublicTransportLanePermissionMask) | desiredMask;
+                }
+
+                PublicTransportLanePermissionState updatedState = new PublicTransportLanePermissionState
+                {
+                    m_OriginalPublicTransportLaneFlags = originalMask,
+                    m_EmergencyActive = emergencyActive ? (byte)1 : (byte)0,
+                };
+
+                if (!hasState)
+                {
+                    ECB.AddComponent(index, entity, updatedState);
+                }
+                else if (!StatesEqual(state, updatedState))
+                {
+                    ECB.SetComponent(index, entity, updatedState);
+                }
+
+                if (flagsChanged || emergencyTransition)
+                {
+                    ECB.AddComponent<PathObsoleteTag>(index, entity);
                 }
             }
-            finally
-            {
-                vehicles.Dispose();
-                cars.Dispose();
-                states.Dispose();
-            }
-
-            EntityManager.RemoveComponent<PublicTransportLanePermissionState>(m_TrackedQuery);
         }
 
-        private void RestoreVehicle(Entity vehicle, Car car, PublicTransportLanePermissionState state, bool removeState)
+        [BurstCompile]
+        private struct RestoreTrackedVehiclesJob : IJobEntity
         {
-            CarFlags currentMask = car.m_Flags & BusLanePolicy.PublicTransportLanePermissionMask;
-            bool flagsChanged = currentMask != state.m_OriginalPublicTransportLaneFlags;
-            if (flagsChanged)
-            {
-                car.m_Flags = (car.m_Flags & ~BusLanePolicy.PublicTransportLanePermissionMask) | state.m_OriginalPublicTransportLaneFlags;
-                EntityManager.SetComponentData(vehicle, car);
-            }
+            public EntityCommandBuffer.ParallelWriter ECB;
 
-            if (flagsChanged || state.m_EmergencyActive != 0)
+            public void Execute([EntityIndexInQuery] int index, Entity entity, ref Car car, ref PublicTransportLanePermissionState state)
             {
-                MarkPathObsolete(vehicle);
-            }
+                CarFlags currentMask = car.m_Flags & BusLanePolicy.PublicTransportLanePermissionMask;
+                bool flagsChanged = currentMask != state.m_OriginalPublicTransportLaneFlags;
+                if (flagsChanged)
+                {
+                    car.m_Flags = (car.m_Flags & ~BusLanePolicy.PublicTransportLanePermissionMask) | state.m_OriginalPublicTransportLaneFlags;
+                }
 
-            if (removeState && EntityManager.HasComponent<PublicTransportLanePermissionState>(vehicle))
-            {
-                EntityManager.RemoveComponent<PublicTransportLanePermissionState>(vehicle);
+                if (flagsChanged || state.m_EmergencyActive != 0)
+                {
+                    ECB.AddComponent<PathObsoleteTag>(index, entity);
+                }
+
+                ECB.RemoveComponent<PublicTransportLanePermissionState>(index, entity);
             }
         }
 
-        private void MarkPathObsolete(Entity vehicle)
-        {
-            if (!m_PathOwnerData.TryGetComponent(vehicle, out PathOwner pathOwner))
-            {
-                return;
-            }
-
-            if ((pathOwner.m_State & PathFlags.Pending) != 0)
-            {
-                return;
-            }
-
-            if ((pathOwner.m_State & PathFlags.Obsolete) != 0)
-            {
-                return;
-            }
-
-            pathOwner.m_State |= PathFlags.Obsolete;
-            EntityManager.SetComponentData(vehicle, pathOwner);
-        }
-
-        private static bool StatesEqual(PublicTransportLanePermissionState left, PublicTransportLanePermissionState right)
+        // PathObsoleteTag: marker for managed follow-up system to obsolete path
+        public struct PathObsoleteTag : IComponentData {}
         {
             return left.m_OriginalPublicTransportLaneFlags == right.m_OriginalPublicTransportLaneFlags &&
                 left.m_EmergencyActive == right.m_EmergencyActive;

@@ -7,21 +7,16 @@ using Entity = Unity.Entities.Entity;
 
 namespace Traffic_Law_Enforcement
 {
-    public partial class VehicleLaneHistorySystem : GameSystemBase
+    [BurstCompile]
+    public partial struct VehicleLaneHistorySystem : ISystem
     {
-        private EntityQuery m_CarQuery;
+        // Queries are now cached via system state
         private EntityQuery m_NewCarQuery;
         private EntityQuery m_ChangedLaneQuery;
-        private ComponentLookup<Owner> m_OwnerData;
-        private ComponentLookup<VehicleLaneHistory> m_HistoryData;
 
-        protected override void OnCreate()
+        public void OnCreate(ref SystemState state)
         {
-            base.OnCreate();
-            m_CarQuery = GetEntityQuery(
-                ComponentType.ReadOnly<Car>(),
-                ComponentType.ReadOnly<CarCurrentLane>());
-            m_NewCarQuery = GetEntityQuery(new EntityQueryDesc
+            m_NewCarQuery = state.GetEntityQuery(new EntityQueryDesc
             {
                 All = new[]
                 {
@@ -33,90 +28,94 @@ namespace Traffic_Law_Enforcement
                     ComponentType.ReadOnly<VehicleLaneHistory>(),
                 },
             });
-            m_ChangedLaneQuery = GetEntityQuery(
-                ComponentType.ReadOnly<Car>(),
-                ComponentType.ReadOnly<CarCurrentLane>(),
-                ComponentType.ReadWrite<VehicleLaneHistory>());
-            m_ChangedLaneQuery.SetChangedVersionFilter(ComponentType.ReadOnly<CarCurrentLane>());
-            m_OwnerData = GetComponentLookup<Owner>(true);
-            m_HistoryData = GetComponentLookup<VehicleLaneHistory>();
-            RequireForUpdate(m_CarQuery);
-        }
-
-        protected override void OnUpdate()
-        {
-            m_OwnerData.Update(this);
-            m_HistoryData.Update(this);
-
-            ProcessQuery(m_NewCarQuery);
-            ProcessQuery(m_ChangedLaneQuery);
-        }
-
-        private void ProcessQuery(EntityQuery query)
-        {
-            NativeArray<Entity> vehicles = query.ToEntityArray(Allocator.Temp);
-            NativeArray<CarCurrentLane> currentLanes = query.ToComponentDataArray<CarCurrentLane>(Allocator.Temp);
-
-            try
+            m_ChangedLaneQuery = state.GetEntityQuery(new EntityQueryDesc
             {
-                for (int index = 0; index < vehicles.Length; index++)
+                All = new[]
                 {
-                    UpdateHistory(vehicles[index], currentLanes[index]);
-                }
-            }
-            finally
-            {
-                vehicles.Dispose();
-                currentLanes.Dispose();
-            }
+                    ComponentType.ReadOnly<Car>(),
+                    ComponentType.ReadOnly<CarCurrentLane>(),
+                    ComponentType.ReadWrite<VehicleLaneHistory>(),
+                },
+            });
+            m_ChangedLaneQuery.SetChangedVersionFilter(ComponentType.ReadOnly<CarCurrentLane>());
+            state.RequireForUpdate(m_NewCarQuery);
         }
 
-        private void UpdateHistory(Entity vehicle, CarCurrentLane currentLane)
+        [BurstCompile]
+        public void OnUpdate(ref SystemState state)
         {
-            Entity currentLaneEntity = currentLane.m_Lane;
-            Entity currentLaneOwner = GetOwner(currentLaneEntity);
-
-            if (!m_HistoryData.TryGetComponent(vehicle, out VehicleLaneHistory history))
+            var ecb = new EntityCommandBuffer(Allocator.Temp);
+            var ownerLookup = state.GetComponentLookup<Owner>(true);
+            // Initialization: Add VehicleLaneHistory to new cars
+            new InitLaneHistoryJob
             {
-                history = new VehicleLaneHistory
+                OwnerLookup = ownerLookup,
+                ECB = ecb.AsParallelWriter()
+            }.ScheduleParallel(m_NewCarQuery);
+
+            // Update: Update lane history for changed lanes
+            new UpdateLaneHistoryJob
+            {
+                OwnerLookup = ownerLookup
+            }.ScheduleParallel(m_ChangedLaneQuery);
+
+            state.Dependency.Complete();
+            ecb.Playback(state.EntityManager);
+            ecb.Dispose();
+        }
+
+        [BurstCompile]
+        private struct InitLaneHistoryJob : IJobEntity
+        {
+            [ReadOnly] public ComponentLookup<Owner> OwnerLookup;
+            public EntityCommandBuffer.ParallelWriter ECB;
+
+            public void Execute([EntityIndexInQuery] int index, Entity entity, in Car car, in CarCurrentLane currentLane)
+            {
+                Entity lane = currentLane.m_Lane;
+                Entity owner = Entity.Null;
+                if (lane != Entity.Null && OwnerLookup.TryGetComponent(lane, out Owner laneOwner))
+                    owner = laneOwner.m_Owner;
+
+                var history = new VehicleLaneHistory
                 {
                     m_PreviousLane = Entity.Null,
-                    m_CurrentLane = currentLaneEntity,
+                    m_CurrentLane = lane,
                     m_PreviousLaneOwner = Entity.Null,
-                    m_CurrentLaneOwner = currentLaneOwner,
+                    m_CurrentLaneOwner = owner,
                     m_LaneChangeCount = 0,
                 };
-                EntityManager.AddComponentData(vehicle, history);
-                return;
+                ECB.AddComponent(index, entity, history);
             }
-
-            if (history.m_CurrentLane == currentLaneEntity)
-            {
-                if (history.m_CurrentLaneOwner != currentLaneOwner)
-                {
-                    history.m_CurrentLaneOwner = currentLaneOwner;
-                    EntityManager.SetComponentData(vehicle, history);
-                }
-
-                return;
-            }
-
-            history.m_PreviousLane = history.m_CurrentLane;
-            history.m_PreviousLaneOwner = history.m_CurrentLaneOwner;
-            history.m_CurrentLane = currentLaneEntity;
-            history.m_CurrentLaneOwner = currentLaneOwner;
-            history.m_LaneChangeCount += 1;
-            EntityManager.SetComponentData(vehicle, history);
         }
 
-        private Entity GetOwner(Entity lane)
+        [BurstCompile]
+        private struct UpdateLaneHistoryJob : IJobEntity
         {
-            if (lane != Entity.Null && m_OwnerData.TryGetComponent(lane, out Owner owner))
-            {
-                return owner.m_Owner;
-            }
+            [ReadOnly] public ComponentLookup<Owner> OwnerLookup;
 
-            return Entity.Null;
+            public void Execute(Entity entity, ref VehicleLaneHistory history, in CarCurrentLane currentLane)
+            {
+                Entity lane = currentLane.m_Lane;
+                Entity owner = Entity.Null;
+                if (lane != Entity.Null && OwnerLookup.TryGetComponent(lane, out Owner laneOwner))
+                    owner = laneOwner.m_Owner;
+
+                if (history.m_CurrentLane == lane)
+                {
+                    if (history.m_CurrentLaneOwner != owner)
+                    {
+                        history.m_CurrentLaneOwner = owner;
+                    }
+                    return;
+                }
+
+                history.m_PreviousLane = history.m_CurrentLane;
+                history.m_PreviousLaneOwner = history.m_CurrentLaneOwner;
+                history.m_CurrentLane = lane;
+                history.m_CurrentLaneOwner = owner;
+                history.m_LaneChangeCount += 1;
+            }
         }
     }
 }
