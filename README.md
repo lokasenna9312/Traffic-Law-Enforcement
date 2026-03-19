@@ -188,4 +188,4 @@ msbuild '.\Traffic Law Enforcement\Traffic Law Enforcement.csproj' /restore /t:B
 
 ## 라이선스
 
-별도 라이선스 파일이 없으므로 필요한 경우 저장소 정책에 맞게 추가하세요.
+Paradox Mods 저작권 정책을 따릅니다.
