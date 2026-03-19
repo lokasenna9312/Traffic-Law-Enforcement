@@ -1,11 +1,89 @@
 # Traffic Law Enforcement
 
-Cities: Skylines II용 교통 법규 단속 모드입니다. 대중교통 전용 차로 무단 주행, 도로 중간 횡단성 차선 이동, 교차로 진입 방향 위반을 감지하고 벌금을 부과합니다. 벌금 수입은 예산 UI에 반영되며, 반복 위반 가중치, 월간 리포트, 디버그 UI, 저장 데이터 유지 기능도 포함합니다.
+## Description
 
-## 주요 기능
+This is a traffic law enforcement mod for Cities: Skylines II. It detects and penalizes unauthorized use of public transport lanes, mid-block median crossing (new), and intersection direction violations. Fine revenue is reflected in the budget UI. The mod includes repeat violation weighting, monthly reports, debug UI, and persistent save data.
+
+### Key Features
+
+- Enforcement of public transport lane violations
+- Prevention of mid-block median crossing
+- Enforcement of intersection direction violations
+- Custom fine amounts per violation type
+- Escalated penalties for repeat offenders
+- Fine revenue integrated into the budget UI
+- Monthly enforcement reports and Chirper integration
+- Debug UI for statistics, recent events, and vehicle fine history
+- Localization support for `en-US` and `ko-KR`
+- Persistent settings and enforcement data on save/load
+
+### Enforcement Targets
+
+1. Public transport lane violation: Detects unauthorized vehicles using public transport lanes.
+2. Mid-block median crossing prevention: Detects vehicles crossing the median outside intersections or accessing parking/building connections from unauthorized lanes.
+3. Intersection direction violation: Detects mismatches between allowed lane directions and actual connection directions at intersections.
+
+### Settings
+
+- Current Save: Real-time enforcement settings applied only to the current city save file
+- New Save Defaults: Default values used when starting a new city
+- Policy Impact: Summary of enforcement effects on routing and avoidance behavior
+- Debug: Information for debugging and inspection
+
+Main settings include:
+
+- Enable/disable all enforcement
+- Detailed toggles for allowed vehicle types in public transport lanes
+- Custom fine amounts per violation type
+- Enable/disable repeat offender penalty escalation
+- Repeat violation window, threshold, and multiplier
+- Public transport lane exit pressure threshold
+
+The default fine for each violation type is `250`.
+
+## UI & Telemetry
+
+- Fine revenue is added to the budget screen as a Traffic Law Enforcement item.
+- The in-game Debug UI shows:
+  - Number of active public transport lane violators
+  - Cumulative counts per violation type
+  - Total fine amount
+  - Recent events
+  - Recent fine records
+  - Vehicle fine and violation history
+  - Repeat offender policy summary
+
+Monthly enforcement statistics and policy impact tracking are also saved.
+
+## Save Data
+
+The following data is saved and restored:
+
+- Enforcement settings for the current save file
+- Violation statistics
+- Recent enforcement records
+- Vehicle fine and violation history
+- Timestamps for repeat violation checks
+- Fine revenue events
+- Monthly reports
+- Policy impact tracking data
+
+## License
+
+Follows Paradox Mods license policy.
+
+---
+
+# 교통법규 단속
+
+## 한국어 설명
+
+Cities: Skylines II용 교통 법규 단속 모드입니다. 대중교통 전용 차로 무단 주행, 도로 중간 중앙선 횡단(신규), 교차로 진입 방향 위반을 감지하고 벌금을 부과합니다. 벌금 수입은 예산 UI에 반영되며, 반복 위반 가중치, 월간 리포트, 디버그 UI, 저장 데이터 유지 기능도 포함합니다.
+
+### 주요 기능
 
 - 대중교통 전용 차로 위반 단속
-- 도로 중간 차선 횡단성 이동 단속
+- 도로 중간 중앙선 횡단 방지
 - 교차로 진입 방향 위반 단속
 - 위반 유형별 벌금 액수 개별 설정
 - 반복 위반 차량 가중 처벌
@@ -15,50 +93,18 @@ Cities: Skylines II용 교통 법규 단속 모드입니다. 대중교통 전용
 - `en-US`, `ko-KR` 로컬라이제이션 제공
 - 저장/불러오기 시 설정과 단속 데이터 유지
 
-## 현재 단속 대상
+### 단속 대상
 
-### 1. Public transport lane violation
+1. 대중교통 전용 차로 위반: 허가되지 않은 차량이 대중교통 전용 차로를 사용하는 경우 단속
+2. 도로 중간 중앙선 횡단 방지: 교차로가 아닌 구간에서 중앙선을 넘어 반대 방향 차선으로 진입하거나, 허가되지 않은 차선에서 주차/건물 연결로를 사용하는 경우 감지
+3. 교차로 진입 방향 위반: 진입 차선의 허용 방향과 실제 연결 방향이 일치하지 않는 경우 감지
 
-대중교통 전용 차로를 허가되지 않은 차량이 사용하는 경우를 단속합니다.
+### 설정
 
-기본적으로 허용 가능한 차량군은 다음과 같습니다.
-
-- 노면 대중교통 차량
-- 택시
-- 경찰차
-- 소방차
-- 구급차
-- 쓰레기 수거 차량
-- 우편 차량
-- 도로 유지보수 차량
-- 제설차
-- 차량 정비 차량
-
-추가 실험용 허용 대상도 설정에서 켜고 끌 수 있습니다.
-
-- 개인 승용차
-- 배달 트럭
-- 화물 운송 차량
-- 영구차
-- 죄수 이송 차량
-- 공원 유지보수 차량
-
-### 2. Mid-block crossing
-
-차량이 교차로가 아닌 구간에서 반대 방향 차선으로 넘어가거나, 측면 접근 권한이 없는 차선에서 주차/차고/건물 접근 연결로를 가로지르는 경우를 휴리스틱 기반으로 감지합니다.
-
-### 3. Intersection movement
-
-진입 차선이 허용한 진행 방향과 실제 연결 차선의 방향이 맞지 않는 경우를 감지합니다. 예를 들어 직진 전용 차선에서 좌회전 연결로로 진입하는 상황을 단속 대상으로 볼 수 있습니다.
-
-## 설정
-
-모드 설정은 크게 네 영역으로 나뉩니다.
-
-- `Current Save`: 현재 도시 저장파일에만 적용되는 실시간 단속 설정
-- `New Save Defaults`: 새 도시 시작 시 사용할 기본값
-- `Policy Impact`: 단속이 경로 선택과 회피 행동에 준 영향 요약
-- `Debug`: 디버그 및 점검용 정보
+- Current Save: 현재 도시 저장파일에만 적용되는 실시간 단속 설정
+- New Save Defaults: 새 도시 시작 시 사용할 기본값
+- Policy Impact: 단속이 경로 선택과 회피 행동에 준 영향 요약
+- Debug: 디버그 및 점검용 정보
 
 주요 설정 항목:
 
@@ -98,94 +144,6 @@ Cities: Skylines II용 교통 법규 단속 모드입니다. 대중교통 전용
 - 월간 리포트
 - 정책 영향 추적 데이터
 
-추가로 단속 이력 텍스트 파일은 아래 경로에 유지됩니다.
-
-`%LocalAppData%\..\LocalLow\Colossal Order\Cities Skylines II\Traffic Law Enforcement\enforcement-history.txt`
-
-## 개발 환경 요구사항
-
-- Windows
-- Cities: Skylines II 설치
-- Cities: Skylines II Modding Toolchain 설치
-- .NET Framework 4.8 빌드 환경
-- MSBuild
-
-프로젝트는 `Lib.Harmony`를 사용하며 타깃 프레임워크는 `net48`입니다.
-
-기본 툴체인 경로 가정값:
-
-`C:\Program Files (x86)\Steam\steamapps\common\Cities Skylines II\Cities2_Data\Content\Game\.ModdingToolchain`
-
-## 빌드
-
-### Visual Studio / MSBuild
-
-프로젝트 파일:
-
-`Traffic Law Enforcement/Traffic Law Enforcement.csproj`
-
-직접 빌드할 때는 `CSII_TOOLPATH` 환경 변수가 Modding Toolchain 폴더를 가리켜야 합니다.
-
-예:
-
-```powershell
-$env:CSII_TOOLPATH = 'C:\Program Files (x86)\Steam\steamapps\common\Cities Skylines II\Cities2_Data\Content\Game\.ModdingToolchain'
-msbuild '.\Traffic Law Enforcement\Traffic Law Enforcement.csproj' /restore /t:Build /p:Configuration=Release /p:TargetFramework=net48
-```
-
-### 로컬 스모크 테스트 배포
-
-루트의 `deploy-local-test.ps1`는 다음 작업을 수행합니다.
-
-- MSBuild 탐색
-- `CSII_TOOLPATH` 설정
-- Release 빌드 실행
-- 생성된 `dll`, `pdb`, `PublishConfiguration.xml`을 로컬 모드 폴더로 복사
-
-배포 대상 경로:
-
-`%USERPROFILE%\AppData\LocalLow\Colossal Order\Cities Skylines II\Mods\Traffic Law Enforcement`
-
-실행 예:
-
-```powershell
-.\deploy-local-test.ps1
-```
-
-## 프로젝트 구성
-
-- `Mod.cs`: 모드 로드, 설정 등록, 시스템 업데이트 순서 구성
-- `Setting.cs`: 옵션 UI와 저장 기본값 정의
-- `PublicTransportLaneViolationSystem.cs`: 대중교통 차로 위반 감지
-- `VehicleLaneHistorySystem.cs`: 차량 차선 이력 추적
-- `LaneTransitionViolationSystem.cs`: 중간 횡단 및 교차로 방향 위반 감지
-- `EnforcementPenaltyService.cs`: 벌금 계산 및 반복 위반 가중 처리
-- `EnforcementFineMoneySystem.cs`: 실제 벌금 수입 반영
-- `BudgetUIPatches.cs`: 예산 UI 통합
-- `EnforcementSaveDataSystem.cs`: 저장/불러오기 처리
-- `MonthlyEnforcementChirperSystem.cs`: 월간 리포트 발행
-- `TrafficLawEnforcementDebugUI.cs`: 디버그 UI 구성
-
-## 구현 메모
-
-- ECS 기반 구조를 따르며 시스템 책임을 파일별로 분리했습니다.
-- 일부 위반 판정은 현재 휴리스틱 기반입니다.
-- 차선 접근/진입 판정은 게임 내부 lane/component 데이터 해석에 의존합니다.
-- 시간 흐름을 변경하는 다른 모드가 있으면 반복 위반 판정의 체감 기간이 달라질 수 있습니다.
-
-## 알려진 한계
-
-- `Mid-block crossing`, `Intersection movement`는 현재 전이 기반 휴리스틱이므로 모든 케이스를 완벽하게 분류하지는 않습니다.
-- 건물/서비스 접근 연결로 관련 판정은 일부 보완되어 있지만, 모든 경로 계획 단계에서 완전 차단을 보장하지는 않습니다.
-- 게임 업데이트로 내부 메서드나 필드 구조가 바뀌면 Harmony 패치가 영향을 받을 수 있습니다.
-
-## 향후 확장 아이디어
-
-- 더 많은 위반 유형 추가
-- 차단 교차로, 불법 유턴 등 세부 분류 강화
-- 정책 영향 분석 고도화
-- UI 리포트 개선
-
 ## 라이선스
 
-별도 라이선스 파일이 없으므로 필요한 경우 저장소 정책에 맞게 추가하세요.
+Paradox Mods 저작권 정책을 따릅니다.
