@@ -7,8 +7,7 @@ using Entity = Unity.Entities.Entity;
 
 namespace Traffic_Law_Enforcement
 {
-    [BurstCompile]
-    public partial struct VehicleLaneHistorySystem : ISystem
+    public class VehicleLaneHistorySystem : GameSystemBase
     {
         // Queries are now cached via system state
         private EntityQuery m_NewCarQuery;

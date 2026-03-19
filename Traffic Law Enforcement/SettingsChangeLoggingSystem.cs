@@ -8,7 +8,7 @@ using UnityEngine;
 
 namespace Traffic_Law_Enforcement
 {
-    public partial class SettingsChangeLoggingSystem : GameSystemBase
+    public class SettingsChangeLoggingSystem : GameSystemBase
     {
         private TimeSystem m_TimeSystem;
         private bool m_HasSnapshot;

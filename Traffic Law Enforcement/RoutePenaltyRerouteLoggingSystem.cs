@@ -25,7 +25,7 @@ namespace Traffic_Law_Enforcement
         }
     }
 
-    public partial class RoutePenaltyRerouteLoggingSystem : GameSystemBase
+    public class RoutePenaltyRerouteLoggingSystem : GameSystemBase
     {
         private const int MaxPenaltyTags = 6;
         private const int MaxLogsPerUpdate = 4;

@@ -197,7 +197,7 @@ namespace Traffic_Law_Enforcement
         }
     }
 
-    public partial class EnforcementFineMoneySystem : GameSystemBase
+    public class EnforcementFineMoneySystem : GameSystemBase
     {
         private const int kMaxOwnershipDepth = 16;
 

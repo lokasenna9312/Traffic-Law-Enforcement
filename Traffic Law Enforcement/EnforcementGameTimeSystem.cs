@@ -109,7 +109,7 @@ namespace Traffic_Law_Enforcement
         }
     }
 
-    public partial class EnforcementGameTimeSystem : GameSystemBase
+    public class EnforcementGameTimeSystem : GameSystemBase
     {
         private TimeSystem m_TimeSystem;
         private EntityQuery m_ActiveTrafficQuery;
