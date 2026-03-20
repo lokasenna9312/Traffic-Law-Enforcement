@@ -148,7 +148,7 @@ namespace Traffic_Law_Enforcement
 
     public static class EnforcementPolicyImpactService
     {
-        // 활성 차량 경로 집계 (ECS 쿼리 기반)
+        // Active vehicle route aggregation (ECS query based)
         public static int GetActiveVehicleRouteCount()
         {
             var world = World.DefaultGameObjectInjectionWorld;
@@ -404,7 +404,7 @@ namespace Traffic_Law_Enforcement
             int routeTotal = snapshot.TotalActualPathCount;
             int violationTotal = snapshot.PublicTransportLaneActualCount + snapshot.MidBlockCrossingActualCount + snapshot.IntersectionMovementActualCount;
             int avoidanceTotal = snapshot.TotalAvoidedPathCount;
-            int activeRouteSum = snapshot.TotalPathRequestCount; // 1달간의 합산 활성 경로 수
+            int activeRouteSum = snapshot.TotalPathRequestCount; // Sum of active routes for 1 month
             Mod.log.Info($"[RouteCount] activeRouteSum={activeRouteSum}, violationTotal={violationTotal}, avoidanceTotal={avoidanceTotal}");
             Mod.log.Info($"[ViolationCount] PublicTransport={snapshot.PublicTransportLaneActualCount}, MidBlock={snapshot.MidBlockCrossingActualCount}, Intersection={snapshot.IntersectionMovementActualCount}");
             Mod.log.Info($"[AvoidanceCount] PublicTransport={snapshot.PublicTransportLaneAvoidedEventCount}, MidBlock={snapshot.MidBlockCrossingAvoidedEventCount}, Intersection={snapshot.IntersectionMovementAvoidedEventCount}");
@@ -492,7 +492,7 @@ namespace Traffic_Law_Enforcement
             }
 
             RollingWindowSnapshot snapshot = GetRollingWindowSnapshot();
-            // 모든 차량 엔티티의 활성 경로 집계값을 분모로 사용
+            // Use the aggregated value of all vehicle entity routes as denominator
             int violationNumerator = snapshot.PublicTransportLaneActualCount + snapshot.MidBlockCrossingActualCount + snapshot.IntersectionMovementActualCount;
             int vehicleRouteDenominator = snapshot.TotalPathRequestCount;
             int suppressionFailureDenominator = violationNumerator + snapshot.TotalAvoidedPathCount;
