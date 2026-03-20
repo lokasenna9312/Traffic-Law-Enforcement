@@ -135,7 +135,14 @@ namespace Traffic_Law_Enforcement
                         continue;
                     }
 
+                    // Exclude emergency vehicles
                     if (EmergencyVehiclePolicy.IsEmergencyVehicle(m_CarData[vehicle]))
+                    {
+                        continue;
+                    }
+
+                    // Exclude vehicles allowed on PT lanes
+                    if ((m_CarData[vehicle].m_Flags & CarFlags.UsePublicTransportLanes) != 0)
                     {
                         continue;
                     }
