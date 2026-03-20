@@ -514,10 +514,11 @@ namespace Traffic_Law_Enforcement
 
             RollingWindowSnapshot snapshot = GetRollingWindowSnapshot();
             StringBuilder builder = new StringBuilder(640);
-            AppendRateAndFineLine(builder, LocalizeText(kTotalLabelLocaleId, "Total"), snapshot.TotalActualPathCount, snapshot.TotalPathRequestCount, snapshot.TotalAvoidedPathCount, snapshot.TotalFineAmount);
-            AppendRateAndFineLine(builder, LocalizeText(kPublicTransportLaneLabelLocaleId, "PT-lane"), snapshot.PublicTransportLaneActualCount, snapshot.TotalPathRequestCount, snapshot.PublicTransportLaneAvoidedEventCount, snapshot.PublicTransportLaneFineAmount);
-            AppendRateAndFineLine(builder, LocalizeText(kMidBlockLabelLocaleId, "Mid-block"), snapshot.MidBlockCrossingActualCount, snapshot.TotalPathRequestCount, snapshot.MidBlockCrossingAvoidedEventCount, snapshot.MidBlockCrossingFineAmount);
-            AppendRateAndFineLine(builder, LocalizeText(kIntersectionLabelLocaleId, "Intersection"), snapshot.IntersectionMovementActualCount, snapshot.TotalPathRequestCount, snapshot.IntersectionMovementAvoidedEventCount, snapshot.IntersectionMovementFineAmount);
+            int vehicleRouteDenominator = GetActiveVehicleRouteCount();
+            AppendRateAndFineLine(builder, LocalizeText(kTotalLabelLocaleId, "Total"), snapshot.TotalActualPathCount, vehicleRouteDenominator, snapshot.TotalAvoidedPathCount, snapshot.TotalFineAmount);
+            AppendRateAndFineLine(builder, LocalizeText(kPublicTransportLaneLabelLocaleId, "PT-lane"), snapshot.PublicTransportLaneActualCount, vehicleRouteDenominator, snapshot.PublicTransportLaneAvoidedEventCount, snapshot.PublicTransportLaneFineAmount);
+            AppendRateAndFineLine(builder, LocalizeText(kMidBlockLabelLocaleId, "Mid-block"), snapshot.MidBlockCrossingActualCount, vehicleRouteDenominator, snapshot.MidBlockCrossingAvoidedEventCount, snapshot.MidBlockCrossingFineAmount);
+            AppendRateAndFineLine(builder, LocalizeText(kIntersectionLabelLocaleId, "Intersection"), snapshot.IntersectionMovementActualCount, vehicleRouteDenominator, snapshot.IntersectionMovementAvoidedEventCount, snapshot.IntersectionMovementFineAmount);
             builder.AppendLine();
             builder.Append(LocalizeText(kNoteLocaleId, "Note: A counts pathfinding requests, not unique trips. D counts estimated rerouted pathfinding outcomes that gave up a penalized route. Per-type D counts can overlap when one reroute avoids multiple penalty types."));
             return builder.ToString();

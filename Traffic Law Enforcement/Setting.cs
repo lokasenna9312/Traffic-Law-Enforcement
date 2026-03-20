@@ -889,16 +889,16 @@ namespace Traffic_Law_Enforcement
             Add(entries, nameof(Setting.EnableEnforcementEventLogging), "교통법규 단속 이벤트 로그 기록", "디버그 전용입니다. 대중교통 전용차선, 중앙선 침범, 교차로 통행규칙 위반 로그와 벌금 수익 징수 로그, 대중교통 전용차선 이탈 압박 로그를 기록합니다. 이 옵션을 꺼도 단속 동작과 벌금 부과는 계속 진행됩니다.");
             Add(entries, nameof(Setting.EnableAllowedType3PublicTransportLaneUsageLogging), "대중교통 전용차선 이용이 허가된 비대중교통 차량의 대중교통 전용차선 사용 로그 기록", "디버그 전용입니다. 바닐라 기준으로는 대중교통 전용차선을 이용할 수 없지만 이 모드의 설정에서 대중교통 전용차선 이용이 허가된 차량이 실제로 그 차선을 이용한 사실을 로그로 기록합니다. 이 옵션을 꺼도 통행 허용 여부와 단속 동작은 계속 유지됩니다.");
             Add(entries, nameof(Setting.EnablePathfindingPenaltyDiagnosticLogging), "경로탐색 페널티 진단 로그 기록", "디버그 전용입니다. 경로탐색 money-axis 페널티 적용 로그와 shared PathfindCarData 진단 로그를 기록합니다. 이 옵션을 꺼도 경로탐색 페널티 자체는 계속 적용됩니다.");
-            Add(entries, nameof(Setting.PolicyImpactSummary), "전체", "최근 1 인게임 월 롤링 구간 기준 전체 위반율 F / A, 억제 실패율 F / (F + D), 그리고 그 구간에서 징수된 총 벌금액을 표시합니다.\nF는 실제 벌금이 부과된 위반이고, A는 전체 경로탐색 요청 수이며, D는 단속 가능성 때문에 벌점 경로를 포기한 것으로 추정되는 경로탐색 결과 수입니다.");
-            Add(entries, nameof(Setting.PolicyImpactPublicTransportLaneSummary), "대중교통 전용차선", "최근 1 인게임 월 롤링 구간 기준 대중교통 전용차선 위반 유형의 위반율 F / A, 억제 실패율 F / (F + D), 그리고 그 구간에서 징수된 벌금 총액을 표시합니다.\nF는 실제 벌금이 부과된 위반이고, A는 전체 경로탐색 요청 수이며, D는 단속 가능성 때문에 벌점 경로를 포기한 것으로 추정되는 경로탐색 결과 수입니다.");
-            Add(entries, nameof(Setting.PolicyImpactMidBlockSummary), "중앙선", "최근 1 인게임 월 롤링 구간 기준 중앙선 침범 위반 유형의 위반율 F / A, 억제 실패율 F / (F + D), 그리고 그 구간에서 징수된 벌금 총액을 표시합니다.\nF는 실제 벌금이 부과된 위반이고, A는 전체 경로탐색 요청 수이며, D는 단속 가능성 때문에 벌점 경로를 포기한 것으로 추정되는 경로탐색 결과 수입니다.");
-            Add(entries, nameof(Setting.PolicyImpactIntersectionSummary), "교차로", "최근 1 인게임 월 롤링 구간 기준 교차로 통행규칙 위반 유형의 위반율 F / A, 억제 실패율 F / (F + D), 그리고 그 구간에서 징수된 벌금 총액을 표시합니다.\nF는 실제 벌금이 부과된 위반이고, A는 전체 경로탐색 요청 수이며, D는 단속 가능성 때문에 벌점 경로를 포기한 것으로 추정되는 경로탐색 결과 수입니다.");
+            Add(entries, nameof(Setting.PolicyImpactSummary), "전체", "게임 시간으로 최근 1달 기준 전체 위반율 F / A, 억제 실패율 F / (F + D), 그리고 그 구간에서 징수된 총 벌금액을 표시합니다.\nF는 실제 벌금이 부과된 위반이고, A는 전체 경로탐색 요청 수이며, D는 단속 가능성 때문에 벌점 경로를 포기한 것으로 추정되는 경로탐색 결과 수입니다.");
+            Add(entries, nameof(Setting.PolicyImpactPublicTransportLaneSummary), "대중교통 전용차선", "게임 시간으로 최근 1달 기준 대중교통 전용차선 위반 유형의 위반율 F / A, 억제 실패율 F / (F + D), 그리고 그 구간에서 징수된 벌금 총액을 표시합니다.\nF는 실제 벌금이 부과된 위반이고, A는 전체 경로탐색 요청 수이며, D는 단속 가능성 때문에 벌점 경로를 포기한 것으로 추정되는 경로탐색 결과 수입니다.");
+            Add(entries, nameof(Setting.PolicyImpactMidBlockSummary), "중앙선", "게임 시간으로 최근 1달 기준 중앙선 침범 위반 유형의 위반율 F / A, 억제 실패율 F / (F + D), 그리고 그 구간에서 징수된 벌금 총액을 표시합니다.\nF는 실제 벌금이 부과된 위반이고, A는 전체 경로탐색 요청 수이며, D는 단속 가능성 때문에 벌점 경로를 포기한 것으로 추정되는 경로탐색 결과 수입니다.");
+            Add(entries, nameof(Setting.PolicyImpactIntersectionSummary), "교차로", "게임 시간으로 최근 1달 기준 교차로 통행규칙 위반 유형의 위반율 F / A, 억제 실패율 F / (F + D), 그리고 그 구간에서 징수된 벌금 총액을 표시합니다.\nF는 실제 벌금이 부과된 위반이고, A는 전체 경로탐색 요청 수이며, D는 단속 가능성 때문에 벌점 경로를 포기한 것으로 추정되는 경로탐색 결과 수입니다.");
             entries[EnforcementPolicyImpactService.kLoadedSaveOnlyLocaleId] = "세이브를 로드한 뒤 표시됩니다.";
             entries[EnforcementPolicyImpactService.kWaitingForTimeLocaleId] = "인게임 시간 초기화 대기 중입니다.";
             entries[EnforcementPolicyImpactService.kNoDataLocaleId] = "경로탐색 요청, 실제 위반, 또는 벌점 경로를 피한 것으로 추정되는 경로탐색 결과에 대한 기록이 아직 없습니다.";
             entries[EnforcementPolicyImpactService.kSummaryLineFormatLocaleId] = "{0}: 위반율 {1}, 억제 실패율 {2}, 벌금 {3}";
             entries[EnforcementPolicyImpactService.kDetailLineFormatLocaleId] = "{0}: 위반율 {1}, 억제 실패율 {2}, 벌금 {3}";
-            entries[EnforcementPolicyImpactService.kNoteLocaleId] = "참고: 정책 효과 지표는 모두 최근 1 인게임 월 롤링 구간 기준입니다. A는 고유 이동 건수가 아니라 전체 경로탐색 요청 수입니다. D는 단속 가능성 때문에 벌점 경로를 포기한 것으로 추정되는 경로탐색 결과 수입니다. 여러 위반 유형을 동시에 피한 결과가 있다면 유형별 D 값은 겹쳐 집계될 수 있습니다.";
+            entries[EnforcementPolicyImpactService.kNoteLocaleId] = "참고: 정책 효과 지표는 모두 게임 시간으로 최근 1달 기준입니다. A는 고유 이동 건수가 아니라 전체 경로탐색 요청 수입니다. D는 단속 가능성 때문에 벌점 경로를 포기한 것으로 추정되는 경로탐색 결과 수입니다. 여러 위반 유형을 동시에 피한 결과가 있다면 유형별 D 값은 겹쳐 집계될 수 있습니다.";
             entries[EnforcementPolicyImpactService.kTotalLabelLocaleId] = "전체";
             entries[EnforcementPolicyImpactService.kPublicTransportLaneLabelLocaleId] = "대중교통 전용차선";
             entries[EnforcementPolicyImpactService.kMidBlockLabelLocaleId] = "중앙선";
@@ -911,7 +911,7 @@ namespace Traffic_Law_Enforcement
             entries[MonthlyEnforcementChirperSystem.kMidBlockLineFormatLocaleId] = "중앙선: 위반율 {0}, 억제 실패율 {1}, 벌금 {2}₡.";
             entries[MonthlyEnforcementChirperSystem.kIntersectionLineFormatLocaleId] = "교차로: 위반율 {0}, 억제 실패율 {1}, 벌금 {2}₡.";
             entries[MonthlyEnforcementChirperSystem.kNoRateLocaleId] = "경로탐색 요청 기준 집계 없음";
-            Add(entries, nameof(Setting.SendMonthlyChirperPreviewNow), "지금 Chirper 보고 보내기", "지금 시점부터 직전 1 인게임 월까지의 롤링 구간 단속 실적을 Chirper로 즉시 한 번 게시합니다.");
+            Add(entries, nameof(Setting.SendMonthlyChirperPreviewNow), "지금 Chirper 보고 보내기", "지금 시점부터 게임 시간 1달 전까지의 단속 실적을 Chirper로 즉시 한 번 게시합니다.");
             return entries;
         }
 
