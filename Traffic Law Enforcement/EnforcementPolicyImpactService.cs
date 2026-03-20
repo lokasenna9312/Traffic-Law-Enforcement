@@ -403,10 +403,13 @@ namespace Traffic_Law_Enforcement
             var snapshot = GetRollingWindowSnapshot();
             int violationTotal = snapshot.PublicTransportLaneActualCount + snapshot.MidBlockCrossingActualCount + snapshot.IntersectionMovementActualCount;
             int avoidanceTotal = snapshot.TotalAvoidedPathCount;
-            int activeRouteSum = snapshot.TotalPathRequestCount; // Sum of active routes for 1 month
-            Mod.log.Info($"[RouteCount] activeRouteSum={activeRouteSum}, violationTotal={violationTotal}, avoidanceTotal={avoidanceTotal}");
-            Mod.log.Info($"[ViolationCount] PublicTransport={snapshot.PublicTransportLaneActualCount}, MidBlock={snapshot.MidBlockCrossingActualCount}, Intersection={snapshot.IntersectionMovementActualCount}");
-            Mod.log.Info($"[AvoidanceCount] PublicTransport={snapshot.PublicTransportLaneAvoidedEventCount}, MidBlock={snapshot.MidBlockCrossingAvoidedEventCount}, Intersection={snapshot.IntersectionMovementAvoidedEventCount}");
+            int vehicleRouteDenominator = snapshot.TotalPathRequestCount; // Unified denominator for all statistics
+            if (EnforcementLoggingPolicy.EnableEnforcementEventLogging)
+            {
+                Mod.log.Info($"[RouteCount] vehicleRouteDenominator={vehicleRouteDenominator}, violationTotal={violationTotal}, avoidanceTotal={avoidanceTotal}");
+                Mod.log.Info($"[ViolationCount] PublicTransport={snapshot.PublicTransportLaneActualCount}, MidBlock={snapshot.MidBlockCrossingActualCount}, Intersection={snapshot.IntersectionMovementActualCount}");
+                Mod.log.Info($"[AvoidanceCount] PublicTransport={snapshot.PublicTransportLaneAvoidedEventCount}, MidBlock={snapshot.MidBlockCrossingAvoidedEventCount}, Intersection={snapshot.IntersectionMovementAvoidedEventCount}");
+            }
 
             long currentMonthIndex = EnforcementGameTime.GetMonthIndex(EnforcementGameTime.CurrentTimestampMonthTicks);
             if (!s_HasTrackingState || currentMonthIndex != s_TrackingState.m_MonthIndex)
@@ -715,7 +718,7 @@ namespace Traffic_Law_Enforcement
             int actualCount = actualCountSelector(snapshot);
             int avoidedCount = avoidedCountSelector(snapshot);
             int fineAmount = fineAmountSelector(snapshot);
-            int vehicleRouteDenominator = GetActiveVehicleRouteCount();
+            int vehicleRouteDenominator = snapshot.TotalPathRequestCount; // Use 1-month aggregated denominator
             string violationRate = FormatRatio(actualCount, vehicleRouteDenominator);
             string suppressionFailureRate = FormatRatio(actualCount, actualCount + avoidedCount);
             string fines = FormatMoney(fineAmount);
