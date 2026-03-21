@@ -15,6 +15,9 @@ namespace Traffic_Law_Enforcement
         private EntityQuery m_ChangedLaneQuery;
         private EntityQuery m_ChangedCarQuery;
         private EntityQuery m_ViolationQuery;
+        private EntityQuery m_Type2UsageQuery;
+        private EntityQuery m_Type3UsageQuery;
+        private EntityQuery m_Type4UsageQuery;
         private EntityQuery m_StatisticsQuery;
         private Entity m_StatisticsEntity;
         private ComponentLookup<Car> m_CarData;
@@ -40,6 +43,9 @@ namespace Traffic_Law_Enforcement
                 ComponentType.ReadOnly<CarCurrentLane>());
             m_ChangedCarQuery.SetChangedVersionFilter(ComponentType.ReadOnly<Car>());
             m_ViolationQuery = GetEntityQuery(ComponentType.ReadOnly<PublicTransportLaneViolation>());
+            m_Type2UsageQuery = GetEntityQuery(ComponentType.ReadOnly<PublicTransportLaneType2UsageState>());
+            m_Type3UsageQuery = GetEntityQuery(ComponentType.ReadOnly<PublicTransportLaneType3UsageState>());
+            m_Type4UsageQuery = GetEntityQuery(ComponentType.ReadOnly<PublicTransportLaneType4UsageState>());
             m_StatisticsQuery = GetEntityQuery(ComponentType.ReadWrite<TrafficLawEnforcementStatistics>());
             if (m_StatisticsQuery.IsEmptyIgnoreFilter)
             {
@@ -69,6 +75,21 @@ namespace Traffic_Law_Enforcement
                 if (!m_ViolationQuery.IsEmptyIgnoreFilter)
                 {
                     EntityManager.RemoveComponent<PublicTransportLaneViolation>(m_ViolationQuery);
+                }
+
+                if (!m_Type2UsageQuery.IsEmptyIgnoreFilter)
+                {
+                    EntityManager.RemoveComponent<PublicTransportLaneType2UsageState>(m_Type2UsageQuery);
+                }
+
+                if (!m_Type3UsageQuery.IsEmptyIgnoreFilter)
+                {
+                    EntityManager.RemoveComponent<PublicTransportLaneType3UsageState>(m_Type3UsageQuery);
+                }
+
+                if (!m_Type4UsageQuery.IsEmptyIgnoreFilter)
+                {
+                    EntityManager.RemoveComponent<PublicTransportLaneType4UsageState>(m_Type4UsageQuery);
                 }
 
                 TrafficLawEnforcementStatistics disabledStats = EntityManager.GetComponentData<TrafficLawEnforcementStatistics>(m_StatisticsEntity);
@@ -155,18 +176,19 @@ namespace Traffic_Law_Enforcement
                 if (!IsEmergencyVehicle(vehicle))
                 {
                     bool hasPermission = PublicTransportLanePolicy.HasPublicTransportLanePermissionFlag(vehicle, ref m_TypeLookups);
+                    isViolation = !hasPermission;
                     var authorizedCategories = PublicTransportLanePolicy.GetVanillaAuthorizedCategories(vehicle, ref m_TypeLookups);
                     var additionalRole = PublicTransportLanePolicy.GetFlagGrantExperimentRole(vehicle, ref m_TypeLookups);
 
-                    // --- Type 2: Vanilla 허용, 모드 불허 ---
+                    // --- Type 2: Vanilla allowed, Mod denied ---
                     bool isType2 = !hasPermission && authorizedCategories != PublicTransportLaneVehicleCategory.None && !settings.AllowsPublicTransportLaneCategories(authorizedCategories);
                     shouldLogType2Usage = isType2;
 
-                    // --- Type 3: 모드 실험적 허가, 바닐라 불허 ---
+                    // --- Type 3: Vanilla denied, Mod allowed ---
                     bool isType3 = hasPermission && PublicTransportLanePolicy.TryGetAllowedType3Role(vehicle, settings, ref m_TypeLookups, out _);
                     shouldLogType3Usage = isType3;
 
-                    // --- Type 4: 바닐라/모드 모두 불허 ---
+                    // --- Type 4: Vanilla denied, Mod denied ---
                     bool isType4 = !hasPermission && authorizedCategories == PublicTransportLaneVehicleCategory.None && additionalRole == PublicTransportLaneFlagGrantExperimentRole.None;
                     shouldLogType4Usage = isType4;
                 }
@@ -176,7 +198,7 @@ namespace Traffic_Law_Enforcement
             UpdateType3UsageObservation(vehicle, laneEntity, shouldLogType3Usage);
             UpdateType4UsageObservation(vehicle, laneEntity, shouldLogType4Usage);
 
-            // --- Violation 상태 추적 및 로깅 ---
+            // --- Violation tracing and logging ---
             bool hasViolation = m_ViolationData.HasComponent(vehicle);
             if (!isViolation)
             {

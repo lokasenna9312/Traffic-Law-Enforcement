@@ -133,7 +133,7 @@ namespace Traffic_Law_Enforcement
                 }
                 else
                 {
-                    // 최초 경로 스냅샷 생성 시 vehicleRouteDenominator 집계
+                    // Record vehicleRouteDenominator when creating the first route snapshot
                     EnforcementPolicyImpactService.RecordPathRequest();
                     m_LastSnapshots[vehicle] = snapshot;
                 }
@@ -370,6 +370,8 @@ namespace Traffic_Law_Enforcement
             int avoidedPenalty = previousSnapshot.TotalPenalty - currentSnapshot.TotalPenalty;
             string role = PublicTransportLanePolicy.DescribeVehicleRole(vehicle, ref m_TypeLookups);
             string message = $"Pathfinding reroute (estimated): vehicle={vehicle}, role={role}, avoidedPenalty={avoidedPenalty}, fromPenalty={previousSnapshot.TotalPenalty} [{previousSnapshot.Breakdown}], toPenalty={currentSnapshot.TotalPenalty} [{currentSnapshot.Breakdown}], fromTags={previousSnapshot.Tags}, toTags={currentSnapshot.Tags}";
+            EnforcementTelemetry.RecordEvent(message);
+            Mod.log.Info(message);
         }
 
         private static void RecordRerouteTelemetry(RoutePenaltySnapshot previousSnapshot, RoutePenaltySnapshot currentSnapshot)
