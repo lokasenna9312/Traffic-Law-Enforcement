@@ -142,13 +142,11 @@ namespace Traffic_Law_Enforcement
 
         private void EvaluateVehicle(Entity vehicle, CarCurrentLane currentLane, EnforcementGameplaySettingsState settings, ref TrafficLawEnforcementStatistics statistics, ref bool statisticsChanged)
         {
-
             Entity laneEntity = currentLane.m_Lane;
             bool isViolation = false;
             bool shouldLogType2Usage = false;
             bool shouldLogType3Usage = false;
             bool shouldLogType4Usage = false;
-
 
             if (laneEntity != Entity.Null &&
                 m_CarLaneData.TryGetComponent(laneEntity, out CarLane laneData) &&

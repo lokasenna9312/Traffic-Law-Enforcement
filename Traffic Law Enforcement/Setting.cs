@@ -17,6 +17,51 @@ namespace Traffic_Law_Enforcement
     [SettingsUIShowGroupName(kGeneralGroup, kBusLaneAuthorizedGroup, kBusLaneAdditionalGroup, kBusLanePressureGroup, kFineGroup, kRepeatOffenderGroup, kTemplateActionsGroup, kPolicyImpactGroup, kDebugGroup)]
     public class Setting : ModSetting
     {
+        // --- Debug logging toggles for save/load ---
+        [Exclude]
+        [SettingsUISection(kCurrentSaveTab, kDebugGroup)]
+        [SettingsUIDisableByCondition(typeof(Setting), nameof(IsCurrentSaveSettingsDisabled))]
+        public bool EnableType2PublicTransportLaneUsageLogging
+        {
+            get => EnforcementGameplaySettingsService.Current.EnableType2PublicTransportLaneUsageLogging;
+            set => UpdateCurrentSaveSettings((ref EnforcementGameplaySettingsState state) => state.EnableType2PublicTransportLaneUsageLogging = value);
+        }
+
+        [Exclude]
+        [SettingsUISection(kCurrentSaveTab, kDebugGroup)]
+        [SettingsUIDisableByCondition(typeof(Setting), nameof(IsCurrentSaveSettingsDisabled))]
+        public bool EnableType3PublicTransportLaneUsageLogging
+        {
+            get => EnforcementGameplaySettingsService.Current.EnableType3PublicTransportLaneUsageLogging;
+            set => UpdateCurrentSaveSettings((ref EnforcementGameplaySettingsState state) => state.EnableType3PublicTransportLaneUsageLogging = value);
+        }
+
+        [Exclude]
+        [SettingsUISection(kCurrentSaveTab, kDebugGroup)]
+        [SettingsUIDisableByCondition(typeof(Setting), nameof(IsCurrentSaveSettingsDisabled))]
+        public bool EnableType4PublicTransportLaneUsageLogging
+        {
+            get => EnforcementGameplaySettingsService.Current.EnableType4PublicTransportLaneUsageLogging;
+            set => UpdateCurrentSaveSettings((ref EnforcementGameplaySettingsState state) => state.EnableType4PublicTransportLaneUsageLogging = value);
+        }
+
+        [Exclude]
+        [SettingsUISection(kCurrentSaveTab, kDebugGroup)]
+        [SettingsUIDisableByCondition(typeof(Setting), nameof(IsCurrentSaveSettingsDisabled))]
+        public bool EnablePathObsoleteSourceLogging
+        {
+            get => EnforcementGameplaySettingsService.Current.EnablePathObsoleteSourceLogging;
+            set => UpdateCurrentSaveSettings((ref EnforcementGameplaySettingsState state) => state.EnablePathObsoleteSourceLogging = value);
+        }
+
+        [SettingsUISection(kNewSaveDefaultsTab, kDebugGroup)]
+        public bool DefaultEnableType2PublicTransportLaneUsageLogging { get; set; }
+        [SettingsUISection(kNewSaveDefaultsTab, kDebugGroup)]
+        public bool DefaultEnableType3PublicTransportLaneUsageLogging { get; set; }
+        [SettingsUISection(kNewSaveDefaultsTab, kDebugGroup)]
+        public bool DefaultEnableType4PublicTransportLaneUsageLogging { get; set; }
+        [SettingsUISection(kNewSaveDefaultsTab, kDebugGroup)]
+        public bool DefaultEnablePathObsoleteSourceLogging { get; set; }
         public const string kCurrentSaveTab = "CurrentSave";
         public const string kNewSaveDefaultsTab = "NewSaveDefaults";
         public const string kPolicyImpactTab = "PolicyImpact";
@@ -568,26 +613,10 @@ namespace Traffic_Law_Enforcement
         [SettingsUISection(kDebugTab, kDebugGroup)]
         public bool EnableEnforcementEventLogging { get; set; }
 
-        [Exclude]
-        [SettingsUISection(kDebugTab, kDebugGroup)]
-        public bool EnableType2PublicTransportLaneUsageLogging { get; set; }
-
-        [Exclude]
-        [SettingsUISection(kDebugTab, kDebugGroup)]
-        public bool EnableType3PublicTransportLaneUsageLogging { get; set; }
-
-
-        [Exclude]
-        [SettingsUISection(kDebugTab, kDebugGroup)]
-        public bool EnableType4PublicTransportLaneUsageLogging { get; set; }
 
         [Exclude]
         [SettingsUISection(kDebugTab, kDebugGroup)]
         public bool EnablePathfindingPenaltyDiagnosticLogging { get; set; }
-
-        [Exclude]
-        [SettingsUISection(kDebugTab, kDebugGroup)]
-        public bool EnablePathObsoleteSourceLogging { get; set; }
 
         [Exclude]
         [SettingsUIButton]
@@ -615,6 +644,10 @@ namespace Traffic_Law_Enforcement
             EnableType4PublicTransportLaneUsageLogging = false;
             EnablePathfindingPenaltyDiagnosticLogging = false;
             EnablePathObsoleteSourceLogging = false;
+            DefaultEnableType2PublicTransportLaneUsageLogging = false;
+            DefaultEnableType3PublicTransportLaneUsageLogging = false;
+            DefaultEnableType4PublicTransportLaneUsageLogging = false;
+            DefaultEnablePathObsoleteSourceLogging = false;
         }
 
         public EnforcementGameplaySettingsState GetNewSaveDefaultSettings()
@@ -656,11 +689,19 @@ namespace Traffic_Law_Enforcement
                 IntersectionMovementRepeatWindowMonths = DefaultIntersectionMovementRepeatWindowMonths,
                 IntersectionMovementRepeatThreshold = DefaultIntersectionMovementRepeatThreshold,
                 IntersectionMovementRepeatMultiplierPercent = DefaultIntersectionMovementRepeatMultiplierPercent,
+                EnableType2PublicTransportLaneUsageLogging = DefaultEnableType2PublicTransportLaneUsageLogging,
+                EnableType3PublicTransportLaneUsageLogging = DefaultEnableType3PublicTransportLaneUsageLogging,
+                EnableType4PublicTransportLaneUsageLogging = DefaultEnableType4PublicTransportLaneUsageLogging,
+                EnablePathObsoleteSourceLogging = DefaultEnablePathObsoleteSourceLogging,
             };
         }
 
         public void ApplyNewSaveDefaultSettings(EnforcementGameplaySettingsState state)
         {
+            DefaultEnableType2PublicTransportLaneUsageLogging = state.EnableType2PublicTransportLaneUsageLogging;
+            DefaultEnableType3PublicTransportLaneUsageLogging = state.EnableType3PublicTransportLaneUsageLogging;
+            DefaultEnableType4PublicTransportLaneUsageLogging = state.EnableType4PublicTransportLaneUsageLogging;
+            DefaultEnablePathObsoleteSourceLogging = state.EnablePathObsoleteSourceLogging;
             DefaultEnablePublicTransportLaneEnforcement = state.EnablePublicTransportLaneEnforcement;
             DefaultEnableMidBlockCrossingEnforcement = state.EnableMidBlockCrossingEnforcement;
             DefaultEnableIntersectionMovementEnforcement = state.EnableIntersectionMovementEnforcement;
@@ -743,19 +784,19 @@ namespace Traffic_Law_Enforcement
                 { m_Setting.GetOptionTabLocaleID(Setting.kCurrentSaveTab), "Current save settings" },
                 { m_Setting.GetOptionTabLocaleID(Setting.kNewSaveDefaultsTab), "New save defaults" },
                 { m_Setting.GetOptionTabLocaleID(Setting.kPolicyImpactTab), "Policy impact" },
-                { m_Setting.GetOptionTabLocaleID(Setting.kDebugTab), "Debug / logs" },
+                { m_Setting.GetOptionTabLocaleID(Setting.kDebugTab), "Debug / Logging" },
                 { m_Setting.GetOptionGroupLocaleID(Setting.kGeneralGroup), "General" },
-                { m_Setting.GetOptionGroupLocaleID(Setting.kBusLaneAuthorizedGroup), "PT-lane permission: Vehicles authorized in Vanilla" },
-                { m_Setting.GetOptionGroupLocaleID(Setting.kBusLaneAdditionalGroup), "PT-lane permission: Vehicles not authorized in Vanilla" },
+                { m_Setting.GetOptionGroupLocaleID(Setting.kBusLaneAuthorizedGroup), "PT-lane authorization: vanilla-authorized vehicles" },
+                { m_Setting.GetOptionGroupLocaleID(Setting.kBusLaneAdditionalGroup), "PT-lane authorization: vanilla-unauthorized vehicles" },
                 { m_Setting.GetOptionGroupLocaleID(Setting.kBusLanePressureGroup), "Illegal PT-lane occupancy response" },
                 { m_Setting.GetOptionGroupLocaleID(Setting.kFineGroup), "Fine amounts" },
                 { m_Setting.GetOptionGroupLocaleID(Setting.kRepeatOffenderGroup), "Repeat offender policy" },
                 { m_Setting.GetOptionGroupLocaleID(Setting.kTemplateActionsGroup), "Template actions" },
-                { m_Setting.GetOptionGroupLocaleID(Setting.kPolicyImpactGroup), "Violation-rate metrics" },
+                { m_Setting.GetOptionGroupLocaleID(Setting.kPolicyImpactGroup), "Policy impact metrics" },
                 { m_Setting.GetOptionGroupLocaleID(Setting.kDebugGroup), "Debug" },
             };
 
-            AddGameplay(entries, nameof(Setting.EnablePublicTransportLaneEnforcement), nameof(Setting.DefaultEnablePublicTransportLaneEnforcement), "Enable PT-lane enforcement", "Turn public-transport-lane violation detection, fines, and PT-lane pathfinding penalties on or off.");
+            AddGameplay(entries, nameof(Setting.EnablePublicTransportLaneEnforcement), nameof(Setting.DefaultEnablePublicTransportLaneEnforcement), "Enable PT-lane enforcement", "Turn public-transport-only-lane violation detection, fines, and pathfinding penalties on or off.");
             AddGameplay(entries, nameof(Setting.EnableMidBlockCrossingEnforcement), nameof(Setting.DefaultEnableMidBlockCrossingEnforcement), "Enable mid-block enforcement", "Turn mid-block U-turn and centerline-crossing detection, fines, and pathfinding penalties on or off.");
             AddGameplay(entries, nameof(Setting.EnableIntersectionMovementEnforcement), nameof(Setting.DefaultEnableIntersectionMovementEnforcement), "Enable intersection enforcement", "Turn intersection movement-rule violation detection, fines, and pathfinding penalties on or off.");
             AddGameplay(entries, nameof(Setting.AllowRoadPublicTransportVehicles), nameof(Setting.DefaultAllowRoadPublicTransportVehicles), "Road public transport vehicles", "While this is on, road public transport vehicles are not fined by this mod for using public-transport-only lanes. Turning this off makes them subject to enforcement when using those lanes. Even then, vehicles actively performing emergency duties are still exempt from this mod's traffic-law fines.");
@@ -779,8 +820,8 @@ namespace Traffic_Law_Enforcement
             AddGameplay(entries, nameof(Setting.MidBlockCrossingFineAmount), nameof(Setting.DefaultMidBlockCrossingFineAmount), "Mid-block crossing fine", "Fine amount charged for mid-block U-turns and illegal centerline crossings for access.");
             AddGameplay(entries, nameof(Setting.IntersectionMovementFineAmount), nameof(Setting.DefaultIntersectionMovementFineAmount), "Intersection movement fine", "Fine amount charged when a vehicle crosses an intersection with a maneuver not allowed from its lane.");
             AddRepeat(entries, nameof(Setting.EnablePublicTransportLaneRepeatPenalty), nameof(Setting.PublicTransportLaneRepeatWindowMonths), nameof(Setting.PublicTransportLaneRepeatThreshold), nameof(Setting.PublicTransportLaneRepeatMultiplierPercent), nameof(Setting.DefaultEnablePublicTransportLaneRepeatPenalty), nameof(Setting.DefaultPublicTransportLaneRepeatWindowMonths), nameof(Setting.DefaultPublicTransportLaneRepeatThreshold), nameof(Setting.DefaultPublicTransportLaneRepeatMultiplierPercent), "PT-lane", "PT-lane");
-            AddRepeat(entries, nameof(Setting.EnableMidBlockCrossingRepeatPenalty), nameof(Setting.MidBlockCrossingRepeatWindowMonths), nameof(Setting.MidBlockCrossingRepeatThreshold), nameof(Setting.MidBlockCrossingRepeatMultiplierPercent), nameof(Setting.DefaultEnableMidBlockCrossingRepeatPenalty), nameof(Setting.DefaultMidBlockCrossingRepeatWindowMonths), nameof(Setting.DefaultMidBlockCrossingRepeatThreshold), nameof(Setting.DefaultMidBlockCrossingRepeatMultiplierPercent), "mid-block", "mid-block");
-            AddRepeat(entries, nameof(Setting.EnableIntersectionMovementRepeatPenalty), nameof(Setting.IntersectionMovementRepeatWindowMonths), nameof(Setting.IntersectionMovementRepeatThreshold), nameof(Setting.IntersectionMovementRepeatMultiplierPercent), nameof(Setting.DefaultEnableIntersectionMovementRepeatPenalty), nameof(Setting.DefaultIntersectionMovementRepeatWindowMonths), nameof(Setting.DefaultIntersectionMovementRepeatThreshold), nameof(Setting.DefaultIntersectionMovementRepeatMultiplierPercent), "intersection", "intersection");
+            AddRepeat(entries, nameof(Setting.EnableMidBlockCrossingRepeatPenalty), nameof(Setting.MidBlockCrossingRepeatWindowMonths), nameof(Setting.MidBlockCrossingRepeatThreshold), nameof(Setting.MidBlockCrossingRepeatMultiplierPercent), nameof(Setting.DefaultEnableMidBlockCrossingRepeatPenalty), nameof(Setting.DefaultMidBlockCrossingRepeatWindowMonths), nameof(Setting.DefaultMidBlockCrossingRepeatThreshold), nameof(Setting.DefaultMidBlockCrossingRepeatMultiplierPercent), "Mid-block", "mid-block crossing");
+            AddRepeat(entries, nameof(Setting.EnableIntersectionMovementRepeatPenalty), nameof(Setting.IntersectionMovementRepeatWindowMonths), nameof(Setting.IntersectionMovementRepeatThreshold), nameof(Setting.IntersectionMovementRepeatMultiplierPercent), nameof(Setting.DefaultEnableIntersectionMovementRepeatPenalty), nameof(Setting.DefaultIntersectionMovementRepeatWindowMonths), nameof(Setting.DefaultIntersectionMovementRepeatThreshold), nameof(Setting.DefaultIntersectionMovementRepeatMultiplierPercent), "Intersection", "intersection movement-rule violation");
             Add(entries, nameof(Setting.ResetCurrentSaveSettingsToCodeDefaults), "Reset current save settings to code defaults", "Reset the current save's gameplay rules to this mod's built-in code defaults.");
             Add(entries, nameof(Setting.CopyCurrentSaveSettingsToDefaults), "Copy current save settings to defaults", "Copy the current save's gameplay rules into the new-save defaults template.");
             Add(entries, nameof(Setting.ResetDefaultsToCodeDefaults), "Reset defaults to code defaults", "Reset the new-save defaults template to this mod's built-in code defaults.");
@@ -791,30 +832,31 @@ namespace Traffic_Law_Enforcement
             Add(entries, nameof(Setting.EnableType4PublicTransportLaneUsageLogging), "Enable PT-lane usage logging for non-public vehicles denied to use PT lanes", "Debug-only. Writes logs when vehicles that cannot use PT lanes in vanilla and are denied to use them by this mod's settings are observed using PT-only lanes. Turning this off affects logging only; permissions and enforcement behavior still run.");
             Add(entries, nameof(Setting.EnablePathfindingPenaltyDiagnosticLogging), "Enable pathfinding penalty diagnostic logging", "Debug-only. Writes pathfinding money-axis penalty apply logs and shared PathfindCarData diagnostic logs. Turning this off affects logging only; pathfinding penalties still run.");
             Add(entries, nameof(Setting.EnablePathObsoleteSourceLogging), "Enable path obsolete source logging", "Debug-only. Writes logs only when a system actually marks a vehicle PathOwner obsolete, including the source system and key reason data. Turning this off affects logging only; rerouting behavior still runs.");
-            Add(entries, nameof(Setting.PolicyImpactTotalStatistics), "Total", "Shows the rolling recent-1-in-game-month total violation rate, suppression failure rate, and fines.");
-            Add(entries, nameof(Setting.PolicyImpactPublicTransportLaneStatistics), "PT-lane", "Shows the rolling recent-1-in-game-month PT-lane violation rate, suppression failure rate, and fines.");
-            Add(entries, nameof(Setting.PolicyImpactMidBlockStatistics), "Mid-block", "Shows the rolling recent-1-in-game-month mid-block violation rate, suppression failure rate, and fines.");
-            Add(entries, nameof(Setting.PolicyImpactIntersectionStatistics), "Intersection", "Shows the rolling recent-1-in-game-month intersection violation rate, suppression failure rate, and fines.");            entries[BudgetUIPatches.FineIncomeBudgetItemLocaleId] = "Traffic law enforcement";
+            Add(entries, nameof(Setting.PolicyImpactTotalStatistics), "Total violations", "Shows the rolling recent-1-in-game-month total violation rate, suppression failure rate, and fines.");
+            Add(entries, nameof(Setting.PolicyImpactPublicTransportLaneStatistics), "PT-lane violations", "Shows the rolling recent-1-in-game-month PT-lane violation rate, suppression failure rate, and fines.");
+            Add(entries, nameof(Setting.PolicyImpactMidBlockStatistics), "Mid-block violations", "Shows the rolling recent-1-in-game-month mid-block violation rate, suppression failure rate, and fines.");
+            Add(entries, nameof(Setting.PolicyImpactIntersectionStatistics), "Intersection violations", "Shows the rolling recent-1-in-game-month intersection violation rate, suppression failure rate, and fines.");
+            entries[BudgetUIPatches.FineIncomeBudgetItemLocaleId] = "Traffic law enforcement";
             entries[BudgetUIPatches.FineIncomePublicTransportLaneLocaleId] = "Public-transport lane violations";
-            entries[BudgetUIPatches.FineIncomeMidBlockCrossingLocaleId] = "Centerline crossings";
-            entries[BudgetUIPatches.FineIncomeIntersectionMovementLocaleId] = "Intersection rule violations";
+            entries[BudgetUIPatches.FineIncomeMidBlockCrossingLocaleId] = "Mid-block violations";
+            entries[BudgetUIPatches.FineIncomeIntersectionMovementLocaleId] = "Intersection violations";
             entries[BudgetUIPatches.FineIncomeBudgetDescriptionLocaleId] = "Fine revenue collected from traffic-law enforcement during the last 1 in-game month.";
             entries[EnforcementPolicyImpactService.kLoadedSaveOnlyLocaleId] = "Available only in a loaded save.";
             entries[EnforcementPolicyImpactService.kWaitingForTimeLocaleId] = "Waiting for in-game time initialization.";
             entries[EnforcementPolicyImpactService.kNoDataLocaleId] = "No pathfinding requests, fined violations, or rerouted pathfinding outcomes that avoided penalized routes have been recorded yet.";
             entries[EnforcementPolicyImpactService.kNoteLocaleId] = "Note: All policy-impact metrics use a rolling recent-1-in-game-month window. A counts pathfinding requests, not unique trips. D counts estimated rerouted pathfinding outcomes that gave up a penalized route. Per-type D counts can overlap when one reroute avoids multiple penalty types.";
             entries[EnforcementPolicyImpactService.kTotalLabelLocaleId] = "Total";
-            entries[EnforcementPolicyImpactService.kPublicTransportLaneLabelLocaleId] = "PT-lane";
-            entries[EnforcementPolicyImpactService.kMidBlockLabelLocaleId] = "Mid-block";
-            entries[EnforcementPolicyImpactService.kIntersectionLabelLocaleId] = "Intersection";
+            entries[EnforcementPolicyImpactService.kPublicTransportLaneLabelLocaleId] = "PT-lane violations";
+            entries[EnforcementPolicyImpactService.kMidBlockLabelLocaleId] = "Mid-block violations";
+            entries[EnforcementPolicyImpactService.kIntersectionLabelLocaleId] = "Intersection violations";
             entries[EnforcementPolicyImpactService.kStatisticsLineFormat] = "{0}: violation rate {1}, suppression failure rate {2}, fines {3}₡.";
             entries[MonthlyEnforcementChirperSystem.kSenderTextLocaleId] = "Traffic Law Enforcement";
             entries[MonthlyEnforcementChirperSystem.kPeriodPointFormatLocaleId] = "{0} {1} {2:00}:{3:00}";
             entries[MonthlyEnforcementChirperSystem.kReportHeaderFormatLocaleId] = "Traffic enforcement report for {0} to {1}: {2} violations.";
-            entries[MonthlyEnforcementChirperSystem.kTotalLineFormatLocaleId] = "Total: violation rate {0}, suppression failure rate {1}, fines {2}₡.";
-            entries[MonthlyEnforcementChirperSystem.kPublicTransportLaneLineFormatLocaleId] = "PT-lane: violation rate {0}, suppression failure rate {1}, fines {2}₡.";
-            entries[MonthlyEnforcementChirperSystem.kMidBlockLineFormatLocaleId] = "Mid-block: violation rate {0}, suppression failure rate {1}, fines {2}₡.";
-            entries[MonthlyEnforcementChirperSystem.kIntersectionLineFormatLocaleId] = "Intersection: violation rate {0}, suppression failure rate {1}, fines {2}₡.";
+            entries[MonthlyEnforcementChirperSystem.kTotalLineFormatLocaleId] = "violation rate {0}, suppression failure rate {1}, fines {2}₡.";
+            entries[MonthlyEnforcementChirperSystem.kPublicTransportLaneLineFormatLocaleId] = "violation rate {0}, suppression failure rate {1}, fines {2}₡.";
+            entries[MonthlyEnforcementChirperSystem.kMidBlockLineFormatLocaleId] = "violation rate {0}, suppression failure rate {1}, fines {2}₡.";
+            entries[MonthlyEnforcementChirperSystem.kIntersectionLineFormatLocaleId] = "violation rate {0}, suppression failure rate {1}, fines {2}₡.";
             entries[MonthlyEnforcementChirperSystem.kNoRateLocaleId] = "No request-based rate available yet.";
             Add(entries, nameof(Setting.SendMonthlyChirperPreviewNow), "Send Chirper report now", "Immediately posts one Chirper report for the rolling recent-1-in-game-month window, from one in-game month ago to the moment you press this button.");
             return entries;
@@ -847,20 +889,15 @@ namespace Traffic_Law_Enforcement
         private void AddGameplay(Dictionary<string, string> entries, string currentName, string defaultName, string label, string desc)
         {
             Add(entries, currentName, label, desc);
-            Add(entries, defaultName, label, "Default for newly created saves. " + desc);
+            Add(entries, defaultName, label, "Default value for newly created saves. " + desc);
         }
 
         private void AddRepeat(Dictionary<string, string> entries, string currentEnableName, string currentWindowName, string currentThresholdName, string currentMultiplierName, string defaultEnableName, string defaultWindowName, string defaultThresholdName, string defaultMultiplierName, string label, string sentenceLabel)
         {
-            AddGameplay(entries, currentEnableName, defaultEnableName, $"{label} Repeat Offense Penalty Enabled", $"Applies higher fines to vehicles that repeatedly commit {sentenceLabel} violations.");
-            AddGameplay(entries, currentWindowName, defaultWindowName, $"{label} Repeat Offense Window (in-game months)", $"The in-game month window to consider repeated {sentenceLabel} violations for the same vehicle. Uses in-game time, not real-world time. 12 in-game months = 1 in-game year. Under vanilla/default timing, 1 in-game month = 1 in-game day. Mods that change day/month flow can skew repeat-offender timing.");
-            AddGameplay(entries, currentThresholdName, defaultThresholdName, $"{label} Repeat Offense Threshold", $"Number of {sentenceLabel} violations within the window required before enhanced fines apply.");
-            AddGameplay(entries, currentMultiplierName, defaultMultiplierName, $"{label} Penalty Multiplier", $"Multiplier applied to {sentenceLabel} fines after the repeat threshold is reached.");
-        }
-
-        private static string Capitalize(string value)
-        {
-            return string.IsNullOrEmpty(value) ? value : char.ToUpperInvariant(value[0]) + value.Substring(1);
+            AddGameplay(entries, currentEnableName, defaultEnableName, $"Enable repeat-offender penalty for {label}", $"Apply a higher fine to vehicles that repeatedly commit {sentenceLabel} violations.");
+            AddGameplay(entries, currentWindowName, defaultWindowName, $"{label} repeat-offender window (in-game months)", $"How long the same vehicle's {sentenceLabel} history is kept for repeat-offender counting. This uses in-game time, not real time. 12 in-game months equal 1 in-game year. On the vanilla time scale, 1 in-game month is roughly 1 in-game day. Mods that alter time progression can distort this window.");
+            AddGameplay(entries, currentThresholdName, defaultThresholdName, $"{label} repeat-offender threshold", $"How many {sentenceLabel} violations within the window are required before the repeat-offender penalty applies.");
+            AddGameplay(entries, currentMultiplierName, defaultMultiplierName, $"{label} repeat-offender multiplier", $"Multiplier applied to the {sentenceLabel} fine once the repeat-offender threshold is reached.");
         }
     }
 
@@ -929,10 +966,10 @@ namespace Traffic_Law_Enforcement
             Add(entries, nameof(Setting.EnableType4PublicTransportLaneUsageLogging), "대중교통 전용차선 이용이 불허된 비대중교통 차량의 대중교통 전용차선 사용 로그 기록", "디버그 전용입니다. 바닐라 기준으로도 대중교통 전용차선을 이용할 수 없으며 이 모드의 설정에서도 대중교통 전용차선 이용이 불허된 차량이 실제로 그 차선을 이용한 사실을 로그로 기록합니다. 이 옵션을 꺼도 통행 허용 여부와 단속 동작은 계속 유지됩니다.");
             Add(entries, nameof(Setting.EnablePathfindingPenaltyDiagnosticLogging), "경로탐색 페널티 진단 로그 기록", "디버그 전용입니다. 경로탐색 money-axis 페널티 적용 로그와 shared PathfindCarData 진단 로그를 기록합니다. 이 옵션을 꺼도 경로탐색 페널티 자체는 계속 적용됩니다.");
             Add(entries, nameof(Setting.EnablePathObsoleteSourceLogging), "경로 obsolete 원인 로그 기록", "디버그 전용입니다. 어떤 시스템이 실제로 차량의 PathOwner를 obsolete 상태로 만들었는지와 주요 판단 근거를 로그로 기록합니다. 이 옵션을 꺼도 재경로 동작 자체는 계속 진행됩니다.");
-            Add(entries, nameof(Setting.PolicyImpactTotalStatistics), "전체", "게임 시간 최근 1달 기준 전체 위반율, 억제 실패율, 벌금액을 표시합니다.");
-            Add(entries, nameof(Setting.PolicyImpactPublicTransportLaneStatistics), "대중교통 전용차선", "게임 시간 최근 1달 기준 대중교통 전용차선 위반율, 억제 실패율, 벌금액을 표시합니다.");
-            Add(entries, nameof(Setting.PolicyImpactMidBlockStatistics), "중앙선", "게임 시간 최근 1달 기준 중앙선 침범 위반율, 억제 실패율, 벌금액을 표시합니다.");
-            Add(entries, nameof(Setting.PolicyImpactIntersectionStatistics), "교차로", "게임 시간 최근 1달 기준 교차로 통행규칙 위반율, 억제 실패율, 벌금액을 표시합니다.");
+            Add(entries, nameof(Setting.PolicyImpactTotalStatistics), "전체 교통법규 위반", "게임 시간 최근 1달 기준 전체 위반율, 억제 실패율, 벌금액을 표시합니다.");
+            Add(entries, nameof(Setting.PolicyImpactPublicTransportLaneStatistics), "대중교통 전용차선 무단 이용", "게임 시간 최근 1달 기준 대중교통 전용차선 통행규칙 위반율, 억제 실패율, 벌금액을 표시합니다.");
+            Add(entries, nameof(Setting.PolicyImpactMidBlockStatistics), "중앙선 침범", "게임 시간 최근 1달 기준 중앙선 통행규칙 위반율, 억제 실패율, 벌금액을 표시합니다.");
+            Add(entries, nameof(Setting.PolicyImpactIntersectionStatistics), "교차로 통행규칙 위반", "게임 시간 최근 1달 기준 교차로 통행규칙 위반율, 억제 실패율, 벌금액을 표시합니다.");
             entries[BudgetUIPatches.FineIncomeBudgetItemLocaleId] = "교통법규 단속";
             entries[BudgetUIPatches.FineIncomePublicTransportLaneLocaleId] = "대중교통 전용차선 침입";
             entries[BudgetUIPatches.FineIncomeMidBlockCrossingLocaleId] = "중앙선 침범";
@@ -943,17 +980,17 @@ namespace Traffic_Law_Enforcement
             entries[EnforcementPolicyImpactService.kNoDataLocaleId] = "경로탐색 요청, 실제 위반, 또는 벌점 경로를 피한 것으로 추정되는 경로탐색 결과에 대한 기록이 아직 없습니다.";
             entries[EnforcementPolicyImpactService.kNoteLocaleId] = "참고: 정책 효과 지표는 모두 게임 시간으로 최근 1달 기준입니다. A는 고유 이동 건수가 아니라 전체 경로탐색 요청 수입니다. D는 단속 가능성 때문에 벌점 경로를 포기한 것으로 추정되는 경로탐색 결과 수입니다. 여러 위반 유형을 동시에 피한 결과가 있다면 유형별 D 값은 겹쳐 집계될 수 있습니다.";
             entries[EnforcementPolicyImpactService.kTotalLabelLocaleId] = "전체";
-            entries[EnforcementPolicyImpactService.kPublicTransportLaneLabelLocaleId] = "대중교통 전용차선";
-            entries[EnforcementPolicyImpactService.kMidBlockLabelLocaleId] = "중앙선";
-            entries[EnforcementPolicyImpactService.kIntersectionLabelLocaleId] = "교차로";
+            entries[EnforcementPolicyImpactService.kPublicTransportLaneLabelLocaleId] = "대중교통 전용차선 침입";
+            entries[EnforcementPolicyImpactService.kMidBlockLabelLocaleId] = "중앙선 침범";
+            entries[EnforcementPolicyImpactService.kIntersectionLabelLocaleId] = "교차로 통행규칙 위반";
             entries[EnforcementPolicyImpactService.kStatisticsLineFormat] = "{0}: 위반율 {1}, 억제 실패율 {2}, 벌금 {3}₡."; // This sentence is used in EnforcementPolicyImpactService.cs
             entries[MonthlyEnforcementChirperSystem.kSenderTextLocaleId] = "교통관리과";
             entries[MonthlyEnforcementChirperSystem.kPeriodPointFormatLocaleId] = "{1}년 {0} {2:00}:{3:00}";
             entries[MonthlyEnforcementChirperSystem.kReportHeaderFormatLocaleId] = "{0}부터 {1}까지 교통법규 단속 보고입니다. 총 위반 적발 {2}건.";
-            entries[MonthlyEnforcementChirperSystem.kTotalLineFormatLocaleId] = "전체: 위반율 {0}, 억제 실패율 {1}, 벌금 {2}₡.";
-            entries[MonthlyEnforcementChirperSystem.kPublicTransportLaneLineFormatLocaleId] = "대중교통 전용차선: 위반율 {0}, 억제 실패율 {1}, 벌금 {2}₡.";
-            entries[MonthlyEnforcementChirperSystem.kMidBlockLineFormatLocaleId] = "중앙선: 위반율 {0}, 억제 실패율 {1}, 벌금 {2}₡.";
-            entries[MonthlyEnforcementChirperSystem.kIntersectionLineFormatLocaleId] = "교차로: 위반율 {0}, 억제 실패율 {1}, 벌금 {2}₡.";
+            entries[MonthlyEnforcementChirperSystem.kTotalLineFormatLocaleId] = "위반율 {0}, 억제 실패율 {1}, 벌금 {2}₡.";
+            entries[MonthlyEnforcementChirperSystem.kPublicTransportLaneLineFormatLocaleId] = "위반율 {0}, 억제 실패율 {1}, 벌금 {2}₡.";
+            entries[MonthlyEnforcementChirperSystem.kMidBlockLineFormatLocaleId] = "위반율 {0}, 억제 실패율 {1}, 벌금 {2}₡.";
+            entries[MonthlyEnforcementChirperSystem.kIntersectionLineFormatLocaleId] = "위반율 {0}, 억제 실패율 {1}, 벌금 {2}₡.";
             entries[MonthlyEnforcementChirperSystem.kNoRateLocaleId] = "경로탐색 요청 기준 집계 없음";
             Add(entries, nameof(Setting.SendMonthlyChirperPreviewNow), "지금 Chirper 보고 보내기", "지금 시점부터 게임 시간 1달 전까지의 단속 실적을 Chirper로 즉시 한 번 게시합니다.");
             return entries;

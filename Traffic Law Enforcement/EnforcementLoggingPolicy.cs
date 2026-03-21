@@ -26,15 +26,16 @@ namespace Traffic_Law_Enforcement
             return EnableEnforcementEventLogging;
         }
 
+        public static bool ShouldLogType2Usage()
+        {
+            return EnableType2PublicTransportLaneUsageLogging;
+        }
+
         public static bool ShouldLogType3Usage()
         {
             return EnableType3PublicTransportLaneUsageLogging;
         }
 
-        public static bool ShouldLogType2Usage()
-        {
-            return EnableType2PublicTransportLaneUsageLogging;
-        }
 
         public static bool ShouldLogType4Usage()
         {

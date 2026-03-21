@@ -8,7 +8,7 @@ namespace Traffic_Law_Enforcement
 {
     public partial class EnforcementSaveDataSystem : GameSystemBase, IDefaultSerializable, ISerializable, IPreDeserialize, IPostDeserialize
     {
-        private const int kSerializationVersion = 6;
+        private const int kSerializationVersion = 7;
 
         private EntityQuery m_StatisticsQuery;
         private EntityQuery m_PublicTransportLaneViolationQuery;
@@ -584,6 +584,10 @@ namespace Traffic_Law_Enforcement
             writer.Write(state.IntersectionMovementRepeatWindowMonths);
             writer.Write(state.IntersectionMovementRepeatThreshold);
             writer.Write(state.IntersectionMovementRepeatMultiplierPercent);
+            writer.Write(state.EnableType2PublicTransportLaneUsageLogging);
+            writer.Write(state.EnableType3PublicTransportLaneUsageLogging);
+            writer.Write(state.EnableType4PublicTransportLaneUsageLogging);
+            writer.Write(state.EnablePathObsoleteSourceLogging);
         }
 
         private static EnforcementGameplaySettingsState ReadGameplaySettings<TReader>(TReader reader, int version) where TReader : IReader
@@ -635,7 +639,17 @@ namespace Traffic_Law_Enforcement
             reader.Read(out state.EnableIntersectionMovementRepeatPenalty);
             reader.Read(out state.IntersectionMovementRepeatWindowMonths);
             reader.Read(out state.IntersectionMovementRepeatThreshold);
+
             reader.Read(out state.IntersectionMovementRepeatMultiplierPercent);
+
+            // New debug logging fields (v7)
+            if (version >= 7)
+            {
+                reader.Read(out state.EnableType2PublicTransportLaneUsageLogging);
+                reader.Read(out state.EnableType3PublicTransportLaneUsageLogging);
+                reader.Read(out state.EnableType4PublicTransportLaneUsageLogging);
+                reader.Read(out state.EnablePathObsoleteSourceLogging);
+            }
 
             // If legacy BusLane fields are present, map them to new PublicTransportLane fields (for older saves)
             // (Assume the reader will provide the correct order; if not, add explicit field mapping here)

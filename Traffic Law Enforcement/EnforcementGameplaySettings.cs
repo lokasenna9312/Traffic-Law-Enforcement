@@ -1,7 +1,12 @@
 namespace Traffic_Law_Enforcement
 {
-    public struct EnforcementGameplaySettingsState
-    {
+        public struct EnforcementGameplaySettingsState
+        {
+            // Debug logging toggles
+            public bool EnableType2PublicTransportLaneUsageLogging;
+            public bool EnableType3PublicTransportLaneUsageLogging;
+            public bool EnableType4PublicTransportLaneUsageLogging;
+            public bool EnablePathObsoleteSourceLogging;
         public bool EnablePublicTransportLaneEnforcement;
         public bool EnableMidBlockCrossingEnforcement;
         public bool EnableIntersectionMovementEnforcement;
@@ -83,6 +88,10 @@ namespace Traffic_Law_Enforcement
                 IntersectionMovementRepeatWindowMonths = 1,
                 IntersectionMovementRepeatThreshold = 2,
                 IntersectionMovementRepeatMultiplierPercent = 150,
+                EnableType2PublicTransportLaneUsageLogging = false,
+                EnableType3PublicTransportLaneUsageLogging = false,
+                EnableType4PublicTransportLaneUsageLogging = false,
+                EnablePathObsoleteSourceLogging = false,
             };
         }
 
