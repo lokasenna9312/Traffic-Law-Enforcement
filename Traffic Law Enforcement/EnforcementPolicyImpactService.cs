@@ -164,6 +164,7 @@ namespace Traffic_Law_Enforcement
         public const string kWaitingForTimeLocaleId = "TrafficLawEnforcement.PolicyImpact.Text.WaitingForTime";
         public const string kNoDataLocaleId = "TrafficLawEnforcement.PolicyImpact.Text.NoData";
         public const string kNoteLocaleId = "TrafficLawEnforcement.PolicyImpact.Text.Note";
+        public const string kStatisticsLineFormat = "TrafficLawEnforcement.PolicyImpact.Text.StatisticsLineFormat";
         public const string kTotalLabelLocaleId = "TrafficLawEnforcement.PolicyImpact.Label.Total";
         public const string kPublicTransportLaneLabelLocaleId = "TrafficLawEnforcement.PolicyImpact.Label.PublicTransportLane";
         public const string kMidBlockLabelLocaleId = "TrafficLawEnforcement.PolicyImpact.Label.MidBlock";
@@ -493,7 +494,7 @@ namespace Traffic_Law_Enforcement
             string suppressionFailureRateTotal = FormatRatio(violationNumeratorTotal, suppressionFailureDenominatorTotal);
             string finesTotal = FormatMoney(snapshot.TotalFineAmount);
             string totalLabel = LocalizeText(kTotalLabelLocaleId, "Total");
-            string lineFormat = LocalizeText("TrafficLawEnforcement.PolicyImpact.Text.StatisticsLineFormat", "{0}: violation rate {1}, suppression failure rate {2}, fines {3}₡.");
+            string lineFormat = LocalizeText(kStatisticsLineFormat, "{0}: violation rate {1}, suppression failure rate {2}, fines {3}₡.");
             return string.Format(lineFormat, totalLabel, violationRateTotal, suppressionFailureRateTotal, finesTotal);
         }
 
@@ -511,7 +512,7 @@ namespace Traffic_Law_Enforcement
             string suppressionFailureRate1 = FormatRatio(violationNumerator1, suppressionFailureDenominator1);
             string fines1 = FormatMoney(snapshot.PublicTransportLaneFineAmount);
             string label1 = LocalizeText(kPublicTransportLaneLabelLocaleId, "PT-lane");
-            string lineFormat = LocalizeText("TrafficLawEnforcement.PolicyImpact.Text.StatisticsLineFormat", "{0}: violation rate {1}, suppression failure rate {2}, fines {3}₡.");
+            string lineFormat = LocalizeText(kStatisticsLineFormat, "{0}: violation rate {1}, suppression failure rate {2}, fines {3}₡.");
             return string.Format(lineFormat, label1, violationRate1, suppressionFailureRate1, fines1);
         }
 
@@ -529,7 +530,7 @@ namespace Traffic_Law_Enforcement
             string suppressionFailureRate2 = FormatRatio(violationNumerator2, suppressionFailureDenominator2);
             string fines2 = FormatMoney(snapshot.MidBlockCrossingFineAmount);
             string label2 = LocalizeText(kMidBlockLabelLocaleId, "Mid-block");
-            string lineFormat = LocalizeText("TrafficLawEnforcement.PolicyImpact.Text.StatisticsLineFormat", "{0}: violation rate {1}, suppression failure rate {2}, fines {3}₡.");
+            string lineFormat = LocalizeText(kStatisticsLineFormat, "{0}: violation rate {1}, suppression failure rate {2}, fines {3}₡.");
             return string.Format(lineFormat, label2, violationRate2, suppressionFailureRate2, fines2);
         }
 
@@ -547,7 +548,7 @@ namespace Traffic_Law_Enforcement
             string suppressionFailureRate3 = FormatRatio(violationNumerator3, suppressionFailureDenominator3);
             string fines3 = FormatMoney(snapshot.IntersectionMovementFineAmount);
             string label3 = LocalizeText(kIntersectionLabelLocaleId, "Intersection");
-            string lineFormat = LocalizeText("TrafficLawEnforcement.PolicyImpact.Text.StatisticsLineFormat", "{0}: violation rate {1}, suppression failure rate {2}, fines {3}₡.");
+            string lineFormat = LocalizeText(kStatisticsLineFormat, "{0}: violation rate {1}, suppression failure rate {2}, fines {3}₡.");
             return string.Format(lineFormat, label3, violationRate3, suppressionFailureRate3, fines3);
         }
 
