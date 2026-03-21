@@ -112,21 +112,21 @@ namespace Traffic_Law_Enforcement
             return (GetEnabledPublicTransportLaneCategories() & categories) != PublicTransportLaneVehicleCategory.None;
         }
 
-        public bool AllowsAdditionalBusLaneRole(BusLaneFlagGrantExperimentRole role)
+        public bool AllowsAdditionalPublicTransportLaneRole(PublicTransportLaneFlagGrantExperimentRole role)
         {
             switch (role)
             {
-                case BusLaneFlagGrantExperimentRole.PersonalCar:
+                case PublicTransportLaneFlagGrantExperimentRole.PersonalCar:
                     return AllowPersonalCars;
-                case BusLaneFlagGrantExperimentRole.DeliveryTruck:
+                case PublicTransportLaneFlagGrantExperimentRole.DeliveryTruck:
                     return AllowDeliveryTrucks;
-                case BusLaneFlagGrantExperimentRole.CargoTransport:
+                case PublicTransportLaneFlagGrantExperimentRole.CargoTransport:
                     return AllowCargoTransportVehicles;
-                case BusLaneFlagGrantExperimentRole.Hearse:
+                case PublicTransportLaneFlagGrantExperimentRole.Hearse:
                     return AllowHearses;
-                case BusLaneFlagGrantExperimentRole.PrisonerTransport:
+                case PublicTransportLaneFlagGrantExperimentRole.PrisonerTransport:
                     return AllowPrisonerTransports;
-                case BusLaneFlagGrantExperimentRole.ParkMaintenanceVehicle:
+                case PublicTransportLaneFlagGrantExperimentRole.ParkMaintenanceVehicle:
                     return AllowParkMaintenanceVehicles;
                 default:
                     return false;

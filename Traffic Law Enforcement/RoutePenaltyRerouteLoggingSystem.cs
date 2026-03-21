@@ -46,7 +46,7 @@ namespace Traffic_Law_Enforcement
         private ComponentLookup<ParkingLane> m_ParkingLaneData;
         private ComponentLookup<GarageLane> m_GarageLaneData;
         private ComponentLookup<ConnectionLane> m_ConnectionLaneData;
-        private BusLaneVehicleTypeLookups m_TypeLookups;
+        private PublicTransportLaneVehicleTypeLookups m_TypeLookups;
         private readonly Dictionary<Entity, RoutePenaltySnapshot> m_LastSnapshots = new Dictionary<Entity, RoutePenaltySnapshot>();
         private readonly HashSet<Entity> m_CandidateVehicles = new HashSet<Entity>();
         private int m_UpdateCount;
@@ -78,7 +78,7 @@ namespace Traffic_Law_Enforcement
             m_ParkingLaneData = GetComponentLookup<ParkingLane>(true);
             m_GarageLaneData = GetComponentLookup<GarageLane>(true);
             m_ConnectionLaneData = GetComponentLookup<ConnectionLane>(true);
-            m_TypeLookups = BusLaneVehicleTypeLookups.Create(this);
+            m_TypeLookups = PublicTransportLaneVehicleTypeLookups.Create(this);
             m_CachedVehicleQuery = GetEntityQuery(ComponentType.ReadOnly<Car>(), ComponentType.ReadOnly<CarCurrentLane>());
             RequireForUpdate(m_CarQuery);
         }
@@ -168,7 +168,7 @@ namespace Traffic_Law_Enforcement
         private RoutePenaltySnapshot BuildSnapshot(Entity vehicle, CarCurrentLane currentLane)
         {
             RoutePenaltyProfile profile = default;
-            bool allowedOnPublicTransportLane = BusLanePolicy.IsAllowedOnPublicTransportLane(vehicle, ref m_TypeLookups);
+            bool allowedOnPublicTransportLane = PublicTransportLanePolicy.IsAllowedOnPublicTransportLane(vehicle, ref m_TypeLookups);
             List<string> penaltyTags = new List<string>(MaxPenaltyTags);
             uint hash = 2166136261u;
             int omittedTagCount = 0;
@@ -368,7 +368,7 @@ namespace Traffic_Law_Enforcement
         private void LogReroute(Entity vehicle, RoutePenaltySnapshot previousSnapshot, RoutePenaltySnapshot currentSnapshot)
         {
             int avoidedPenalty = previousSnapshot.TotalPenalty - currentSnapshot.TotalPenalty;
-            string role = BusLanePolicy.DescribeVehicleRole(vehicle, ref m_TypeLookups);
+            string role = PublicTransportLanePolicy.DescribeVehicleRole(vehicle, ref m_TypeLookups);
             string message = $"Pathfinding reroute (estimated): vehicle={vehicle}, role={role}, avoidedPenalty={avoidedPenalty}, fromPenalty={previousSnapshot.TotalPenalty} [{previousSnapshot.Breakdown}], toPenalty={currentSnapshot.TotalPenalty} [{currentSnapshot.Breakdown}], fromTags={previousSnapshot.Tags}, toTags={currentSnapshot.Tags}";
         }
 

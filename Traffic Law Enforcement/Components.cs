@@ -4,6 +4,21 @@ using Unity.Entities;
 
 namespace Traffic_Law_Enforcement
 {
+    public struct PublicTransportLaneViolation : IComponentData
+    {
+        public Entity m_Lane;
+        public long m_StartDayTicks;
+        public bool m_ExitPressureApplied;
+    }
+    public struct PublicTransportLaneType2UsageState : IComponentData
+    {
+        public Entity m_Lane;
+    }
+
+    public struct PublicTransportLaneType4UsageState : IComponentData
+    {
+        public Entity m_Lane;
+    }
     public struct LaneTransitionAnalysisState : IComponentData
     {
         public byte m_LastProcessedLaneChangeCount;
@@ -25,12 +40,6 @@ namespace Traffic_Law_Enforcement
         public Entity m_Lane;
     }
 
-    public struct PublicTransportLaneViolation : IComponentData
-    {
-        public Entity m_Lane;
-        public long m_StartDayTicks;
-        public bool m_ExitPressureApplied;
-    }
 
     public struct CenterlineAccessObsoleteState : IComponentData
     {
@@ -54,6 +63,7 @@ namespace Traffic_Law_Enforcement
         public int m_MidBlockCrossingViolationCount;
         public int m_IntersectionMovementViolationCount;
     }
+
 
     public struct VehicleLaneHistory : IComponentData
     {

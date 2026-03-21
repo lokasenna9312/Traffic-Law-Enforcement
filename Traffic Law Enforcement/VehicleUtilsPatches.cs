@@ -104,10 +104,10 @@ namespace Traffic_Law_Enforcement
                 return;
             }
 
-            BusLaneVehicleTypeLookups typeLookups = BusLaneVehicleTypeLookups.Create(system);
+            PublicTransportLaneVehicleTypeLookups typeLookups = PublicTransportLaneVehicleTypeLookups.Create(system);
             typeLookups.Update(system);
 
-            if (!BusLanePolicy.TryGetDesiredPermissionState(owner, car, EnforcementGameplaySettingsService.Current, ref typeLookups, out bool shouldTrack, out CarFlags desiredMask) || !shouldTrack)
+            if (!PublicTransportLanePolicy.TryGetDesiredPermissionState(owner, car, EnforcementGameplaySettingsService.Current, ref typeLookups, out bool shouldTrack, out CarFlags desiredMask) || !shouldTrack)
             {
                 return;
             }

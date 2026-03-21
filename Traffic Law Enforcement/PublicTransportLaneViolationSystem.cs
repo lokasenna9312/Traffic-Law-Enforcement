@@ -2,6 +2,7 @@ using Game;
 using Game.Net;
 using Game.Vehicles;
 using Game.SceneFlow;
+using Traffic_Law_Enforcement;
 using Unity.Collections;
 using Unity.Entities;
 using Entity = Unity.Entities.Entity;
@@ -141,10 +142,13 @@ namespace Traffic_Law_Enforcement
 
         private void EvaluateVehicle(Entity vehicle, CarCurrentLane currentLane, EnforcementGameplaySettingsState settings, ref TrafficLawEnforcementStatistics statistics, ref bool statisticsChanged)
         {
+
             Entity laneEntity = currentLane.m_Lane;
             bool isViolation = false;
+            bool shouldLogType2Usage = false;
             bool shouldLogType3Usage = false;
-            BusLaneFlagGrantExperimentRole type3Role = BusLaneFlagGrantExperimentRole.None;
+            bool shouldLogType4Usage = false;
+
 
             if (laneEntity != Entity.Null &&
                 m_CarLaneData.TryGetComponent(laneEntity, out CarLane laneData) &&
@@ -152,14 +156,29 @@ namespace Traffic_Law_Enforcement
             {
                 if (!IsEmergencyVehicle(vehicle))
                 {
-                    bool hasPermission = BusLanePolicy.HasPublicTransportLanePermissionFlag(vehicle, ref m_TypeLookups);
-                    isViolation = !hasPermission;
-                    shouldLogType3Usage = hasPermission && BusLanePolicy.TryGetAllowedType3Role(vehicle, settings, ref m_TypeLookups, out type3Role);
+                    bool hasPermission = PublicTransportLanePolicy.HasPublicTransportLanePermissionFlag(vehicle, ref m_TypeLookups);
+                    var authorizedCategories = PublicTransportLanePolicy.GetVanillaAuthorizedCategories(vehicle, ref m_TypeLookups);
+                    var additionalRole = PublicTransportLanePolicy.GetFlagGrantExperimentRole(vehicle, ref m_TypeLookups);
+
+                    // --- Type 2: Vanilla 허용, 모드 불허 ---
+                    bool isType2 = !hasPermission && authorizedCategories != PublicTransportLaneVehicleCategory.None && !settings.AllowsPublicTransportLaneCategories(authorizedCategories);
+                    shouldLogType2Usage = isType2;
+
+                    // --- Type 3: 모드 실험적 허가, 바닐라 불허 ---
+                    bool isType3 = hasPermission && PublicTransportLanePolicy.TryGetAllowedType3Role(vehicle, settings, ref m_TypeLookups, out _);
+                    shouldLogType3Usage = isType3;
+
+                    // --- Type 4: 바닐라/모드 모두 불허 ---
+                    bool isType4 = !hasPermission && authorizedCategories == PublicTransportLaneVehicleCategory.None && additionalRole == PublicTransportLaneFlagGrantExperimentRole.None;
+                    shouldLogType4Usage = isType4;
                 }
             }
 
-            UpdateType3UsageObservation(vehicle, laneEntity, shouldLogType3Usage, type3Role);
+            UpdateType2UsageObservation(vehicle, laneEntity, shouldLogType2Usage);
+            UpdateType3UsageObservation(vehicle, laneEntity, shouldLogType3Usage);
+            UpdateType4UsageObservation(vehicle, laneEntity, shouldLogType4Usage);
 
+            // --- Violation 상태 추적 및 로깅 ---
             bool hasViolation = m_ViolationData.HasComponent(vehicle);
             if (!isViolation)
             {
@@ -167,7 +186,6 @@ namespace Traffic_Law_Enforcement
                 {
                     EntityManager.RemoveComponent<PublicTransportLaneViolation>(vehicle);
                 }
-
                 return;
             }
 
@@ -199,30 +217,50 @@ namespace Traffic_Law_Enforcement
                 EntityManager.SetComponentData(vehicle, violation);
             }
         }
-
-        private bool IsEmergencyVehicle(Entity vehicle)
+        // --- Trace and Log Type 2 ---
+        private void UpdateType2UsageObservation(Entity vehicle, Entity laneEntity, bool shouldLogType2Usage)
         {
-            return m_CarData.TryGetComponent(vehicle, out Car car) && EmergencyVehiclePolicy.IsEmergencyVehicle(car);
+            bool hasUsageState = EntityManager.HasComponent<PublicTransportLaneType2UsageState>(vehicle);
+            if (!shouldLogType2Usage || laneEntity == Entity.Null)
+            {
+                if (hasUsageState)
+                {
+                    EntityManager.RemoveComponent<PublicTransportLaneType2UsageState>(vehicle);
+                }
+                return;
+            }
+
+            if (!hasUsageState)
+            {
+                EntityManager.AddComponentData(vehicle, new PublicTransportLaneType2UsageState
+                {
+                    m_Lane = laneEntity,
+                });
+                LogType2Usage(vehicle, laneEntity);
+                return;
+            }
+
+            var state = EntityManager.GetComponentData<PublicTransportLaneType2UsageState>(vehicle);
+            if (state.m_Lane == laneEntity)
+            {
+                return;
+            }
+
+            state.m_Lane = laneEntity;
+            EntityManager.SetComponentData(vehicle, state);
+            LogType2Usage(vehicle, laneEntity);
         }
 
-        private void LogViolation(Entity vehicle, EnforcementGameplaySettingsState settings, PublicTransportLaneViolation violation, int totalCount)
+        // --- Trace and Log Type 3 ---
+        private void UpdateType3UsageObservation(Entity vehicle, Entity laneEntity, bool shouldLogType3Usage)
         {
-            string reason = BusLanePolicy.DescribeMissingPermissionReason(vehicle, settings, ref m_TypeLookups);
-            string message = $"Public transport lane violation #{totalCount}: vehicle={vehicle}, lane={violation.m_Lane}, reason={reason}";
-            EnforcementPenaltyService.RecordPublicTransportLaneViolation(vehicle, violation.m_Lane, reason);
-            EnforcementLoggingPolicy.RecordEnforcementEvent(message);
-        }
-
-        private void UpdateType3UsageObservation(Entity vehicle, Entity laneEntity, bool shouldLogType3Usage, BusLaneFlagGrantExperimentRole type3Role)
-        {
-            bool hasUsageState = m_Type3UsageData.HasComponent(vehicle);
-            if (!shouldLogType3Usage || type3Role == BusLaneFlagGrantExperimentRole.None || laneEntity == Entity.Null)
+            bool hasUsageState = EntityManager.HasComponent<PublicTransportLaneType3UsageState>(vehicle);
+            if (!shouldLogType3Usage || laneEntity == Entity.Null)
             {
                 if (hasUsageState)
                 {
                     EntityManager.RemoveComponent<PublicTransportLaneType3UsageState>(vehicle);
                 }
-
                 return;
             }
 
@@ -232,11 +270,11 @@ namespace Traffic_Law_Enforcement
                 {
                     m_Lane = laneEntity,
                 });
-                LogType3Usage(vehicle, laneEntity, type3Role);
+                LogType3Usage(vehicle, laneEntity);
                 return;
             }
 
-            PublicTransportLaneType3UsageState state = m_Type3UsageData[vehicle];
+            var state = EntityManager.GetComponentData<PublicTransportLaneType3UsageState>(vehicle);
             if (state.m_Lane == laneEntity)
             {
                 return;
@@ -244,19 +282,72 @@ namespace Traffic_Law_Enforcement
 
             state.m_Lane = laneEntity;
             EntityManager.SetComponentData(vehicle, state);
-            LogType3Usage(vehicle, laneEntity, type3Role);
+            LogType3Usage(vehicle, laneEntity);
         }
 
-        private static void LogType3Usage(Entity vehicle, Entity laneEntity, BusLaneFlagGrantExperimentRole type3Role)
+        // --- Trace and Log Type 4 ---
+        private void UpdateType4UsageObservation(Entity vehicle, Entity laneEntity, bool shouldLogType4Usage)
         {
-            // Locale-aware display name
-            var lang = GameManager.instance?.localizationManager?.activeLocaleId ?? "en-US";
-            var setting = Mod.Settings ?? new Setting(null);
-            string roleName = lang.StartsWith("ko")
-                ? new LocaleKO(setting).GetBusLaneFlagGrantExperimentRoleDisplayName(type3Role)
-                : new LocaleEN(setting).GetBusLaneFlagGrantExperimentRoleDisplayName(type3Role);
-            string message = $"PT-lane usage by non-public vehicles allowed to use PT lanes: vehicle={vehicle}, lane={laneEntity}, role={roleName}";
-            EnforcementLoggingPolicy.RecordAllowedType3Usage(message);
+            bool hasUsageState = EntityManager.HasComponent<PublicTransportLaneType4UsageState>(vehicle);
+            if (!shouldLogType4Usage || laneEntity == Entity.Null)
+            {
+                if (hasUsageState)
+                {
+                    EntityManager.RemoveComponent<PublicTransportLaneType4UsageState>(vehicle);
+                }
+                return;
+            }
+
+            if (!hasUsageState)
+            {
+                EntityManager.AddComponentData(vehicle, new PublicTransportLaneType4UsageState
+                {
+                    m_Lane = laneEntity,
+                });
+                LogType4Usage(vehicle, laneEntity);
+                return;
+            }
+
+            var state = EntityManager.GetComponentData<PublicTransportLaneType4UsageState>(vehicle);
+            if (state.m_Lane == laneEntity)
+            {
+                return;
+            }
+
+            state.m_Lane = laneEntity;
+            EntityManager.SetComponentData(vehicle, state);
+            LogType4Usage(vehicle, laneEntity);
+        }
+
+        private void LogType2Usage(Entity vehicle, Entity laneEntity)
+        {
+            string msg = $"PT-lane usage by vanilla-allowed but mod-denied vehicle (Type 2): vehicle={vehicle}, lane={laneEntity}";
+            EnforcementLoggingPolicy.RecordType2Usage(msg);
+        }
+
+        private static void LogType3Usage(Entity vehicle, Entity laneEntity)
+        {
+            string msg = $"PT-lane usage by vanilla-denied but mod-allowed vehicle (Type 3): vehicle={vehicle}, lane={laneEntity}";
+            EnforcementLoggingPolicy.RecordType3Usage(msg);
+        }
+
+        private void LogType4Usage(Entity vehicle, Entity laneEntity)
+        {
+            string msg = $"PT-lane usage by vanilla-denied and mod-denied vehicle (Type 4): vehicle={vehicle}, lane={laneEntity}";
+            EnforcementLoggingPolicy.RecordType4Usage(msg);
+        }
+
+        private bool IsEmergencyVehicle(Entity vehicle)
+        {
+            return m_CarData.TryGetComponent(vehicle, out Car car) && EmergencyVehiclePolicy.IsEmergencyVehicle(car);
+        }
+
+        private void LogViolation(Entity vehicle, EnforcementGameplaySettingsState settings, PublicTransportLaneViolation violation, int totalCount)
+        {
+            string reason = PublicTransportLanePolicy.DescribeMissingPermissionReason(vehicle, settings, ref m_TypeLookups);
+            string message = $"Public transport lane violation #{totalCount}: vehicle={vehicle}, lane={violation.m_Lane}, reason={reason}";
+            EnforcementPenaltyService.RecordPublicTransportLaneViolation(vehicle, violation.m_Lane, reason);
+            EnforcementLoggingPolicy.RecordEnforcementEvent(message);
         }
     }
 }

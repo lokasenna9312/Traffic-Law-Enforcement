@@ -42,7 +42,7 @@ namespace Traffic_Law_Enforcement
             LogChange(inGameTimeLabel, nameof(Setting.EnableIntersectionMovementEnforcement), previous.Gameplay.EnableIntersectionMovementEnforcement, current.Gameplay.EnableIntersectionMovementEnforcement);
             LogChange(inGameTimeLabel, nameof(Setting.EnableEstimatedRerouteLogging), previous.EnableEstimatedRerouteLogging, current.EnableEstimatedRerouteLogging);
             LogChange(inGameTimeLabel, nameof(Setting.EnableEnforcementEventLogging), previous.EnableEnforcementEventLogging, current.EnableEnforcementEventLogging);
-            LogChange(inGameTimeLabel, nameof(Setting.EnableAllowedType3PublicTransportLaneUsageLogging), previous.EnableAllowedType3PublicTransportLaneUsageLogging, current.EnableAllowedType3PublicTransportLaneUsageLogging);
+            LogChange(inGameTimeLabel, nameof(Setting.EnableType3PublicTransportLaneUsageLogging), previous.EnableType3PublicTransportLaneUsageLogging, current.EnableType3PublicTransportLaneUsageLogging);
             LogChange(inGameTimeLabel, nameof(Setting.EnablePathfindingPenaltyDiagnosticLogging), previous.EnablePathfindingPenaltyDiagnosticLogging, current.EnablePathfindingPenaltyDiagnosticLogging);
             LogChange(inGameTimeLabel, nameof(Setting.AllowRoadPublicTransportVehicles), previous.Gameplay.AllowRoadPublicTransportVehicles, current.Gameplay.AllowRoadPublicTransportVehicles);
             LogChange(inGameTimeLabel, nameof(Setting.AllowTaxis), previous.Gameplay.AllowTaxis, current.Gameplay.AllowTaxis);
@@ -131,20 +131,20 @@ namespace Traffic_Law_Enforcement
             public readonly EnforcementGameplaySettingsState Gameplay;
             public readonly bool EnableEstimatedRerouteLogging;
             public readonly bool EnableEnforcementEventLogging;
-            public readonly bool EnableAllowedType3PublicTransportLaneUsageLogging;
+            public readonly bool EnableType3PublicTransportLaneUsageLogging;
             public readonly bool EnablePathfindingPenaltyDiagnosticLogging;
 
             private LoggedSettingsSnapshot(
                 EnforcementGameplaySettingsState gameplay,
                 bool enableEstimatedRerouteLogging,
                 bool enableEnforcementEventLogging,
-                bool enableAllowedType3PublicTransportLaneUsageLogging,
+                bool EnableType3PublicTransportLaneUsageLogging,
                 bool enablePathfindingPenaltyDiagnosticLogging)
             {
                 Gameplay = gameplay;
                 EnableEstimatedRerouteLogging = enableEstimatedRerouteLogging;
                 EnableEnforcementEventLogging = enableEnforcementEventLogging;
-                EnableAllowedType3PublicTransportLaneUsageLogging = enableAllowedType3PublicTransportLaneUsageLogging;
+                EnableType3PublicTransportLaneUsageLogging = EnableType3PublicTransportLaneUsageLogging;
                 EnablePathfindingPenaltyDiagnosticLogging = enablePathfindingPenaltyDiagnosticLogging;
             }
 
@@ -154,7 +154,7 @@ namespace Traffic_Law_Enforcement
                     EnforcementGameplaySettingsService.Current,
                     Mod.Settings?.EnableEstimatedRerouteLogging ?? false,
                     Mod.Settings?.EnableEnforcementEventLogging ?? false,
-                    Mod.Settings?.EnableAllowedType3PublicTransportLaneUsageLogging ?? false,
+                    Mod.Settings?.EnableType3PublicTransportLaneUsageLogging ?? false,
                     Mod.Settings?.EnablePathfindingPenaltyDiagnosticLogging ?? false);
             }
 
@@ -166,7 +166,7 @@ namespace Traffic_Law_Enforcement
                 Append(builder, nameof(Setting.EnableIntersectionMovementEnforcement), Gameplay.EnableIntersectionMovementEnforcement);
                 Append(builder, nameof(Setting.EnableEstimatedRerouteLogging), EnableEstimatedRerouteLogging);
                 Append(builder, nameof(Setting.EnableEnforcementEventLogging), EnableEnforcementEventLogging);
-                Append(builder, nameof(Setting.EnableAllowedType3PublicTransportLaneUsageLogging), EnableAllowedType3PublicTransportLaneUsageLogging);
+                Append(builder, nameof(Setting.EnableType3PublicTransportLaneUsageLogging), EnableType3PublicTransportLaneUsageLogging);
                 Append(builder, nameof(Setting.EnablePathfindingPenaltyDiagnosticLogging), EnablePathfindingPenaltyDiagnosticLogging);
                 Append(builder, nameof(Setting.AllowRoadPublicTransportVehicles), Gameplay.AllowRoadPublicTransportVehicles);
                 Append(builder, nameof(Setting.AllowTaxis), Gameplay.AllowTaxis);

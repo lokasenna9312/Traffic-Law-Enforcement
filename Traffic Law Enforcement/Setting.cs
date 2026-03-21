@@ -554,7 +554,15 @@ namespace Traffic_Law_Enforcement
 
         [Exclude]
         [SettingsUISection(kDebugTab, kDebugGroup)]
-        public bool EnableAllowedType3PublicTransportLaneUsageLogging { get; set; }
+        public bool EnableType3PublicTransportLaneUsageLogging { get; set; }
+
+        [Exclude]
+        [SettingsUISection(kDebugTab, kDebugGroup)]
+        public bool EnableType2PublicTransportLaneUsageLogging { get; set; }
+
+        [Exclude]
+        [SettingsUISection(kDebugTab, kDebugGroup)]
+        public bool EnableType4PublicTransportLaneUsageLogging { get; set; }
 
         [Exclude]
         [SettingsUISection(kDebugTab, kDebugGroup)]
@@ -581,7 +589,9 @@ namespace Traffic_Law_Enforcement
             // Keep debug logging opt-in by default.
             EnableEstimatedRerouteLogging = false;
             EnableEnforcementEventLogging = false;
-            EnableAllowedType3PublicTransportLaneUsageLogging = false;
+            EnableType3PublicTransportLaneUsageLogging = false;
+            EnableType2PublicTransportLaneUsageLogging = false;
+            EnableType4PublicTransportLaneUsageLogging = false;
             EnablePathfindingPenaltyDiagnosticLogging = false;
         }
 
@@ -754,7 +764,7 @@ namespace Traffic_Law_Enforcement
             Add(entries, nameof(Setting.ResetDefaultsToCodeDefaults), "Reset defaults to code defaults", "Reset the new-save defaults template to this mod's built-in code defaults.");
             Add(entries, nameof(Setting.EnableEstimatedRerouteLogging), "Enable estimated reroute logging", "Debug-only. Writes only 'Pathfinding reroute (estimated)' logs. Turning this off disables reroute debug tracking and logging only; traffic-law detection, fines, repeat-offender logic, and pathfinding penalties still run.");
             Add(entries, nameof(Setting.EnableEnforcementEventLogging), "Enable enforcement event logging", "Debug-only. Writes traffic-law enforcement event logs: PT-lane, mid-block, and intersection violation logs, fine-income collection logs, and bus-lane exit-pressure logs. Turning this off affects logging only; enforcement behavior and penalties still run.");
-            Add(entries, nameof(Setting.EnableAllowedType3PublicTransportLaneUsageLogging), "Enable PT-lane usage logging for non-public vehicles allowed to use PT lanes", "Debug-only. Writes logs when vehicles that cannot use PT lanes in vanilla but are allowed to use them by this mod's settings are observed using PT-only lanes. Turning this off affects logging only; permissions and enforcement behavior still run.");
+            Add(entries, nameof(Setting.EnableType3PublicTransportLaneUsageLogging), "Enable PT-lane usage logging for non-public vehicles allowed to use PT lanes", "Debug-only. Writes logs when vehicles that cannot use PT lanes in vanilla but are allowed to use them by this mod's settings are observed using PT-only lanes. Turning this off affects logging only; permissions and enforcement behavior still run.");
             Add(entries, nameof(Setting.EnablePathfindingPenaltyDiagnosticLogging), "Enable pathfinding penalty diagnostic logging", "Debug-only. Writes pathfinding money-axis penalty apply logs and shared PathfindCarData diagnostic logs. Turning this off affects logging only; pathfinding penalties still run.");
             entries[BudgetUIPatches.FineIncomeBudgetItemLocaleId] = "Traffic law enforcement";
             entries[BudgetUIPatches.FineIncomePublicTransportLaneLocaleId] = "Public-transport lane violations";
@@ -792,16 +802,16 @@ namespace Traffic_Law_Enforcement
             entries[m_Setting.GetOptionDescLocaleID(optionName)] = desc;
         }
 
-        public string GetBusLaneFlagGrantExperimentRoleDisplayName(BusLaneFlagGrantExperimentRole role)
+        public string GetPublicTransportLaneFlagGrantExperimentRoleDisplayName(PublicTransportLaneFlagGrantExperimentRole role)
         {
             switch (role)
             {
-                case BusLaneFlagGrantExperimentRole.PersonalCar: return "Personal cars";
-                case BusLaneFlagGrantExperimentRole.DeliveryTruck: return "Delivery trucks";
-                case BusLaneFlagGrantExperimentRole.CargoTransport: return "Cargo transport vehicles";
-                case BusLaneFlagGrantExperimentRole.Hearse: return "Hearses";
-                case BusLaneFlagGrantExperimentRole.PrisonerTransport: return "Prisoner transports";
-                case BusLaneFlagGrantExperimentRole.ParkMaintenanceVehicle: return "Park maintenance vehicles";
+                case PublicTransportLaneFlagGrantExperimentRole.PersonalCar: return "Personal cars";
+                case PublicTransportLaneFlagGrantExperimentRole.DeliveryTruck: return "Delivery trucks";
+                case PublicTransportLaneFlagGrantExperimentRole.CargoTransport: return "Cargo transport vehicles";
+                case PublicTransportLaneFlagGrantExperimentRole.Hearse: return "Hearses";
+                case PublicTransportLaneFlagGrantExperimentRole.PrisonerTransport: return "Prisoner transports";
+                case PublicTransportLaneFlagGrantExperimentRole.ParkMaintenanceVehicle: return "Park maintenance vehicles";
                 default: return "None";
             }
         }
@@ -886,7 +896,7 @@ namespace Traffic_Law_Enforcement
             Add(entries, nameof(Setting.ResetDefaultsToCodeDefaults), "기본값을 코드 기본값으로 초기화", "새 세이브 기본값 템플릿을 이 모드의 내장 기본값으로 되돌립니다.");
             Add(entries, nameof(Setting.EnableEstimatedRerouteLogging), "추정 우회 경로 로그 기록", "디버그 전용입니다. 교통법규 위반 단속을 피하기 위해 경로를 수정한 교통량의 로그를 기록합니다. 이 옵션을 꺼도 위반 감지, 벌금 부과, 상습 위반 처리, 경로탐색 페널티는 계속 동작합니다.");
             Add(entries, nameof(Setting.EnableEnforcementEventLogging), "교통법규 단속 이벤트 로그 기록", "디버그 전용입니다. 대중교통 전용차선, 중앙선 침범, 교차로 통행규칙 위반 로그와 벌금 수익 징수 로그, 대중교통 전용차선 이탈 압박 로그를 기록합니다. 이 옵션을 꺼도 단속 동작과 벌금 부과는 계속 진행됩니다.");
-            Add(entries, nameof(Setting.EnableAllowedType3PublicTransportLaneUsageLogging), "대중교통 전용차선 이용이 허가된 비대중교통 차량의 대중교통 전용차선 사용 로그 기록", "디버그 전용입니다. 바닐라 기준으로는 대중교통 전용차선을 이용할 수 없지만 이 모드의 설정에서 대중교통 전용차선 이용이 허가된 차량이 실제로 그 차선을 이용한 사실을 로그로 기록합니다. 이 옵션을 꺼도 통행 허용 여부와 단속 동작은 계속 유지됩니다.");
+            Add(entries, nameof(Setting.EnableType3PublicTransportLaneUsageLogging), "대중교통 전용차선 이용이 허가된 비대중교통 차량의 대중교통 전용차선 사용 로그 기록", "디버그 전용입니다. 바닐라 기준으로는 대중교통 전용차선을 이용할 수 없지만 이 모드의 설정에서 대중교통 전용차선 이용이 허가된 차량이 실제로 그 차선을 이용한 사실을 로그로 기록합니다. 이 옵션을 꺼도 통행 허용 여부와 단속 동작은 계속 유지됩니다.");
             Add(entries, nameof(Setting.EnablePathfindingPenaltyDiagnosticLogging), "경로탐색 페널티 진단 로그 기록", "디버그 전용입니다. 경로탐색 money-axis 페널티 적용 로그와 shared PathfindCarData 진단 로그를 기록합니다. 이 옵션을 꺼도 경로탐색 페널티 자체는 계속 적용됩니다.");
             entries[BudgetUIPatches.FineIncomeBudgetItemLocaleId] = "교통법규 단속";
             entries[BudgetUIPatches.FineIncomePublicTransportLaneLocaleId] = "대중교통 전용차선 침입";
@@ -924,16 +934,16 @@ namespace Traffic_Law_Enforcement
             entries[m_Setting.GetOptionDescLocaleID(optionName)] = desc;
         }
 
-        public string GetBusLaneFlagGrantExperimentRoleDisplayName(BusLaneFlagGrantExperimentRole role)
+        public string GetPublicTransportLaneFlagGrantExperimentRoleDisplayName(PublicTransportLaneFlagGrantExperimentRole role)
         {
             switch (role)
             {
-                case BusLaneFlagGrantExperimentRole.PersonalCar: return "개인 승용차";
-                case BusLaneFlagGrantExperimentRole.DeliveryTruck: return "배달 트럭";
-                case BusLaneFlagGrantExperimentRole.CargoTransport: return "화물 운송 차량";
-                case BusLaneFlagGrantExperimentRole.Hearse: return "영구차";
-                case BusLaneFlagGrantExperimentRole.PrisonerTransport: return "죄수 호송차";
-                case BusLaneFlagGrantExperimentRole.ParkMaintenanceVehicle: return "공원 정비 차량";
+                case PublicTransportLaneFlagGrantExperimentRole.PersonalCar: return "개인 승용차";
+                case PublicTransportLaneFlagGrantExperimentRole.DeliveryTruck: return "배달 트럭";
+                case PublicTransportLaneFlagGrantExperimentRole.CargoTransport: return "화물 운송 차량";
+                case PublicTransportLaneFlagGrantExperimentRole.Hearse: return "영구차";
+                case PublicTransportLaneFlagGrantExperimentRole.PrisonerTransport: return "죄수 호송차";
+                case PublicTransportLaneFlagGrantExperimentRole.ParkMaintenanceVehicle: return "공원 정비 차량";
                 default: return "없음";
             }
         }

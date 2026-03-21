@@ -146,7 +146,7 @@ namespace Traffic_Law_Enforcement
         }
     }
 
-    public static class BusLanePolicy
+    public static class PublicTransportLanePolicy
     {
         public const CarFlags PublicTransportLanePermissionMask = CarFlags.UsePublicTransportLanes | CarFlags.PreferPublicTransportLanes;
 
@@ -182,8 +182,8 @@ namespace Traffic_Law_Enforcement
 
             bool emergency = EmergencyVehiclePolicy.IsEmergencyVehicle(car);
             PublicTransportLaneVehicleCategory authorizedCategories = GetVanillaAuthorizedCategories(vehicle, ref lookups);
-            BusLaneFlagGrantExperimentRole additionalRole = GetFlagGrantExperimentRole(vehicle, ref lookups);
-            bool recognizedRole = authorizedCategories != PublicTransportLaneVehicleCategory.None || additionalRole != BusLaneFlagGrantExperimentRole.None;
+            PublicTransportLaneFlagGrantExperimentRole additionalRole = GetFlagGrantExperimentRole(vehicle, ref lookups);
+            bool recognizedRole = authorizedCategories != PublicTransportLaneVehicleCategory.None || additionalRole != PublicTransportLaneFlagGrantExperimentRole.None;
 
             if (!recognizedRole && !emergency)
             {
@@ -192,13 +192,13 @@ namespace Traffic_Law_Enforcement
 
             shouldTrack = true;
             bool allowAuthorized = settings.AllowsPublicTransportLaneCategories(authorizedCategories);
-            bool allowAdditional = settings.AllowsAdditionalBusLaneRole(additionalRole);
+            bool allowAdditional = settings.AllowsAdditionalPublicTransportLaneRole(additionalRole);
             bool allow = emergency || allowAuthorized || allowAdditional;
             desiredMask = GetDesiredPermissionMask(emergency, authorizedCategories, additionalRole, allowAdditional, allow);
             return true;
         }
 
-        private static CarFlags GetDesiredPermissionMask(bool emergency, PublicTransportLaneVehicleCategory authorizedCategories, BusLaneFlagGrantExperimentRole additionalRole, bool allowAdditional, bool allow)
+        private static CarFlags GetDesiredPermissionMask(bool emergency, PublicTransportLaneVehicleCategory authorizedCategories, PublicTransportLaneFlagGrantExperimentRole additionalRole, bool allowAdditional, bool allow)
         {
             if (!allow)
             {
@@ -211,7 +211,7 @@ namespace Traffic_Law_Enforcement
             }
 
             if (authorizedCategories == PublicTransportLaneVehicleCategory.None &&
-                additionalRole != BusLaneFlagGrantExperimentRole.None &&
+                additionalRole != PublicTransportLaneFlagGrantExperimentRole.None &&
                 allowAdditional)
             {
                 return CarFlags.UsePublicTransportLanes;
@@ -223,7 +223,7 @@ namespace Traffic_Law_Enforcement
         public static string DescribeMissingPermissionReason(Entity vehicle, EnforcementGameplaySettingsState settings, ref PublicTransportLaneVehicleTypeLookups lookups)
         {
             PublicTransportLaneVehicleCategory authorizedCategories = GetVanillaAuthorizedCategories(vehicle, ref lookups);
-            BusLaneFlagGrantExperimentRole additionalRole = GetFlagGrantExperimentRole(vehicle, ref lookups);
+            PublicTransportLaneFlagGrantExperimentRole additionalRole = GetFlagGrantExperimentRole(vehicle, ref lookups);
 
 
             if (authorizedCategories != PublicTransportLaneVehicleCategory.None)
@@ -236,15 +236,11 @@ namespace Traffic_Law_Enforcement
                 return $"public-transport-lane flags missing for vanilla-authorized categories: {authorizedCategories}";
             }
 
-            if (additionalRole != BusLaneFlagGrantExperimentRole.None)
+            if (additionalRole != PublicTransportLaneFlagGrantExperimentRole.None)
             {
-                // Locale-aware display name (consistent with PublicTransportLaneViolationSystem)
-                var lang = GameManager.instance?.localizationManager?.activeLocaleId ?? "en-US";
                 var setting = Mod.Settings ?? new Setting(null);
-                var displayName = lang.StartsWith("ko")
-                    ? new LocaleKO(setting).GetBusLaneFlagGrantExperimentRoleDisplayName(additionalRole)
-                    : new LocaleEN(setting).GetBusLaneFlagGrantExperimentRoleDisplayName(additionalRole);
-                if (settings.AllowsAdditionalBusLaneRole(additionalRole))
+                var displayName = new LocaleEN(setting).GetPublicTransportLaneFlagGrantExperimentRoleDisplayName(additionalRole);
+                if (settings.AllowsAdditionalPublicTransportLaneRole(additionalRole))
                 {
                     return $"public-transport-lane flags missing for granted role: {displayName}";
                 }
@@ -255,10 +251,10 @@ namespace Traffic_Law_Enforcement
             return "vehicle has no public-transport-lane permission flags";
         }
 
-        public static bool TryGetAllowedType3Role(Entity vehicle, EnforcementGameplaySettingsState settings, ref PublicTransportLaneVehicleTypeLookups lookups, out BusLaneFlagGrantExperimentRole role)
+        public static bool TryGetAllowedType3Role(Entity vehicle, EnforcementGameplaySettingsState settings, ref PublicTransportLaneVehicleTypeLookups lookups, out PublicTransportLaneFlagGrantExperimentRole role)
         {
             role = GetFlagGrantExperimentRole(vehicle, ref lookups);
-            if (role == BusLaneFlagGrantExperimentRole.None)
+            if (role == PublicTransportLaneFlagGrantExperimentRole.None)
             {
                 return false;
             }
@@ -268,7 +264,7 @@ namespace Traffic_Law_Enforcement
                 return false;
             }
 
-            return settings.AllowsAdditionalBusLaneRole(role);
+            return settings.AllowsAdditionalPublicTransportLaneRole(role);
         }
 
         public static string DescribeVehicleRole(Entity vehicle, ref PublicTransportLaneVehicleTypeLookups lookups)
@@ -278,15 +274,13 @@ namespace Traffic_Law_Enforcement
             PublicTransportLaneVehicleCategory authorizedCategories = GetVanillaAuthorizedCategories(vehicle, ref lookups);
             AppendAuthorizedCategoryNames(authorizedCategories, names);
 
-            BusLaneFlagGrantExperimentRole additionalRole = GetFlagGrantExperimentRole(vehicle, ref lookups);
+            PublicTransportLaneFlagGrantExperimentRole additionalRole = GetFlagGrantExperimentRole(vehicle, ref lookups);
 
-            if (additionalRole != BusLaneFlagGrantExperimentRole.None)
+            if (additionalRole != PublicTransportLaneFlagGrantExperimentRole.None)
             {
-                var lang = GameManager.instance?.localizationManager?.activeLocaleId ?? "en-US";
+                // Always use English for display/logging
                 var setting = new Setting(null); // Or use your actual Setting instance
-                var displayName = lang.StartsWith("ko")
-                    ? new LocaleKO(setting).GetBusLaneFlagGrantExperimentRoleDisplayName(additionalRole)
-                    : new LocaleEN(setting).GetBusLaneFlagGrantExperimentRoleDisplayName(additionalRole);
+                var displayName = new LocaleEN(setting).GetPublicTransportLaneFlagGrantExperimentRoleDisplayName(additionalRole);
                 names.Add(displayName);
             }
 
@@ -347,39 +341,39 @@ namespace Traffic_Law_Enforcement
             return categories;
         }
 
-        public static BusLaneFlagGrantExperimentRole GetFlagGrantExperimentRole(Entity vehicle, ref PublicTransportLaneVehicleTypeLookups lookups)
+        public static PublicTransportLaneFlagGrantExperimentRole GetFlagGrantExperimentRole(Entity vehicle, ref PublicTransportLaneVehicleTypeLookups lookups)
         {
             if (lookups.PersonalCarData.HasComponent(vehicle))
             {
-                return BusLaneFlagGrantExperimentRole.PersonalCar;
+                return PublicTransportLaneFlagGrantExperimentRole.PersonalCar;
             }
 
             if (lookups.DeliveryTruckData.HasComponent(vehicle))
             {
-                return BusLaneFlagGrantExperimentRole.DeliveryTruck;
+                return PublicTransportLaneFlagGrantExperimentRole.DeliveryTruck;
             }
 
             if (lookups.CargoTransportData.HasComponent(vehicle))
             {
-                return BusLaneFlagGrantExperimentRole.CargoTransport;
+                return PublicTransportLaneFlagGrantExperimentRole.CargoTransport;
             }
 
             if (lookups.HearseData.HasComponent(vehicle))
             {
-                return BusLaneFlagGrantExperimentRole.Hearse;
+                return PublicTransportLaneFlagGrantExperimentRole.Hearse;
             }
 
             if (lookups.PrisonerTransportData.HasComponent(vehicle))
             {
-                return BusLaneFlagGrantExperimentRole.PrisonerTransport;
+                return PublicTransportLaneFlagGrantExperimentRole.PrisonerTransport;
             }
 
             if (lookups.ParkMaintenanceVehicleData.HasComponent(vehicle))
             {
-                return BusLaneFlagGrantExperimentRole.ParkMaintenanceVehicle;
+                return PublicTransportLaneFlagGrantExperimentRole.ParkMaintenanceVehicle;
             }
 
-            return BusLaneFlagGrantExperimentRole.None;
+            return PublicTransportLaneFlagGrantExperimentRole.None;
         }
 
         private static PublicTransportLaneVehicleCategory GetMaintenanceCategories(Entity vehicle, ref PublicTransportLaneVehicleTypeLookups lookups)

@@ -273,7 +273,7 @@ namespace Traffic_Law_Enforcement
 
             if (collectedFineIncome > 0 && EnforcementLoggingPolicy.ShouldLogEnforcementEvents())
             {
-                Mod.log.Info($"Traffic law enforcement fine income recorded. batch={collectedFineIncome}, rolling1m={EnforcementBudgetUIService.CurrentFineIncome}, busLane1m={EnforcementBudgetUIService.CurrentPublicTransportLaneFineIncome}, midBlock1m={EnforcementBudgetUIService.CurrentMidBlockCrossingFineIncome}, intersection1m={EnforcementBudgetUIService.CurrentIntersectionMovementFineIncome}, monthTicks={currentTimestampMonthTicks}");
+                Mod.log.Info($"Traffic law enforcement fine income recorded. batch={collectedFineIncome}, rolling1m={EnforcementBudgetUIService.CurrentFineIncome}, PTLane1m={EnforcementBudgetUIService.CurrentPublicTransportLaneFineIncome}, midBlock1m={EnforcementBudgetUIService.CurrentMidBlockCrossingFineIncome}, intersection1m={EnforcementBudgetUIService.CurrentIntersectionMovementFineIncome}, monthTicks={currentTimestampMonthTicks}");
             }
         }
 

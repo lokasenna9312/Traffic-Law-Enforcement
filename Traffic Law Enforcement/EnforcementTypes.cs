@@ -35,7 +35,7 @@ namespace Traffic_Law_Enforcement
         VehicleMaintenanceVehicle = 1 << 9,
     }
 
-    public enum BusLaneFlagGrantExperimentRole : byte
+    public enum PublicTransportLaneFlagGrantExperimentRole : byte
     {
         None = 0,
         PersonalCar = 1,
@@ -46,16 +46,16 @@ namespace Traffic_Law_Enforcement
         ParkMaintenanceVehicle = 6,
     }
 
-    public static class BusLaneFlagGrantExperimentRoleInfo
+    public static class PublicTransportLaneFlagGrantExperimentRoleInfo
     {
-        public static BusLaneFlagGrantExperimentRole Clamp(int value)
+        public static PublicTransportLaneFlagGrantExperimentRole Clamp(int value)
         {
-            if (value < (int)BusLaneFlagGrantExperimentRole.None || value > (int)BusLaneFlagGrantExperimentRole.ParkMaintenanceVehicle)
+            if (value < (int)PublicTransportLaneFlagGrantExperimentRole.None || value > (int)PublicTransportLaneFlagGrantExperimentRole.ParkMaintenanceVehicle)
             {
-                return BusLaneFlagGrantExperimentRole.None;
+                return PublicTransportLaneFlagGrantExperimentRole.None;
             }
 
-            return (BusLaneFlagGrantExperimentRole)value;
+            return (PublicTransportLaneFlagGrantExperimentRole)value;
         }
 
     }

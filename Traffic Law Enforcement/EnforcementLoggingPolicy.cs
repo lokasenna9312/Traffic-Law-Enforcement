@@ -6,7 +6,11 @@ namespace Traffic_Law_Enforcement
 
         public static bool EnableEnforcementEventLogging => Mod.Settings?.EnableEnforcementEventLogging ?? false;
 
-        public static bool EnableAllowedType3PublicTransportLaneUsageLogging => Mod.Settings?.EnableAllowedType3PublicTransportLaneUsageLogging ?? false;
+        public static bool EnableType2PublicTransportLaneUsageLogging => Mod.Settings?.EnableType2PublicTransportLaneUsageLogging ?? false;
+
+        public static bool EnableType3PublicTransportLaneUsageLogging => Mod.Settings?.EnableType3PublicTransportLaneUsageLogging ?? false;
+
+        public static bool EnableType4PublicTransportLaneUsageLogging => Mod.Settings?.EnableType4PublicTransportLaneUsageLogging ?? false;
 
         public static bool EnablePathfindingPenaltyDiagnosticLogging => Mod.Settings?.EnablePathfindingPenaltyDiagnosticLogging ?? false;
 
@@ -20,9 +24,19 @@ namespace Traffic_Law_Enforcement
             return EnableEnforcementEventLogging;
         }
 
-        public static bool ShouldLogAllowedType3Usage()
+        public static bool ShouldLogType3Usage()
         {
-            return EnableAllowedType3PublicTransportLaneUsageLogging;
+            return EnableType3PublicTransportLaneUsageLogging;
+        }
+
+        public static bool ShouldLogType2Usage()
+        {
+            return EnableType2PublicTransportLaneUsageLogging;
+        }
+
+        public static bool ShouldLogType4Usage()
+        {
+            return EnableType4PublicTransportLaneUsageLogging;
         }
 
         public static bool ShouldLogPathfindingPenaltyDiagnostics()
@@ -41,13 +55,33 @@ namespace Traffic_Law_Enforcement
             Mod.log.Info(message);
         }
 
-        public static void RecordAllowedType3Usage(string message)
+        public static void RecordType2Usage(string message)
         {
-            if (!ShouldLogAllowedType3Usage() || string.IsNullOrWhiteSpace(message))
+            if (!ShouldLogType2Usage() || string.IsNullOrWhiteSpace(message))
+            {
+                return;
+            }
+            EnforcementTelemetry.RecordEvent(message);
+            Mod.log.Info(message);
+        }
+
+        public static void RecordType3Usage(string message)
+        {
+            if (!ShouldLogType3Usage() || string.IsNullOrWhiteSpace(message))
             {
                 return;
             }
 
+            EnforcementTelemetry.RecordEvent(message);
+            Mod.log.Info(message);
+        }
+
+        public static void RecordType4Usage(string message)
+        {
+            if (!ShouldLogType4Usage() || string.IsNullOrWhiteSpace(message))
+            {
+                return;
+            }
             EnforcementTelemetry.RecordEvent(message);
             Mod.log.Info(message);
         }
