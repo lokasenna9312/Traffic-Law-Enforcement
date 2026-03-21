@@ -138,13 +138,13 @@ namespace Traffic_Law_Enforcement
                 EnforcementGameplaySettingsState gameplay,
                 bool enableEstimatedRerouteLogging,
                 bool enableEnforcementEventLogging,
-                bool EnableType3PublicTransportLaneUsageLogging,
+                bool enableType3PublicTransportLaneUsageLogging,
                 bool enablePathfindingPenaltyDiagnosticLogging)
             {
                 Gameplay = gameplay;
                 EnableEstimatedRerouteLogging = enableEstimatedRerouteLogging;
                 EnableEnforcementEventLogging = enableEnforcementEventLogging;
-                EnableType3PublicTransportLaneUsageLogging = EnableType3PublicTransportLaneUsageLogging;
+                EnableType3PublicTransportLaneUsageLogging = enableType3PublicTransportLaneUsageLogging;
                 EnablePathfindingPenaltyDiagnosticLogging = enablePathfindingPenaltyDiagnosticLogging;
             }
 
