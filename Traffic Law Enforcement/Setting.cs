@@ -809,7 +809,7 @@ namespace Traffic_Law_Enforcement
             entries[EnforcementPolicyImpactService.kPublicTransportLaneLabelLocaleId] = "PT-lane violations";
             entries[EnforcementPolicyImpactService.kMidBlockLabelLocaleId] = "Mid-block violations";
             entries[EnforcementPolicyImpactService.kIntersectionLabelLocaleId] = "Intersection violations";
-            entries[EnforcementPolicyImpactService.kStatisticsLineFormat] = "{0}: violation rate {1}, suppression failure rate {2}, fines {3}₡.";
+            entries[EnforcementPolicyImpactService.kStatisticsLineFormat] = "violation rate {0}, suppression failure rate {1}, fines {2}₡.";
             entries[MonthlyEnforcementChirperSystem.kSenderTextLocaleId] = "Traffic Law Enforcement";
             entries[MonthlyEnforcementChirperSystem.kPeriodPointFormatLocaleId] = "{0} {1} {2:00}:{3:00}";
             entries[MonthlyEnforcementChirperSystem.kReportHeaderFormatLocaleId] = "Traffic enforcement report for {0} to {1}: {2} violations.";
@@ -943,7 +943,7 @@ namespace Traffic_Law_Enforcement
             entries[EnforcementPolicyImpactService.kPublicTransportLaneLabelLocaleId] = "대중교통 전용차선 침입";
             entries[EnforcementPolicyImpactService.kMidBlockLabelLocaleId] = "중앙선 침범";
             entries[EnforcementPolicyImpactService.kIntersectionLabelLocaleId] = "교차로 통행규칙 위반";
-            entries[EnforcementPolicyImpactService.kStatisticsLineFormat] = "{0}: 위반율 {1}, 억제 실패율 {2}, 벌금 {3}₡."; // This sentence is used in EnforcementPolicyImpactService.cs
+            entries[EnforcementPolicyImpactService.kStatisticsLineFormat] = "위반율 {0}, 억제 실패율 {1}, 벌금 {2}₡.";
             entries[MonthlyEnforcementChirperSystem.kSenderTextLocaleId] = "교통관리과";
             entries[MonthlyEnforcementChirperSystem.kPeriodPointFormatLocaleId] = "{1}년 {0} {2:00}:{3:00}";
             entries[MonthlyEnforcementChirperSystem.kReportHeaderFormatLocaleId] = "{0}부터 {1}까지 교통법규 단속 보고입니다. 총 위반 적발 {2}건.";
