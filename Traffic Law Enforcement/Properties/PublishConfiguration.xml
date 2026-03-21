@@ -7,19 +7,19 @@
 	<ShortDescription Value="Penalizes traffic offenders and encourages drivers to comply with traffic laws." />
 	<!--Long description of the mod. Single line or multi line. Supports minimal markdown subset-->
 	<!--LongDescription Value="This mod enforces traffic laws by penalizing, 1. U-turning at the midst of road, 2. improper lane usage at intersections, 3. private vehicles' using public transport lanes, 4. blocking intersections. More violation types will be added in future updates." /-->
-<LongDescription>
+	<LongDescription>
 My first CSL2 mod, created with extensive help from GPT-5.4 in Visual Studio Code.
 Visual Studio Code의 GPT-5.4에게서 많은 도움을 받아 만든 저의 첫 번째 시스카2 모드입니다.
 
 ## Language Info
 
-Version 0.1.0 supports English and Korean.
-0.1.0 기준 영어와 한국어를 지원합니다.
+Version 0.1.* supports English and Korean.
+0.1.* 기준 영어와 한국어를 지원합니다.
 
 ## English Introduction
 
 ### 1. Main Features
-As of version 0.1.0, this mod discourages drivers from committing the following three types of traffic law violations by imposing fines and increasing the cost of the affected routes.
+As of version 0.1.*, this mod discourages drivers from committing the following three types of traffic law violations by imposing fines and increasing the cost of the affected routes.
 - **Illegal center line crossing:** Making a U-turn where U-turns are not permitted; crossing the center line to enter a parking lot or service building on the opposite side of the road; and crossing the center line when leaving such a building to enter a lane on the opposite side.
 - **Intersection rule violations:** Traveling in a direction that is not permitted at an intersection. (Example: making a left turn from a lane where left turns are not allowed.)
 - **PT lane violations:** Using a PT (public transport) lane with a vehicle that is not permitted to enter PT lanes.
@@ -52,7 +52,7 @@ The following options can be configured either for the currently loaded save fil
 ## 한국어 설명
 
 ### 1. 주요 기능
-0.1.0 기준 이 모드는 다음의 3가지 교통법규 위반 행위에 대해서 벌금을 부과하고 해당 경로의 비용을 증가시킴으로써, 운전자들이 그러한 행위를 꺼리게 만듭니다.
+0.1.* 기준 이 모드는 다음의 3가지 교통법규 위반 행위에 대해서 벌금을 부과하고 해당 경로의 비용을 증가시킴으로써, 운전자들이 그러한 행위를 꺼리게 만듭니다.
 - **불법 중앙선 침입:** U턴이 허가되지 않은 곳에서 U턴을 하는 행위, 중앙선 반대편에 있는 주차장 또는 서비스 건물을 이용하기 위해 중앙선을 넘어 진입하는 행위, 그리고 그러한 건물에서 나오는 차량이 중앙선을 넘어 반대편 차선으로 진입하는 행위
 - **교차로 통행규칙 위반:** 교차로에서 허가되지 않은 방향으로 통행하는 행위 (예: 좌회전이 허가되지 않은 차선에서 좌회전하는 행위)
 - **대중교통 전용차선 침범:** 대중교통 전용차선 진입이 허가되지 않은 차량이 대중교통 전용차선을 이용하는 행위
@@ -81,7 +81,7 @@ The following options can be configured either for the currently loaded save fil
 ### 5. 추가적으로 개선하거나 구현하고 싶은 사항
 - 교차로 안에서 정차하는 운전자들도 단속하도록 만들고 싶었지만, 제 코딩 실력이 부족해서 그 기능은 구현하지 못했습니다.
 - 심각한 상습 교통법규 위반자들에게는 더욱 강한 처벌(예: 운전면허 정지 또는 취소, 교도소 수감)을 적용하고 싶었지만, 그 기능 역시 제 코딩 실력이 부족해서 구현하지 못했습니다.
-</LongDescription>
+	</LongDescription>
 	<!--Thumbnail-->
 	<Thumbnail Value="Properties/Thumbnail.jpg" />
 	<!--Screenshot, can be set multiple times-->
@@ -99,7 +99,7 @@ The following options can be configured either for the currently loaded save fil
 	<!--Link to the forum post where the mod can be discussed-->
 	<ForumLink Value="https://forum.paradoxplaza.com/forum/threads/traffic-law-enforcement.1909882/" />
 	<!--Version of the mod-->
-	<ModVersion Value="0.1.3" />
+	<ModVersion Value="0.1.4" />
 	<!--Recommended version of the base game to use the mod-->
 	<GameVersion Value="1.5.6f1" />
 	<!--Dependency for the mod, can be set multiple times-->
@@ -107,9 +107,12 @@ The following options can be configured either for the currently loaded save fil
 	<!--Required DLC, can be set multiple times. Supported values are "Landmark Buildings", "San Fransisco Set", "Beach Properties", "Urban Promenades", "Modern Architecture"-->
 	<RequiredDLC Value="" />
 	<!--Change log for new version. Single line or multi line. Supports minimal markdown subset-->
-	<ChangeLog Value="Fixed all traffic count which is used to calculate violation rates." />
-	<!--<ChangeLog>
-	</ChangeLog>-->
+	<ChangeLog>
+Fixed logics about statistics.
+Fixed logics and explanations about logging.
+Fixed the bug that caused mass path obsolescence for vehicles using PT lanes.
+Made Type 1 (Allowed to use PT lanes in Vanilla, and by this mod) vehicles except RoadPublicTransport not be given PreferPublicTransportLanes flag.
+	</ChangeLog>
 	<!--External link, can be set multiple times. supported types are "discord", "github", "youtube", "twitch", "x", "paypal", "patreon", "buymeacoffee", "kofi", "crowdin", "gitlab", "gofundme"-->
 	<ExternalLink Type="github" Url="https://github.com/lokasenna9312/Traffic-Law-Enforcement/" />
 	<ExternalLink Type="discord" Url="https://discord.com/channels/1024242828114673724/1484043147662069851" />
