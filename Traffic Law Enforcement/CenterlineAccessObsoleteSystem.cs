@@ -272,15 +272,14 @@ namespace Traffic_Law_Enforcement
             for (int index = 0; index < navigationLanes.Length; index++)
             {
                 Entity nextLane = navigationLanes[index].m_Lane;
-                if (nextLane == Entity.Null || nextLane == sourceLane)
+                if (nextLane == Entity.Null || nextLane == currentLane)
                 {
                     continue;
                 }
 
-                if (!IsAccessTransition(sourceLane, nextLane))
+                if (!IsAccessTransition(currentLane, nextLane))
                 {
-                    sourceLane = nextLane;
-                    continue;
+                    return false;
                 }
 
                 targetLane = nextLane;
