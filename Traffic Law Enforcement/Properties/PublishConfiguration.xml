@@ -29,8 +29,8 @@ As of version 0.1.*, this mod discourages drivers from committing the following 
 - In addition, if a vehicle that is not permitted to enter PT lanes is found in a PT lane, that vehicle will recalculate its route at regular intervals. (Default: 0.01 in-game days)
 
 ### 2. Interface
-Fine revenue can be viewed in the Budget panel.
-Once per in-game month, and also when the corresponding button is pressed in the mod options, a Chirper message reports the traffic enforcement results from the past month.
+- Fine revenue can be viewed in the **Budget panel**.
+- Once per in-game month, and also when the corresponding button is pressed in the mod options, a **Chirper message** reports the traffic enforcement results from the past month.
 
 ### 3. Mod Option Settings
 The following options can be configured either for the currently loaded save file or for all future save files to which this mod will be applied.
@@ -62,8 +62,8 @@ The following options can be configured either for the currently loaded save fil
 - 또한, 대중교통 전용차선 진입이 허가되지 않은 차량이 대중교통 전용차선에 진입해 있을 경우, 일정 시간마다 해당 차량이 경로를 재설정하게 됩니다. (기본값: 인게임 0.01일)
 
 ### 2. 인터페이스
-예산 창에서 벌금 수익을 볼 수 있습니다.
-게임 시간 1달에 1번씩, 그리고 모드 옵션에서 해당 버튼을 눌렀을 때 Chirper 메시지로 최근 1달간의 교통 단속 실적을 알려줍니다.
+- **예산 창**에서 벌금 수익을 볼 수 있습니다.
+- 게임 시간 1달에 1번씩, 그리고 모드 옵션에서 해당 버튼을 눌렀을 때 **Chirper 메시지**로 최근 1달간의 교통 단속 실적을 알려줍니다.
 
 ### 3. 모드 옵션 설정
 다음의 옵션을 현재 로드한 세이브파일에 대해, 또는 앞으로 새로 이 모드를 적용할 모든 세이브파일에 대해 설정할 수 있습니다.
