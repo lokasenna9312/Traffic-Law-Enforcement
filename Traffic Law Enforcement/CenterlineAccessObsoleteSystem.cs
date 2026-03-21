@@ -44,6 +44,7 @@ namespace Traffic_Law_Enforcement
         private ComponentLookup<ParkingLane> m_ParkingLaneData;
         private ComponentLookup<GarageLane> m_GarageLaneData;
         private ComponentLookup<ConnectionLane> m_ConnectionLaneData;
+        private PublicTransportLaneVehicleTypeLookups m_TypeLookups;
         private readonly HashSet<Entity> m_CandidateVehicles = new HashSet<Entity>();
         private readonly HashSet<string> m_StructureSampleSignatures = new HashSet<string>();
         private PrefabSystem m_PrefabSystem;
@@ -95,6 +96,7 @@ namespace Traffic_Law_Enforcement
             m_GarageLaneData = GetComponentLookup<GarageLane>(true);
             m_ConnectionLaneData = GetComponentLookup<ConnectionLane>(true);
             m_PrefabSystem = World.GetOrCreateSystemManaged<PrefabSystem>();
+            m_TypeLookups = PublicTransportLaneVehicleTypeLookups.Create(this);
             RequireForUpdate(m_VehicleQuery);
         }
 
@@ -118,6 +120,7 @@ namespace Traffic_Law_Enforcement
             m_ParkingLaneData.Update(this);
             m_GarageLaneData.Update(this);
             m_ConnectionLaneData.Update(this);
+            m_TypeLookups.Update(this);
 
             m_CandidateVehicles.Clear();
             CollectCandidateVehicles(m_CurrentLaneChangedQuery);
@@ -185,8 +188,29 @@ namespace Traffic_Law_Enforcement
                         continue;
                     }
 
+                    PathFlags stateBefore = pathOwner.m_State;
                     pathOwner.m_State |= PathFlags.Obsolete;
                     EntityManager.SetComponentData(vehicle, pathOwner);
+
+                    string role = PublicTransportLanePolicy.DescribeVehicleRole(vehicle, ref m_TypeLookups);
+                    string extra =
+                        $"sourceLane={sourceLane}, targetLane={targetLane}, transitionIndex={transitionIndex}, " +
+                        $"transitionKind={transitionKind}, transitionFamily={transitionFamily}, " +
+                        $"laneShapeCurrent={DescribeLaneShape(currentLane.m_Lane)}, " +
+                        $"laneShapeSource={DescribeLaneShape(sourceLane)}, " +
+                        $"laneShapeTarget={DescribeLaneShape(targetLane)}";
+
+                    PathObsoleteTraceLogging.Record(
+                        "CENTERLINE",
+                        vehicle,
+                        currentLane.m_Lane,
+                        stateBefore,
+                        pathOwner.m_State,
+                        reason,
+                        m_CarData[vehicle],
+                        role,
+                        extra);
+
                     RecordObservedSnapshot(vehicle, currentLane.m_Lane, sourceLane, targetLane, transitionIndex, evaluationResult, transitionFamily);
                     RecordInvalidationContext(currentLane.m_Lane);
 

@@ -569,6 +569,10 @@ namespace Traffic_Law_Enforcement
         public bool EnablePathfindingPenaltyDiagnosticLogging { get; set; }
 
         [Exclude]
+        [SettingsUISection(kDebugTab, kDebugGroup)]
+        public bool EnablePathObsoleteSourceLogging { get; set; }
+
+        [Exclude]
         [SettingsUIButton]
         [SettingsUIDisableByCondition(typeof(Setting), nameof(IsMonthlyChirperPreviewButtonDisabled))]
         [SettingsUISection(kDebugTab, kDebugGroup)]
@@ -593,6 +597,7 @@ namespace Traffic_Law_Enforcement
             EnableType2PublicTransportLaneUsageLogging = false;
             EnableType4PublicTransportLaneUsageLogging = false;
             EnablePathfindingPenaltyDiagnosticLogging = false;
+            EnablePathObsoleteSourceLogging = false;
         }
 
         public EnforcementGameplaySettingsState GetNewSaveDefaultSettings()
@@ -766,6 +771,7 @@ namespace Traffic_Law_Enforcement
             Add(entries, nameof(Setting.EnableEnforcementEventLogging), "Enable enforcement event logging", "Debug-only. Writes traffic-law enforcement event logs: PT-lane, mid-block, and intersection violation logs, fine-income collection logs, and bus-lane exit-pressure logs. Turning this off affects logging only; enforcement behavior and penalties still run.");
             Add(entries, nameof(Setting.EnableType3PublicTransportLaneUsageLogging), "Enable PT-lane usage logging for non-public vehicles allowed to use PT lanes", "Debug-only. Writes logs when vehicles that cannot use PT lanes in vanilla but are allowed to use them by this mod's settings are observed using PT-only lanes. Turning this off affects logging only; permissions and enforcement behavior still run.");
             Add(entries, nameof(Setting.EnablePathfindingPenaltyDiagnosticLogging), "Enable pathfinding penalty diagnostic logging", "Debug-only. Writes pathfinding money-axis penalty apply logs and shared PathfindCarData diagnostic logs. Turning this off affects logging only; pathfinding penalties still run.");
+            Add(entries, nameof(Setting.EnablePathObsoleteSourceLogging), "Enable path obsolete source logging", "Debug-only. Writes logs only when a system actually marks a vehicle PathOwner obsolete, including the source system and key reason data. Turning this off affects logging only; rerouting behavior still runs.");
             entries[BudgetUIPatches.FineIncomeBudgetItemLocaleId] = "Traffic law enforcement";
             entries[BudgetUIPatches.FineIncomePublicTransportLaneLocaleId] = "Public-transport lane violations";
             entries[BudgetUIPatches.FineIncomeMidBlockCrossingLocaleId] = "Centerline crossings";
@@ -898,6 +904,7 @@ namespace Traffic_Law_Enforcement
             Add(entries, nameof(Setting.EnableEnforcementEventLogging), "교통법규 단속 이벤트 로그 기록", "디버그 전용입니다. 대중교통 전용차선, 중앙선 침범, 교차로 통행규칙 위반 로그와 벌금 수익 징수 로그, 대중교통 전용차선 이탈 압박 로그를 기록합니다. 이 옵션을 꺼도 단속 동작과 벌금 부과는 계속 진행됩니다.");
             Add(entries, nameof(Setting.EnableType3PublicTransportLaneUsageLogging), "대중교통 전용차선 이용이 허가된 비대중교통 차량의 대중교통 전용차선 사용 로그 기록", "디버그 전용입니다. 바닐라 기준으로는 대중교통 전용차선을 이용할 수 없지만 이 모드의 설정에서 대중교통 전용차선 이용이 허가된 차량이 실제로 그 차선을 이용한 사실을 로그로 기록합니다. 이 옵션을 꺼도 통행 허용 여부와 단속 동작은 계속 유지됩니다.");
             Add(entries, nameof(Setting.EnablePathfindingPenaltyDiagnosticLogging), "경로탐색 페널티 진단 로그 기록", "디버그 전용입니다. 경로탐색 money-axis 페널티 적용 로그와 shared PathfindCarData 진단 로그를 기록합니다. 이 옵션을 꺼도 경로탐색 페널티 자체는 계속 적용됩니다.");
+            Add(entries, nameof(Setting.EnablePathObsoleteSourceLogging), "경로 obsolete 원인 로그 기록", "디버그 전용입니다. 어떤 시스템이 실제로 차량의 PathOwner를 obsolete 상태로 만들었는지와 주요 판단 근거를 로그로 기록합니다. 이 옵션을 꺼도 재경로 동작 자체는 계속 진행됩니다.");
             entries[BudgetUIPatches.FineIncomeBudgetItemLocaleId] = "교통법규 단속";
             entries[BudgetUIPatches.FineIncomePublicTransportLaneLocaleId] = "대중교통 전용차선 침입";
             entries[BudgetUIPatches.FineIncomeMidBlockCrossingLocaleId] = "중앙선 침범";

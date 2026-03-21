@@ -14,6 +14,8 @@ namespace Traffic_Law_Enforcement
 
         public static bool EnablePathfindingPenaltyDiagnosticLogging => Mod.Settings?.EnablePathfindingPenaltyDiagnosticLogging ?? false;
 
+        public static bool EnablePathObsoleteSourceLogging => Mod.Settings?.EnablePathObsoleteSourceLogging ?? false;
+
         public static bool ShouldLogEstimatedReroutes()
         {
             return Mod.IsEnforcementEnabled && EnableEstimatedRerouteLogging;
@@ -42,6 +44,11 @@ namespace Traffic_Law_Enforcement
         public static bool ShouldLogPathfindingPenaltyDiagnostics()
         {
             return EnablePathfindingPenaltyDiagnosticLogging;
+        }
+
+        public static bool ShouldLogPathObsoleteSources()
+        {
+            return EnablePathObsoleteSourceLogging;
         }
 
         public static void RecordEnforcementEvent(string message)

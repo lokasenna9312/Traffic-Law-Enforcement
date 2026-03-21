@@ -10,6 +10,8 @@ namespace Traffic_Law_Enforcement
     public partial class PublicTransportLaneExitPressureSystem : GameSystemBase
     {
         private EntityQuery m_ViolationQuery;
+        private ComponentLookup<CarCurrentLane> m_CurrentLaneData;
+        private PublicTransportLaneVehicleTypeLookups m_TypeLookups;
 
         protected override void OnCreate()
         {
@@ -19,6 +21,8 @@ namespace Traffic_Law_Enforcement
                 ComponentType.ReadWrite<PathOwner>(),
                 ComponentType.ReadWrite<PublicTransportLaneViolation>());
             RequireForUpdate(m_ViolationQuery);
+            m_CurrentLaneData = GetComponentLookup<CarCurrentLane>(true);
+            m_TypeLookups = PublicTransportLaneVehicleTypeLookups.Create(this);
         }
 
         protected override void OnUpdate()
@@ -27,6 +31,9 @@ namespace Traffic_Law_Enforcement
             {
                 return;
             }
+
+            m_CurrentLaneData.Update(this);
+            m_TypeLookups.Update(this);
 
             long thresholdDayTicks = (long)System.Math.Round(System.Math.Max(0f, EnforcementGameplaySettingsService.Current.PublicTransportLaneExitPressureThresholdDays) * EnforcementGameTime.DayTicksPerDay);
             long currentDayTicks = EnforcementGameTime.CurrentTimestampDayTicks;
@@ -65,8 +72,31 @@ namespace Traffic_Law_Enforcement
 
                     if ((pathOwner.m_State & PathFlags.Obsolete) == 0)
                     {
+                        PathFlags stateBefore = pathOwner.m_State;
                         pathOwner.m_State |= PathFlags.Obsolete;
                         EntityManager.SetComponentData(vehicles[index], pathOwner);
+
+                        Entity currentLane = m_CurrentLaneData.TryGetComponent(vehicles[index], out CarCurrentLane currentLaneData)
+                            ? currentLaneData.m_Lane
+                            : violation.m_Lane;
+
+                        string role = PublicTransportLanePolicy.DescribeVehicleRole(vehicles[index], ref m_TypeLookups);
+                        string reason = "bus-lane-exit-pressure-threshold-reached";
+                        string extra =
+                            $"violationLane={violation.m_Lane}, elapsedDayTicks={elapsedDayTicks}, " +
+                            $"thresholdDayTicks={thresholdDayTicks}, exitPressureAppliedBefore={violation.m_ExitPressureApplied}";
+
+                        PathObsoleteTraceLogging.Record(
+                            "PT_EXIT_PRESSURE",
+                            vehicles[index],
+                            currentLane,
+                            stateBefore,
+                            pathOwner.m_State,
+                            reason,
+                            cars[index],
+                            role,
+                            extra);
+
                         if (EnforcementLoggingPolicy.ShouldLogEnforcementEvents())
                         {
                             Mod.log.Info($"Applied bus-lane exit pressure: vehicle={vehicles[index]}, lane={violation.m_Lane}, elapsedDayTicks={elapsedDayTicks}, thresholdDayTicks={thresholdDayTicks}");
