@@ -198,7 +198,12 @@ namespace Traffic_Law_Enforcement
             return true;
         }
 
-        private static CarFlags GetDesiredPermissionMask(bool emergency, PublicTransportLaneVehicleCategory authorizedCategories, PublicTransportLaneFlagGrantExperimentRole additionalRole, bool allowAdditional, bool allow)
+        private static CarFlags GetDesiredPermissionMask(
+            bool emergency,
+            PublicTransportLaneVehicleCategory authorizedCategories,
+            PublicTransportLaneFlagGrantExperimentRole additionalRole,
+            bool allowAdditional,
+            bool allow)
         {
             if (!allow)
             {
@@ -210,14 +215,25 @@ namespace Traffic_Law_Enforcement
                 return PublicTransportLanePermissionMask;
             }
 
-            if (authorizedCategories == PublicTransportLaneVehicleCategory.None &&
-                additionalRole != PublicTransportLaneFlagGrantExperimentRole.None &&
-                allowAdditional)
+            bool isRoadPublicTransport =
+                (authorizedCategories & PublicTransportLaneVehicleCategory.RoadPublicTransportVehicle) != 0;
+
+            if (isRoadPublicTransport)
+            {
+                return PublicTransportLanePermissionMask;
+            }
+
+            if (authorizedCategories != PublicTransportLaneVehicleCategory.None)
             {
                 return CarFlags.UsePublicTransportLanes;
             }
 
-            return PublicTransportLanePermissionMask;
+            if (additionalRole != PublicTransportLaneFlagGrantExperimentRole.None && allowAdditional)
+            {
+                return CarFlags.UsePublicTransportLanes;
+            }
+
+            return 0;
         }
 
         private static string GetRoleDisplayNameEnglish(PublicTransportLaneFlagGrantExperimentRole role)

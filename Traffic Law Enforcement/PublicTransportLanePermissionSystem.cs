@@ -103,6 +103,11 @@ namespace Traffic_Law_Enforcement
             bool emergencyTransition = hasState && state.m_EmergencyActive != (emergencyActive ? (byte)1 : (byte)0);
             bool flagsChanged = currentMask != desiredMask;
 
+            CarFlags obsoleteRelevantMask = CarFlags.UsePublicTransportLanes;
+            bool obsoleteRelevantFlagsChanged =
+                (currentMask & obsoleteRelevantMask) != (desiredMask & obsoleteRelevantMask);
+            bool preferenceOnlyChange = flagsChanged && !obsoleteRelevantFlagsChanged;
+
             if (flagsChanged)
             {
                 car.m_Flags = (car.m_Flags & ~PublicTransportLanePolicy.PublicTransportLanePermissionMask) | desiredMask;
@@ -124,15 +129,16 @@ namespace Traffic_Law_Enforcement
                 EntityManager.SetComponentData(vehicle, updatedState);
             }
 
-            if (flagsChanged || emergencyTransition)
+            if (obsoleteRelevantFlagsChanged || emergencyTransition)
             {
                 string role = PublicTransportLanePolicy.DescribeVehicleRole(vehicle, ref m_TypeLookups);
-                string reason = flagsChanged
-                    ? "pt-permission-mask-changed"
+                string reason = obsoleteRelevantFlagsChanged
+                    ? "pt-permission-capability-changed"
                     : "emergency-state-changed";
                 string extra =
                     $"currentMaskBefore={currentMask}, desiredMask={desiredMask}, originalMask={originalMask}, " +
-                    $"flagsChanged={flagsChanged}, emergencyTransition={emergencyTransition}";
+                    $"flagsChanged={flagsChanged}, obsoleteRelevantFlagsChanged={obsoleteRelevantFlagsChanged}, " +
+                    $"preferenceOnlyChange={preferenceOnlyChange}, emergencyTransition={emergencyTransition}";
 
                 MarkPathObsolete(vehicle, car, reason, role, extra);
             }
