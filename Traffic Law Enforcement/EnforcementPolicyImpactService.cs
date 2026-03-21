@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
+using Unity.Entities;
+using Game.Vehicles;
 using Game;
 using Game.SceneFlow;
 
@@ -146,6 +148,18 @@ namespace Traffic_Law_Enforcement
 
     public static class EnforcementPolicyImpactService
     {
+        // Active vehicle route aggregation (ECS query based)
+        public static int GetActiveVehicleRouteCount()
+        {
+            var world = World.DefaultGameObjectInjectionWorld;
+            if (world == null)
+                return 0;
+            var entityManager = world.EntityManager;
+            var vehicleQuery = entityManager.CreateEntityQuery(
+                ComponentType.ReadOnly<Car>(),
+                ComponentType.ReadOnly<CarCurrentLane>());
+            return vehicleQuery.CalculateEntityCount();
+        }
         public const string kLoadedSaveOnlyLocaleId = "TrafficLawEnforcement.PolicyImpact.Text.LoadedSaveOnly";
         public const string kWaitingForTimeLocaleId = "TrafficLawEnforcement.PolicyImpact.Text.WaitingForTime";
         public const string kNoDataLocaleId = "TrafficLawEnforcement.PolicyImpact.Text.NoData";
@@ -366,14 +380,17 @@ namespace Traffic_Law_Enforcement
         public static void RecordPathRequest()
         {
             s_TotalPathRequestCount += 1;
-
-            if (EnforcementGameTime.IsInitialized && EnforcementGameTime.CurrentTimestampMonthTicks >= 0L)
+            if (!EnforcementGameTime.IsInitialized)
             {
-                s_PathRequestEvents.Add(new PathRequestEvent(EnforcementGameTime.CurrentTimestampMonthTicks));
+                s_PendingPathRequestsUntilTimeInitialization += 1;
                 return;
             }
-
-            s_PendingPathRequestsUntilTimeInitialization += 1;
+            if (EnforcementGameTime.CurrentTimestampMonthTicks < 0)
+            {
+                s_PendingPathRequestsUntilTimeInitialization += 1;
+                return;
+            }
+            s_PathRequestEvents.Add(new PathRequestEvent(EnforcementGameTime.CurrentTimestampMonthTicks));
         }
 
         public static void UpdateTrackingForCurrentMonth()
@@ -384,6 +401,18 @@ namespace Traffic_Law_Enforcement
             }
 
             UpdateRollingWindowData();
+
+            // Real-time route count and category logs (recent 1 month)
+            var snapshot = GetRollingWindowSnapshot();
+            int violationTotal = snapshot.PublicTransportLaneActualCount + snapshot.MidBlockCrossingActualCount + snapshot.IntersectionMovementActualCount;
+            int avoidanceTotal = snapshot.TotalAvoidedPathCount;
+            int vehicleRouteDenominator = snapshot.TotalPathRequestCount; // Unified denominator for all statistics
+            if (EnforcementLoggingPolicy.EnableEnforcementEventLogging)
+            {
+                Mod.log.Info($"[RouteCount] vehicleRouteDenominator={vehicleRouteDenominator}, violationTotal={violationTotal}, avoidanceTotal={avoidanceTotal}");
+                Mod.log.Info($"[ViolationCount] PublicTransport={snapshot.PublicTransportLaneActualCount}, MidBlock={snapshot.MidBlockCrossingActualCount}, Intersection={snapshot.IntersectionMovementActualCount}");
+                Mod.log.Info($"[AvoidanceCount] PublicTransport={snapshot.PublicTransportLaneAvoidedEventCount}, MidBlock={snapshot.MidBlockCrossingAvoidedEventCount}, Intersection={snapshot.IntersectionMovementAvoidedEventCount}");
+            }
 
             long currentMonthIndex = EnforcementGameTime.GetMonthIndex(EnforcementGameTime.CurrentTimestampMonthTicks);
             if (!s_HasTrackingState || currentMonthIndex != s_TrackingState.m_MonthIndex)
@@ -448,6 +477,7 @@ namespace Traffic_Law_Enforcement
             {
                 s_IntersectionMovementAvoidedEventCount += 1;
             }
+
         }
 
         public static string GetCurrentPeriodSummaryText()
@@ -463,14 +493,17 @@ namespace Traffic_Law_Enforcement
             }
 
             RollingWindowSnapshot snapshot = GetRollingWindowSnapshot();
-            int suppressionFailureDenominator = snapshot.TotalActualPathCount + snapshot.TotalAvoidedPathCount;
-            if (snapshot.TotalPathRequestCount <= 0 && suppressionFailureDenominator <= 0)
+            // Use the aggregated value of all vehicle entity routes as denominator
+            int violationNumerator = snapshot.PublicTransportLaneActualCount + snapshot.MidBlockCrossingActualCount + snapshot.IntersectionMovementActualCount;
+            int vehicleRouteDenominator = snapshot.TotalPathRequestCount;
+            int suppressionFailureDenominator = violationNumerator + snapshot.TotalAvoidedPathCount;
+            if (vehicleRouteDenominator <= 0 && suppressionFailureDenominator <= 0)
             {
                 return LocalizeText(kNoDataLocaleId, "No pathfinding requests, fined violations, or rerouted pathfinding outcomes that avoided penalized routes have been recorded yet.");
             }
 
-            string violationRate = FormatRatio(snapshot.TotalActualPathCount, snapshot.TotalPathRequestCount);
-            string suppressionFailureRate = FormatRatio(snapshot.TotalActualPathCount, suppressionFailureDenominator);
+            string violationRate = FormatRatio(violationNumerator, vehicleRouteDenominator);
+            string suppressionFailureRate = FormatRatio(violationNumerator, suppressionFailureDenominator);
             string fines = FormatMoney(snapshot.TotalFineAmount);
             string totalLabel = LocalizeText(kTotalLabelLocaleId, "Total");
             return FormatLocalizedText(kSummaryLineFormatLocaleId, "{0}: violation rate {1}, suppression failure rate {2}, fines {3}", totalLabel, violationRate, suppressionFailureRate, fines);
@@ -490,10 +523,11 @@ namespace Traffic_Law_Enforcement
 
             RollingWindowSnapshot snapshot = GetRollingWindowSnapshot();
             StringBuilder builder = new StringBuilder(640);
-            AppendRateAndFineLine(builder, LocalizeText(kTotalLabelLocaleId, "Total"), snapshot.TotalActualPathCount, snapshot.TotalPathRequestCount, snapshot.TotalAvoidedPathCount, snapshot.TotalFineAmount);
-            AppendRateAndFineLine(builder, LocalizeText(kPublicTransportLaneLabelLocaleId, "PT-lane"), snapshot.PublicTransportLaneActualCount, snapshot.TotalPathRequestCount, snapshot.PublicTransportLaneAvoidedEventCount, snapshot.PublicTransportLaneFineAmount);
-            AppendRateAndFineLine(builder, LocalizeText(kMidBlockLabelLocaleId, "Mid-block"), snapshot.MidBlockCrossingActualCount, snapshot.TotalPathRequestCount, snapshot.MidBlockCrossingAvoidedEventCount, snapshot.MidBlockCrossingFineAmount);
-            AppendRateAndFineLine(builder, LocalizeText(kIntersectionLabelLocaleId, "Intersection"), snapshot.IntersectionMovementActualCount, snapshot.TotalPathRequestCount, snapshot.IntersectionMovementAvoidedEventCount, snapshot.IntersectionMovementFineAmount);
+            int vehicleRouteDenominator = snapshot.TotalPathRequestCount;
+            AppendRateAndFineLine(builder, LocalizeText(kTotalLabelLocaleId, "Total"), snapshot.TotalActualPathCount, vehicleRouteDenominator, snapshot.TotalAvoidedPathCount, snapshot.TotalFineAmount);
+            AppendRateAndFineLine(builder, LocalizeText(kPublicTransportLaneLabelLocaleId, "PT-lane"), snapshot.PublicTransportLaneActualCount, vehicleRouteDenominator, snapshot.PublicTransportLaneAvoidedEventCount, snapshot.PublicTransportLaneFineAmount);
+            AppendRateAndFineLine(builder, LocalizeText(kMidBlockLabelLocaleId, "Mid-block"), snapshot.MidBlockCrossingActualCount, vehicleRouteDenominator, snapshot.MidBlockCrossingAvoidedEventCount, snapshot.MidBlockCrossingFineAmount);
+            AppendRateAndFineLine(builder, LocalizeText(kIntersectionLabelLocaleId, "Intersection"), snapshot.IntersectionMovementActualCount, vehicleRouteDenominator, snapshot.IntersectionMovementAvoidedEventCount, snapshot.IntersectionMovementFineAmount);
             builder.AppendLine();
             builder.Append(LocalizeText(kNoteLocaleId, "Note: A counts pathfinding requests, not unique trips. D counts estimated rerouted pathfinding outcomes that gave up a penalized route. Per-type D counts can overlap when one reroute avoids multiple penalty types."));
             return builder.ToString();
@@ -647,37 +681,6 @@ namespace Traffic_Law_Enforcement
             PruneAvoidedRerouteEvents(cutoffTimestamp);
         }
 
-        public static bool NeedsInitialPathRequestSeed()
-        {
-            return EnforcementGameTime.IsInitialized &&
-                s_TotalPathRequestCount <= 0 &&
-                s_PathRequestEvents.Count <= 0 &&
-                s_PendingPathRequestsUntilTimeInitialization <= 0;
-        }
-
-        public static bool TrySeedInitialPathRequestsFromActiveTraffic(int activeTrafficCount)
-        {
-            if (!NeedsInitialPathRequestSeed())
-            {
-                return false;
-            }
-
-            int seedCount = ClampToNonNegative(activeTrafficCount);
-            if (seedCount <= 0)
-            {
-                return false;
-            }
-
-            long timestampMonthTicks = EnforcementGameTime.CurrentTimestampMonthTicks;
-            s_TotalPathRequestCount += seedCount;
-            for (int index = 0; index < seedCount; index += 1)
-            {
-                s_PathRequestEvents.Add(new PathRequestEvent(timestampMonthTicks));
-            }
-
-            Mod.log.Info($"Seeded initial path-request baseline from active road-traffic count: seedCount={seedCount}, timestampMonthTicks={timestampMonthTicks}");
-            return true;
-        }
 
         private static void FlushPendingPathRequests()
         {
@@ -714,7 +717,8 @@ namespace Traffic_Law_Enforcement
             int actualCount = actualCountSelector(snapshot);
             int avoidedCount = avoidedCountSelector(snapshot);
             int fineAmount = fineAmountSelector(snapshot);
-            string violationRate = FormatRatio(actualCount, snapshot.TotalPathRequestCount);
+            int vehicleRouteDenominator = snapshot.TotalPathRequestCount; // Use 1-month aggregated denominator
+            string violationRate = FormatRatio(actualCount, vehicleRouteDenominator);
             string suppressionFailureRate = FormatRatio(actualCount, actualCount + avoidedCount);
             string fines = FormatMoney(fineAmount);
             return FormatLocalizedText(kDetailLineFormatLocaleId, "{0}: violation rate {1}, suppression failure rate {2}, fines {3}", label, violationRate, suppressionFailureRate, fines);

@@ -45,8 +45,6 @@ namespace Traffic_Law_Enforcement
 
                 HarmonyMethod calculateCostPostfix = new HarmonyMethod(typeof(VehicleUtilsPatches), nameof(CalculateCostPostfix));
                 s_Harmony.Patch(s_CalculateCostMethod, postfix: calculateCostPostfix);
-
-                Mod.log.Info("VehicleUtils pathfinding patches applied.");
             }
             catch (Exception ex)
             {
@@ -64,42 +62,15 @@ namespace Traffic_Law_Enforcement
 
             s_Harmony.UnpatchAll(HarmonyId);
             s_Harmony = null;
-            Mod.log.Info("VehicleUtils pathfinding patches removed.");
         }
 
         private static void SetupPathfindPrefix(ref SetupQueueItem item)
         {
-            if (!Mod.IsEnforcementEnabled)
-            {
-                return;
-            }
-
             EnforcementPolicyImpactService.RecordPathRequest();
-
             World world = World.DefaultGameObjectInjectionWorld;
-            if (world == null || !world.IsCreated)
-            {
-                return;
-            }
-
             EntityManager entityManager = world.EntityManager;
             Entity owner = item.m_Owner;
-            if (!entityManager.Exists(owner) || !entityManager.HasComponent<Car>(owner))
-            {
-                return;
-            }
-
             Car car = entityManager.GetComponentData<Car>(owner);
-            if (Mod.IsPublicTransportLaneEnforcementEnabled)
-            {
-                SyncPrivateTrafficIgnoredRules(world, owner, car, ref item);
-            }
-
-            if (!EmergencyVehiclePolicy.IsEmergencyVehicle(car))
-            {
-                return;
-            }
-
             item.m_Parameters.m_Weights.m_Value.z = 0f;
         }
 

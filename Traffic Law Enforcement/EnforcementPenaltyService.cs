@@ -103,7 +103,6 @@ namespace Traffic_Law_Enforcement
             }
 
             s_LastLoggedRepeatPolicySummary = summary;
-            Mod.log.Info(summary);
         }
 
         private static void RecordViolation(string kind, Entity vehicle, Entity lane, int fineAmount, string reason)

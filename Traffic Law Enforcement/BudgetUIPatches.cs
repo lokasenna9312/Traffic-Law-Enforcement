@@ -52,7 +52,6 @@ namespace Traffic_Law_Enforcement
                 s_Harmony = new Harmony(HarmonyId);
                 s_Harmony.PatchAll(typeof(BudgetUIPatches).Assembly);
                 RefreshExistingBudgetBindings("apply");
-                Mod.log.Info("Budget UI patches applied.");
             }
             catch (Exception ex)
             {
@@ -70,7 +69,6 @@ namespace Traffic_Law_Enforcement
 
             s_Harmony.UnpatchAll(HarmonyId);
             s_Harmony = null;
-            Mod.log.Info("Budget UI patches removed.");
         }
 
         private static UIEconomyConfigurationPrefab GetConfig(BudgetUISystem system)
@@ -133,7 +131,6 @@ namespace Traffic_Law_Enforcement
                 if (!s_LoggedFineIncomeTemplateMissing)
                 {
                     s_LoggedFineIncomeTemplateMissing = true;
-                    Mod.log.Info("Budget UI patch could not find an income-item template for traffic law enforcement revenue. Using fallback styling.");
                 }
 
                 return new BudgetItem<IncomeSource>
@@ -203,11 +200,9 @@ namespace Traffic_Law_Enforcement
                 UpdateBinding(s_IncomeItemsBindingField?.GetValue(system) as IUpdateBinding);
                 UpdateBinding(s_IncomeValuesBindingField?.GetValue(system) as IUpdateBinding);
                 UpdateBinding(s_TotalIncomeBindingField?.GetValue(system) as IUpdateBinding);
-                Mod.log.Info($"Budget UI bindings refreshed. reason={reason}");
             }
             catch (Exception ex)
             {
-                Mod.log.Info($"Budget UI binding refresh failed. reason={reason}, error={ex.GetType().Name}: {ex.Message}");
             }
         }
 

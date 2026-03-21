@@ -169,12 +169,7 @@ namespace Traffic_Law_Enforcement
                         : currentData;
 
                     string prefabName = m_PrefabSystem != null ? m_PrefabSystem.GetPrefabName(prefab) : prefab.ToString();
-                    Mod.log.Info(
-                        $"Shared PathfindCarData diagnostic: prefab={prefabName} ({prefab}), laneCrossBase={originalData.m_LaneCrossCost.m_Value.z:0}, laneCrossCurrent={currentData.m_LaneCrossCost.m_Value.z:0}, unsafeTurningBase={originalData.m_UnsafeTurningCost.m_Value.z:0}, unsafeTurningCurrent={currentData.m_UnsafeTurningCost.m_Value.z:0}, forbiddenBase={originalData.m_ForbiddenCost.m_Value.z:0}, forbiddenCurrent={currentData.m_ForbiddenCost.m_Value.z:0}");
                 }
-
-                Mod.log.Info(
-                    $"Shared PathfindCarData diagnostic summary: prefabs={prefabs.Length}, shared overrides cover mid-block/intersection only, bus-lane penalty is applied per route");
             }
             finally
             {

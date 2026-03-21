@@ -25,7 +25,6 @@ namespace Traffic_Law_Enforcement
             LoggedSettingsSnapshot snapshot = LoggedSettingsSnapshot.Capture();
             if (!m_HasSnapshot)
             {
-                Mod.log.Info($"Settings snapshot: inGameTime={GetInGameTimeLabel()}, {snapshot.ToLogString()}");
                 m_LastSnapshot = snapshot;
                 m_HasSnapshot = true;
                 return;
@@ -89,8 +88,6 @@ namespace Traffic_Law_Enforcement
             {
                 return;
             }
-
-            Mod.log.Info($"Setting changed: inGameTime={inGameTimeLabel}, {settingName} {previous.ToString().ToLowerInvariant()} -> {current.ToString().ToLowerInvariant()}");
         }
 
         private static void LogChange(string inGameTimeLabel, string settingName, int previous, int current)
@@ -99,8 +96,6 @@ namespace Traffic_Law_Enforcement
             {
                 return;
             }
-
-            Mod.log.Info($"Setting changed: inGameTime={inGameTimeLabel}, {settingName} {previous} -> {current}");
         }
 
         private static void LogChange(string inGameTimeLabel, string settingName, float previous, float current)
@@ -109,8 +104,6 @@ namespace Traffic_Law_Enforcement
             {
                 return;
             }
-
-            Mod.log.Info($"Setting changed: inGameTime={inGameTimeLabel}, {settingName} {FormatFloat(previous)} -> {FormatFloat(current)}");
         }
 
         private string GetInGameTimeLabel()

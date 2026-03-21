@@ -146,7 +146,7 @@ namespace Traffic_Law_Enforcement
                     {
                         continue;
                     }
-                    
+
                     SyncAccessOriginWatch(vehicle, currentLane.m_Lane);
 
                     ResetDuplicateSuppressionIfPathChanged(vehicle, pathOwner);
@@ -292,14 +292,6 @@ namespace Traffic_Law_Enforcement
             {
                 return;
             }
-
-            Mod.log.Info(
-                $"Centerline access structure sample: vehicle={vehicle}, accessIndex={transitionIndex}, transition={transitionKind}, reason={reason}, " +
-                $"accessLane={accessLane}, accessShape={accessLaneShape}, accessOwnerChain={accessOwnerChain}, " +
-                $"roadLane={roadLane}, roadShape={roadLaneShape}, roadOwnerChain={roadOwnerChain}, " +
-                $"currentLane={currentLane}, currentShape={currentLaneShape}, currentOwnerChain={currentOwnerChain}, " +
-                $"sourceLane={sourceLane}, sourceShape={sourceLaneShape}, sourceOwnerChain={sourceOwnerChain}, " +
-                $"targetLane={targetLane}, targetShape={targetLaneShape}, targetOwnerChain={targetOwnerChain}");
         }
 
         private void RecordInvalidationContext(Entity currentLane)
@@ -345,13 +337,6 @@ namespace Traffic_Law_Enforcement
             }
 
             m_LastContextSummaryLoggedTotal = m_TotalInvalidationCount;
-            Mod.log.Info(
-                $"Centerline invalidation context totals: total={m_TotalInvalidationCount}, " +
-                $"customCurrent={m_CustomCurrentContextInvalidationCount} ({FormatPercent(m_CustomCurrentContextInvalidationCount, m_TotalInvalidationCount)}), " +
-                $"pedestrianStreetCurrent={m_PedestrianStreetCurrentContextInvalidationCount} ({FormatPercent(m_PedestrianStreetCurrentContextInvalidationCount, m_TotalInvalidationCount)}), " +
-                $"mediumRoadCurrent={m_MediumRoadCurrentContextInvalidationCount} ({FormatPercent(m_MediumRoadCurrentContextInvalidationCount, m_TotalInvalidationCount)}), " +
-                $"publicTransportLaneCurrent={m_PublicTransportLaneCurrentContextInvalidationCount} ({FormatPercent(m_PublicTransportLaneCurrentContextInvalidationCount, m_TotalInvalidationCount)}), " +
-                $"customOrPedestrianOrPublicTransportCurrent={m_CustomPedestrianOrPublicTransportCurrentContextInvalidationCount} ({FormatPercent(m_CustomPedestrianOrPublicTransportCurrentContextInvalidationCount, m_TotalInvalidationCount)})");
         }
 
         private string DescribeLaneShape(Entity lane)

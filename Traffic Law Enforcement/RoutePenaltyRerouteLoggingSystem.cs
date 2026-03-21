@@ -5,6 +5,8 @@ using Game.Net;
 using Game.Vehicles;
 using Unity.Collections;
 using Unity.Entities;
+using Unity.Burst;
+using System.Linq;
 using Entity = Unity.Entities.Entity;
 
 namespace Traffic_Law_Enforcement
@@ -24,9 +26,10 @@ namespace Traffic_Law_Enforcement
             LastEmittedLogCount = lastEmittedLogCount;
         }
     }
-
+    [BurstCompile]
     public partial class RoutePenaltyRerouteLoggingSystem : GameSystemBase
     {
+        private EntityQuery m_CachedVehicleQuery;
         private const int MaxPenaltyTags = 6;
         private const int MaxLogsPerUpdate = 4;
         private const int SnapshotSweepInterval = 2048;
@@ -76,9 +79,11 @@ namespace Traffic_Law_Enforcement
             m_GarageLaneData = GetComponentLookup<GarageLane>(true);
             m_ConnectionLaneData = GetComponentLookup<ConnectionLane>(true);
             m_TypeLookups = BusLaneVehicleTypeLookups.Create(this);
+            m_CachedVehicleQuery = GetEntityQuery(ComponentType.ReadOnly<Car>(), ComponentType.ReadOnly<CarCurrentLane>());
             RequireForUpdate(m_CarQuery);
         }
 
+        [BurstCompile]
         protected override void OnUpdate()
         {
             bool loggingEnabled = EnforcementLoggingPolicy.ShouldLogEstimatedReroutes();
@@ -104,13 +109,13 @@ namespace Traffic_Law_Enforcement
             CollectCandidateVehicles(m_NavigationLaneChangedQuery);
             CollectCandidateVehicles(m_CarChangedQuery);
 
-            int emittedLogs = 0;
-            foreach (Entity vehicle in m_CandidateVehicles)
+            var candidateVehicles = m_CandidateVehicles.ToList();
+            int logsEmitted = 0;
+            for (int i = 0; i < candidateVehicles.Count; i++)
             {
+                Entity vehicle = candidateVehicles[i];
                 if (!m_CurrentLaneData.TryGetComponent(vehicle, out CarCurrentLane currentLane))
-                {
                     continue;
-                }
 
                 RoutePenaltySnapshot snapshot = BuildSnapshot(vehicle, currentLane);
                 if (m_LastSnapshots.TryGetValue(vehicle, out RoutePenaltySnapshot previousSnapshot))
@@ -118,21 +123,22 @@ namespace Traffic_Law_Enforcement
                     if (ShouldLogReroute(previousSnapshot, snapshot))
                     {
                         RecordRerouteTelemetry(previousSnapshot, snapshot);
-
-                        if (loggingEnabled && emittedLogs < MaxLogsPerUpdate)
+                        if (loggingEnabled && logsEmitted < MaxLogsPerUpdate)
                         {
                             LogReroute(vehicle, previousSnapshot, snapshot);
-                            emittedLogs += 1;
+                            logsEmitted++;
                         }
                     }
-
                     m_LastSnapshots[vehicle] = snapshot;
                 }
                 else
                 {
+                    // 최초 경로 스냅샷 생성 시 vehicleRouteDenominator 집계
+                    EnforcementPolicyImpactService.RecordPathRequest();
                     m_LastSnapshots[vehicle] = snapshot;
                 }
             }
+            int emittedLogs = logsEmitted;
 
             m_UpdateCount += 1;
             if ((m_UpdateCount % SnapshotSweepInterval) == 0)
@@ -364,7 +370,6 @@ namespace Traffic_Law_Enforcement
             int avoidedPenalty = previousSnapshot.TotalPenalty - currentSnapshot.TotalPenalty;
             string role = BusLanePolicy.DescribeVehicleRole(vehicle, ref m_TypeLookups);
             string message = $"Pathfinding reroute (estimated): vehicle={vehicle}, role={role}, avoidedPenalty={avoidedPenalty}, fromPenalty={previousSnapshot.TotalPenalty} [{previousSnapshot.Breakdown}], toPenalty={currentSnapshot.TotalPenalty} [{currentSnapshot.Breakdown}], fromTags={previousSnapshot.Tags}, toTags={currentSnapshot.Tags}";
-            Mod.log.Info(message);
         }
 
         private static void RecordRerouteTelemetry(RoutePenaltySnapshot previousSnapshot, RoutePenaltySnapshot currentSnapshot)

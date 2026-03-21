@@ -66,7 +66,6 @@ namespace Traffic_Law_Enforcement
             if (logOnInitialization && !wasInitialized && !s_HasLoggedInitialization)
             {
                 s_HasLoggedInitialization = true;
-                Mod.log.Info($"Enforcement game time initialized. year={timeSystem.year}, normalizedDate={timeSystem.normalizedDate:0.0000}, normalizedTime={timeSystem.normalizedTime:0.0000}, daysPerYear={daysPerYear}, monthTicks={absoluteMonthTicks}, dayTicks={absoluteDayTicks}");
             }
 
             failureReason = null;
@@ -134,19 +133,13 @@ namespace Traffic_Law_Enforcement
 
         protected override void OnUpdate()
         {
-            if (!EnforcementGameTime.TryUpdateFromTimeSystem(m_TimeSystem, logOnInitialization: true, out _))
+            bool result = EnforcementGameTime.TryUpdateFromTimeSystem(m_TimeSystem, logOnInitialization: true, out string failureReason);
+            if (!result)
             {
                 return;
             }
 
             EnforcementPolicyImpactService.UpdateTrackingForCurrentMonth();
-
-            if (EnforcementPolicyImpactService.NeedsInitialPathRequestSeed() &&
-                EnforcementPolicyImpactService.TrySeedInitialPathRequestsFromActiveTraffic(CountActiveRoadTrafficVehicles()))
-            {
-                EnforcementPolicyImpactService.UpdateTrackingForCurrentMonth();
-            }
-
             EnforcementPenaltyService.LogRepeatPolicySummaryIfChanged();
             EnforcementTelemetry.PruneExpiredViolationTimestamps();
         }
@@ -202,10 +195,6 @@ namespace Traffic_Law_Enforcement
 
                     activeRoadTrafficCount += 1;
                 }
-
-                Mod.log.Info(
-                    $"Initial path-request seed candidate scan: candidates={currentLanes.Length}, includedRoadTraffic={activeRoadTrafficCount}, excludedNullLane={nullLaneCount}, excludedMissingEdgeLane={missingEdgeLaneCount}, excludedMissingCarLane={missingCarLaneCount}, excludedParkingLane={parkingLaneCount}, excludedGarageLane={garageLaneCount}");
-
                 return activeRoadTrafficCount;
             }
             finally
