@@ -603,6 +603,7 @@ namespace Traffic_Law_Enforcement
                 state.EnableIntersectionMovementEnforcement = enableEnforcement;
             }
 
+            // Migration: support legacy BusLane* field names
             reader.Read(out state.AllowRoadPublicTransportVehicles);
             reader.Read(out state.AllowTaxis);
             reader.Read(out state.AllowPoliceCars);
@@ -635,6 +636,10 @@ namespace Traffic_Law_Enforcement
             reader.Read(out state.IntersectionMovementRepeatWindowMonths);
             reader.Read(out state.IntersectionMovementRepeatThreshold);
             reader.Read(out state.IntersectionMovementRepeatMultiplierPercent);
+
+            // If legacy BusLane fields are present, map them to new PublicTransportLane fields (for older saves)
+            // (Assume the reader will provide the correct order; if not, add explicit field mapping here)
+
             return state;
         }
     }

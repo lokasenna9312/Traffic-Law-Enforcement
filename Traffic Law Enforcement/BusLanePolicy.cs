@@ -18,10 +18,11 @@ using VehiclePostVan = Game.Vehicles.PostVan;
 using VehiclePrisonerTransport = Game.Vehicles.PrisonerTransport;
 using VehiclePublicTransport = Game.Vehicles.PublicTransport;
 using VehicleTaxi = Game.Vehicles.Taxi;
+using Game.SceneFlow;
 
 namespace Traffic_Law_Enforcement
 {
-    public struct BusLaneVehicleTypeLookups
+    public struct PublicTransportLaneVehicleTypeLookups // TODO: Rename to PublicTransportLaneVehicleTypeLookups in a later refactor
     {
         public ComponentLookup<Car> CarData;
         public ComponentLookup<VehiclePublicTransport> PublicTransportData;
@@ -41,9 +42,9 @@ namespace Traffic_Law_Enforcement
         public ComponentLookup<PrefabRef> PrefabRefData;
         public ComponentLookup<MaintenanceVehicleData> PrefabMaintenanceVehicleData;
 
-        public static BusLaneVehicleTypeLookups Create(ref SystemState state)
+        public static PublicTransportLaneVehicleTypeLookups Create(ref SystemState state)
         {
-            return new BusLaneVehicleTypeLookups
+            return new PublicTransportLaneVehicleTypeLookups
             {
                 CarData = state.GetComponentLookup<Car>(true),
                 PublicTransportData = state.GetComponentLookup<VehiclePublicTransport>(true),
@@ -65,9 +66,9 @@ namespace Traffic_Law_Enforcement
             };
         }
 
-        public static BusLaneVehicleTypeLookups Create(GameSystemBase system)
+        public static PublicTransportLaneVehicleTypeLookups Create(GameSystemBase system)
         {
-            return new BusLaneVehicleTypeLookups
+            return new PublicTransportLaneVehicleTypeLookups
             {
                 CarData = system.GetComponentLookup<Car>(true),
                 PublicTransportData = system.GetComponentLookup<VehiclePublicTransport>(true),
@@ -139,7 +140,7 @@ namespace Traffic_Law_Enforcement
             return (car.m_Flags & CarFlags.Emergency) != 0;
         }
 
-        public static bool IsEmergencyVehicle(Entity vehicle, ref BusLaneVehicleTypeLookups lookups)
+        public static bool IsEmergencyVehicle(Entity vehicle, ref PublicTransportLaneVehicleTypeLookups lookups)
         {
             return lookups.CarData.TryGetComponent(vehicle, out Car car) && IsEmergencyVehicle(car);
         }
@@ -149,7 +150,7 @@ namespace Traffic_Law_Enforcement
     {
         public const CarFlags PublicTransportLanePermissionMask = CarFlags.UsePublicTransportLanes | CarFlags.PreferPublicTransportLanes;
 
-        public static bool IsAllowedOnPublicTransportLane(Entity vehicle, ref BusLaneVehicleTypeLookups lookups)
+        public static bool IsAllowedOnPublicTransportLane(Entity vehicle, ref PublicTransportLaneVehicleTypeLookups lookups)
         {
             if (EmergencyVehiclePolicy.IsEmergencyVehicle(vehicle, ref lookups))
             {
@@ -159,7 +160,7 @@ namespace Traffic_Law_Enforcement
             return HasPublicTransportLanePermissionFlag(vehicle, ref lookups);
         }
 
-        public static bool HasPublicTransportLanePermissionFlag(Entity vehicle, ref BusLaneVehicleTypeLookups lookups)
+        public static bool HasPublicTransportLanePermissionFlag(Entity vehicle, ref PublicTransportLaneVehicleTypeLookups lookups)
         {
             return lookups.CarData.TryGetComponent(vehicle, out Car car) && HasPublicTransportLanePermissionFlag(car);
         }
@@ -174,15 +175,15 @@ namespace Traffic_Law_Enforcement
             return settings.GetPermissionSettingsMask();
         }
 
-        public static bool TryGetDesiredPermissionState(Entity vehicle, Car car, EnforcementGameplaySettingsState settings, ref BusLaneVehicleTypeLookups lookups, out bool shouldTrack, out CarFlags desiredMask)
+        public static bool TryGetDesiredPermissionState(Entity vehicle, Car car, EnforcementGameplaySettingsState settings, ref PublicTransportLaneVehicleTypeLookups lookups, out bool shouldTrack, out CarFlags desiredMask)
         {
             shouldTrack = false;
             desiredMask = 0;
 
             bool emergency = EmergencyVehiclePolicy.IsEmergencyVehicle(car);
-            BusLaneVehicleCategory authorizedCategories = GetVanillaAuthorizedCategories(vehicle, ref lookups);
+            PublicTransportLaneVehicleCategory authorizedCategories = GetVanillaAuthorizedCategories(vehicle, ref lookups);
             BusLaneFlagGrantExperimentRole additionalRole = GetFlagGrantExperimentRole(vehicle, ref lookups);
-            bool recognizedRole = authorizedCategories != BusLaneVehicleCategory.None || additionalRole != BusLaneFlagGrantExperimentRole.None;
+            bool recognizedRole = authorizedCategories != PublicTransportLaneVehicleCategory.None || additionalRole != BusLaneFlagGrantExperimentRole.None;
 
             if (!recognizedRole && !emergency)
             {
@@ -190,14 +191,14 @@ namespace Traffic_Law_Enforcement
             }
 
             shouldTrack = true;
-            bool allowAuthorized = settings.AllowsBusLaneCategories(authorizedCategories);
+            bool allowAuthorized = settings.AllowsPublicTransportLaneCategories(authorizedCategories);
             bool allowAdditional = settings.AllowsAdditionalBusLaneRole(additionalRole);
             bool allow = emergency || allowAuthorized || allowAdditional;
             desiredMask = GetDesiredPermissionMask(emergency, authorizedCategories, additionalRole, allowAdditional, allow);
             return true;
         }
 
-        private static CarFlags GetDesiredPermissionMask(bool emergency, BusLaneVehicleCategory authorizedCategories, BusLaneFlagGrantExperimentRole additionalRole, bool allowAdditional, bool allow)
+        private static CarFlags GetDesiredPermissionMask(bool emergency, PublicTransportLaneVehicleCategory authorizedCategories, BusLaneFlagGrantExperimentRole additionalRole, bool allowAdditional, bool allow)
         {
             if (!allow)
             {
@@ -209,7 +210,7 @@ namespace Traffic_Law_Enforcement
                 return PublicTransportLanePermissionMask;
             }
 
-            if (authorizedCategories == BusLaneVehicleCategory.None &&
+            if (authorizedCategories == PublicTransportLaneVehicleCategory.None &&
                 additionalRole != BusLaneFlagGrantExperimentRole.None &&
                 allowAdditional)
             {
@@ -219,14 +220,15 @@ namespace Traffic_Law_Enforcement
             return PublicTransportLanePermissionMask;
         }
 
-        public static string DescribeMissingPermissionReason(Entity vehicle, EnforcementGameplaySettingsState settings, ref BusLaneVehicleTypeLookups lookups)
+        public static string DescribeMissingPermissionReason(Entity vehicle, EnforcementGameplaySettingsState settings, ref PublicTransportLaneVehicleTypeLookups lookups)
         {
-            BusLaneVehicleCategory authorizedCategories = GetVanillaAuthorizedCategories(vehicle, ref lookups);
+            PublicTransportLaneVehicleCategory authorizedCategories = GetVanillaAuthorizedCategories(vehicle, ref lookups);
             BusLaneFlagGrantExperimentRole additionalRole = GetFlagGrantExperimentRole(vehicle, ref lookups);
 
-            if (authorizedCategories != BusLaneVehicleCategory.None)
+
+            if (authorizedCategories != PublicTransportLaneVehicleCategory.None)
             {
-                if (!settings.AllowsBusLaneCategories(authorizedCategories))
+                if (!settings.AllowsPublicTransportLaneCategories(authorizedCategories))
                 {
                     return $"public-transport-lane flags revoked by mod setting: {authorizedCategories}";
                 }
@@ -236,18 +238,24 @@ namespace Traffic_Law_Enforcement
 
             if (additionalRole != BusLaneFlagGrantExperimentRole.None)
             {
+                // Locale-aware display name (consistent with PublicTransportLaneViolationSystem)
+                var lang = GameManager.instance?.localizationManager?.activeLocaleId ?? "en-US";
+                var setting = Mod.Settings ?? new Setting(null);
+                var displayName = lang.StartsWith("ko")
+                    ? new LocaleKO(setting).GetBusLaneFlagGrantExperimentRoleDisplayName(additionalRole)
+                    : new LocaleEN(setting).GetBusLaneFlagGrantExperimentRoleDisplayName(additionalRole);
                 if (settings.AllowsAdditionalBusLaneRole(additionalRole))
                 {
-                    return $"public-transport-lane flags missing for granted role: {BusLaneFlagGrantExperimentRoleInfo.ToDisplayName(additionalRole)}";
+                    return $"public-transport-lane flags missing for granted role: {displayName}";
                 }
 
-                return $"public-transport-lane flags not granted for role: {BusLaneFlagGrantExperimentRoleInfo.ToDisplayName(additionalRole)}";
+                return $"public-transport-lane flags not granted for role: {displayName}";
             }
 
             return "vehicle has no public-transport-lane permission flags";
         }
 
-        public static bool TryGetAllowedType3Role(Entity vehicle, EnforcementGameplaySettingsState settings, ref BusLaneVehicleTypeLookups lookups, out BusLaneFlagGrantExperimentRole role)
+        public static bool TryGetAllowedType3Role(Entity vehicle, EnforcementGameplaySettingsState settings, ref PublicTransportLaneVehicleTypeLookups lookups, out BusLaneFlagGrantExperimentRole role)
         {
             role = GetFlagGrantExperimentRole(vehicle, ref lookups);
             if (role == BusLaneFlagGrantExperimentRole.None)
@@ -255,7 +263,7 @@ namespace Traffic_Law_Enforcement
                 return false;
             }
 
-            if (GetVanillaAuthorizedCategories(vehicle, ref lookups) != BusLaneVehicleCategory.None)
+            if (GetVanillaAuthorizedCategories(vehicle, ref lookups) != PublicTransportLaneVehicleCategory.None)
             {
                 return false;
             }
@@ -263,17 +271,23 @@ namespace Traffic_Law_Enforcement
             return settings.AllowsAdditionalBusLaneRole(role);
         }
 
-        public static string DescribeVehicleRole(Entity vehicle, ref BusLaneVehicleTypeLookups lookups)
+        public static string DescribeVehicleRole(Entity vehicle, ref PublicTransportLaneVehicleTypeLookups lookups)
         {
             List<string> names = new List<string>(4);
 
-            BusLaneVehicleCategory authorizedCategories = GetVanillaAuthorizedCategories(vehicle, ref lookups);
+            PublicTransportLaneVehicleCategory authorizedCategories = GetVanillaAuthorizedCategories(vehicle, ref lookups);
             AppendAuthorizedCategoryNames(authorizedCategories, names);
 
             BusLaneFlagGrantExperimentRole additionalRole = GetFlagGrantExperimentRole(vehicle, ref lookups);
+
             if (additionalRole != BusLaneFlagGrantExperimentRole.None)
             {
-                names.Add(BusLaneFlagGrantExperimentRoleInfo.ToDisplayName(additionalRole));
+                var lang = GameManager.instance?.localizationManager?.activeLocaleId ?? "en-US";
+                var setting = new Setting(null); // Or use your actual Setting instance
+                var displayName = lang.StartsWith("ko")
+                    ? new LocaleKO(setting).GetBusLaneFlagGrantExperimentRoleDisplayName(additionalRole)
+                    : new LocaleEN(setting).GetBusLaneFlagGrantExperimentRoleDisplayName(additionalRole);
+                names.Add(displayName);
             }
 
             if (names.Count == 0)
@@ -290,50 +304,50 @@ namespace Traffic_Law_Enforcement
             return description;
         }
 
-        public static BusLaneVehicleCategory GetVanillaAuthorizedCategories(Entity vehicle, ref BusLaneVehicleTypeLookups lookups)
+        public static PublicTransportLaneVehicleCategory GetVanillaAuthorizedCategories(Entity vehicle, ref PublicTransportLaneVehicleTypeLookups lookups)
         {
-            BusLaneVehicleCategory categories = BusLaneVehicleCategory.None;
+            PublicTransportLaneVehicleCategory categories = PublicTransportLaneVehicleCategory.None;
 
             if (lookups.PublicTransportData.HasComponent(vehicle))
             {
-                categories |= BusLaneVehicleCategory.RoadPublicTransportVehicle;
+                categories |= PublicTransportLaneVehicleCategory.RoadPublicTransportVehicle;
             }
 
             if (lookups.TaxiData.HasComponent(vehicle))
             {
-                categories |= BusLaneVehicleCategory.Taxi;
+                categories |= PublicTransportLaneVehicleCategory.Taxi;
             }
 
             if (lookups.PoliceCarData.HasComponent(vehicle))
             {
-                categories |= BusLaneVehicleCategory.PoliceCar;
+                categories |= PublicTransportLaneVehicleCategory.PoliceCar;
             }
 
             if (lookups.FireEngineData.HasComponent(vehicle))
             {
-                categories |= BusLaneVehicleCategory.FireEngine;
+                categories |= PublicTransportLaneVehicleCategory.FireEngine;
             }
 
             if (lookups.AmbulanceData.HasComponent(vehicle))
             {
-                categories |= BusLaneVehicleCategory.Ambulance;
+                categories |= PublicTransportLaneVehicleCategory.Ambulance;
             }
 
             if (lookups.GarbageTruckData.HasComponent(vehicle))
             {
-                categories |= BusLaneVehicleCategory.GarbageTruck;
+                categories |= PublicTransportLaneVehicleCategory.GarbageTruck;
             }
 
             if (lookups.PostVanData.HasComponent(vehicle))
             {
-                categories |= BusLaneVehicleCategory.PostVan;
+                categories |= PublicTransportLaneVehicleCategory.PostVan;
             }
 
             categories |= GetMaintenanceCategories(vehicle, ref lookups);
             return categories;
         }
 
-        public static BusLaneFlagGrantExperimentRole GetFlagGrantExperimentRole(Entity vehicle, ref BusLaneVehicleTypeLookups lookups)
+        public static BusLaneFlagGrantExperimentRole GetFlagGrantExperimentRole(Entity vehicle, ref PublicTransportLaneVehicleTypeLookups lookups)
         {
             if (lookups.PersonalCarData.HasComponent(vehicle))
             {
@@ -368,11 +382,11 @@ namespace Traffic_Law_Enforcement
             return BusLaneFlagGrantExperimentRole.None;
         }
 
-        private static BusLaneVehicleCategory GetMaintenanceCategories(Entity vehicle, ref BusLaneVehicleTypeLookups lookups)
+        private static PublicTransportLaneVehicleCategory GetMaintenanceCategories(Entity vehicle, ref PublicTransportLaneVehicleTypeLookups lookups)
         {
             if (!lookups.MaintenanceVehicleData.HasComponent(vehicle))
             {
-                return BusLaneVehicleCategory.None;
+                return PublicTransportLaneVehicleCategory.None;
             }
 
             MaintenanceVehicleData prefabData;
@@ -385,78 +399,78 @@ namespace Traffic_Law_Enforcement
             }
             else
             {
-                return BusLaneVehicleCategory.None;
+                return PublicTransportLaneVehicleCategory.None;
             }
 
-            BusLaneVehicleCategory categories = BusLaneVehicleCategory.None;
+            PublicTransportLaneVehicleCategory categories = PublicTransportLaneVehicleCategory.None;
             MaintenanceType maintenanceType = prefabData.m_MaintenanceType;
 
             if ((maintenanceType & MaintenanceType.Road) != MaintenanceType.None)
             {
-                categories |= BusLaneVehicleCategory.RoadMaintenanceVehicle;
+                categories |= PublicTransportLaneVehicleCategory.RoadMaintenanceVehicle;
             }
 
             if ((maintenanceType & MaintenanceType.Snow) != MaintenanceType.None)
             {
-                categories |= BusLaneVehicleCategory.Snowplow;
+                categories |= PublicTransportLaneVehicleCategory.Snowplow;
             }
 
             if ((maintenanceType & MaintenanceType.Vehicle) != MaintenanceType.None)
             {
-                categories |= BusLaneVehicleCategory.VehicleMaintenanceVehicle;
+                categories |= PublicTransportLaneVehicleCategory.VehicleMaintenanceVehicle;
             }
 
             return categories;
         }
 
-        private static void AppendAuthorizedCategoryNames(BusLaneVehicleCategory categories, List<string> names)
+        private static void AppendAuthorizedCategoryNames(PublicTransportLaneVehicleCategory categories, List<string> names)
         {
-            if ((categories & BusLaneVehicleCategory.RoadPublicTransportVehicle) != 0)
+            if ((categories & PublicTransportLaneVehicleCategory.RoadPublicTransportVehicle) != 0)
             {
                 names.Add("Road public transport vehicles");
             }
 
-            if ((categories & BusLaneVehicleCategory.Taxi) != 0)
+            if ((categories & PublicTransportLaneVehicleCategory.Taxi) != 0)
             {
                 names.Add("Taxis");
             }
 
-            if ((categories & BusLaneVehicleCategory.PoliceCar) != 0)
+            if ((categories & PublicTransportLaneVehicleCategory.PoliceCar) != 0)
             {
                 names.Add("Police cars");
             }
 
-            if ((categories & BusLaneVehicleCategory.FireEngine) != 0)
+            if ((categories & PublicTransportLaneVehicleCategory.FireEngine) != 0)
             {
                 names.Add("Fire engines");
             }
 
-            if ((categories & BusLaneVehicleCategory.Ambulance) != 0)
+            if ((categories & PublicTransportLaneVehicleCategory.Ambulance) != 0)
             {
                 names.Add("Ambulances");
             }
 
-            if ((categories & BusLaneVehicleCategory.GarbageTruck) != 0)
+            if ((categories & PublicTransportLaneVehicleCategory.GarbageTruck) != 0)
             {
                 names.Add("Garbage trucks");
             }
 
-            if ((categories & BusLaneVehicleCategory.PostVan) != 0)
+            if ((categories & PublicTransportLaneVehicleCategory.PostVan) != 0)
             {
                 names.Add("Post vans");
             }
 
-            if ((categories & BusLaneVehicleCategory.RoadMaintenanceVehicle) != 0)
+            if ((categories & PublicTransportLaneVehicleCategory.RoadMaintenanceVehicle) != 0)
             {
                 names.Add("Road maintenance vehicles");
             }
 
-            if ((categories & BusLaneVehicleCategory.Snowplow) != 0)
+            if ((categories & PublicTransportLaneVehicleCategory.Snowplow) != 0)
             {
                 names.Add("Snowplows");
             }
 
-            if ((categories & BusLaneVehicleCategory.VehicleMaintenanceVehicle) != 0)
+            if ((categories & PublicTransportLaneVehicleCategory.VehicleMaintenanceVehicle) != 0)
             {
                 names.Add("Vehicle maintenance vehicles");
             }

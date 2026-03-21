@@ -478,21 +478,14 @@ namespace Traffic_Law_Enforcement
 
         }
 
-        public static string GetCurrentPeriodStatisticsText()
+
+        public static string GetTotalStatisticsLine()
         {
             if (!IsGameplayContextAvailable())
-            {
                 return LocalizeText(kLoadedSaveOnlyLocaleId, "Available only in a loaded save.");
-            }
-
             if (!EnforcementGameTime.IsInitialized)
-            {
                 return LocalizeText(kWaitingForTimeLocaleId, "Waiting for in-game time initialization.");
-            }
-
-            RollingWindowSnapshot snapshot = GetRollingWindowSnapshot();
-
-            // Total
+            var snapshot = GetRollingWindowSnapshot();
             int violationNumeratorTotal = snapshot.PublicTransportLaneActualCount + snapshot.MidBlockCrossingActualCount + snapshot.IntersectionMovementActualCount;
             int vehicleRouteDenominatorTotal = snapshot.TotalPathRequestCount;
             int suppressionFailureDenominatorTotal = violationNumeratorTotal + snapshot.TotalAvoidedPathCount;
@@ -500,38 +493,62 @@ namespace Traffic_Law_Enforcement
             string suppressionFailureRateTotal = FormatRatio(violationNumeratorTotal, suppressionFailureDenominatorTotal);
             string finesTotal = FormatMoney(snapshot.TotalFineAmount);
             string totalLabel = LocalizeText(kTotalLabelLocaleId, "Total");
-            // PT-lane invasion
+            string lineFormat = LocalizeText("TrafficLawEnforcement.PolicyImpact.Text.StatisticsLineFormat", "{0}: violation rate {1}, suppression failure rate {2}, fines {3}₡.");
+            return string.Format(lineFormat, totalLabel, violationRateTotal, suppressionFailureRateTotal, finesTotal);
+        }
+
+        public static string GetPublicTransportLaneStatisticsLine()
+        {
+            if (!IsGameplayContextAvailable())
+                return LocalizeText(kLoadedSaveOnlyLocaleId, "Available only in a loaded save.");
+            if (!EnforcementGameTime.IsInitialized)
+                return LocalizeText(kWaitingForTimeLocaleId, "Waiting for in-game time initialization.");
+            var snapshot = GetRollingWindowSnapshot();
+            int vehicleRouteDenominatorTotal = snapshot.TotalPathRequestCount;
             int violationNumerator1 = snapshot.PublicTransportLaneActualCount;
             int suppressionFailureDenominator1 = violationNumerator1 + snapshot.PublicTransportLaneAvoidedEventCount;
             string violationRate1 = FormatRatio(violationNumerator1, vehicleRouteDenominatorTotal);
             string suppressionFailureRate1 = FormatRatio(violationNumerator1, suppressionFailureDenominator1);
             string fines1 = FormatMoney(snapshot.PublicTransportLaneFineAmount);
             string label1 = LocalizeText(kPublicTransportLaneLabelLocaleId, "PT-lane");
-            // Mid-block crossing
+            string lineFormat = LocalizeText("TrafficLawEnforcement.PolicyImpact.Text.StatisticsLineFormat", "{0}: violation rate {1}, suppression failure rate {2}, fines {3}₡.");
+            return string.Format(lineFormat, label1, violationRate1, suppressionFailureRate1, fines1);
+        }
+
+        public static string GetMidBlockCrossingStatisticsLine()
+        {
+            if (!IsGameplayContextAvailable())
+                return LocalizeText(kLoadedSaveOnlyLocaleId, "Available only in a loaded save.");
+            if (!EnforcementGameTime.IsInitialized)
+                return LocalizeText(kWaitingForTimeLocaleId, "Waiting for in-game time initialization.");
+            var snapshot = GetRollingWindowSnapshot();
+            int vehicleRouteDenominatorTotal = snapshot.TotalPathRequestCount;
             int violationNumerator2 = snapshot.MidBlockCrossingActualCount;
             int suppressionFailureDenominator2 = violationNumerator2 + snapshot.MidBlockCrossingAvoidedEventCount;
             string violationRate2 = FormatRatio(violationNumerator2, vehicleRouteDenominatorTotal);
             string suppressionFailureRate2 = FormatRatio(violationNumerator2, suppressionFailureDenominator2);
             string fines2 = FormatMoney(snapshot.MidBlockCrossingFineAmount);
             string label2 = LocalizeText(kMidBlockLabelLocaleId, "Mid-block");
-            // Intersection rule violation
+            string lineFormat = LocalizeText("TrafficLawEnforcement.PolicyImpact.Text.StatisticsLineFormat", "{0}: violation rate {1}, suppression failure rate {2}, fines {3}₡.");
+            return string.Format(lineFormat, label2, violationRate2, suppressionFailureRate2, fines2);
+        }
+
+        public static string GetIntersectionMovementStatisticsLine()
+        {
+            if (!IsGameplayContextAvailable())
+                return LocalizeText(kLoadedSaveOnlyLocaleId, "Available only in a loaded save.");
+            if (!EnforcementGameTime.IsInitialized)
+                return LocalizeText(kWaitingForTimeLocaleId, "Waiting for in-game time initialization.");
+            var snapshot = GetRollingWindowSnapshot();
+            int vehicleRouteDenominatorTotal = snapshot.TotalPathRequestCount;
             int violationNumerator3 = snapshot.IntersectionMovementActualCount;
             int suppressionFailureDenominator3 = violationNumerator3 + snapshot.IntersectionMovementAvoidedEventCount;
             string violationRate3 = FormatRatio(violationNumerator3, vehicleRouteDenominatorTotal);
             string suppressionFailureRate3 = FormatRatio(violationNumerator3, suppressionFailureDenominator3);
             string fines3 = FormatMoney(snapshot.IntersectionMovementFineAmount);
             string label3 = LocalizeText(kIntersectionLabelLocaleId, "Intersection");
-
             string lineFormat = LocalizeText("TrafficLawEnforcement.PolicyImpact.Text.StatisticsLineFormat", "{0}: violation rate {1}, suppression failure rate {2}, fines {3}₡.");
-            // The text above is in Settings.cs
-            var lines = new List<string>
-            {
-                string.Format(lineFormat, totalLabel, violationRateTotal, suppressionFailureRateTotal, finesTotal),
-                string.Format(lineFormat, label1, violationRate1, suppressionFailureRate1, fines1),
-                string.Format(lineFormat, label2, violationRate2, suppressionFailureRate2, fines2),
-                string.Format(lineFormat, label3, violationRate3, suppressionFailureRate3, fines3)
-            };
-            return string.Join("\n", lines);
+            return string.Format(lineFormat, label3, violationRate3, suppressionFailureRate3, fines3);
         }
 
         public static RollingWindowSnapshot GetRollingWindowSnapshot()

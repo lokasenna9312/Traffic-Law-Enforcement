@@ -241,6 +241,8 @@ namespace Traffic_Law_Enforcement
                         writer.TypeBegin("Game.UI.InGame.BudgetItem");
                         writer.PropertyName("id");
                         writer.Write(budgetItem.m_ID);
+                        writer.PropertyName("label");
+                        writer.Write(GameManager.instance.localizationManager.activeDictionary.TryGetValue($"EconomyPanel.BUDGET_ITEM[{budgetItem.m_ID}]", out var label) ? label : budgetItem.m_ID);
                         writer.PropertyName("color");
                         writer.Write(budgetItem.m_Color);
                         writer.PropertyName("icon");
@@ -265,6 +267,9 @@ namespace Traffic_Law_Enforcement
                                 writer.TypeBegin("Game.UI.InGame.BudgetSource");
                                 writer.PropertyName("id");
                                 writer.Write(Enum.GetName(typeof(IncomeSource), incomeSource));
+                                var sourceName = Enum.GetName(typeof(IncomeSource), incomeSource);
+                                writer.PropertyName("label");
+                                writer.Write(GameManager.instance.localizationManager.activeDictionary.TryGetValue($"EconomyPanel.BUDGET_SUB_ITEM[{sourceName}]", out var sourceLabel) ? sourceLabel : sourceName);
                                 writer.PropertyName("index");
                                 writer.Write((int)incomeSource);
                                 writer.TypeEnd();
@@ -278,6 +283,8 @@ namespace Traffic_Law_Enforcement
                     writer.TypeBegin("Game.UI.InGame.BudgetItem");
                     writer.PropertyName("id");
                     writer.Write(fineIncomeItem.m_ID);
+                    writer.PropertyName("label");
+                    writer.Write(GameManager.instance.localizationManager.activeDictionary.TryGetValue(FineIncomeBudgetItemLocaleId, out var fineLabel) ? fineLabel : fineIncomeItem.m_ID);
                     writer.PropertyName("color");
                     writer.Write(fineIncomeItem.m_Color);
                     writer.PropertyName("icon");

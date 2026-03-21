@@ -1,6 +1,7 @@
 using Game;
 using Game.Net;
 using Game.Vehicles;
+using Game.SceneFlow;
 using Unity.Collections;
 using Unity.Entities;
 using Entity = Unity.Entities.Entity;
@@ -19,7 +20,7 @@ namespace Traffic_Law_Enforcement
         private ComponentLookup<CarLane> m_CarLaneData;
         private ComponentLookup<PublicTransportLaneViolation> m_ViolationData;
         private ComponentLookup<PublicTransportLaneType3UsageState> m_Type3UsageData;
-        private BusLaneVehicleTypeLookups m_TypeLookups;
+        private PublicTransportLaneVehicleTypeLookups m_TypeLookups;
         private bool m_HasEvaluated;
         private bool m_LastEnforcementEnabled;
 
@@ -53,7 +54,7 @@ namespace Traffic_Law_Enforcement
             m_CarLaneData = GetComponentLookup<CarLane>(true);
             m_ViolationData = GetComponentLookup<PublicTransportLaneViolation>();
             m_Type3UsageData = GetComponentLookup<PublicTransportLaneType3UsageState>();
-            m_TypeLookups = BusLaneVehicleTypeLookups.Create(this);
+            m_TypeLookups = PublicTransportLaneVehicleTypeLookups.Create(this);
             RequireForUpdate(m_CarQuery);
         }
 
@@ -248,7 +249,12 @@ namespace Traffic_Law_Enforcement
 
         private static void LogType3Usage(Entity vehicle, Entity laneEntity, BusLaneFlagGrantExperimentRole type3Role)
         {
-            string roleName = BusLaneFlagGrantExperimentRoleInfo.ToDisplayName(type3Role);
+            // Locale-aware display name
+            var lang = GameManager.instance?.localizationManager?.activeLocaleId ?? "en-US";
+            var setting = Mod.Settings ?? new Setting(null);
+            string roleName = lang.StartsWith("ko")
+                ? new LocaleKO(setting).GetBusLaneFlagGrantExperimentRoleDisplayName(type3Role)
+                : new LocaleEN(setting).GetBusLaneFlagGrantExperimentRoleDisplayName(type3Role);
             string message = $"PT-lane usage by non-public vehicles allowed to use PT lanes: vehicle={vehicle}, lane={laneEntity}, role={roleName}";
             EnforcementLoggingPolicy.RecordAllowedType3Usage(message);
         }

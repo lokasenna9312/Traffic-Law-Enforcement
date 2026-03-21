@@ -560,11 +560,6 @@ namespace Traffic_Law_Enforcement
         [SettingsUISection(kDebugTab, kDebugGroup)]
         public bool EnablePathfindingPenaltyDiagnosticLogging { get; set; }
 
-
-        [Exclude]
-        [SettingsUISection(kPolicyImpactTab, kPolicyImpactGroup)]
-        public string PolicyImpactStatisticsSummary => EnforcementPolicyImpactService.GetCurrentPeriodStatisticsText();
-
         [Exclude]
         [SettingsUIButton]
         [SettingsUIDisableByCondition(typeof(Setting), nameof(IsMonthlyChirperPreviewButtonDisabled))]
@@ -761,7 +756,6 @@ namespace Traffic_Law_Enforcement
             Add(entries, nameof(Setting.EnableEnforcementEventLogging), "Enable enforcement event logging", "Debug-only. Writes traffic-law enforcement event logs: PT-lane, mid-block, and intersection violation logs, fine-income collection logs, and bus-lane exit-pressure logs. Turning this off affects logging only; enforcement behavior and penalties still run.");
             Add(entries, nameof(Setting.EnableAllowedType3PublicTransportLaneUsageLogging), "Enable PT-lane usage logging for non-public vehicles allowed to use PT lanes", "Debug-only. Writes logs when vehicles that cannot use PT lanes in vanilla but are allowed to use them by this mod's settings are observed using PT-only lanes. Turning this off affects logging only; permissions and enforcement behavior still run.");
             Add(entries, nameof(Setting.EnablePathfindingPenaltyDiagnosticLogging), "Enable pathfinding penalty diagnostic logging", "Debug-only. Writes pathfinding money-axis penalty apply logs and shared PathfindCarData diagnostic logs. Turning this off affects logging only; pathfinding penalties still run.");
-            Add(entries, nameof(Setting.PolicyImpactStatisticsSummary), "Violation Statistics", "Shows the overall and per-type violation rate, suppression failure rate, and total fines for the most recent in-game month. F is the number of actual violations fined, A is the total number of pathfinding requests, and D is the number of pathfinding outcomes estimated to have avoided penalized routes.");
             entries[BudgetUIPatches.FineIncomeBudgetItemLocaleId] = "Traffic law enforcement";
             entries[BudgetUIPatches.FineIncomePublicTransportLaneLocaleId] = "Public-transport lane violations";
             entries[BudgetUIPatches.FineIncomeMidBlockCrossingLocaleId] = "Centerline crossings";
@@ -796,6 +790,20 @@ namespace Traffic_Law_Enforcement
         {
             entries[m_Setting.GetOptionLabelLocaleID(optionName)] = label;
             entries[m_Setting.GetOptionDescLocaleID(optionName)] = desc;
+        }
+
+        public string GetBusLaneFlagGrantExperimentRoleDisplayName(BusLaneFlagGrantExperimentRole role)
+        {
+            switch (role)
+            {
+                case BusLaneFlagGrantExperimentRole.PersonalCar: return "Personal cars";
+                case BusLaneFlagGrantExperimentRole.DeliveryTruck: return "Delivery trucks";
+                case BusLaneFlagGrantExperimentRole.CargoTransport: return "Cargo transport vehicles";
+                case BusLaneFlagGrantExperimentRole.Hearse: return "Hearses";
+                case BusLaneFlagGrantExperimentRole.PrisonerTransport: return "Prisoner transports";
+                case BusLaneFlagGrantExperimentRole.ParkMaintenanceVehicle: return "Park maintenance vehicles";
+                default: return "None";
+            }
         }
 
         private void AddGameplay(Dictionary<string, string> entries, string currentName, string defaultName, string label, string desc)
@@ -880,7 +888,6 @@ namespace Traffic_Law_Enforcement
             Add(entries, nameof(Setting.EnableEnforcementEventLogging), "교통법규 단속 이벤트 로그 기록", "디버그 전용입니다. 대중교통 전용차선, 중앙선 침범, 교차로 통행규칙 위반 로그와 벌금 수익 징수 로그, 대중교통 전용차선 이탈 압박 로그를 기록합니다. 이 옵션을 꺼도 단속 동작과 벌금 부과는 계속 진행됩니다.");
             Add(entries, nameof(Setting.EnableAllowedType3PublicTransportLaneUsageLogging), "대중교통 전용차선 이용이 허가된 비대중교통 차량의 대중교통 전용차선 사용 로그 기록", "디버그 전용입니다. 바닐라 기준으로는 대중교통 전용차선을 이용할 수 없지만 이 모드의 설정에서 대중교통 전용차선 이용이 허가된 차량이 실제로 그 차선을 이용한 사실을 로그로 기록합니다. 이 옵션을 꺼도 통행 허용 여부와 단속 동작은 계속 유지됩니다.");
             Add(entries, nameof(Setting.EnablePathfindingPenaltyDiagnosticLogging), "경로탐색 페널티 진단 로그 기록", "디버그 전용입니다. 경로탐색 money-axis 페널티 적용 로그와 shared PathfindCarData 진단 로그를 기록합니다. 이 옵션을 꺼도 경로탐색 페널티 자체는 계속 적용됩니다.");
-            Add(entries, nameof(Setting.PolicyImpactStatisticsSummary), "위반율 지표", "최근 1달 기준 전체 및 항목별 위반율, 억제 실패율, 벌금 총액을 한 번에 표시합니다. F는 실제 벌금이 부과된 위반이고, A는 전체 경로탐색 요청 수이며, D는 단속 가능성 때문에 벌점 경로를 포기한 것으로 추정되는 경로탐색 결과 수입니다.");
             entries[BudgetUIPatches.FineIncomeBudgetItemLocaleId] = "교통법규 단속";
             entries[BudgetUIPatches.FineIncomePublicTransportLaneLocaleId] = "대중교통 전용차선 침입";
             entries[BudgetUIPatches.FineIncomeMidBlockCrossingLocaleId] = "중앙선 침범";
@@ -915,6 +922,20 @@ namespace Traffic_Law_Enforcement
         {
             entries[m_Setting.GetOptionLabelLocaleID(optionName)] = label;
             entries[m_Setting.GetOptionDescLocaleID(optionName)] = desc;
+        }
+
+        public string GetBusLaneFlagGrantExperimentRoleDisplayName(BusLaneFlagGrantExperimentRole role)
+        {
+            switch (role)
+            {
+                case BusLaneFlagGrantExperimentRole.PersonalCar: return "개인 승용차";
+                case BusLaneFlagGrantExperimentRole.DeliveryTruck: return "배달 트럭";
+                case BusLaneFlagGrantExperimentRole.CargoTransport: return "화물 운송 차량";
+                case BusLaneFlagGrantExperimentRole.Hearse: return "영구차";
+                case BusLaneFlagGrantExperimentRole.PrisonerTransport: return "죄수 호송차";
+                case BusLaneFlagGrantExperimentRole.ParkMaintenanceVehicle: return "공원 정비 차량";
+                default: return "없음";
+            }
         }
 
         private void AddGameplay(Dictionary<string, string> entries, string currentName, string defaultName, string label, string desc)

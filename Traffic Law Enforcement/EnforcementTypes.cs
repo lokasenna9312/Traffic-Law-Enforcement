@@ -20,7 +20,7 @@ namespace Traffic_Law_Enforcement
     }
 
     [Flags]
-    public enum BusLaneVehicleCategory : ushort
+    public enum PublicTransportLaneVehicleCategory : ushort
     {
         None = 0,
         RoadPublicTransportVehicle = 1 << 0,
@@ -58,26 +58,6 @@ namespace Traffic_Law_Enforcement
             return (BusLaneFlagGrantExperimentRole)value;
         }
 
-        public static string ToDisplayName(BusLaneFlagGrantExperimentRole role, bool korean = false)
-        {
-            switch (role)
-            {
-                case BusLaneFlagGrantExperimentRole.PersonalCar:
-                    return korean ? "\uac1c\uc778 \uc2b9\uc6a9\ucc28" : "Personal cars";
-                case BusLaneFlagGrantExperimentRole.DeliveryTruck:
-                    return korean ? "\ubc30\ub2ec \ud2b8\ub7ed" : "Delivery trucks";
-                case BusLaneFlagGrantExperimentRole.CargoTransport:
-                    return korean ? "\ud654\ubb3c \uc6b4\uc1a1 \ucc28\ub7c9" : "Cargo transport vehicles";
-                case BusLaneFlagGrantExperimentRole.Hearse:
-                    return korean ? "\uc601\uad6c\ucc28" : "Hearses";
-                case BusLaneFlagGrantExperimentRole.PrisonerTransport:
-                    return korean ? "\uc8c4\uc218 \uc774\uc1a1\ucc28" : "Prisoner transports";
-                case BusLaneFlagGrantExperimentRole.ParkMaintenanceVehicle:
-                    return korean ? "\uacf5\uc6d0 \uc815\ube44 \ucc28\ub7c9" : "Park maintenance vehicles";
-                default:
-                    return korean ? "\uc5c6\uc74c" : "None";
-            }
-        }
     }
 
     public readonly struct EnforcementRecord
