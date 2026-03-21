@@ -163,8 +163,6 @@ namespace Traffic_Law_Enforcement
         public const string kLoadedSaveOnlyLocaleId = "TrafficLawEnforcement.PolicyImpact.Text.LoadedSaveOnly";
         public const string kWaitingForTimeLocaleId = "TrafficLawEnforcement.PolicyImpact.Text.WaitingForTime";
         public const string kNoDataLocaleId = "TrafficLawEnforcement.PolicyImpact.Text.NoData";
-        public const string kSummaryLineFormatLocaleId = "TrafficLawEnforcement.PolicyImpact.Text.SummaryLineFormat";
-        public const string kDetailLineFormatLocaleId = "TrafficLawEnforcement.PolicyImpact.Text.DetailLineFormat";
         public const string kNoteLocaleId = "TrafficLawEnforcement.PolicyImpact.Text.Note";
         public const string kTotalLabelLocaleId = "TrafficLawEnforcement.PolicyImpact.Label.Total";
         public const string kPublicTransportLaneLabelLocaleId = "TrafficLawEnforcement.PolicyImpact.Label.PublicTransportLane";
@@ -502,26 +500,20 @@ namespace Traffic_Law_Enforcement
             string suppressionFailureRateTotal = FormatRatio(violationNumeratorTotal, suppressionFailureDenominatorTotal);
             string finesTotal = FormatMoney(snapshot.TotalFineAmount);
             string totalLabel = LocalizeText(kTotalLabelLocaleId, "Total");
-            string totalLine = FormatLocalizedText(kSummaryLineFormatLocaleId, "{0}: violation rate {1}, suppression failure rate {2}, fines {3}", totalLabel, violationRateTotal, suppressionFailureRateTotal, finesTotal);
-
-            // PT-lane rule violation
+            // PT-lane invasion
             int violationNumerator1 = snapshot.PublicTransportLaneActualCount;
             int suppressionFailureDenominator1 = violationNumerator1 + snapshot.PublicTransportLaneAvoidedEventCount;
             string violationRate1 = FormatRatio(violationNumerator1, vehicleRouteDenominatorTotal);
             string suppressionFailureRate1 = FormatRatio(violationNumerator1, suppressionFailureDenominator1);
             string fines1 = FormatMoney(snapshot.PublicTransportLaneFineAmount);
-            string label1 = LocalizeText(kPublicTransportLaneLabelLocaleId, "Public Transport Lane");
-            string line1 = FormatLocalizedText(kSummaryLineFormatLocaleId, "{0}: violation rate {1}, suppression failure rate {2}, fines {3}", label1, violationRate1, suppressionFailureRate1, fines1);
-
+            string label1 = LocalizeText(kPublicTransportLaneLabelLocaleId, "PT-lane");
             // Mid-block crossing
             int violationNumerator2 = snapshot.MidBlockCrossingActualCount;
             int suppressionFailureDenominator2 = violationNumerator2 + snapshot.MidBlockCrossingAvoidedEventCount;
             string violationRate2 = FormatRatio(violationNumerator2, vehicleRouteDenominatorTotal);
             string suppressionFailureRate2 = FormatRatio(violationNumerator2, suppressionFailureDenominator2);
             string fines2 = FormatMoney(snapshot.MidBlockCrossingFineAmount);
-            string label2 = LocalizeText(kMidBlockLabelLocaleId, "Mid-block Crossing");
-            string line2 = FormatLocalizedText(kSummaryLineFormatLocaleId, "{0}: violation rate {1}, suppression failure rate {2}, fines {3}", label2, violationRate2, suppressionFailureRate2, fines2);
-
+            string label2 = LocalizeText(kMidBlockLabelLocaleId, "Mid-block");
             // Intersection rule violation
             int violationNumerator3 = snapshot.IntersectionMovementActualCount;
             int suppressionFailureDenominator3 = violationNumerator3 + snapshot.IntersectionMovementAvoidedEventCount;
@@ -529,9 +521,17 @@ namespace Traffic_Law_Enforcement
             string suppressionFailureRate3 = FormatRatio(violationNumerator3, suppressionFailureDenominator3);
             string fines3 = FormatMoney(snapshot.IntersectionMovementFineAmount);
             string label3 = LocalizeText(kIntersectionLabelLocaleId, "Intersection");
-            string line3 = FormatLocalizedText(kSummaryLineFormatLocaleId, "{0}: violation rate {1}, suppression failure rate {2}, fines {3}", label3, violationRate3, suppressionFailureRate3, fines3);
 
-            return string.Join("\n", new[] { totalLine, line1, line2, line3 });
+            string lineFormat = LocalizeText("TrafficLawEnforcement.PolicyImpact.Text.StatisticsLineFormat", "{0}: violation rate {1}, suppression failure rate {2}, fines {3}₡.");
+            // The text above is in Settings.cs
+            var lines = new List<string>
+            {
+                string.Format(lineFormat, totalLabel, violationRateTotal, suppressionFailureRateTotal, finesTotal),
+                string.Format(lineFormat, label1, violationRate1, suppressionFailureRate1, fines1),
+                string.Format(lineFormat, label2, violationRate2, suppressionFailureRate2, fines2),
+                string.Format(lineFormat, label3, violationRate3, suppressionFailureRate3, fines3)
+            };
+            return string.Join("\n", lines);
         }
 
         public static RollingWindowSnapshot GetRollingWindowSnapshot()
@@ -686,35 +686,6 @@ namespace Traffic_Law_Enforcement
             s_PendingPathRequestsUntilTimeInitialization = 0;
         }
 
-        private static string GetCurrentPeriodLineText(string labelLocaleId, string fallbackLabel, Func<RollingWindowSnapshot, int> actualCountSelector, Func<RollingWindowSnapshot, int> avoidedCountSelector, Func<RollingWindowSnapshot, int> fineAmountSelector)
-        {
-            if (!IsGameplayContextAvailable())
-            {
-                return LocalizeText(kLoadedSaveOnlyLocaleId, "Available only in a loaded save.");
-            }
-
-            if (!EnforcementGameTime.IsInitialized)
-            {
-                return LocalizeText(kWaitingForTimeLocaleId, "Waiting for in-game time initialization.");
-            }
-
-            RollingWindowSnapshot snapshot = GetRollingWindowSnapshot();
-            string label = LocalizeText(labelLocaleId, fallbackLabel);
-            int actualCount = actualCountSelector(snapshot);
-            int avoidedCount = avoidedCountSelector(snapshot);
-            int fineAmount = fineAmountSelector(snapshot);
-            int vehicleRouteDenominator = snapshot.TotalPathRequestCount; // Use 1-month aggregated denominator
-            string violationRate = FormatRatio(actualCount, vehicleRouteDenominator);
-            string suppressionFailureRate = FormatRatio(actualCount, actualCount + avoidedCount);
-            string fines = FormatMoney(fineAmount);
-            return FormatLocalizedText(kDetailLineFormatLocaleId, "{0}: violation rate {1}, suppression failure rate {2}, fines {3}", label, violationRate, suppressionFailureRate, fines);
-        }
-
-        private static int ClampToNonNegative(int value)
-        {
-            return value < 0 ? 0 : value;
-        }
-
         private static string FormatRatio(int numerator, int denominator)
         {
             if (denominator <= 0)
@@ -728,20 +699,6 @@ namespace Traffic_Law_Enforcement
         private static string FormatMoney(int amount)
         {
             return amount.ToString("N0", CultureInfo.InvariantCulture);
-        }
-
-        private static string FormatLocalizedText(string localeId, string fallbackFormat, params object[] args)
-        {
-            string format = LocalizeText(localeId, fallbackFormat);
-            return string.Format(CultureInfo.InvariantCulture, format, args);
-        }
-
-        private static void AppendRateAndFineLine(StringBuilder builder, string label, int actualCount, int totalPathRequestCount, int avoidedCount, int fineAmount)
-        {
-            string violationRate = FormatRatio(actualCount, totalPathRequestCount);
-            string suppressionFailureRate = FormatRatio(actualCount, actualCount + avoidedCount);
-            string fines = FormatMoney(fineAmount);
-            builder.AppendLine(FormatLocalizedText(kDetailLineFormatLocaleId, "{0}: violation rate {1}, suppression failure rate {2}, fines {3}", label, violationRate, suppressionFailureRate, fines));
         }
 
         private static void PrunePathRequestEvents(long cutoffTimestamp)

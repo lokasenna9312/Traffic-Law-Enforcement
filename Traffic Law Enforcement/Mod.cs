@@ -33,8 +33,6 @@ namespace Traffic_Law_Enforcement
             m_Setting.RegisterInOptionsUI();
             GameManager.instance.localizationManager.AddSource("en-US", new LocaleEN(m_Setting));
             GameManager.instance.localizationManager.AddSource("ko-KR", new LocaleKO(m_Setting));
-            GameManager.instance.localizationManager.AddSource("en-US", new BudgetLocaleEN());
-            GameManager.instance.localizationManager.AddSource("ko-KR", new BudgetLocaleKO());
             BudgetUIPatches.Apply();
             VehicleUtilsPatches.Apply();
             updateSystem.UpdateAfter<EnforcementSaveDataSystem, EnforcementGameTimeSystem>(SystemUpdatePhase.GameSimulation);
