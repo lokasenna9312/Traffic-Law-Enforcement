@@ -513,49 +513,11 @@ namespace Traffic_Law_Enforcement
             return $"TrafficLawEnforcement.MonthlyChirperPreview_{periodEndMonthTicks}_{previewSequence}";
         }
 
-        private static string BuildEnglishMessage(MonthlyEnforcementReport report, long periodStartMonthTicks, long periodEndMonthTicks)
-        {
-            return
-                $"Traffic enforcement report for {FormatEnglishPeriodPoint(periodStartMonthTicks)} to {FormatEnglishPeriodPoint(periodEndMonthTicks)}: {report.TotalViolationCount} violations.\n" +
-                $"Total violation rate: {FormatViolationRate(report.TotalViolationCount, report.m_TotalPathRequestCount)}. Total suppression failure rate: {FormatSuppressionFailureRate(report.TotalViolationCount, report.m_TotalAvoidedPathCount)}. Total fines: {FormatMoney(report.m_TotalFineAmount)}\u20A1.\n" +
-                $"PT-lane: violation rate {FormatViolationRate(report.m_PublicTransportLaneCount, report.m_TotalPathRequestCount)}, suppression failure rate {FormatSuppressionFailureRate(report.m_PublicTransportLaneCount, report.m_PublicTransportLaneAvoidedEventCount)}, fines {FormatMoney(report.m_PublicTransportLaneFineAmount)}\u20A1.\n" +
-                $"Mid-block: violation rate {FormatViolationRate(report.m_MidBlockCrossingCount, report.m_TotalPathRequestCount)}, suppression failure rate {FormatSuppressionFailureRate(report.m_MidBlockCrossingCount, report.m_MidBlockCrossingAvoidedEventCount)}, fines {FormatMoney(report.m_MidBlockCrossingFineAmount)}\u20A1.\n" +
-                $"Intersection: violation rate {FormatViolationRate(report.m_IntersectionMovementCount, report.m_TotalPathRequestCount)}, suppression failure rate {FormatSuppressionFailureRate(report.m_IntersectionMovementCount, report.m_IntersectionMovementAvoidedEventCount)}, fines {FormatMoney(report.m_IntersectionMovementFineAmount)}\u20A1.";
-        }
-
-        private static string BuildKoreanMessageLegacy(MonthlyEnforcementReport report, long periodStartMonthTicks, long periodEndMonthTicks)
-        {
-            string fineText = report.m_TotalFineAmount.ToString("N0", CultureInfo.InvariantCulture);
-            return $"{FormatKoreanPeriodPoint(periodStartMonthTicks)}부터 {FormatKoreanPeriodPoint(periodEndMonthTicks)}까지 버스전용차선 침범 {report.m_PublicTransportLaneCount}건, 중앙선 침범 {report.m_MidBlockCrossingCount}건, 교차로 통행규칙 위반 {report.m_IntersectionMovementCount}건, 총 {report.TotalViolationCount}건의 교통법규 위반 단속이 있었습니다. 총 벌금은 {fineText}\u20A1입니다.";
-        }
-
         private static string FormatEnglishPeriodPoint(long monthTicks)
         {
             GetPeriodParts(monthTicks, out int year, out int month, out int hour, out int minute);
             string monthName = CultureInfo.GetCultureInfo(kDefaultLocale).DateTimeFormat.GetMonthName(month);
             return $"{monthName} {year} {hour:00}:{minute:00}";
-        }
-
-        private static string FormatKoreanPeriodPoint(long monthTicks)
-        {
-            GetPeriodParts(monthTicks, out int year, out int month, out int hour, out int minute);
-            return $"{year}년 {month}월 {hour:00}:{minute:00}";
-        }
-
-        private static string BuildKoreanMessage(MonthlyEnforcementReport report, long periodStartMonthTicks, long periodEndMonthTicks)
-        {
-            return
-                $"{FormatKoreanPeriodText(periodStartMonthTicks)}부터 {FormatKoreanPeriodText(periodEndMonthTicks)}까지 교통법규 단속 보고입니다. 총 위반 적발 {report.TotalViolationCount}건.\n" +
-                $"전체 위반율: {FormatViolationRate(report.TotalViolationCount, report.m_TotalPathRequestCount)}. 전체 억제 실패율: {FormatSuppressionFailureRate(report.TotalViolationCount, report.m_TotalAvoidedPathCount)}. 총 벌금: {FormatMoney(report.m_TotalFineAmount)}\u20A1.\n" +
-                $"대중교통 전용차선: 위반율 {FormatViolationRate(report.m_PublicTransportLaneCount, report.m_TotalPathRequestCount)}, 억제 실패율 {FormatSuppressionFailureRate(report.m_PublicTransportLaneCount, report.m_PublicTransportLaneAvoidedEventCount)}, 벌금 {FormatMoney(report.m_PublicTransportLaneFineAmount)}\u20A1.\n" +
-                $"중앙선 침범: 위반율 {FormatViolationRate(report.m_MidBlockCrossingCount, report.m_TotalPathRequestCount)}, 억제 실패율 {FormatSuppressionFailureRate(report.m_MidBlockCrossingCount, report.m_MidBlockCrossingAvoidedEventCount)}, 벌금 {FormatMoney(report.m_MidBlockCrossingFineAmount)}\u20A1.\n" +
-                $"교차로 통행규칙 위반: 위반율 {FormatViolationRate(report.m_IntersectionMovementCount, report.m_TotalPathRequestCount)}, 억제 실패율 {FormatSuppressionFailureRate(report.m_IntersectionMovementCount, report.m_IntersectionMovementAvoidedEventCount)}, 벌금 {FormatMoney(report.m_IntersectionMovementFineAmount)}\u20A1.";
-        }
-
-        private static string FormatKoreanPeriodText(long monthTicks)
-        {
-            GetPeriodParts(monthTicks, out int year, out int month, out int hour, out int minute);
-            return $"{year}년 {month}월 {hour:00}:{minute:00}";
         }
 
         private static string BuildLocalizedMessage(MonthlyEnforcementReport report, long periodStartMonthTicks, long periodEndMonthTicks)

@@ -43,6 +43,7 @@ The following options can be configured either for the currently loaded save fil
 - I coded the mod so that traffic law enforcement records are stored in each save file, but this feature has not yet been thoroughly tested.
 - Because the mod works by monitoring traffic that is expected to violate traffic laws and applying penalties accordingly, it may cause performance degradation.
 - I coded the mod so that the budget of the household or company that owns a fined vehicle is actually reduced. However, due to my limited development experience, I have not been able to thoroughly verify whether this is actually reflected in practice. (is it possible to view the budget balance details of individual households or companies with the developer tools?)
+- Log files are saved to the following path: C:\Users\(USERNAME)\AppData\LocalLow\Colossal Order\Cities Skylines II\Logs\Traffic_Law_Enforcement.Mod.log
 
 ### 5. Desired Improvements and Additional Features
 - I wanted to penalize drivers who stop in intersections but I could not implement that feature because of my limited coding skills.
@@ -75,6 +76,7 @@ The following options can be configured either for the currently loaded save fil
 - 교통법규 위반 단속 실적은 각 세이브파일에 저장되도록 코딩했지만, 아직 충분히 테스트되지는 않았습니다.
 - 교통법규 위반이 예상되는 교통량을 감시하여 페널티를 부과하는 방식이기 때문에, 성능 저하가 발생할 수 있습니다.
 - 벌금이 부과된 차량을 소유한 가구 또는 업체의 예산이 실제로 줄어들도록 코딩했지만, 실제로 그 예산 감소가 충분히 반영되는지는 아직 철저하게 검증하지 못했습니다.
+- 로그 파일은 다음 경로에 저장됩니다. C:\Users\(USERNAME)\AppData\LocalLow\Colossal Order\Cities Skylines II\Logs\Traffic_Law_Enforcement.Mod.log
 
 ### 5. 추가적으로 개선하거나 구현하고 싶은 사항
 - 교차로 안에서 정차하는 운전자들도 단속하도록 만들고 싶었지만, 제 코딩 실력이 부족해서 그 기능은 구현하지 못했습니다.

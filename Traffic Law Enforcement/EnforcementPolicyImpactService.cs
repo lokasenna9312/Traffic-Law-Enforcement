@@ -511,9 +511,8 @@ namespace Traffic_Law_Enforcement
             string violationRate1 = FormatRatio(violationNumerator1, vehicleRouteDenominatorTotal);
             string suppressionFailureRate1 = FormatRatio(violationNumerator1, suppressionFailureDenominator1);
             string fines1 = FormatMoney(snapshot.PublicTransportLaneFineAmount);
-            string label1 = LocalizeText(kPublicTransportLaneLabelLocaleId, "PT-lane");
-            string lineFormat = LocalizeText(kStatisticsLineFormat, "{0}: violation rate {1}, suppression failure rate {2}, fines {3}₡.");
-            return string.Format(lineFormat, label1, violationRate1, suppressionFailureRate1, fines1);
+            string lineFormat = LocalizeText(kStatisticsLineFormat, "violation rate {0}, suppression failure rate {1}, fines {2}₡.");
+            return string.Format(lineFormat, violationRate1, suppressionFailureRate1, fines1);
         }
 
         public static string GetMidBlockCrossingStatisticsLine()
@@ -529,9 +528,8 @@ namespace Traffic_Law_Enforcement
             string violationRate2 = FormatRatio(violationNumerator2, vehicleRouteDenominatorTotal);
             string suppressionFailureRate2 = FormatRatio(violationNumerator2, suppressionFailureDenominator2);
             string fines2 = FormatMoney(snapshot.MidBlockCrossingFineAmount);
-            string label2 = LocalizeText(kMidBlockLabelLocaleId, "Mid-block");
-            string lineFormat = LocalizeText(kStatisticsLineFormat, "{0}: violation rate {1}, suppression failure rate {2}, fines {3}₡.");
-            return string.Format(lineFormat, label2, violationRate2, suppressionFailureRate2, fines2);
+            string lineFormat = LocalizeText(kStatisticsLineFormat, "violation rate {0}, suppression failure rate {1}, fines {2}₡.");
+            return string.Format(lineFormat, violationRate2, suppressionFailureRate2, fines2);
         }
 
         public static string GetIntersectionMovementStatisticsLine()
@@ -547,9 +545,8 @@ namespace Traffic_Law_Enforcement
             string violationRate3 = FormatRatio(violationNumerator3, vehicleRouteDenominatorTotal);
             string suppressionFailureRate3 = FormatRatio(violationNumerator3, suppressionFailureDenominator3);
             string fines3 = FormatMoney(snapshot.IntersectionMovementFineAmount);
-            string label3 = LocalizeText(kIntersectionLabelLocaleId, "Intersection");
-            string lineFormat = LocalizeText(kStatisticsLineFormat, "{0}: violation rate {1}, suppression failure rate {2}, fines {3}₡.");
-            return string.Format(lineFormat, label3, violationRate3, suppressionFailureRate3, fines3);
+            string lineFormat = LocalizeText(kStatisticsLineFormat, "violation rate {0}, suppression failure rate {1}, fines {2}₡.");
+            return string.Format(lineFormat, violationRate3, suppressionFailureRate3, fines3);
         }
 
         public static RollingWindowSnapshot GetRollingWindowSnapshot()
