@@ -12,17 +12,19 @@ namespace Traffic_Law_Enforcement
     internal static class IntersectionMovementCalculateCostFallbackPatch
     {
         private static int s_LogCount;
+        private static bool s_LoadLogWritten;
 
         private static MethodBase TargetMethod()
         {
             Type executorType = AccessTools.Inner(typeof(PathfindJobs), "PathfindExecutor");
             if (executorType == null)
             {
+                Mod.log.Info("Intersection fallback hook skipped: PathfindExecutor type not found.");
                 return null;
             }
 
-            MethodInfo[] methods = AccessTools.GetDeclaredMethods(executorType);
-            for (int index = 0; index < methods.Length; index += 1)
+            var methods = AccessTools.GetDeclaredMethods(executorType);
+            for (int index = 0; index < methods.Count; index += 1)
             {
                 MethodInfo method = methods[index];
                 if (method.IsStatic)
@@ -35,14 +37,22 @@ namespace Traffic_Law_Enforcement
                     continue;
                 }
 
+                Mod.log.Info($"Intersection fallback hook target selected: {method}");
                 return method;
             }
 
+            Mod.log.Info("Intersection fallback hook skipped: CalculateCost not found.");
             return null;
         }
 
         private static void Postfix(object[] __args, ref float __result, PathfindParameters ___m_Parameters, MethodBase __originalMethod)
         {
+            if (!s_LoadLogWritten)
+            {
+                s_LoadLogWritten = true;
+                Mod.log.Info($"Intersection fallback hook active: method={__originalMethod?.Name}, argCount={__args?.Length ?? 0}");
+            }
+
             if (!Mod.IsIntersectionMovementEnforcementEnabled)
             {
                 return;
