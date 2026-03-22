@@ -49,6 +49,55 @@ namespace Traffic_Law_Enforcement
             return (allowedMovement & actualMovement) == LaneMovement.None;
         }
 
+        public static bool TryGetIllegalIntersectionMovement(
+            EntityManager entityManager,
+            Entity sourceLane,
+            Entity targetLane,
+            out LaneMovement actualMovement,
+            out LaneMovement allowedMovement)
+        {
+            actualMovement = LaneMovement.None;
+            allowedMovement = LaneMovement.None;
+
+            if (sourceLane == Entity.Null || targetLane == Entity.Null)
+            {
+                return false;
+            }
+
+            if (!entityManager.HasComponent<ConnectionLane>(targetLane))
+            {
+                return false;
+            }
+
+            ConnectionLane connectionLane = entityManager.GetComponentData<ConnectionLane>(targetLane);
+            bool isRoadIntersectionConnection =
+                (connectionLane.m_Flags & ConnectionLaneFlags.Road) != 0 &&
+                (connectionLane.m_Flags & ConnectionLaneFlags.Parking) == 0;
+
+            if (!isRoadIntersectionConnection)
+            {
+                return false;
+            }
+
+            if (!entityManager.HasComponent<CarLane>(sourceLane) || !entityManager.HasComponent<CarLane>(targetLane))
+            {
+                return false;
+            }
+
+            CarLane sourceCarLane = entityManager.GetComponentData<CarLane>(sourceLane);
+            CarLane targetCarLane = entityManager.GetComponentData<CarLane>(targetLane);
+
+            actualMovement = GetMovement(targetCarLane.m_Flags);
+            allowedMovement = GetMovement(sourceCarLane.m_Flags);
+
+            if (actualMovement == LaneMovement.None || allowedMovement == LaneMovement.None)
+            {
+                return false;
+            }
+
+            return (allowedMovement & actualMovement) == LaneMovement.None;
+        }
+
         public static LaneMovement GetMovement(CarLaneFlags flags)
         {
             LaneMovement movement = LaneMovement.None;
