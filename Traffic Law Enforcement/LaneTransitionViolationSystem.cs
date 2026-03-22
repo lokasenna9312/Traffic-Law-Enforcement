@@ -20,6 +20,8 @@ namespace Traffic_Law_Enforcement
         private ComponentLookup<GarageLane> m_GarageLaneData;
         private ComponentLookup<ConnectionLane> m_ConnectionLaneData;
         private ComponentLookup<LaneTransitionAnalysisState> m_AnalysisStateData;
+        private const int MaxIntersectionTransitionDiagnostics = 32;
+        private int m_IntersectionTransitionDiagnosticCount;
 
         protected override void OnCreate()
         {
@@ -134,6 +136,39 @@ namespace Traffic_Law_Enforcement
             if (m_CarData.TryGetComponent(vehicle, out Car car) && EmergencyVehiclePolicy.IsEmergencyVehicle(car))
             {
                 return;
+            }
+
+            if (Mod.IsIntersectionMovementEnforcementEnabled &&
+                (currentLane.m_LaneFlags & Game.Vehicles.CarLaneFlags.Connection) != 0 &&
+                m_IntersectionTransitionDiagnosticCount < MaxIntersectionTransitionDiagnostics)
+            {
+                bool illegal = IntersectionMovementPolicy.TryGetIllegalIntersectionMovement(
+                    m_ConnectionLaneData,
+                    m_CarLaneData,
+                    history.m_PreviousLane,
+                    history.m_CurrentLane,
+                    out LaneMovement diagActual,
+                    out LaneMovement diagAllowed);
+
+                m_IntersectionTransitionDiagnosticCount += 1;
+
+                string previousFlagsText = m_CarLaneData.TryGetComponent(history.m_PreviousLane, out CarLane previousCarLane)
+                    ? previousCarLane.m_Flags.ToString()
+                    : "(no CarLane)";
+
+                string currentFlagsText = m_CarLaneData.TryGetComponent(history.m_CurrentLane, out CarLane currentCarLane)
+                    ? currentCarLane.m_Flags.ToString()
+                    : "(no CarLane)";
+
+                string connectionFlagsText = m_ConnectionLaneData.TryGetComponent(history.m_CurrentLane, out ConnectionLane connectionLane)
+                    ? connectionLane.m_Flags.ToString()
+                    : "(no ConnectionLane)";
+
+                Mod.log.Info(
+                    $"Intersection transition candidate: vehicle={vehicle}, " +
+                    $"fromLane={history.m_PreviousLane}, toLane={history.m_CurrentLane}, " +
+                    $"illegal={illegal}, actual={diagActual}, allowed={diagAllowed}, " +
+                    $"previousFlags={previousFlagsText}, currentFlags={currentFlagsText}, connectionFlags={connectionFlagsText}");
             }
 
             if (TryDetectMidBlockCrossing(history, out string midBlockReason))
