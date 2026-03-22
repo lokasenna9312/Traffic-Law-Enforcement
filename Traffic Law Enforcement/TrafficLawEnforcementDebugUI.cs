@@ -18,12 +18,12 @@ namespace Traffic_Law_Enforcement
 
             overview.children.Add(new DebugUI.Value
             {
-                displayName = "Active bus-lane violators",
+                displayName = "Active PT-lane violators",
                 getter = () => EnforcementTelemetry.ActivePublicTransportLaneViolators
             });
             overview.children.Add(new DebugUI.Value
             {
-                displayName = "Bus-lane violations total",
+                displayName = "PT-lane violations total",
                 getter = () => EnforcementTelemetry.PublicTransportLaneViolationCount
             });
             overview.children.Add(new DebugUI.Value
@@ -43,7 +43,7 @@ namespace Traffic_Law_Enforcement
             });
             overview.children.Add(new DebugUI.Value
             {
-                displayName = "Configured bus-lane fine",
+                displayName = "Configured PT-lane fine",
                 getter = () => EnforcementPenaltyService.GetPublicTransportLaneFine()
             });
             overview.children.Add(new DebugUI.Value
@@ -88,7 +88,7 @@ namespace Traffic_Law_Enforcement
             });
             overview.children.Add(new DebugUI.Value
             {
-                displayName = "Bus-lane repeat policy",
+                displayName = "PT-lane repeat policy",
                 getter = () => EnforcementPenaltyService.GetRepeatPolicyDebugSummary(EnforcementKinds.PublicTransportLane)
             });
             overview.children.Add(new DebugUI.Value

@@ -81,7 +81,7 @@ namespace Traffic_Law_Enforcement
                             : violation.m_Lane;
 
                         string role = PublicTransportLanePolicy.DescribeVehicleRole(vehicles[index], ref m_TypeLookups);
-                        string reason = "bus-lane-exit-pressure-threshold-reached";
+                        string reason = "PT-lane-exit-pressure-threshold-reached";
                         string extra =
                             $"violationLane={violation.m_Lane}, elapsedDayTicks={elapsedDayTicks}, " +
                             $"thresholdDayTicks={thresholdDayTicks}, exitPressureAppliedBefore={violation.m_ExitPressureApplied}";
@@ -99,7 +99,7 @@ namespace Traffic_Law_Enforcement
 
                         if (EnforcementLoggingPolicy.ShouldLogEnforcementEvents())
                         {
-                            Mod.log.Info($"Applied bus-lane exit pressure: vehicle={vehicles[index]}, lane={violation.m_Lane}, elapsedDayTicks={elapsedDayTicks}, thresholdDayTicks={thresholdDayTicks}");
+                            Mod.log.Info($"Applied PT-lane exit pressure: vehicle={vehicles[index]}, lane={violation.m_Lane}, elapsedDayTicks={elapsedDayTicks}, thresholdDayTicks={thresholdDayTicks}");
                         }
                     }
 

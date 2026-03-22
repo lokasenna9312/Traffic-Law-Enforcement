@@ -493,9 +493,8 @@ namespace Traffic_Law_Enforcement
             string violationRateTotal = FormatRatio(violationNumeratorTotal, vehicleRouteDenominatorTotal);
             string suppressionFailureRateTotal = FormatRatio(violationNumeratorTotal, suppressionFailureDenominatorTotal);
             string finesTotal = FormatMoney(snapshot.TotalFineAmount);
-            string totalLabel = LocalizeText(kTotalLabelLocaleId, "Total");
-            string lineFormat = LocalizeText(kStatisticsLineFormat, "{0}: violation rate {1}, suppression failure rate {2}, fines {3}₡.");
-            return string.Format(lineFormat, totalLabel, violationRateTotal, suppressionFailureRateTotal, finesTotal);
+            string lineFormat = LocalizeText(kStatisticsLineFormat, "violation rate {0}, suppression failure rate {1}, fines {2}₡.");
+            return string.Format(lineFormat, violationRateTotal, suppressionFailureRateTotal, finesTotal);
         }
 
         public static string GetPublicTransportLaneStatisticsLine()

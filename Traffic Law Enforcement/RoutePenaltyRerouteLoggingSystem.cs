@@ -310,36 +310,18 @@ namespace Traffic_Law_Enforcement
         {
             tag = null;
 
-            if (!m_ConnectionLaneData.TryGetComponent(targetLane, out ConnectionLane connectionLane))
+            if (!IntersectionMovementPolicy.TryGetIllegalIntersectionMovement(
+                    m_ConnectionLaneData,
+                    m_CarLaneData,
+                    sourceLane,
+                    targetLane,
+                    out LaneMovement actualMovement,
+                    out LaneMovement allowedMovement))
             {
                 return false;
             }
 
-            bool isRoadIntersectionConnection = (connectionLane.m_Flags & ConnectionLaneFlags.Road) != 0 && (connectionLane.m_Flags & ConnectionLaneFlags.Parking) == 0;
-            if (!isRoadIntersectionConnection)
-            {
-                return false;
-            }
-
-            if (!m_CarLaneData.TryGetComponent(sourceLane, out CarLane sourceCarLane) ||
-                !m_CarLaneData.TryGetComponent(targetLane, out CarLane targetCarLane))
-            {
-                return false;
-            }
-
-            LaneMovement actualMovement = GetMovement(targetCarLane.m_Flags);
-            LaneMovement allowedMovement = GetMovement(sourceCarLane.m_Flags);
-            if (actualMovement == LaneMovement.None || allowedMovement == LaneMovement.None)
-            {
-                return false;
-            }
-
-            if ((allowedMovement & actualMovement) != LaneMovement.None)
-            {
-                return false;
-            }
-
-            tag = $"intersection(illegal {FormatMovement(actualMovement)}; allowed {FormatMovement(allowedMovement)})";
+            tag = $"intersection(illegal {IntersectionMovementPolicy.FormatMovement(actualMovement)}; allowed {IntersectionMovementPolicy.FormatMovement(allowedMovement)})";
             return true;
         }
 
@@ -574,7 +556,7 @@ namespace Traffic_Law_Enforcement
             List<string> parts = new List<string>(3);
             if (profile.PublicTransportLaneSegments > 0)
             {
-                parts.Add($"bus-lane {profile.PublicTransportLaneSegments} x {EnforcementPenaltyService.GetPublicTransportLaneFine()}");
+                parts.Add($"PT-lane {profile.PublicTransportLaneSegments} x {EnforcementPenaltyService.GetPublicTransportLaneFine()}");
             }
 
             if (profile.MidBlockTransitions > 0)

@@ -180,7 +180,7 @@ namespace Traffic_Law_Enforcement
             }
 
             StringBuilder builder = new StringBuilder("Repeat-offender policy summary: ");
-            AppendPolicySummary(builder, "bus-lane", settings.EnablePublicTransportLaneRepeatPenalty, settings.PublicTransportLaneRepeatWindowMonths, settings.PublicTransportLaneRepeatThreshold, settings.PublicTransportLaneRepeatMultiplierPercent);
+            AppendPolicySummary(builder, "PT-lane", settings.EnablePublicTransportLaneRepeatPenalty, settings.PublicTransportLaneRepeatWindowMonths, settings.PublicTransportLaneRepeatThreshold, settings.PublicTransportLaneRepeatMultiplierPercent);
             builder.Append("; ");
             AppendPolicySummary(builder, "mid-block", settings.EnableMidBlockCrossingRepeatPenalty, settings.MidBlockCrossingRepeatWindowMonths, settings.MidBlockCrossingRepeatThreshold, settings.MidBlockCrossingRepeatMultiplierPercent);
             builder.Append("; ");

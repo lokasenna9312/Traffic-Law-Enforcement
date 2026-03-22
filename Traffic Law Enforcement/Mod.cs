@@ -35,6 +35,7 @@ namespace Traffic_Law_Enforcement
             GameManager.instance.localizationManager.AddSource("ko-KR", new LocaleKO(m_Setting));
             BudgetUIPatches.Apply();
             VehicleUtilsPatches.Apply();
+            IntersectionMovementPathfindPatches.Apply();
             updateSystem.UpdateAfter<EnforcementSaveDataSystem, EnforcementGameTimeSystem>(SystemUpdatePhase.GameSimulation);
             updateSystem.UpdateBefore<PathfindingMoneyPenaltySystem, CarNavigationSystem>(SystemUpdatePhase.GameSimulation);
             updateSystem.UpdateBefore<PublicTransportLanePermissionSystem, CarNavigationSystem>(SystemUpdatePhase.GameSimulation);
@@ -59,8 +60,9 @@ namespace Traffic_Law_Enforcement
         public void OnDispose()
         {
             log.Info(nameof(OnDispose));
-            VehicleUtilsPatches.Remove();
             BudgetUIPatches.Remove();
+            VehicleUtilsPatches.Remove();
+            IntersectionMovementPathfindPatches.Remove();
             if (m_Setting != null)
             {
                 m_Setting.UnregisterInOptionsUI();

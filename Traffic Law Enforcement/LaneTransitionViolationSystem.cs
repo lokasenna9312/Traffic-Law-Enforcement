@@ -236,31 +236,13 @@ namespace Traffic_Law_Enforcement
                 return false;
             }
 
-            if (!m_ConnectionLaneData.TryGetComponent(history.m_CurrentLane, out ConnectionLane connectionLane))
-            {
-                return false;
-            }
-
-            bool isRoadIntersectionConnection = (connectionLane.m_Flags & ConnectionLaneFlags.Road) != 0 && (connectionLane.m_Flags & ConnectionLaneFlags.Parking) == 0;
-            if (!isRoadIntersectionConnection)
-            {
-                return false;
-            }
-
-            if (!m_CarLaneData.TryGetComponent(history.m_PreviousLane, out CarLane sourceLane) ||
-                !m_CarLaneData.TryGetComponent(history.m_CurrentLane, out CarLane connectionCarLane))
-            {
-                return false;
-            }
-
-            actualMovement = GetMovement(connectionCarLane.m_Flags);
-            allowedMovement = GetMovement(sourceLane.m_Flags);
-            if (actualMovement == LaneMovement.None || allowedMovement == LaneMovement.None)
-            {
-                return false;
-            }
-
-            return (allowedMovement & actualMovement) == LaneMovement.None;
+            return IntersectionMovementPolicy.TryGetIllegalIntersectionMovement(
+                m_ConnectionLaneData,
+                m_CarLaneData,
+                history.m_PreviousLane,
+                history.m_CurrentLane,
+                out actualMovement,
+                out allowedMovement);
         }
 
         private static bool IsOppositeDirection(EdgeLane previousLane, EdgeLane currentLane)

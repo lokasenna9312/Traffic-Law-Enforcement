@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using Game;
 using Game.Common;
 using Game.Net;
@@ -55,6 +55,16 @@ namespace Traffic_Law_Enforcement
         private int m_PublicTransportLaneCurrentContextInvalidationCount;
         private int m_CustomPedestrianOrPublicTransportCurrentContextInvalidationCount;
         private int m_LastContextSummaryLoggedTotal;
+        private readonly Dictionary<Entity, RepeatCenterlineInvalidationState> m_RepeatInvalidationStates = new Dictionary<Entity, RepeatCenterlineInvalidationState>();
+
+        private struct RepeatCenterlineInvalidationState
+        {
+            public Entity AccessAnchor;
+            public Entity RoadAnchor;
+            public byte TransitionFamily;
+            public string Reason;
+            public int Count;
+        }
 
         protected override void OnCreate()
         {
@@ -153,7 +163,6 @@ namespace Traffic_Law_Enforcement
                     SyncAccessOriginWatch(vehicle, currentLane.m_Lane);
 
                     ResetDuplicateSuppressionIfPathChanged(vehicle, pathOwner);
-
                     if ((pathOwner.m_State & (PathFlags.Pending | PathFlags.Obsolete)) != 0)
                     {
                         continue;
@@ -161,12 +170,14 @@ namespace Traffic_Law_Enforcement
 
                     if (navigationLanes.Length == 0)
                     {
+                        ClearRepeatInvalidation(vehicle);
                         continue;
                     }
 
                     if (!TryGetFirstPlannedAccessTransition(currentLane.m_Lane, navigationLanes, out Entity sourceLane, out Entity targetLane, out int transitionIndex, out string transitionKind))
                     {
-                        if (!ShouldSuppressObservedSnapshot(vehicle, currentLane.m_Lane, Entity.Null, Entity.Null, -1, EvaluationNoAccessTransition, TransitionFamilyNone))
+                        ClearRepeatInvalidation(vehicle);
+                                            if (!ShouldSuppressObservedSnapshot(vehicle, currentLane.m_Lane, Entity.Null, Entity.Null, -1, EvaluationNoAccessTransition, TransitionFamilyNone))
                         {
                             RecordObservedSnapshot(vehicle, currentLane.m_Lane, Entity.Null, Entity.Null, -1, EvaluationNoAccessTransition, TransitionFamilyNone);
                         }
@@ -184,9 +195,17 @@ namespace Traffic_Law_Enforcement
 
                     if (!illegalTransition)
                     {
+                        ClearRepeatInvalidation(vehicle);
                         RecordObservedSnapshot(vehicle, currentLane.m_Lane, sourceLane, targetLane, transitionIndex, evaluationResult, transitionFamily);
                         continue;
                     }
+
+                    int repeatCount = RecordRepeatInvalidation(
+                        vehicle,
+                        sourceLane,
+                        targetLane,
+                        transitionFamily,
+                        reason);
 
                     PathFlags stateBefore = pathOwner.m_State;
                     pathOwner.m_State |= PathFlags.Obsolete;
@@ -195,10 +214,18 @@ namespace Traffic_Law_Enforcement
                     string role = PublicTransportLanePolicy.DescribeVehicleRole(vehicle, ref m_TypeLookups);
                     string extra =
                         $"sourceLane={sourceLane}, targetLane={targetLane}, transitionIndex={transitionIndex}, " +
-                        $"transitionKind={transitionKind}, transitionFamily={transitionFamily}, " +
+                        $"transitionKind={transitionKind}, transitionFamily={transitionFamily}, repeatCount={repeatCount}, " +
                         $"laneShapeCurrent={DescribeLaneShape(currentLane.m_Lane)}, " +
                         $"laneShapeSource={DescribeLaneShape(sourceLane)}, " +
                         $"laneShapeTarget={DescribeLaneShape(targetLane)}";
+
+                    if (repeatCount >= 3 && EnforcementLoggingPolicy.ShouldLogEnforcementEvents())
+                    {
+                        Mod.log.Info(
+                            $"Repeated identical CENTERLINE invalidation: vehicle={vehicle}, role={role}, repeatCount={repeatCount}, " +
+                            $"reason={reason}, currentLane={currentLane.m_Lane}, sourceLane={sourceLane}, targetLane={targetLane}, " +
+                            $"transitionIndex={transitionIndex}, transitionKind={transitionKind}, transitionFamily={transitionFamily}");
+                    }
 
                     PathObsoleteTraceLogging.Record(
                         "CENTERLINE",
@@ -272,15 +299,14 @@ namespace Traffic_Law_Enforcement
             for (int index = 0; index < navigationLanes.Length; index++)
             {
                 Entity nextLane = navigationLanes[index].m_Lane;
-                if (nextLane == Entity.Null || nextLane == sourceLane)
+                if (nextLane == Entity.Null || nextLane == currentLane)
                 {
                     continue;
                 }
 
-                if (!IsAccessTransition(sourceLane, nextLane))
+                if (!IsAccessTransition(currentLane, nextLane))
                 {
-                    sourceLane = nextLane;
-                    continue;
+                    return false;
                 }
 
                 targetLane = nextLane;
@@ -316,6 +342,70 @@ namespace Traffic_Law_Enforcement
             {
                 return;
             }
+        }
+
+        private Entity GetRepeatAccessAnchor(Entity sourceLane, Entity targetLane)
+        {
+            return IsAccessOrigin(sourceLane)
+                ? GetRepeatAnchor(sourceLane)
+                : GetRepeatAnchor(targetLane);
+        }
+
+        private Entity GetRepeatRoadAnchor(Entity sourceLane, Entity targetLane)
+        {
+            return IsAccessOrigin(sourceLane)
+                ? GetRepeatAnchor(targetLane)
+                : GetRepeatAnchor(sourceLane);
+        }
+
+        private Entity GetRepeatAnchor(Entity lane)
+        {
+            if (lane == Entity.Null)
+            {
+                return Entity.Null;
+            }
+
+            if (m_OwnerData.TryGetComponent(lane, out Owner owner) &&
+                owner.m_Owner != Entity.Null &&
+                owner.m_Owner != lane)
+            {
+                return owner.m_Owner;
+            }
+
+            return lane;
+        }
+
+        private void ClearRepeatInvalidation(Entity vehicle)
+        {
+            m_RepeatInvalidationStates.Remove(vehicle);
+        }
+
+        private int RecordRepeatInvalidation(Entity vehicle, Entity sourceLane, Entity targetLane, byte transitionFamily, string reason)
+        {
+            Entity accessAnchor = GetRepeatAccessAnchor(sourceLane, targetLane);
+            Entity roadAnchor = GetRepeatRoadAnchor(sourceLane, targetLane);
+
+            if (m_RepeatInvalidationStates.TryGetValue(vehicle, out RepeatCenterlineInvalidationState state) &&
+                state.AccessAnchor == accessAnchor &&
+                state.RoadAnchor == roadAnchor &&
+                state.TransitionFamily == transitionFamily &&
+                string.Equals(state.Reason, reason, System.StringComparison.Ordinal))
+            {
+                state.Count += 1;
+                m_RepeatInvalidationStates[vehicle] = state;
+                return state.Count;
+            }
+
+            m_RepeatInvalidationStates[vehicle] = new RepeatCenterlineInvalidationState
+            {
+                AccessAnchor = accessAnchor,
+                RoadAnchor = roadAnchor,
+                TransitionFamily = transitionFamily,
+                Reason = reason,
+                Count = 1,
+            };
+
+            return 1;
         }
 
         private void RecordInvalidationContext(Entity currentLane)
