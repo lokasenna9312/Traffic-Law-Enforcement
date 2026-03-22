@@ -90,7 +90,7 @@ namespace Traffic_Law_Enforcement
                 return;
             }
 
-            string[] files = Directory.GetFiles(localeDir, "*.txt");
+            string[] files = Directory.GetFiles(localeDir, "*.properties");
             if (files.Length == 0)
             {
                 log.Warn($"No locale files found in: {localeDir}");
@@ -105,7 +105,7 @@ namespace Traffic_Law_Enforcement
 
                 if (string.Equals(localeId, "en-US", StringComparison.OrdinalIgnoreCase))
                 {
-                    englishEntries = TextLocaleSource.LoadKeyValueFile(filePath);
+                    englishEntries = PropertiesLocaleSource.LoadKeyValueFile(filePath);
                     break;
                 }
             }
@@ -113,7 +113,7 @@ namespace Traffic_Law_Enforcement
             foreach (string filePath in files)
             {
                 string localeId = Path.GetFileNameWithoutExtension(filePath);
-                Dictionary<string, string> entries = TextLocaleSource.LoadKeyValueFile(filePath);
+                Dictionary<string, string> entries = PropertiesLocaleSource.LoadKeyValueFile(filePath);
 
                 ValidateTextLocaleFile(localeId, entries, englishEntries, keyMap);
 
@@ -124,7 +124,7 @@ namespace Traffic_Law_Enforcement
                     localizationManager.AddLocale(localeId, systemLanguage, localizedName);
                 }
 
-                localizationManager.AddSource(localeId, new TextLocaleSource(filePath, keyMap));
+                localizationManager.AddSource(localeId, new PropertiesLocaleSource(filePath, keyMap));
                 log.Info($"Registered locale {localeId} from {Path.GetFileName(filePath)}");
             }
         }

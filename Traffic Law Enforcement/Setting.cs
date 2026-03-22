@@ -759,6 +759,7 @@ namespace Traffic_Law_Enforcement
         private delegate void CurrentSaveSettingsMutator(ref EnforcementGameplaySettingsState state);
     }
 
+/* Suspended : Moved to LocalizationKeys.cs
     public class LocaleEN : IDictionarySource
     {
         private readonly Setting m_Setting;
@@ -899,7 +900,9 @@ namespace Traffic_Law_Enforcement
             AddGameplay(entries, currentMultiplierName, defaultMultiplierName, $"{label} repeat-offender multiplier", $"Multiplier applied to the {sentenceLabel} fine once the repeat-offender threshold is reached.");
         }
     }
+*/
 
+/* Suspended : Moved to LocalizationKeys.cs
     public class LocaleKO : IDictionarySource
     {
         private readonly Setting m_Setting;
@@ -1040,4 +1043,5 @@ namespace Traffic_Law_Enforcement
             AddGameplay(entries, currentMultiplierName, defaultMultiplierName, $"{label} 가중처벌 배수", $"상습 위반 기준에 도달했을 때 {sentenceLabel} 벌금에 적용할 배수입니다.");
         }
     }
+*/
 }

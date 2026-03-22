@@ -5,13 +5,13 @@ using Colossal;
 
 namespace Traffic_Law_Enforcement
 {
-    internal sealed class TextLocaleSource : IDictionarySource
+    internal sealed class PropertiesLocaleSource : IDictionarySource
     {
         private readonly string m_FilePath;
         private readonly Dictionary<string, string> m_SymbolicToGameKeys;
         private Dictionary<string, string> m_ResolvedEntries;
 
-        public TextLocaleSource(
+        public PropertiesLocaleSource(
             string filePath,
             Dictionary<string, string> symbolicToGameKeys)
         {
