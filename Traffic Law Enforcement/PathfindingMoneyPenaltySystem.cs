@@ -14,7 +14,7 @@ namespace Traffic_Law_Enforcement
         public static int ModifiedPrefabCount { get; private set; }
         public static string OverrideSummary { get; private set; } = "Waiting for car pathfinding prefabs.";
 
-        public static void SetState(int modifiedPrefabCount, bool enabled, float midBlockPenalty, float intersectionPenalty)
+        public static void SetState(int modifiedPrefabCount, bool enabled, float midBlockPenalty)
         {
             ModifiedPrefabCount = modifiedPrefabCount;
 
@@ -30,7 +30,7 @@ namespace Traffic_Law_Enforcement
                 return;
             }
 
-            OverrideSummary = $"UTurn +{midBlockPenalty:0}, UnsafeUTurn +{midBlockPenalty:0}, LaneCross +{midBlockPenalty:0}, UnsafeTurning +{intersectionPenalty:0}, Forbidden intersection +{intersectionPenalty:0}; PT-lane money-axis penalty is handled per route rather than through shared PathfindCarData prefabs";
+            OverrideSummary = $"UTurn +{midBlockPenalty:0}, UnsafeUTurn +{midBlockPenalty:0}, LaneCross +{midBlockPenalty:0}; PT-lane money-axis penalty is handled per route rather than through shared PathfindCarData prefabs";
         }
     }
 
@@ -96,7 +96,7 @@ namespace Traffic_Law_Enforcement
             m_LastEnforcementEnabled = enforcementEnabled;
             m_HasApplied = true;
 
-            PathfindingPenaltyTelemetry.SetState(prefabCount, enforcementEnabled, midBlockPenalty, intersectionPenalty);
+            PathfindingPenaltyTelemetry.SetState(prefabCount, enforcementEnabled, midBlockPenalty);
             if (EnforcementLoggingPolicy.ShouldLogPathfindingPenaltyDiagnostics())
             {
                 Mod.log.Info($"Applied pathfinding money-axis penalties: prefabs={prefabCount}, enabled={enforcementEnabled}, {PathfindingPenaltyTelemetry.OverrideSummary}");
