@@ -165,7 +165,7 @@ namespace Traffic_Law_Enforcement
                     SyncAccessOriginWatch(vehicle, currentLane.m_Lane);
 
                     ResetDuplicateSuppressionIfPathChanged(vehicle, pathOwner);
-                    ResetRepeatInvalidationIfPathChanged(vehicle, pathOwner, currentLane.m_Lane);
+                    ResetRepeatInvalidationIfPathChanged(vehicle, pathOwner, currentLane.m_Lane, navigationLanes);
                     if ((pathOwner.m_State & (PathFlags.Pending | PathFlags.Obsolete)) != 0)
                     {
                         continue;
@@ -383,7 +383,7 @@ namespace Traffic_Law_Enforcement
             return 1;
         }
 
-        private void ResetRepeatInvalidationIfPathChanged(Entity vehicle, PathOwner pathOwner, Entity currentLane)
+        private void ResetRepeatInvalidationIfPathChanged(Entity vehicle, PathOwner pathOwner, Entity currentLane, DynamicBuffer<CarNavigationLane> navigationLanes)
         {
             PathFlags resetFlags = pathOwner.m_State & PathFlags.Updated;
             if (resetFlags == 0)
@@ -394,6 +394,43 @@ namespace Traffic_Law_Enforcement
             if (!m_RepeatInvalidationStates.TryGetValue(vehicle, out RepeatCenterlineInvalidationState state))
             {
                 return;
+            }
+
+            if (TryGetFirstPlannedAccessTransition(currentLane, navigationLanes, out Entity sourceLane, out Entity targetLane, out int transitionIndex, out _))
+            {
+                bool illegalTransition = IsIllegalIngress(sourceLane, targetLane, out string reason) || IsIllegalEgress(sourceLane, targetLane, out reason);
+                byte transitionFamily = illegalTransition
+                    ? GetTransitionFamily(sourceLane, targetLane, EvaluationInvalidatedAccessTransition)
+                    : TransitionFamilyNone;
+
+                bool sameInvalidTransition =
+                    illegalTransition &&
+                    state.CurrentLane == currentLane &&
+                    state.SourceLane == sourceLane &&
+                    state.TargetLane == targetLane &&
+                    state.TransitionIndex == transitionIndex &&
+                    state.TransitionFamily == transitionFamily &&
+                    string.Equals(state.Reason, reason, System.StringComparison.Ordinal);
+
+                if (sameInvalidTransition)
+                {
+                    if (EnforcementLoggingPolicy.ShouldLogEnforcementEvents())
+                    {
+                        string role = m_CarData.HasComponent(vehicle)
+                            ? PublicTransportLanePolicy.DescribeVehicleRole(vehicle, ref m_TypeLookups)
+                            : "Unknown";
+
+                        Mod.log.Info(
+                            $"CENTERLINE repeat-tracking kept after path update: vehicle={vehicle}, role={role}, " +
+                            $"repeatCount={state.Count}, resetFlags={resetFlags}, " +
+                            $"currentLaneNow={currentLane}, trackedCurrentLane={state.CurrentLane}, " +
+                            $"trackedSourceLane={state.SourceLane}, trackedTargetLane={state.TargetLane}, " +
+                            $"trackedTransitionIndex={state.TransitionIndex}, trackedTransitionFamily={state.TransitionFamily}, " +
+                            $"trackedReason={state.Reason}");
+                    }
+
+                    return;
+                }
             }
 
             if (EnforcementLoggingPolicy.ShouldLogEnforcementEvents())
