@@ -15,6 +15,7 @@ namespace Traffic_Law_Enforcement
         private const int MaxDiagnosticLogs = 32;
         private static readonly Type s_PathfindExecutorType = AccessTools.Inner(typeof(PathfindJobs), "PathfindExecutor");
         private static int s_DiagnosticLogCount;
+        private static readonly HashSet<string> s_ActivatedMethods = new HashSet<string>();
         private const string HarmonyId = "Traffic_Law_Enforcement.IntersectionMovementPathfindReflectionPatches";
         private static Harmony s_Harmony;
 
@@ -85,6 +86,12 @@ namespace Traffic_Law_Enforcement
 
         private static void Postfix(object[] __args, ref float __result, PathfindParameters ___m_Parameters, MethodBase __originalMethod)
         {
+            string methodKey = __originalMethod?.ToString() ?? "(null)";
+            if (s_ActivatedMethods.Add(methodKey))
+            {
+                Mod.log.Info($"Intersection reflection fallback active: method={methodKey}, argCount={__args?.Length ?? 0}");
+            }
+            
             if (!Mod.IsIntersectionMovementEnforcementEnabled)
             {
                 return;
