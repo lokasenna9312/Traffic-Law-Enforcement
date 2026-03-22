@@ -161,21 +161,6 @@ namespace Traffic_Law_Enforcement
             };
         }
 
-        private static string GetFineIncomeSourceId(int sourceIndex)
-        {
-            switch (sourceIndex)
-            {
-                case FineIncomePublicTransportLaneSourceIndex:
-                    return FineIncomePublicTransportLaneSourceId;
-                case FineIncomeMidBlockCrossingSourceIndex:
-                    return FineIncomeMidBlockCrossingSourceId;
-                case FineIncomeIntersectionMovementSourceIndex:
-                    return FineIncomeIntersectionMovementSourceId;
-                default:
-                    return FineIncomeItemId;
-            }
-        }
-
         private static void RefreshExistingBudgetBindings(string reason)
         {
             World world = World.DefaultGameObjectInjectionWorld;
@@ -241,8 +226,6 @@ namespace Traffic_Law_Enforcement
                         writer.TypeBegin("Game.UI.InGame.BudgetItem");
                         writer.PropertyName("id");
                         writer.Write(budgetItem.m_ID);
-                        writer.PropertyName("label");
-                        writer.Write(GameManager.instance.localizationManager.activeDictionary.TryGetValue($"EconomyPanel.BUDGET_ITEM[{budgetItem.m_ID}]", out var label) ? label : budgetItem.m_ID);
                         writer.PropertyName("color");
                         writer.Write(budgetItem.m_Color);
                         writer.PropertyName("icon");
@@ -268,8 +251,6 @@ namespace Traffic_Law_Enforcement
                                 writer.PropertyName("id");
                                 writer.Write(Enum.GetName(typeof(IncomeSource), incomeSource));
                                 var sourceName = Enum.GetName(typeof(IncomeSource), incomeSource);
-                                writer.PropertyName("label");
-                                writer.Write(GameManager.instance.localizationManager.activeDictionary.TryGetValue($"EconomyPanel.BUDGET_SUB_ITEM[{sourceName}]", out var sourceLabel) ? sourceLabel : sourceName);
                                 writer.PropertyName("index");
                                 writer.Write((int)incomeSource);
                                 writer.TypeEnd();
@@ -283,8 +264,6 @@ namespace Traffic_Law_Enforcement
                     writer.TypeBegin("Game.UI.InGame.BudgetItem");
                     writer.PropertyName("id");
                     writer.Write(fineIncomeItem.m_ID);
-                    writer.PropertyName("label");
-                    writer.Write(GameManager.instance.localizationManager.activeDictionary.TryGetValue(FineIncomeBudgetItemLocaleId, out var fineLabel) ? fineLabel : fineIncomeItem.m_ID);
                     writer.PropertyName("color");
                     writer.Write(fineIncomeItem.m_Color);
                     writer.PropertyName("icon");
@@ -321,45 +300,11 @@ namespace Traffic_Law_Enforcement
             writer.TypeBegin("Game.UI.InGame.BudgetSource");
             writer.PropertyName("id");
             writer.Write(sourceId);
-            writer.PropertyName("label");
-            writer.Write(GetFineIncomeSourceLabel(sourceIndex));
             writer.PropertyName("index");
             writer.Write(sourceIndex);
             writer.TypeEnd();
         }
 
-        private static string GetFineIncomeSourceLabel(int sourceIndex)
-        {
-            string localeId;
-            string fallback;
-
-            switch (sourceIndex)
-            {
-                case FineIncomePublicTransportLaneSourceIndex:
-                    localeId = FineIncomePublicTransportLaneLocaleId;
-                    fallback = "Public-transport lane violations";
-                    break;
-                case FineIncomeMidBlockCrossingSourceIndex:
-                    localeId = FineIncomeMidBlockCrossingLocaleId;
-                    fallback = "Mid-block violations";
-                    break;
-                case FineIncomeIntersectionMovementSourceIndex:
-                    localeId = FineIncomeIntersectionMovementLocaleId;
-                    fallback = "Intersection violations";
-                    break;
-                default:
-                    return FineIncomeItemId;
-            }
-
-            if (GameManager.instance?.localizationManager?.activeDictionary != null &&
-                GameManager.instance.localizationManager.activeDictionary.TryGetValue(localeId, out string label) &&
-                !string.IsNullOrWhiteSpace(label))
-            {
-                return label;
-            }
-
-            return fallback;
-        }
 
         [HarmonyPatch(typeof(BudgetUISystem), "BindIncomeValues")]
         private static class BindIncomeValuesPatch
