@@ -70,29 +70,29 @@ namespace Traffic_Law_Enforcement
 
             if (!Mod.IsPublicTransportLaneEnforcementEnabled)
             {
-                TrafficLawEnforcementStatistics statistics =
+                TrafficLawEnforcementStatistics disabledStatistics =
                     EntityManager.GetComponentData<TrafficLawEnforcementStatistics>(m_StatisticsEntity);
 
-                bool statisticsChanged = false;
+                bool disabledStatisticsChanged = false;
 
-                if (statistics.m_ActivePublicTransportLaneViolatorCount != 0)
+                if (disabledStatistics.m_ActivePublicTransportLaneViolatorCount != 0)
                 {
-                    statistics.m_ActivePublicTransportLaneViolatorCount = 0;
-                    statisticsChanged = true;
+                    disabledStatistics.m_ActivePublicTransportLaneViolatorCount = 0;
+                    disabledStatisticsChanged = true;
                 }
 
-                if (statisticsChanged)
+                if (disabledStatisticsChanged)
                 {
-                    EntityManager.SetComponentData(m_StatisticsEntity, statistics);
+                    EntityManager.SetComponentData(m_StatisticsEntity, disabledStatistics);
                 }
 
-                EnforcementTelemetry.SetStatistics(statistics);
+                EnforcementTelemetry.SetStatistics(disabledStatistics);
 
-                DynamicBuffer<DetectedPublicTransportLaneEvent> events =
+                DynamicBuffer<DetectedPublicTransportLaneEvent> disabledEvents =
                     EntityManager.GetBuffer<DetectedPublicTransportLaneEvent>(m_EventEntity);
-                if (events.Length > 0)
+                if (disabledEvents.Length > 0)
                 {
-                    events.Clear();
+                    disabledEvents.Clear();
                 }
 
                 return;
