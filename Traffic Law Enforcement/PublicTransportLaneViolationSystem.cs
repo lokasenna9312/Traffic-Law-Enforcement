@@ -29,6 +29,9 @@ namespace Traffic_Law_Enforcement
         private PublicTransportLaneVehicleTypeLookups m_TypeLookups;
         private bool m_HasEvaluated;
         private bool m_LastEnforcementEnabled;
+        private const int kVehiclesPerFrame = 512;
+        private NativeList<Entity> m_PendingRefreshVehicles;
+        private int m_RefreshCursor;
 
         protected override void OnCreate()
         {
@@ -77,6 +80,7 @@ namespace Traffic_Law_Enforcement
             m_ViolationData = GetComponentLookup<PublicTransportLaneViolation>();
             m_Type3UsageData = GetComponentLookup<PublicTransportLaneType3UsageState>();
             m_TypeLookups = PublicTransportLaneVehicleTypeLookups.Create(this);
+            m_PendingRefreshVehicles = new NativeList<Entity>(Allocator.Persistent);    
             RequireForUpdate(m_CarQuery);
         }
 
@@ -115,6 +119,7 @@ namespace Traffic_Law_Enforcement
                 }
                 EnforcementTelemetry.SetStatistics(disabledStats);
 
+                ClearPendingRefresh();
                 m_HasEvaluated = false;
                 m_LastEnforcementEnabled = false;
                 return;
@@ -139,22 +144,37 @@ namespace Traffic_Law_Enforcement
             bool statisticsChanged = false;
             bool fullRefresh = !m_HasEvaluated || !m_LastEnforcementEnabled;
 
-            if (fullRefresh)
+            if (fullRefresh && m_PendingRefreshVehicles.Length == 0)
             {
-                EvaluateQuery(m_CarQuery, settings, events);
-            }
-            else
-            {
-                EvaluateQuery(m_ChangedLaneQuery, settings, events);
-                EvaluateQuery(m_ChangedCarQuery, settings, events);
+                BuildPendingRefreshList();
             }
 
-            int activeViolatorCount = m_ViolationQuery.CalculateEntityCount();
-            if (statistics.m_ActivePublicTransportLaneViolatorCount != activeViolatorCount)
+            if (m_PendingRefreshVehicles.Length > 0)
             {
-                statistics.m_ActivePublicTransportLaneViolatorCount = activeViolatorCount;
-                statisticsChanged = true;
+                ProcessRefreshBatch(settings, events);
+
+                UpdateActiveViolatorStatistics(ref statistics, ref statisticsChanged);
+
+                if (statisticsChanged)
+                {
+                    EntityManager.SetComponentData(m_StatisticsEntity, statistics);
+                }
+
+                EnforcementTelemetry.SetStatistics(statistics);
+
+                if (m_PendingRefreshVehicles.Length == 0)
+                {
+                    m_HasEvaluated = true;
+                    m_LastEnforcementEnabled = true;
+                }
+
+                return;
             }
+
+            EvaluateQuery(m_ChangedLaneQuery, settings, events);
+            EvaluateQuery(m_ChangedCarQuery, settings, events);
+
+            UpdateActiveViolatorStatistics(ref statistics, ref statisticsChanged);
 
             if (statisticsChanged)
             {
@@ -164,6 +184,86 @@ namespace Traffic_Law_Enforcement
 
             m_HasEvaluated = true;
             m_LastEnforcementEnabled = true;
+        }
+
+        protected override void OnDestroy()
+        {
+            if (m_PendingRefreshVehicles.IsCreated)
+            {
+                m_PendingRefreshVehicles.Dispose();
+            }
+
+            base.OnDestroy();
+        }
+
+        private void UpdateActiveViolatorStatistics(
+            ref TrafficLawEnforcementStatistics statistics,
+            ref bool statisticsChanged)
+        {
+            int activeViolatorCount = m_ViolationQuery.CalculateEntityCount();
+            if (statistics.m_ActivePublicTransportLaneViolatorCount != activeViolatorCount)
+            {
+                statistics.m_ActivePublicTransportLaneViolatorCount = activeViolatorCount;
+                statisticsChanged = true;
+            }
+        }
+
+        private void BuildPendingRefreshList()
+        {
+            ClearPendingRefresh();
+
+            NativeArray<Entity> vehicles = m_CarQuery.ToEntityArray(Allocator.Temp);
+            try
+            {
+                for (int index = 0; index < vehicles.Length; index += 1)
+                {
+                    m_PendingRefreshVehicles.Add(vehicles[index]);
+                }
+            }
+            finally
+            {
+                vehicles.Dispose();
+            }
+        }
+
+        private void ClearPendingRefresh()
+        {
+            if (m_PendingRefreshVehicles.IsCreated)
+            {
+                m_PendingRefreshVehicles.Clear();
+            }
+
+            m_RefreshCursor = 0;
+        }
+
+        private void ProcessRefreshBatch(
+            EnforcementGameplaySettingsState settings,
+            DynamicBuffer<DetectedPublicTransportLaneEvent> events)
+        {
+            int end = System.Math.Min(
+                m_RefreshCursor + kVehiclesPerFrame,
+                m_PendingRefreshVehicles.Length);
+
+            for (int index = m_RefreshCursor; index < end; index += 1)
+            {
+                Entity vehicle = m_PendingRefreshVehicles[index];
+                if (!EntityManager.Exists(vehicle) ||
+                    !EntityManager.HasComponent<Car>(vehicle) ||
+                    !EntityManager.HasComponent<CarCurrentLane>(vehicle))
+                {
+                    continue;
+                }
+
+                CarCurrentLane currentLane = EntityManager.GetComponentData<CarCurrentLane>(vehicle);
+                EvaluateVehicle(vehicle, currentLane, settings, events);
+            }
+
+            m_RefreshCursor = end;
+
+            if (m_RefreshCursor >= m_PendingRefreshVehicles.Length)
+            {
+                ClearPendingRefresh();
+            }
         }
 
         private void EvaluateQuery(EntityQuery query, EnforcementGameplaySettingsState settings, DynamicBuffer<DetectedPublicTransportLaneEvent> events)
