@@ -156,6 +156,12 @@ namespace Traffic_Law_Enforcement
             bool allowOnPublicTransportLane =
                 (profile.m_DesiredPublicTransportLaneMask & CarFlags.UsePublicTransportLanes) != 0;
 
+            if (!allowOnPublicTransportLane &&
+                entityManager.HasComponent<PublicTransportLanePendingExit>(owner))
+            {
+                allowOnPublicTransportLane = true;
+            }
+
             SetRuleFlag(
                 ref item.m_Parameters.m_IgnoredRules,
                 RuleFlags.ForbidPrivateTraffic,

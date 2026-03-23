@@ -1,4 +1,5 @@
 using Game;
+using Game.Net;
 using Game.Pathfind;
 using Game.Vehicles;
 using Unity.Collections;
@@ -15,15 +16,14 @@ namespace Traffic_Law_Enforcement
         private EntityQuery m_ChangedCarQuery;
         private EntityQuery m_TrackedQuery;
         private EntityQuery m_TrackedWithoutProfileQuery;
-
+        private EntityQuery m_PendingExitQuery;
+        private ComponentLookup<CarLane> m_CarLaneData;
         private ComponentLookup<PathOwner> m_PathOwnerData;
         private ComponentLookup<CarCurrentLane> m_CurrentLaneData;
         private ComponentLookup<VehicleTrafficLawProfile> m_ProfileData;
         private PublicTransportLaneVehicleTypeLookups m_TypeLookups;
-
         private NativeList<Entity> m_PendingRefreshVehicles;
         private int m_RefreshCursor;
-
         private bool m_HasEvaluated;
         private bool m_LastEnforcementEnabled;
         private int m_LastSettingsMask;
@@ -33,14 +33,16 @@ namespace Traffic_Law_Enforcement
             base.OnCreate();
 
             m_AllCarsQuery = GetEntityQuery(ComponentType.ReadWrite<Car>());
-
+            m_PendingExitQuery = GetEntityQuery(
+                ComponentType.ReadWrite<Car>(),
+                ComponentType.ReadOnly<CarCurrentLane>(),
+                ComponentType.ReadOnly<PublicTransportLanePendingExit>());
+            m_CarLaneData = GetComponentLookup<CarLane>(true);
             m_ChangedCarQuery = GetEntityQuery(ComponentType.ReadWrite<Car>());
             m_ChangedCarQuery.SetChangedVersionFilter(ComponentType.ReadOnly<Car>());
-
             m_TrackedQuery = GetEntityQuery(
                 ComponentType.ReadWrite<Car>(),
                 ComponentType.ReadWrite<PublicTransportLanePermissionState>());
-
             m_TrackedWithoutProfileQuery = GetEntityQuery(new EntityQueryDesc
             {
                 All = new[]
@@ -53,14 +55,11 @@ namespace Traffic_Law_Enforcement
                     ComponentType.ReadOnly<VehicleTrafficLawProfile>(),
                 },
             });
-
             m_PathOwnerData = GetComponentLookup<PathOwner>();
             m_CurrentLaneData = GetComponentLookup<CarCurrentLane>(true);
             m_ProfileData = GetComponentLookup<VehicleTrafficLawProfile>(true);
             m_TypeLookups = PublicTransportLaneVehicleTypeLookups.Create(this);
-
             m_PendingRefreshVehicles = new NativeList<Entity>(Allocator.Persistent);
-
             RequireForUpdate(m_AllCarsQuery);
         }
 
@@ -76,6 +75,7 @@ namespace Traffic_Law_Enforcement
 
         protected override void OnUpdate()
         {
+            m_CurrentLaneData.Update(this);
             m_PathOwnerData.Update(this);
             m_CurrentLaneData.Update(this);
             m_ProfileData.Update(this);
@@ -87,6 +87,10 @@ namespace Traffic_Law_Enforcement
             if (!enforcementEnabled)
             {
                 RestoreTrackedVehicles();
+                if (!m_PendingExitQuery.IsEmptyIgnoreFilter)
+                {
+                    EntityManager.RemoveComponent<PublicTransportLanePendingExit>(m_PendingExitQuery);
+                }
                 ClearPendingRefresh();
                 m_HasEvaluated = false;
                 m_LastEnforcementEnabled = false;
@@ -119,11 +123,51 @@ namespace Traffic_Law_Enforcement
             }
 
             EvaluateQuery(m_ChangedCarQuery);
+            EvaluatePendingExitVehicles();
             RestoreVehiclesMissingProfile();
 
             m_HasEvaluated = true;
             m_LastEnforcementEnabled = true;
             m_LastSettingsMask = settingsMask;
+        }
+
+        private void EvaluatePendingExitVehicles()
+        {
+            if (m_PendingExitQuery.IsEmptyIgnoreFilter)
+            {
+                return;
+            }
+
+            NativeArray<Entity> vehicles = m_PendingExitQuery.ToEntityArray(Allocator.Temp);
+            NativeArray<Car> cars = m_PendingExitQuery.ToComponentDataArray<Car>(Allocator.Temp);
+
+            try
+            {
+                for (int index = 0; index < vehicles.Length; index += 1)
+                {
+                    EvaluateVehicle(vehicles[index], cars[index]);
+                }
+            }
+            finally
+            {
+                vehicles.Dispose();
+                cars.Dispose();
+            }
+        }
+
+        private bool IsPublicOnlyLane(Entity laneEntity)
+        {
+            return laneEntity != Entity.Null &&
+                m_CarLaneData.TryGetComponent(laneEntity, out CarLane laneData) &&
+                (laneData.m_Flags & Game.Net.CarLaneFlags.PublicOnly) != 0;
+        }
+
+        private void RemovePendingExitIfPresent(Entity vehicle)
+        {
+            if (EntityManager.HasComponent<PublicTransportLanePendingExit>(vehicle))
+            {
+                EntityManager.RemoveComponent<PublicTransportLanePendingExit>(vehicle);
+            }
         }
 
         private void BuildPendingRefreshList()
@@ -240,6 +284,8 @@ namespace Traffic_Law_Enforcement
             if (!m_ProfileData.TryGetComponent(vehicle, out VehicleTrafficLawProfile profile) ||
                 profile.m_ShouldTrack == 0)
             {
+                RemovePendingExitIfPresent(vehicle);
+
                 if (hasState)
                 {
                     RestoreVehicle(vehicle, car, state, removeState: true);
@@ -254,6 +300,38 @@ namespace Traffic_Law_Enforcement
 
             CarFlags currentMask =
                 car.m_Flags & PublicTransportLanePolicy.PublicTransportLanePermissionMask;
+
+            Entity currentLaneEntity = m_CurrentLaneData.TryGetComponent(vehicle, out CarCurrentLane currentLaneData)
+                ? currentLaneData.m_Lane
+                : Entity.Null;
+
+            bool currentLaneIsPublicOnly = IsPublicOnlyLane(currentLaneEntity);
+            bool hasPendingExit = EntityManager.HasComponent<PublicTransportLanePendingExit>(vehicle);
+
+            bool currentlyUsingPTLane =
+                currentLaneIsPublicOnly &&
+                (currentMask & CarFlags.UsePublicTransportLanes) != 0;
+
+            bool permissionBeingRevoked =
+                (desiredMask & CarFlags.UsePublicTransportLanes) == 0;
+
+            if (currentlyUsingPTLane && permissionBeingRevoked)
+            {
+                if (!hasPendingExit)
+                {
+                    EntityManager.AddComponentData(vehicle, new PublicTransportLanePendingExit
+                    {
+                        m_LaneWhenGraceGranted = currentLaneEntity,
+                    });
+                }
+
+                // Keep the current PT permission flags until the vehicle exits the PT lane.
+                desiredMask = currentMask;
+            }
+            else if (hasPendingExit)
+            {
+                EntityManager.RemoveComponent<PublicTransportLanePendingExit>(vehicle);
+            }
 
             bool emergencyActive = profile.m_EmergencyVehicle != 0;
             bool emergencyTransition =
