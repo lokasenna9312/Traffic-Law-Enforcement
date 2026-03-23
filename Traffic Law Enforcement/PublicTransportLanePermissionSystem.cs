@@ -308,6 +308,10 @@ namespace Traffic_Law_Enforcement
             bool currentLaneIsPublicOnly = IsPublicOnlyLane(currentLaneEntity);
             bool hasPendingExit = EntityManager.HasComponent<PublicTransportLanePendingExit>(vehicle);
 
+            PublicTransportLanePendingExit pendingExit = hasPendingExit
+                ? EntityManager.GetComponentData<PublicTransportLanePendingExit>(vehicle)
+                : default;
+
             bool currentlyUsingPTLane =
                 currentLaneIsPublicOnly &&
                 (currentMask & CarFlags.UsePublicTransportLanes) != 0;
@@ -319,10 +323,13 @@ namespace Traffic_Law_Enforcement
             {
                 if (!hasPendingExit)
                 {
-                    EntityManager.AddComponentData(vehicle, new PublicTransportLanePendingExit
+                    pendingExit = new PublicTransportLanePendingExit
                     {
                         m_LaneWhenGraceGranted = currentLaneEntity,
-                    });
+                        m_HasLeftPublicTransportLane = 0,
+                    };
+
+                    EntityManager.AddComponentData(vehicle, pendingExit);
 
                     MarkPathObsolete(
                         vehicle,
@@ -332,12 +339,39 @@ namespace Traffic_Law_Enforcement
                         $"currentLane={currentLaneEntity}, originalMask={originalMask}, currentMask={currentMask}, desiredMaskBeforeGrace={desiredMask}");
                 }
 
-                // Keep the current PT permission flags until the vehicle exits the PT lane.
+                // Still on PT lane: keep temporary permission.
                 desiredMask = currentMask;
             }
             else if (hasPendingExit)
             {
-                EntityManager.RemoveComponent<PublicTransportLanePendingExit>(vehicle);
+                // Permission was re-enabled meanwhile: clear grace immediately.
+                if (!permissionBeingRevoked)
+                {
+                    EntityManager.RemoveComponent<PublicTransportLanePendingExit>(vehicle);
+                }
+                // First evaluation after leaving PT lane:
+                // keep grace for one more step and force one more reroute from a safe lane.
+                else if (!currentLaneIsPublicOnly && pendingExit.m_HasLeftPublicTransportLane == 0)
+                {
+                    pendingExit.m_HasLeftPublicTransportLane = 1;
+                    EntityManager.SetComponentData(vehicle, pendingExit);
+
+                    MarkPathObsolete(
+                        vehicle,
+                        car,
+                        "pt-pending-exit-left-public-lane",
+                        PublicTransportLanePolicy.DescribeVehicleRole(vehicle, ref m_TypeLookups),
+                        $"currentLane={currentLaneEntity}, graceGrantedLane={pendingExit.m_LaneWhenGraceGranted}, originalMask={originalMask}, currentMask={currentMask}, desiredMaskStillDeferred={desiredMask}");
+
+                    // Keep temporary permission for one more evaluation after leaving PT lane.
+                    desiredMask = currentMask;
+                }
+                // Second evaluation after leaving PT lane:
+                // now really revoke permission.
+                else if (!currentLaneIsPublicOnly && pendingExit.m_HasLeftPublicTransportLane != 0)
+                {
+                    EntityManager.RemoveComponent<PublicTransportLanePendingExit>(vehicle);
+                }
             }
 
             bool emergencyActive = profile.m_EmergencyVehicle != 0;
