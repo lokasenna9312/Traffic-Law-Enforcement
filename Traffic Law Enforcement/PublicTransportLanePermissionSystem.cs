@@ -327,7 +327,7 @@ namespace Traffic_Law_Enforcement
             bool permissionBeingRevoked =
                 (desiredMask & CarFlags.UsePublicTransportLanes) == 0;
 
-            if (currentlyUsingPTLane && permissionBeingRevoked)
+            if (currentLaneStillInExitCorridor && permissionBeingRevoked)
             {
                 if (!hasPendingExit)
                 {
