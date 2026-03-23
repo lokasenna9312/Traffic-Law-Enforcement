@@ -33,4 +33,7 @@ namespace Traffic_Law_Enforcement
         public LaneMovement ActualMovement;
         public LaneMovement AllowedMovement;
     }
+    public struct LaneTransitionViolationEventBufferTag : IComponentData
+    {
+    }
 }

@@ -12,6 +12,8 @@ namespace Traffic_Law_Enforcement
         private EntityQuery m_CarQuery;
         private EntityQuery m_ChangedTransitionQuery;
         private EntityQuery m_StatisticsQuery;
+        private EntityQuery m_EventBufferQuery;
+        private Entity m_EventEntity;
         private Entity m_StatisticsEntity;
         private ComponentLookup<Car> m_CarData;
         private ComponentLookup<CarLane> m_CarLaneData;
@@ -35,6 +37,20 @@ namespace Traffic_Law_Enforcement
                 ComponentType.ReadOnly<CarCurrentLane>(),
                 ComponentType.ReadOnly<VehicleLaneHistory>());
             m_ChangedTransitionQuery.SetChangedVersionFilter(ComponentType.ReadOnly<VehicleLaneHistory>());
+            m_EventBufferQuery = GetEntityQuery(
+                ComponentType.ReadOnly<LaneTransitionViolationEventBufferTag>(),
+                ComponentType.ReadWrite<DetectedLaneTransitionViolation>());
+
+            if (m_EventBufferQuery.IsEmptyIgnoreFilter)
+            {
+                m_EventEntity = EntityManager.CreateEntity();
+                EntityManager.AddComponent<LaneTransitionViolationEventBufferTag>(m_EventEntity);
+                EntityManager.AddBuffer<DetectedLaneTransitionViolation>(m_EventEntity);
+            }
+            else
+            {
+                m_EventEntity = m_EventBufferQuery.GetSingletonEntity();
+            }
             m_StatisticsQuery = GetEntityQuery(ComponentType.ReadWrite<TrafficLawEnforcementStatistics>());
             if (m_StatisticsQuery.IsEmptyIgnoreFilter)
             {
@@ -69,6 +85,16 @@ namespace Traffic_Law_Enforcement
             NativeArray<CarCurrentLane> currentLanes = m_ChangedTransitionQuery.ToComponentDataArray<CarCurrentLane>(Allocator.Temp);
             NativeArray<VehicleLaneHistory> histories = m_ChangedTransitionQuery.ToComponentDataArray<VehicleLaneHistory>(Allocator.Temp);
 
+            if (m_EventEntity == Entity.Null || !EntityManager.Exists(m_EventEntity))
+            {
+                m_EventEntity = m_EventBufferQuery.GetSingletonEntity();
+            }
+
+            DynamicBuffer<DetectedLaneTransitionViolation> events =
+                EntityManager.GetBuffer<DetectedLaneTransitionViolation>(m_EventEntity);
+            events.Clear();
+
+
             try
             {
                 if (!Mod.IsMidBlockCrossingEnforcementEnabled && !Mod.IsIntersectionMovementEnforcementEnabled)
@@ -83,7 +109,7 @@ namespace Traffic_Law_Enforcement
 
                 for (int index = 0; index < vehicles.Length; index++)
                 {
-                    ProcessTransition(vehicles[index], currentLanes[index], histories[index]);
+                    ProcessTransition(vehicles[index], currentLanes[index], histories[index], events);
                 }
             }
             finally
@@ -117,7 +143,7 @@ namespace Traffic_Law_Enforcement
             }
         }
 
-        private void ProcessTransition(Entity vehicle, CarCurrentLane currentLane, VehicleLaneHistory history)
+        private void ProcessTransition(Entity vehicle, CarCurrentLane currentLane, VehicleLaneHistory history, DynamicBuffer<DetectedLaneTransitionViolation> events)
         {
             if (!m_AnalysisStateData.TryGetComponent(vehicle, out LaneTransitionAnalysisState analysisState))
             {
@@ -171,24 +197,34 @@ namespace Traffic_Law_Enforcement
                     $"previousFlags={previousFlagsText}, currentFlags={currentFlagsText}, connectionFlags={connectionFlagsText}");
             }
 
-            if (TryDetectMidBlockCrossing(history, out string midBlockReason))
+            if (TryDetectMidBlockCrossing(history, out LaneTransitionViolationReasonCode reasonCode))
             {
-                IncrementMidBlockStatistic();
-                string message = $"Mid-block crossing violation: vehicle={vehicle}, fromLane={history.m_PreviousLane}, toLane={history.m_CurrentLane}, reason={midBlockReason}";
-                EnforcementPenaltyService.RecordMidBlockCrossingViolation(vehicle, history.m_CurrentLane, midBlockReason);
-                EnforcementLoggingPolicy.RecordEnforcementEvent(message);
+                events.Add(new DetectedLaneTransitionViolation
+                {
+                    Vehicle = vehicle,
+                    Lane = history.m_CurrentLane,
+                    Kind = LaneTransitionViolationKind.MidBlockCrossing,
+                    ReasonCode = reasonCode,
+                    ActualMovement = LaneMovement.None,
+                    AllowedMovement = LaneMovement.None,
+                });
             }
 
             if (TryDetectIntersectionMovementViolation(history, currentLane, out LaneMovement actualMovement, out LaneMovement allowedMovement))
             {
-                IncrementIntersectionStatistic();
-                string message = $"Intersection movement violation: vehicle={vehicle}, fromLane={history.m_PreviousLane}, connectionLane={history.m_CurrentLane}, actual={actualMovement}, allowed={allowedMovement}";
-                EnforcementPenaltyService.RecordIntersectionMovementViolation(vehicle, history.m_CurrentLane, $"actual {actualMovement}, allowed {allowedMovement}");
-                EnforcementLoggingPolicy.RecordEnforcementEvent(message);
+                events.Add(new DetectedLaneTransitionViolation
+                {
+                    Vehicle = vehicle,
+                    Lane = history.m_CurrentLane,
+                    Kind = LaneTransitionViolationKind.IntersectionMovement,
+                    ReasonCode = LaneTransitionViolationReasonCode.None,
+                    ActualMovement = actualMovement,
+                    AllowedMovement = allowedMovement,
+                });
             }
         }
 
-        private bool TryDetectMidBlockCrossing(VehicleLaneHistory history, out string reason)
+        private bool TryDetectMidBlockCrossing(VehicleLaneHistory history, out LaneTransitionViolationReasonCode reasonCode)
         {
             reason = null;
 
@@ -376,22 +412,6 @@ namespace Traffic_Law_Enforcement
             }
 
             return movement;
-        }
-
-        private void IncrementMidBlockStatistic()
-        {
-            TrafficLawEnforcementStatistics statistics = EntityManager.GetComponentData<TrafficLawEnforcementStatistics>(m_StatisticsEntity);
-            statistics.m_MidBlockCrossingViolationCount += 1;
-            EntityManager.SetComponentData(m_StatisticsEntity, statistics);
-            EnforcementTelemetry.SetStatistics(statistics);
-        }
-
-        private void IncrementIntersectionStatistic()
-        {
-            TrafficLawEnforcementStatistics statistics = EntityManager.GetComponentData<TrafficLawEnforcementStatistics>(m_StatisticsEntity);
-            statistics.m_IntersectionMovementViolationCount += 1;
-            EntityManager.SetComponentData(m_StatisticsEntity, statistics);
-            EnforcementTelemetry.SetStatistics(statistics);
         }
     }
 }
