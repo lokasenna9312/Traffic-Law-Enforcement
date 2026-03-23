@@ -152,13 +152,22 @@ namespace Traffic_Law_Enforcement
                     return true;
             }
         }
-
         private string GetLocalizationDirectory()
         {
             if (GameManager.instance.modManager.TryGetExecutableAsset(this, out var asset) &&
                 !string.IsNullOrWhiteSpace(asset.path))
             {
-                return Path.Combine(asset.path, "Localization");
+                string basePath = asset.path;
+
+                if (File.Exists(basePath))
+                {
+                    basePath = Path.GetDirectoryName(basePath);
+                }
+
+                if (!string.IsNullOrWhiteSpace(basePath))
+                {
+                    return Path.Combine(basePath, "Localization");
+                }
             }
 
             return Path.Combine(AppContext.BaseDirectory, "Mods", "Traffic Law Enforcement", "Localization");
