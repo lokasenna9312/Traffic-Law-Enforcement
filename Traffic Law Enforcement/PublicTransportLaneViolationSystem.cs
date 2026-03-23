@@ -2,10 +2,10 @@ using Game;
 using Game.Net;
 using Game.Vehicles;
 using Game.SceneFlow;
-using Traffic_Law_Enforcement;
 using Unity.Collections;
 using Unity.Entities;
 using Entity = Unity.Entities.Entity;
+using System.Collections.Generic;
 
 namespace Traffic_Law_Enforcement
 {
@@ -27,6 +27,7 @@ namespace Traffic_Law_Enforcement
         private ComponentLookup<PublicTransportLaneViolation> m_ViolationData;
         private ComponentLookup<PublicTransportLaneType3UsageState> m_Type3UsageData;
         private PublicTransportLaneVehicleTypeLookups m_TypeLookups;
+        private HashSet<Entity> m_ProcessedThisFrame;
         private bool m_HasEvaluated;
         private bool m_LastEnforcementEnabled;
         private const int kVehiclesPerFrame = 512;
@@ -81,6 +82,7 @@ namespace Traffic_Law_Enforcement
             m_Type3UsageData = GetComponentLookup<PublicTransportLaneType3UsageState>();
             m_TypeLookups = PublicTransportLaneVehicleTypeLookups.Create(this);
             m_PendingRefreshVehicles = new NativeList<Entity>(Allocator.Persistent);    
+            m_ProcessedThisFrame = new HashSet<Entity>();
             RequireForUpdate(m_CarQuery);
         }
 
@@ -171,9 +173,10 @@ namespace Traffic_Law_Enforcement
                 return;
             }
 
-            EvaluateQuery(m_ChangedLaneQuery, settings, events);
-            EvaluateQuery(m_ChangedCarQuery, settings, events);
-
+            BeginSteadyStateEvaluation();
+            EvaluateQueryDeduplicated(m_ChangedLaneQuery, settings, events);
+            EvaluateQueryDeduplicated(m_ChangedCarQuery, settings, events);
+            
             UpdateActiveViolatorStatistics(ref statistics, ref statisticsChanged);
 
             if (statisticsChanged)
@@ -263,6 +266,39 @@ namespace Traffic_Law_Enforcement
             if (m_RefreshCursor >= m_PendingRefreshVehicles.Length)
             {
                 ClearPendingRefresh();
+            }
+        }
+
+        private void BeginSteadyStateEvaluation()
+        {
+            m_ProcessedThisFrame.Clear();
+        }
+
+        private void EvaluateQueryDeduplicated(
+            EntityQuery query,
+            EnforcementGameplaySettingsState settings,
+            DynamicBuffer<DetectedPublicTransportLaneEvent> events)
+        {
+            NativeArray<Entity> vehicles = query.ToEntityArray(Allocator.Temp);
+            NativeArray<CarCurrentLane> currentLanes = query.ToComponentDataArray<CarCurrentLane>(Allocator.Temp);
+
+            try
+            {
+                for (int index = 0; index < vehicles.Length; index += 1)
+                {
+                    Entity vehicle = vehicles[index];
+                    if (!m_ProcessedThisFrame.Add(vehicle))
+                    {
+                        continue;
+                    }
+
+                    EvaluateVehicle(vehicle, currentLanes[index], settings, events);
+                }
+            }
+            finally
+            {
+                vehicles.Dispose();
+                currentLanes.Dispose();
             }
         }
 
