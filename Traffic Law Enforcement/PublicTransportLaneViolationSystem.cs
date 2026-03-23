@@ -100,14 +100,6 @@ namespace Traffic_Law_Enforcement
                     EntityManager.RemoveComponent<PublicTransportLaneType4UsageState>(m_Type4UsageQuery);
                 }
 
-                TrafficLawEnforcementStatistics disabledStats = EntityManager.GetComponentData<TrafficLawEnforcementStatistics>(m_StatisticsEntity);
-                if (disabledStats.m_ActivePublicTransportLaneViolatorCount != 0)
-                {
-                    disabledStats.m_ActivePublicTransportLaneViolatorCount = 0;
-                    EntityManager.SetComponentData(m_StatisticsEntity, disabledStats);
-                }
-                EnforcementTelemetry.SetStatistics(disabledStats);
-
                 ClearPendingRefresh();
                 m_HasEvaluated = false;
                 m_LastEnforcementEnabled = false;
