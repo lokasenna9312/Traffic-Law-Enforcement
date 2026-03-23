@@ -25,7 +25,7 @@ namespace Traffic_Law_Enforcement
         private ComponentLookup<Car> m_CarData;
         private ComponentLookup<CarLane> m_CarLaneData;
         private ComponentLookup<PublicTransportLaneViolation> m_ViolationData;
-        private ComponentLookup<PublicTransportLaneType3UsageState> m_Type3UsageData;
+  
         private PublicTransportLaneVehicleTypeLookups m_TypeLookups;
         private HashSet<Entity> m_ProcessedThisFrame;
         private bool m_HasEvaluated;
@@ -79,7 +79,6 @@ namespace Traffic_Law_Enforcement
             m_CarData = GetComponentLookup<Car>(true);
             m_CarLaneData = GetComponentLookup<CarLane>(true);
             m_ViolationData = GetComponentLookup<PublicTransportLaneViolation>();
-            m_Type3UsageData = GetComponentLookup<PublicTransportLaneType3UsageState>();
             m_TypeLookups = PublicTransportLaneVehicleTypeLookups.Create(this);
             m_PendingRefreshVehicles = new NativeList<Entity>(Allocator.Persistent);    
             m_ProcessedThisFrame = new HashSet<Entity>();
@@ -130,7 +129,6 @@ namespace Traffic_Law_Enforcement
             m_CarData.Update(this);
             m_CarLaneData.Update(this);
             m_ViolationData.Update(this);
-            m_Type3UsageData.Update(this);
             m_TypeLookups.Update(this);
 
             if (m_EventEntity == Entity.Null || !EntityManager.Exists(m_EventEntity))
@@ -176,7 +174,7 @@ namespace Traffic_Law_Enforcement
             BeginSteadyStateEvaluation();
             EvaluateQueryDeduplicated(m_ChangedLaneQuery, settings, events);
             EvaluateQueryDeduplicated(m_ChangedCarQuery, settings, events);
-            
+
             UpdateActiveViolatorStatistics(ref statistics, ref statisticsChanged);
 
             if (statisticsChanged)
@@ -293,25 +291,6 @@ namespace Traffic_Law_Enforcement
                     }
 
                     EvaluateVehicle(vehicle, currentLanes[index], settings, events);
-                }
-            }
-            finally
-            {
-                vehicles.Dispose();
-                currentLanes.Dispose();
-            }
-        }
-
-        private void EvaluateQuery(EntityQuery query, EnforcementGameplaySettingsState settings, DynamicBuffer<DetectedPublicTransportLaneEvent> events)
-        {
-            NativeArray<Entity> vehicles = query.ToEntityArray(Allocator.Temp);
-            NativeArray<CarCurrentLane> currentLanes = query.ToComponentDataArray<CarCurrentLane>(Allocator.Temp);
-
-            try
-            {
-                for (int index = 0; index < vehicles.Length; index++)
-                {
-                    EvaluateVehicle(vehicles[index], currentLanes[index], settings, events);
                 }
             }
             finally
