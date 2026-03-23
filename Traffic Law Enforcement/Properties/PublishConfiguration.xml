@@ -118,6 +118,7 @@ Revised localization structures to facilitate Crowdin integration.
 	<ExternalLink Type="kofi" Url="https://ko-fi.com/pecuts_solentis" />
 	<ExternalLink Type="patreon" Url="https://www.patreon.com/c/PectusSolentis" />
 	<ExternalLink Type="paypal" Url="https://www.paypal.com/donate?hosted_button_id=XXXXXXXXXXXX" />
+	<ExternalLink Type="crowdin" Url="https://crowdin.com/project/csl2_traffic_law_enforcement" />
 	<!--Supported values Public, Private, Unlisted-->
 	<AccessLevel Value="Public" />
 </Publish>
