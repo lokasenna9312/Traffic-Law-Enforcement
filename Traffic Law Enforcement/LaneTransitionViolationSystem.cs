@@ -226,9 +226,10 @@ namespace Traffic_Law_Enforcement
 
         private bool TryDetectMidBlockCrossing(VehicleLaneHistory history, out LaneTransitionViolationReasonCode reasonCode)
         {
-            reason = null;
+            reasonCode = LaneTransitionViolationReasonCode.None;
 
-            if (m_EdgeLaneData.HasComponent(history.m_PreviousLane) && m_EdgeLaneData.HasComponent(history.m_CurrentLane))
+            if (m_EdgeLaneData.HasComponent(history.m_PreviousLane) &&
+                m_EdgeLaneData.HasComponent(history.m_CurrentLane))
             {
                 if (!m_CarLaneData.TryGetComponent(history.m_PreviousLane, out CarLane previousCarLane) ||
                     !m_CarLaneData.TryGetComponent(history.m_CurrentLane, out CarLane currentCarLane))
@@ -238,52 +239,70 @@ namespace Traffic_Law_Enforcement
 
                 EdgeLane previousEdgeLane = m_EdgeLaneData[history.m_PreviousLane];
                 EdgeLane currentEdgeLane = m_EdgeLaneData[history.m_CurrentLane];
-                bool sameOwner = history.m_PreviousLaneOwner == history.m_CurrentLaneOwner && history.m_CurrentLaneOwner != Entity.Null;
+                bool sameOwner =
+                    history.m_PreviousLaneOwner == history.m_CurrentLaneOwner &&
+                    history.m_CurrentLaneOwner != Entity.Null;
                 bool oppositeDirections = IsOppositeDirection(previousEdgeLane, currentEdgeLane);
-                bool sameCarriageway = previousCarLane.m_CarriagewayGroup == currentCarLane.m_CarriagewayGroup;
+                bool sameCarriageway =
+                    previousCarLane.m_CarriagewayGroup == currentCarLane.m_CarriagewayGroup;
 
                 if (sameOwner && oppositeDirections && sameCarriageway)
                 {
-                    reason = "vehicle switched to the opposite flow on the same road segment";
+                    reasonCode = LaneTransitionViolationReasonCode.OppositeFlowSameRoadSegment;
                     return true;
                 }
             }
 
-            if (!m_EdgeLaneData.HasComponent(history.m_PreviousLane) || !m_CarLaneData.TryGetComponent(history.m_PreviousLane, out CarLane sourceLane))
+            if (!m_EdgeLaneData.HasComponent(history.m_PreviousLane) ||
+                !m_CarLaneData.TryGetComponent(history.m_PreviousLane, out CarLane sourceLane))
             {
-                return TryDetectOutboundAccessCrossing(history, out reason);
+                return TryDetectOutboundAccessCrossing(history, out reasonCode);
             }
 
             if (!LaneAllowsSideAccess(sourceLane))
             {
-                if (m_ParkingLaneData.HasComponent(history.m_CurrentLane) || m_GarageLaneData.HasComponent(history.m_CurrentLane))
+                if (m_GarageLaneData.HasComponent(history.m_CurrentLane))
                 {
-                    reason = m_GarageLaneData.HasComponent(history.m_CurrentLane)
-                        ? "vehicle entered garage access from a lane without side-access permission"
-                        : "vehicle entered parking access from a lane without side-access permission";
+                    reasonCode = LaneTransitionViolationReasonCode.EnteredGarageAccessWithoutSideAccess;
                     return true;
                 }
 
-                if (IsAccessConnection(history.m_CurrentLane))
+                if (m_ParkingLaneData.HasComponent(history.m_CurrentLane))
                 {
-                    reason = $"vehicle crossed into {DescribeAccessConnection(history.m_CurrentLane)} from a lane without side-access permission";
+                    reasonCode = LaneTransitionViolationReasonCode.EnteredParkingAccessWithoutSideAccess;
                     return true;
+                }
+
+                if (m_ConnectionLaneData.TryGetComponent(history.m_CurrentLane, out ConnectionLane connectionLane))
+                {
+                    if ((connectionLane.m_Flags & ConnectionLaneFlags.Parking) != 0)
+                    {
+                        reasonCode = LaneTransitionViolationReasonCode.EnteredParkingConnectionWithoutSideAccess;
+                        return true;
+                    }
+
+                    if ((connectionLane.m_Flags & ConnectionLaneFlags.Road) == 0)
+                    {
+                        reasonCode = LaneTransitionViolationReasonCode.EnteredBuildingAccessConnectionWithoutSideAccess;
+                        return true;
+                    }
                 }
             }
 
-            return TryDetectOutboundAccessCrossing(history, out reason);
+            return TryDetectOutboundAccessCrossing(history, out reasonCode);
         }
 
-        private bool TryDetectOutboundAccessCrossing(VehicleLaneHistory history, out string reason)
+        private bool TryDetectOutboundAccessCrossing(VehicleLaneHistory history, out LaneTransitionViolationReasonCode reasonCode)
         {
-            reason = null;
+            reasonCode = LaneTransitionViolationReasonCode.None;
 
             if (!IsAccessOrigin(history.m_PreviousLane))
             {
                 return false;
             }
 
-            if (!m_EdgeLaneData.HasComponent(history.m_CurrentLane) || !m_CarLaneData.TryGetComponent(history.m_CurrentLane, out CarLane targetLane))
+            if (!m_EdgeLaneData.HasComponent(history.m_CurrentLane) ||
+                !m_CarLaneData.TryGetComponent(history.m_CurrentLane, out CarLane targetLane))
             {
                 return false;
             }
@@ -293,8 +312,34 @@ namespace Traffic_Law_Enforcement
                 return false;
             }
 
-            reason = $"vehicle exited {DescribeAccessOrigin(history.m_PreviousLane)} into a lane without side-access permission";
-            return true;
+            if (m_ParkingLaneData.HasComponent(history.m_PreviousLane))
+            {
+                reasonCode = LaneTransitionViolationReasonCode.ExitedParkingAccessWithoutSideAccess;
+                return true;
+            }
+
+            if (m_GarageLaneData.HasComponent(history.m_PreviousLane))
+            {
+                reasonCode = LaneTransitionViolationReasonCode.ExitedGarageAccessWithoutSideAccess;
+                return true;
+            }
+
+            if (m_ConnectionLaneData.TryGetComponent(history.m_PreviousLane, out ConnectionLane connectionLane))
+            {
+                if ((connectionLane.m_Flags & ConnectionLaneFlags.Parking) != 0)
+                {
+                    reasonCode = LaneTransitionViolationReasonCode.ExitedParkingConnectionWithoutSideAccess;
+                    return true;
+                }
+
+                if ((connectionLane.m_Flags & ConnectionLaneFlags.Road) == 0)
+                {
+                    reasonCode = LaneTransitionViolationReasonCode.ExitedBuildingAccessConnectionWithoutSideAccess;
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private bool TryDetectIntersectionMovementViolation(VehicleLaneHistory history, CarCurrentLane currentLane, out LaneMovement actualMovement, out LaneMovement allowedMovement)
