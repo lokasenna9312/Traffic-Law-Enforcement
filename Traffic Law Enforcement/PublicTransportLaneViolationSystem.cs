@@ -20,8 +20,6 @@ namespace Traffic_Law_Enforcement
         private EntityQuery m_Type2UsageQuery;
         private EntityQuery m_Type3UsageQuery;
         private EntityQuery m_Type4UsageQuery;
-        private EntityQuery m_StatisticsQuery;
-        private Entity m_StatisticsEntity;
         private ComponentLookup<Car> m_CarData;
         private ComponentLookup<CarLane> m_CarLaneData;
         private ComponentLookup<PublicTransportLaneViolation> m_ViolationData;
@@ -52,16 +50,6 @@ namespace Traffic_Law_Enforcement
             m_Type2UsageQuery = GetEntityQuery(ComponentType.ReadOnly<PublicTransportLaneType2UsageState>());
             m_Type3UsageQuery = GetEntityQuery(ComponentType.ReadOnly<PublicTransportLaneType3UsageState>());
             m_Type4UsageQuery = GetEntityQuery(ComponentType.ReadOnly<PublicTransportLaneType4UsageState>());
-            m_StatisticsQuery = GetEntityQuery(ComponentType.ReadWrite<TrafficLawEnforcementStatistics>());
-            if (m_StatisticsQuery.IsEmptyIgnoreFilter)
-            {
-                m_StatisticsEntity = EntityManager.CreateEntity();
-                EntityManager.AddComponentData(m_StatisticsEntity, default(TrafficLawEnforcementStatistics));
-            }
-            else
-            {
-                m_StatisticsEntity = m_StatisticsQuery.GetSingletonEntity();
-            }
             m_EventBufferQuery = GetEntityQuery(
                 ComponentType.ReadOnly<PublicTransportLaneEventBufferTag>(),
                 ComponentType.ReadWrite<DetectedPublicTransportLaneEvent>());
@@ -140,8 +128,6 @@ namespace Traffic_Law_Enforcement
                 EntityManager.GetBuffer<DetectedPublicTransportLaneEvent>(m_EventEntity);
             events.Clear();
 
-            TrafficLawEnforcementStatistics statistics = EntityManager.GetComponentData<TrafficLawEnforcementStatistics>(m_StatisticsEntity);
-            bool statisticsChanged = false;
             bool fullRefresh = !m_HasEvaluated || !m_LastEnforcementEnabled;
 
             if (fullRefresh && m_PendingRefreshVehicles.Length == 0)
@@ -152,15 +138,6 @@ namespace Traffic_Law_Enforcement
             if (m_PendingRefreshVehicles.Length > 0)
             {
                 ProcessRefreshBatch(settings, events);
-
-                UpdateActiveViolatorStatistics(ref statistics, ref statisticsChanged);
-
-                if (statisticsChanged)
-                {
-                    EntityManager.SetComponentData(m_StatisticsEntity, statistics);
-                }
-
-                EnforcementTelemetry.SetStatistics(statistics);
 
                 if (m_PendingRefreshVehicles.Length == 0)
                 {
@@ -175,14 +152,6 @@ namespace Traffic_Law_Enforcement
             EvaluateQueryDeduplicated(m_ChangedLaneQuery, settings, events);
             EvaluateQueryDeduplicated(m_ChangedCarQuery, settings, events);
 
-            UpdateActiveViolatorStatistics(ref statistics, ref statisticsChanged);
-
-            if (statisticsChanged)
-            {
-                EntityManager.SetComponentData(m_StatisticsEntity, statistics);
-            }
-            EnforcementTelemetry.SetStatistics(statistics);
-
             m_HasEvaluated = true;
             m_LastEnforcementEnabled = true;
         }
@@ -195,18 +164,6 @@ namespace Traffic_Law_Enforcement
             }
 
             base.OnDestroy();
-        }
-
-        private void UpdateActiveViolatorStatistics(
-            ref TrafficLawEnforcementStatistics statistics,
-            ref bool statisticsChanged)
-        {
-            int activeViolatorCount = m_ViolationQuery.CalculateEntityCount();
-            if (statistics.m_ActivePublicTransportLaneViolatorCount != activeViolatorCount)
-            {
-                statistics.m_ActivePublicTransportLaneViolatorCount = activeViolatorCount;
-                statisticsChanged = true;
-            }
         }
 
         private void BuildPendingRefreshList()
