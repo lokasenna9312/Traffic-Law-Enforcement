@@ -301,11 +301,19 @@ namespace Traffic_Law_Enforcement
             CarFlags currentMask =
                 car.m_Flags & PublicTransportLanePolicy.PublicTransportLanePermissionMask;
 
-            Entity currentLaneEntity = m_CurrentLaneData.TryGetComponent(vehicle, out CarCurrentLane currentLaneData)
+            bool hasCurrentLane = m_CurrentLaneData.TryGetComponent(vehicle, out CarCurrentLane currentLaneData);
+            Entity currentLaneEntity = hasCurrentLane
                 ? currentLaneData.m_Lane
                 : Entity.Null;
 
             bool currentLaneIsPublicOnly = IsPublicOnlyLane(currentLaneEntity);
+            bool currentLaneIsConnection =
+                hasCurrentLane &&
+                (currentLaneData.m_LaneFlags & Game.Vehicles.CarLaneFlags.Connection) != 0;
+
+            bool currentLaneStillInExitCorridor =
+                currentLaneIsPublicOnly || currentLaneIsConnection;
+
             bool hasPendingExit = EntityManager.HasComponent<PublicTransportLanePendingExit>(vehicle);
 
             PublicTransportLanePendingExit pendingExit = hasPendingExit
@@ -349,9 +357,14 @@ namespace Traffic_Law_Enforcement
                 {
                     EntityManager.RemoveComponent<PublicTransportLanePendingExit>(vehicle);
                 }
-                // First evaluation after leaving PT lane:
-                // keep grace for one more step and force one more reroute from a safe lane.
-                else if (!currentLaneIsPublicOnly && pendingExit.m_HasLeftPublicTransportLane == 0)
+                // Still inside PT exit corridor (PT lane or intersection connection): keep grace.
+                else if (currentLaneStillInExitCorridor)
+                {
+                    desiredMask = currentMask;
+                }
+                // First safe non-corridor lane after leaving PT/connection area:
+                // keep grace for one more step and force one more reroute.
+                else if (pendingExit.m_HasLeftPublicTransportLane == 0)
                 {
                     pendingExit.m_HasLeftPublicTransportLane = 1;
                     EntityManager.SetComponentData(vehicle, pendingExit);
@@ -359,16 +372,14 @@ namespace Traffic_Law_Enforcement
                     MarkPathObsolete(
                         vehicle,
                         car,
-                        "pt-pending-exit-left-public-lane",
+                        "pt-pending-exit-safe-lane-reached",
                         PublicTransportLanePolicy.DescribeVehicleRole(vehicle, ref m_TypeLookups),
                         $"currentLane={currentLaneEntity}, graceGrantedLane={pendingExit.m_LaneWhenGraceGranted}, originalMask={originalMask}, currentMask={currentMask}, desiredMaskStillDeferred={desiredMask}");
 
-                    // Keep temporary permission for one more evaluation after leaving PT lane.
                     desiredMask = currentMask;
                 }
-                // Second evaluation after leaving PT lane:
-                // now really revoke permission.
-                else if (!currentLaneIsPublicOnly && pendingExit.m_HasLeftPublicTransportLane != 0)
+                // Second evaluation on a safe non-corridor lane: now really revoke.
+                else
                 {
                     EntityManager.RemoveComponent<PublicTransportLanePendingExit>(vehicle);
                 }
