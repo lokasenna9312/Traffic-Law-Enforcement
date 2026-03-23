@@ -17,6 +17,7 @@ namespace Traffic_Law_Enforcement
     {
         public static ILog log = LogManager.GetLogger($"{nameof(Traffic_Law_Enforcement)}.{nameof(Mod)}").SetShowsErrorsInUI(false);
         public static Setting Settings { get; private set; }
+        public static string LocalizationDirectory { get; private set; }
         public static bool IsEnforcementEnabled => EnforcementGameplaySettingsService.Current.HasAnyEnforcementEnabled();
         public static bool IsPublicTransportLaneEnforcementEnabled => EnforcementGameplaySettingsService.Current.EnablePublicTransportLaneEnforcement;
         public static bool IsMidBlockCrossingEnforcementEnabled => EnforcementGameplaySettingsService.Current.EnableMidBlockCrossingEnforcement;
@@ -82,7 +83,8 @@ namespace Traffic_Law_Enforcement
             var localizationManager = GameManager.instance.localizationManager;
             var keyMap = LocalizationKeys.Build(m_Setting);
 
-            string localeDir = GetLocalizationDirectory();
+            LocalizationDirectory = GetLocalizationDirectory();
+            string localeDir = LocalizationDirectory;
 
             if (!Directory.Exists(localeDir))
             {

@@ -755,29 +755,9 @@ namespace Traffic_Law_Enforcement
 
         private static string GetLocalizationDirectory()
         {
-            try
+            if (!string.IsNullOrWhiteSpace(Mod.LocalizationDirectory))
             {
-                string assemblyPath = Assembly.GetExecutingAssembly().Location;
-                string assemblyDir = Path.GetDirectoryName(assemblyPath);
-
-                if (!string.IsNullOrWhiteSpace(assemblyDir))
-                {
-                    string candidate = Path.Combine(assemblyDir, "Localization");
-                    if (Directory.Exists(candidate))
-                    {
-                        return candidate;
-                    }
-
-                    candidate = Path.Combine(assemblyDir, "..", "Localization");
-                    candidate = Path.GetFullPath(candidate);
-                    if (Directory.Exists(candidate))
-                    {
-                        return candidate;
-                    }
-                }
-            }
-            catch
-            {
+                return Mod.LocalizationDirectory;
             }
 
             return Path.Combine(AppContext.BaseDirectory, "Mods", "Traffic Law Enforcement", "Localization");
