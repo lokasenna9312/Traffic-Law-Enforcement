@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.IO;
+using System.Reflection;
 using Colossal.Localization;
 using Game;
 using Game.Common;
@@ -175,15 +177,31 @@ namespace Traffic_Law_Enforcement
         {
             m_StaticChirperTemplatesByLocale.Clear();
 
-            Dictionary<string, string> enTemplates = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            LocaleEN.AddMonthlyChirperEntries(enTemplates);
-            m_StaticChirperTemplatesByLocale["en-US"] = enTemplates;
+            string localeDir = GetLocalizationDirectory();
+            if (!Directory.Exists(localeDir))
+            {
+                Mod.log.Warn($"Monthly chirper localization directory not found: {localeDir}");
+                return;
+            }
 
-            Dictionary<string, string> koTemplates = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            LocaleKO.AddMonthlyChirperEntries(koTemplates);
-            m_StaticChirperTemplatesByLocale["ko-KR"] = koTemplates;
+            string[] files = Directory.GetFiles(localeDir, "*.properties");
+            foreach (string filePath in files)
+            {
+                string localeId = Path.GetFileNameWithoutExtension(filePath);
+                Dictionary<string, string> symbolicEntries = PropertiesLocaleSource.LoadKeyValueFile(filePath);
+                Dictionary<string, string> resolvedTemplates = ResolveMonthlyChirperTemplates(symbolicEntries);
+
+                if (resolvedTemplates.Count > 0)
+                {
+                    m_StaticChirperTemplatesByLocale[localeId] = resolvedTemplates;
+                }
+            }
+
+            if (!m_StaticChirperTemplatesByLocale.ContainsKey(kDefaultLocale))
+            {
+                Mod.log.Warn($"Monthly chirper default locale templates not found: {kDefaultLocale}");
+            }
         }
-
         private string GetStaticChirperTemplate(string localeId, string key)
         {
             localeId = NormalizeLocaleId(localeId);
@@ -203,6 +221,35 @@ namespace Traffic_Law_Enforcement
             }
 
             return key;
+        }
+
+        private static Dictionary<string, string> ResolveMonthlyChirperTemplates(Dictionary<string, string> symbolicEntries)
+        {
+            Dictionary<string, string> result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+            AddTemplate(symbolicEntries, result, "MonthlyChirper.SenderText", kSenderTextLocaleId);
+            AddTemplate(symbolicEntries, result, "MonthlyChirper.PeriodPointFormat", kPeriodPointFormatLocaleId);
+            AddTemplate(symbolicEntries, result, "MonthlyChirper.ReportHeaderFormat", kReportHeaderFormatLocaleId);
+            AddTemplate(symbolicEntries, result, "MonthlyChirper.TotalLineFormat", kTotalLineFormatLocaleId);
+            AddTemplate(symbolicEntries, result, "MonthlyChirper.PublicTransportLaneLineFormat", kPublicTransportLaneLineFormatLocaleId);
+            AddTemplate(symbolicEntries, result, "MonthlyChirper.MidBlockLineFormat", kMidBlockLineFormatLocaleId);
+            AddTemplate(symbolicEntries, result, "MonthlyChirper.IntersectionLineFormat", kIntersectionLineFormatLocaleId);
+            AddTemplate(symbolicEntries, result, "MonthlyChirper.NoRate", kNoRateLocaleId);
+
+            return result;
+        }
+
+        private static void AddTemplate(
+            Dictionary<string, string> symbolicEntries,
+            Dictionary<string, string> resolvedEntries,
+            string symbolicKey,
+            string actualLocaleKey)
+        {
+            if (symbolicEntries.TryGetValue(symbolicKey, out string value) &&
+                !string.IsNullOrWhiteSpace(value))
+            {
+                resolvedEntries[actualLocaleKey] = value;
+            }
         }
 
         private void EnsureSenderAccount()
@@ -704,6 +751,36 @@ namespace Traffic_Law_Enforcement
             month = (int)(wholeMonths % EnforcementGameTime.MonthsPerYear) + 1;
             hour = totalMinutes / 60;
             minute = totalMinutes % 60;
+        }
+
+        private static string GetLocalizationDirectory()
+        {
+            try
+            {
+                string assemblyPath = Assembly.GetExecutingAssembly().Location;
+                string assemblyDir = Path.GetDirectoryName(assemblyPath);
+
+                if (!string.IsNullOrWhiteSpace(assemblyDir))
+                {
+                    string candidate = Path.Combine(assemblyDir, "Localization");
+                    if (Directory.Exists(candidate))
+                    {
+                        return candidate;
+                    }
+
+                    candidate = Path.Combine(assemblyDir, "..", "Localization");
+                    candidate = Path.GetFullPath(candidate);
+                    if (Directory.Exists(candidate))
+                    {
+                        return candidate;
+                    }
+                }
+            }
+            catch
+            {
+            }
+
+            return Path.Combine(AppContext.BaseDirectory, "Mods", "Traffic Law Enforcement", "Localization");
         }
     }
 }
