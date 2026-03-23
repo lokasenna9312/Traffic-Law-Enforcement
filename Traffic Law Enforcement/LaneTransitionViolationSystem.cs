@@ -11,10 +11,8 @@ namespace Traffic_Law_Enforcement
     {
         private EntityQuery m_CarQuery;
         private EntityQuery m_ChangedTransitionQuery;
-        private EntityQuery m_StatisticsQuery;
         private EntityQuery m_EventBufferQuery;
         private Entity m_EventEntity;
-        private Entity m_StatisticsEntity;
         private ComponentLookup<Car> m_CarData;
         private ComponentLookup<CarLane> m_CarLaneData;
         private ComponentLookup<EdgeLane> m_EdgeLaneData;
@@ -50,16 +48,6 @@ namespace Traffic_Law_Enforcement
             else
             {
                 m_EventEntity = m_EventBufferQuery.GetSingletonEntity();
-            }
-            m_StatisticsQuery = GetEntityQuery(ComponentType.ReadWrite<TrafficLawEnforcementStatistics>());
-            if (m_StatisticsQuery.IsEmptyIgnoreFilter)
-            {
-                m_StatisticsEntity = EntityManager.CreateEntity();
-                EntityManager.AddComponentData(m_StatisticsEntity, default(TrafficLawEnforcementStatistics));
-            }
-            else
-            {
-                m_StatisticsEntity = m_StatisticsQuery.GetSingletonEntity();
             }
             m_CarData = GetComponentLookup<Car>(true);
             m_CarLaneData = GetComponentLookup<CarLane>(true);
