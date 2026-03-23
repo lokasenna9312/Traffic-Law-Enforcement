@@ -68,6 +68,36 @@ namespace Traffic_Law_Enforcement
                 m_EventEntity = m_EventBufferQuery.GetSingletonEntity();
             }
 
+            if (!Mod.IsPublicTransportLaneEnforcementEnabled)
+            {
+                TrafficLawEnforcementStatistics statistics =
+                    EntityManager.GetComponentData<TrafficLawEnforcementStatistics>(m_StatisticsEntity);
+
+                bool statisticsChanged = false;
+
+                if (statistics.m_ActivePublicTransportLaneViolatorCount != 0)
+                {
+                    statistics.m_ActivePublicTransportLaneViolatorCount = 0;
+                    statisticsChanged = true;
+                }
+
+                if (statisticsChanged)
+                {
+                    EntityManager.SetComponentData(m_StatisticsEntity, statistics);
+                }
+
+                EnforcementTelemetry.SetStatistics(statistics);
+
+                DynamicBuffer<DetectedPublicTransportLaneEvent> events =
+                    EntityManager.GetBuffer<DetectedPublicTransportLaneEvent>(m_EventEntity);
+                if (events.Length > 0)
+                {
+                    events.Clear();
+                }
+
+                return;
+            }
+
             m_TypeLookups.Update(this);
 
             DynamicBuffer<DetectedPublicTransportLaneEvent> events =
