@@ -47,8 +47,7 @@ namespace Traffic_Law_Enforcement
             updateSystem.UpdateBefore<VehicleTrafficLawProfileSystem, CarNavigationSystem>(SystemUpdatePhase.GameSimulation);
             updateSystem.UpdateBefore<PathfindingMoneyPenaltySystem, CarNavigationSystem>(SystemUpdatePhase.GameSimulation);
             updateSystem.UpdateBefore<PublicTransportLanePermissionSystem, CarNavigationSystem>(SystemUpdatePhase.GameSimulation);
-            updateSystem.UpdateBefore<PublicTransportLanePermissionSystem, PublicTransportLaneReconcileSystem>(SystemUpdatePhase.GameSimulation);
-            updateSystem.UpdateBefore<PublicTransportLaneReconcileSystem, PublicTransportLaneViolationSystem>(SystemUpdatePhase.GameSimulation);
+            updateSystem.UpdateBefore<PublicTransportLanePermissionSystem, PublicTransportLaneViolationSystem>(SystemUpdatePhase.GameSimulation);
             updateSystem.UpdateBefore<IntersectionMovementPenaltyCacheSystem, CarNavigationSystem>(SystemUpdatePhase.GameSimulation);
             updateSystem.UpdateAfter<CenterlineAccessObsoleteSystem, PublicTransportLanePermissionSystem>(SystemUpdatePhase.GameSimulation);
             updateSystem.UpdateAfter<CenterlineAccessObsoleteSystem, PublicTransportLaneExitPressureSystem>(SystemUpdatePhase.GameSimulation);
