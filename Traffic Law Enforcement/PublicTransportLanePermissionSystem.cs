@@ -323,6 +323,13 @@ namespace Traffic_Law_Enforcement
                     {
                         m_LaneWhenGraceGranted = currentLaneEntity,
                     });
+
+                    MarkPathObsolete(
+                        vehicle,
+                        car,
+                        "pt-pending-exit-grace-granted",
+                        PublicTransportLanePolicy.DescribeVehicleRole(vehicle, ref m_TypeLookups),
+                        $"currentLane={currentLaneEntity}, originalMask={originalMask}, currentMask={currentMask}, desiredMaskBeforeGrace={desiredMask}");
                 }
 
                 // Keep the current PT permission flags until the vehicle exits the PT lane.
