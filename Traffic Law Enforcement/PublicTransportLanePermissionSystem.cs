@@ -461,6 +461,11 @@ namespace Traffic_Law_Enforcement
                         $"currentLane={currentLaneEntity}, originalMask={originalMask}, currentMask={currentMask}, desiredMaskBeforeGrace={desiredMask}");
                 }
 
+                if (bootstrapImmediateEntryGrace)
+                {
+                    immediateEntryGraceConsumed = 1;
+                }
+
                 desiredMask = currentMask;
             }
             else if (hasPendingExit)
@@ -517,6 +522,7 @@ namespace Traffic_Law_Enforcement
             {
                 m_OriginalPublicTransportLaneFlags = originalMask,
                 m_EmergencyActive = emergencyActive ? (byte)1 : (byte)0,
+                m_ImmediateEntryGraceConsumed = immediateEntryGraceConsumed,
             };
 
             if (!hasState)
@@ -650,7 +656,8 @@ namespace Traffic_Law_Enforcement
             PublicTransportLanePermissionState right)
         {
             return left.m_OriginalPublicTransportLaneFlags == right.m_OriginalPublicTransportLaneFlags &&
-                   left.m_EmergencyActive == right.m_EmergencyActive;
+                left.m_EmergencyActive == right.m_EmergencyActive &&
+                left.m_ImmediateEntryGraceConsumed == right.m_ImmediateEntryGraceConsumed;
         }
     }
 }
