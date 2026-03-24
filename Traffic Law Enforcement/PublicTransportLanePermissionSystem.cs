@@ -410,6 +410,8 @@ namespace Traffic_Law_Enforcement
             bool committedToImmediatePublicTransportEntry =
                 permissionBeingRevoked &&
                 currentlyHasPublicTransportLaneFlag &&
+                hasPendingExit &&
+                pendingExit.m_HasLeftPublicTransportLane == 0 &&
                 !currentLaneStillInExitCorridor &&
                 IsCommittedToImmediatePublicTransportEntry(vehicle, currentLaneEntity);
 
