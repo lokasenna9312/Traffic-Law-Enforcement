@@ -236,6 +236,7 @@ namespace Traffic_Law_Enforcement
             foreach (PathRequestEvent entry in pathRequestEvents)
             {
                 writer.Write(entry.TimestampMonthTicks);
+                writer.Write(entry.PathContextSequence);
             }
 
             IReadOnlyCollection<ActualViolationEvent> actualViolationEvents = EnforcementPolicyImpactService.GetActualViolationEventSnapshot();
@@ -243,10 +244,9 @@ namespace Traffic_Law_Enforcement
             foreach (ActualViolationEvent entry in actualViolationEvents)
             {
                 writer.Write(entry.TimestampMonthTicks);
+                writer.Write(entry.PathContextSequence);
                 writer.Write(entry.Kind);
                 writer.Write(entry.FineAmount);
-                writer.Write(entry.CountsTowardTotalPath);
-                writer.Write(entry.CountsTowardKindPath);
             }
 
             IReadOnlyCollection<AvoidedRerouteEvent> avoidedRerouteEvents = EnforcementPolicyImpactService.GetAvoidedRerouteEventSnapshot();
@@ -254,13 +254,10 @@ namespace Traffic_Law_Enforcement
             foreach (AvoidedRerouteEvent entry in avoidedRerouteEvents)
             {
                 writer.Write(entry.TimestampMonthTicks);
+                writer.Write(entry.PathContextSequence);
                 writer.Write(entry.AvoidedPublicTransportLanePenalty);
                 writer.Write(entry.AvoidedMidBlockPenalty);
                 writer.Write(entry.AvoidedIntersectionPenalty);
-                writer.Write(entry.CountsTowardTotalPath);
-                writer.Write(entry.CountsTowardPublicTransportLanePath);
-                writer.Write(entry.CountsTowardMidBlockPath);
-                writer.Write(entry.CountsTowardIntersectionPath);
             }
             NativeArray<Entity> ptVehicles =
                 m_PublicTransportLaneProfileQuery.ToEntityArray(Allocator.Temp);
@@ -544,61 +541,77 @@ namespace Traffic_Law_Enforcement
                 for (int index = 0; index < pathRequestEventCount; index += 1)
                 {
                     reader.Read(out long timestampMonthTicks);
-                    pathRequestEvents.Add(new PathRequestEvent(timestampMonthTicks));
+
+                    long pathContextSequence = 0L;
+                    if (version >= 9)
+                    {
+                        reader.Read(out pathContextSequence);
+                    }
+
+                    pathRequestEvents.Add(
+                        new PathRequestEvent(
+                            timestampMonthTicks,
+                            pathContextSequence));
                 }
 
                 reader.Read(out int actualViolationEventCount);
                 for (int index = 0; index < actualViolationEventCount; index += 1)
                 {
                     reader.Read(out long timestampMonthTicks);
-                    reader.Read(out string kind);
-                    reader.Read(out int fineAmount);
-                    bool countsTowardTotalPath = true;
-                    bool countsTowardKindPath = true;
+
+                    long pathContextSequence = 0L;
                     if (version >= 9)
                     {
-                        reader.Read(out countsTowardTotalPath);
-                        reader.Read(out countsTowardKindPath);
+                        reader.Read(out pathContextSequence);
+                    }
+
+                    reader.Read(out string kind);
+                    reader.Read(out int fineAmount);
+
+                    if (version == 9)
+                    {
+                        reader.Read(out bool _);
+                        reader.Read(out bool _);
                     }
 
                     actualViolationEvents.Add(
                         new ActualViolationEvent(
                             timestampMonthTicks,
+                            pathContextSequence,
                             kind,
-                            fineAmount,
-                            countsTowardTotalPath,
-                            countsTowardKindPath));
+                            fineAmount));
                 }
 
                 reader.Read(out int avoidedRerouteEventCount);
                 for (int index = 0; index < avoidedRerouteEventCount; index += 1)
                 {
                     reader.Read(out long timestampMonthTicks);
+
+                    long pathContextSequence = 0L;
+                    if (version >= 9)
+                    {
+                        reader.Read(out pathContextSequence);
+                    }
+
                     reader.Read(out bool avoidedPublicTransportLanePenalty);
                     reader.Read(out bool avoidedMidBlockPenalty);
                     reader.Read(out bool avoidedIntersectionPenalty);
-                    bool countsTowardTotalPath = avoidedPublicTransportLanePenalty || avoidedMidBlockPenalty || avoidedIntersectionPenalty;
-                    bool countsTowardPublicTransportLanePath = avoidedPublicTransportLanePenalty;
-                    bool countsTowardMidBlockPath = avoidedMidBlockPenalty;
-                    bool countsTowardIntersectionPath = avoidedIntersectionPenalty;
-                    if (version >= 9)
+
+                    if (version == 9)
                     {
-                        reader.Read(out countsTowardTotalPath);
-                        reader.Read(out countsTowardPublicTransportLanePath);
-                        reader.Read(out countsTowardMidBlockPath);
-                        reader.Read(out countsTowardIntersectionPath);
+                        reader.Read(out bool _);
+                        reader.Read(out bool _);
+                        reader.Read(out bool _);
+                        reader.Read(out bool _);
                     }
 
                     avoidedRerouteEvents.Add(
                         new AvoidedRerouteEvent(
                             timestampMonthTicks,
+                            pathContextSequence,
                             avoidedPublicTransportLanePenalty,
                             avoidedMidBlockPenalty,
-                            avoidedIntersectionPenalty,
-                            countsTowardTotalPath,
-                            countsTowardPublicTransportLanePath,
-                            countsTowardMidBlockPath,
-                            countsTowardIntersectionPath));
+                            avoidedIntersectionPenalty));
                 }
             }
 

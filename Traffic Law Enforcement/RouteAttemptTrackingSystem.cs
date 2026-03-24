@@ -17,8 +17,10 @@ namespace Traffic_Law_Enforcement
         private EntityQuery m_PathOwnerQuery;
         private EntityQuery m_MissingStateQuery;
         private EntityQuery m_ChangedPathOwnerQuery;
+        private EntityQuery m_TrackingStateQuery;
 
         private ComponentLookup<PathOwner> m_PathOwnerData;
+        private int m_LastObservedRuntimeWorldGeneration = -1;
 
         protected override void OnCreate()
         {
@@ -49,6 +51,11 @@ namespace Traffic_Law_Enforcement
             m_ChangedPathOwnerQuery.SetChangedVersionFilter(
                 ComponentType.ReadOnly<PathOwner>());
 
+            m_TrackingStateQuery = GetEntityQuery(
+                ComponentType.ReadOnly<Car>(),
+                ComponentType.ReadOnly<PathOwner>(),
+                ComponentType.ReadOnly<RouteAttemptTrackingState>());
+
             m_PathOwnerData = GetComponentLookup<PathOwner>(true);
 
             RequireForUpdate(m_PathOwnerQuery);
@@ -56,10 +63,30 @@ namespace Traffic_Law_Enforcement
 
         protected override void OnUpdate()
         {
+            HandleRuntimeWorldReload();
             m_PathOwnerData.Update(this);
 
             SeedMissingTrackingState();
             ProcessChangedPathOwners();
+        }
+
+        private void HandleRuntimeWorldReload()
+        {
+            int currentGeneration = EnforcementSaveDataSystem.RuntimeWorldGeneration;
+            if (m_LastObservedRuntimeWorldGeneration == currentGeneration)
+            {
+                return;
+            }
+
+            m_LastObservedRuntimeWorldGeneration = currentGeneration;
+
+            if (!m_TrackingStateQuery.IsEmptyIgnoreFilter)
+            {
+                EntityManager.RemoveComponent<RouteAttemptTrackingState>(m_TrackingStateQuery);
+            }
+
+            Mod.log.Info(
+                $"[SAVELOAD] RouteAttemptTrackingSystem runtime reset: generation={currentGeneration}");
         }
 
         private void SeedMissingTrackingState()
