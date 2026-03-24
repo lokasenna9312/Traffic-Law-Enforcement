@@ -23,20 +23,30 @@ namespace Traffic_Law_Enforcement
         protected override void OnUpdate()
         {
             LoggedSettingsSnapshot snapshot = LoggedSettingsSnapshot.Capture();
+            string inGameTimeLabel = GetInGameTimeLabel();
+
             if (!m_HasSnapshot)
             {
+                Mod.log.Info($"[Settings] Initial snapshot at {inGameTimeLabel}: {snapshot.ToLogString()}");
                 m_LastSnapshot = snapshot;
                 m_HasSnapshot = true;
                 return;
             }
 
-            string inGameTimeLabel = GetInGameTimeLabel();
             LogChanges(inGameTimeLabel, m_LastSnapshot, snapshot);
             m_LastSnapshot = snapshot;
         }
-
         private void LogChanges(string inGameTimeLabel, LoggedSettingsSnapshot previous, LoggedSettingsSnapshot current)
         {
+            bool invalidateVehicleUtilsPenaltyCache =
+                previous.Gameplay.EnablePublicTransportLaneEnforcement != current.Gameplay.EnablePublicTransportLaneEnforcement ||
+                previous.Gameplay.PublicTransportLaneFineAmount != current.Gameplay.PublicTransportLaneFineAmount;
+
+            if (invalidateVehicleUtilsPenaltyCache)
+            {
+                VehicleUtilsPatches.InvalidateCachedPenaltyValues();
+            }
+            
             LogChange(inGameTimeLabel, nameof(Setting.EnablePublicTransportLaneEnforcement), previous.Gameplay.EnablePublicTransportLaneEnforcement, current.Gameplay.EnablePublicTransportLaneEnforcement);
             LogChange(inGameTimeLabel, nameof(Setting.EnableMidBlockCrossingEnforcement), previous.Gameplay.EnableMidBlockCrossingEnforcement, current.Gameplay.EnableMidBlockCrossingEnforcement);
             LogChange(inGameTimeLabel, nameof(Setting.EnableIntersectionMovementEnforcement), previous.Gameplay.EnableIntersectionMovementEnforcement, current.Gameplay.EnableIntersectionMovementEnforcement);

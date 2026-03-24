@@ -43,9 +43,12 @@ namespace Traffic_Law_Enforcement
             IntersectionMovementPathfindPatches.Apply();
             IntersectionMovementPathfindReflectionPatches.Apply();
             updateSystem.UpdateAfter<EnforcementSaveDataSystem, EnforcementGameTimeSystem>(SystemUpdatePhase.GameSimulation);
+            updateSystem.UpdateBefore<VehicleTrafficLawProfileSystem, PublicTransportLanePermissionSystem>(SystemUpdatePhase.GameSimulation);
+            updateSystem.UpdateBefore<VehicleTrafficLawProfileSystem, CarNavigationSystem>(SystemUpdatePhase.GameSimulation);
             updateSystem.UpdateBefore<PathfindingMoneyPenaltySystem, CarNavigationSystem>(SystemUpdatePhase.GameSimulation);
             updateSystem.UpdateBefore<PublicTransportLanePermissionSystem, CarNavigationSystem>(SystemUpdatePhase.GameSimulation);
             updateSystem.UpdateBefore<PublicTransportLanePermissionSystem, PublicTransportLaneViolationSystem>(SystemUpdatePhase.GameSimulation);
+            updateSystem.UpdateBefore<IntersectionMovementPenaltyCacheSystem, CarNavigationSystem>(SystemUpdatePhase.GameSimulation);
             updateSystem.UpdateAfter<CenterlineAccessObsoleteSystem, PublicTransportLanePermissionSystem>(SystemUpdatePhase.GameSimulation);
             updateSystem.UpdateAfter<CenterlineAccessObsoleteSystem, PublicTransportLaneExitPressureSystem>(SystemUpdatePhase.GameSimulation);
             updateSystem.UpdateBefore<CenterlineAccessObsoleteSystem, CarNavigationSystem>(SystemUpdatePhase.GameSimulation);
@@ -55,12 +58,14 @@ namespace Traffic_Law_Enforcement
             updateSystem.UpdateBefore<MonthlyEnforcementChirperSystem, CreateChirpSystem>(SystemUpdatePhase.GameSimulation);
             updateSystem.UpdateAfter<VehicleLaneHistorySystem, EnforcementGameTimeSystem>(SystemUpdatePhase.GameSimulation);
             updateSystem.UpdateAfter<RoutePenaltyRerouteLoggingSystem, VehicleLaneHistorySystem>(SystemUpdatePhase.GameSimulation);
-            updateSystem.UpdateAfter<PublicTransportLaneViolationSystem, EnforcementGameTimeSystem>(SystemUpdatePhase.GameSimulation);
+            updateSystem.UpdateAfter<PublicTransportLaneViolationSystem, PublicTransportLaneViolationApplySystem>(SystemUpdatePhase.GameSimulation);
+            updateSystem.UpdateAfter<PublicTransportLaneViolationApplySystem, EnforcementGameTimeSystem>(SystemUpdatePhase.GameSimulation);
             updateSystem.UpdateAfter<PublicTransportLaneExitPressureSystem, PublicTransportLaneViolationSystem>(SystemUpdatePhase.GameSimulation);
             updateSystem.UpdateBefore<PublicTransportLaneExitPressureSystem, CarNavigationSystem>(SystemUpdatePhase.GameSimulation);
             updateSystem.UpdateAfter<LaneTransitionViolationSystem, VehicleLaneHistorySystem>(SystemUpdatePhase.GameSimulation);
-            updateSystem.UpdateAfter<EnforcementFineMoneySystem, PublicTransportLaneViolationSystem>(SystemUpdatePhase.GameSimulation);
-            updateSystem.UpdateAfter<EnforcementFineMoneySystem, LaneTransitionViolationSystem>(SystemUpdatePhase.GameSimulation);
+            updateSystem.UpdateAfter<LaneTransitionViolationApplySystem, LaneTransitionViolationSystem>(SystemUpdatePhase.GameSimulation);
+            updateSystem.UpdateAfter<EnforcementFineMoneySystem, PublicTransportLaneViolationApplySystem>(SystemUpdatePhase.GameSimulation);
+            updateSystem.UpdateAfter<EnforcementFineMoneySystem, LaneTransitionViolationApplySystem>(SystemUpdatePhase.GameSimulation);
         }
 
         public void OnDispose()

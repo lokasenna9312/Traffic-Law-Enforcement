@@ -200,7 +200,6 @@ namespace Traffic_Law_Enforcement
     public partial class EnforcementFineMoneySystem : GameSystemBase
     {
         private const int kMaxOwnershipDepth = 16;
-
         private CitySystem m_CitySystem;
         private BufferLookup<Resources> m_Resources;
         private ComponentLookup<PlayerMoney> m_PlayerMoneyData;
@@ -208,6 +207,9 @@ namespace Traffic_Law_Enforcement
         private ComponentLookup<Controller> m_ControllerData;
         private ComponentLookup<PersonalCar> m_PersonalCarData;
         private ComponentLookup<Game.Citizens.HouseholdMember> m_HouseholdMemberData;
+        private Dictionary<Entity, Entity> m_PayerCache;
+        private Dictionary<Entity, int> m_PayerTotals;
+        private Dictionary<string, int> m_CollectedByKind;
 
         protected override void OnCreate()
         {
@@ -219,6 +221,9 @@ namespace Traffic_Law_Enforcement
             m_ControllerData = GetComponentLookup<Controller>(true);
             m_PersonalCarData = GetComponentLookup<PersonalCar>(true);
             m_HouseholdMemberData = GetComponentLookup<Game.Citizens.HouseholdMember>(true);
+            m_PayerCache = new Dictionary<Entity, Entity>(256);
+            m_PayerTotals = new Dictionary<Entity, int>(256);
+            m_CollectedByKind = new Dictionary<string, int>(8);
         }
 
         protected override void OnDestroy()
@@ -255,16 +260,59 @@ namespace Traffic_Law_Enforcement
             m_PersonalCarData.Update(this);
             m_HouseholdMemberData.Update(this);
 
+            ClearFrameBatches();
+
             int collectedFineIncome = 0;
+
+            if (!m_PlayerMoneyData.TryGetComponent(city, out PlayerMoney playerMoney))
+            {
+                while (EnforcementFineMoneyService.TryDequeue(out _))
+                {
+                }
+
+                EnforcementBudgetUIService.UpdateCurrentFineIncome(currentTimestampMonthTicks);
+                return;
+            }
+
             while (EnforcementFineMoneyService.TryDequeue(out PendingFineMoneyCharge charge))
             {
-                int collectedAmount = ApplyCharge(city, charge);
-                if (collectedAmount > 0)
+                if (!TryResolveCachedPayer(charge.Vehicle, city, out Entity payer))
                 {
-                    collectedFineIncome += collectedAmount;
-                    if (currentTimestampMonthTicks > 0L)
+                    continue;
+                }
+
+                AccumulateAmount(m_PayerTotals, payer, charge.Amount);
+                AccumulateAmount(m_CollectedByKind, charge.Kind, charge.Amount);
+            }
+
+            foreach (KeyValuePair<Entity, int> pair in m_PayerTotals)
+            {
+                if (pair.Key == Entity.Null || pair.Value <= 0 || !m_Resources.HasBuffer(pair.Key))
+                {
+                    continue;
+                }
+
+                DynamicBuffer<Resources> payerResources = m_Resources[pair.Key];
+                EconomyUtils.AddResources(Resource.Money, -pair.Value, payerResources);
+                collectedFineIncome += pair.Value;
+            }
+
+            if (collectedFineIncome > 0)
+            {
+                playerMoney.Add(collectedFineIncome);
+                EntityManager.SetComponentData(city, playerMoney);
+
+                if (currentTimestampMonthTicks > 0L)
+                {
+                    foreach (KeyValuePair<string, int> pair in m_CollectedByKind)
                     {
-                        EnforcementBudgetUIService.RecordCollectedFine(currentTimestampMonthTicks, collectedAmount, charge.Kind);
+                        if (pair.Value > 0)
+                        {
+                            EnforcementBudgetUIService.RecordCollectedFine(
+                                currentTimestampMonthTicks,
+                                pair.Value,
+                                pair.Key);
+                        }
                     }
                 }
             }
@@ -276,29 +324,47 @@ namespace Traffic_Law_Enforcement
                 Mod.log.Info($"Traffic law enforcement fine income recorded. batch={collectedFineIncome}, rolling1m={EnforcementBudgetUIService.CurrentFineIncome}, PTLane1m={EnforcementBudgetUIService.CurrentPublicTransportLaneFineIncome}, midBlock1m={EnforcementBudgetUIService.CurrentMidBlockCrossingFineIncome}, intersection1m={EnforcementBudgetUIService.CurrentIntersectionMovementFineIncome}, monthTicks={currentTimestampMonthTicks}");
             }
         }
-
-        private int ApplyCharge(Entity city, PendingFineMoneyCharge charge)
+        
+        private void ClearFrameBatches()
         {
-            if (!m_PlayerMoneyData.TryGetComponent(city, out PlayerMoney playerMoney))
+            m_PayerCache.Clear();
+            m_PayerTotals.Clear();
+            m_CollectedByKind.Clear();
+        }
+
+        private bool TryResolveCachedPayer(Entity vehicle, Entity city, out Entity payer)
+        {
+            if (vehicle == Entity.Null)
             {
-                return 0;
+                payer = Entity.Null;
+                return false;
             }
 
-            if (!TryResolvePayer(charge.Vehicle, city, out Entity payer))
+            if (m_PayerCache.TryGetValue(vehicle, out payer))
             {
-                return 0;
+                return payer != Entity.Null;
             }
 
-            if (!m_Resources.HasBuffer(payer))
+            bool resolved = TryResolvePayer(vehicle, city, out payer);
+            m_PayerCache[vehicle] = resolved ? payer : Entity.Null;
+            return resolved;
+        }
+
+        private static void AccumulateAmount<TKey>(Dictionary<TKey, int> totals, TKey key, int amount)
+        {
+            if (amount <= 0)
             {
-                return 0;
+                return;
             }
 
-            DynamicBuffer<Resources> payerResources = m_Resources[payer];
-            EconomyUtils.AddResources(Resource.Money, -charge.Amount, payerResources);
-            playerMoney.Add(charge.Amount);
-            EntityManager.SetComponentData(city, playerMoney);
-            return charge.Amount;
+            if (totals.TryGetValue(key, out int current))
+            {
+                totals[key] = current + amount;
+            }
+            else
+            {
+                totals[key] = amount;
+            }
         }
 
         private bool TryResolvePayer(Entity vehicle, Entity city, out Entity payer)
