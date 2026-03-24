@@ -33,6 +33,8 @@ namespace Traffic_Law_Enforcement
         private const int MaxPenaltyTags = 6;
         private const int MaxLogsPerUpdate = 4;
         private const int SnapshotSweepInterval = 2048;
+        private const int MaxPublicTransportLaneDecisionDiagnosticLogsPerUpdate = 8;
+        private int m_PublicTransportLaneDecisionDiagnosticLogsThisUpdate;
 
         private EntityQuery m_CarQuery;
         private EntityQuery m_CurrentLaneChangedQuery;
@@ -91,6 +93,7 @@ namespace Traffic_Law_Enforcement
         {
             HandleRuntimeWorldReload();
             bool loggingEnabled = EnforcementLoggingPolicy.ShouldLogEstimatedReroutes();
+            m_PublicTransportLaneDecisionDiagnosticLogsThisUpdate = 0;
             if (!Mod.IsEnforcementEnabled)
             {
                 m_LastSnapshots.Clear();
@@ -204,6 +207,7 @@ namespace Traffic_Law_Enforcement
             Entity previousLaneOwner = Entity.Null;
 
             AppendLaneToSnapshot(
+                vehicle,
                 currentLane.m_Lane,
                 hasResolvedPublicTransportLanePolicy,
                 allowedOnPublicTransportLane,
@@ -231,6 +235,7 @@ namespace Traffic_Law_Enforcement
                     }
 
                     AppendLaneToSnapshot(
+                        vehicle,
                         nextLane,
                         hasResolvedPublicTransportLanePolicy,
                         allowedOnPublicTransportLane,
@@ -248,6 +253,7 @@ namespace Traffic_Law_Enforcement
         }
 
         private void AppendLaneToSnapshot(
+            Entity vehicle,
             Entity lane,
             bool hasResolvedPublicTransportLanePolicy,
             bool allowedOnPublicTransportLane,
@@ -283,6 +289,14 @@ namespace Traffic_Law_Enforcement
             bool unauthorizedPublicTransportLane =
                 hasResolvedPublicTransportLanePolicy &&
                 IsunauthorizedPublicTransportLane(lane, allowedOnPublicTransportLane);
+
+            MaybeLogPublicTransportLaneDecisionDiagnostic(
+                vehicle,
+                lane,
+                hasResolvedPublicTransportLanePolicy,
+                allowedOnPublicTransportLane,
+                unauthorizedPublicTransportLane);
+
             if (unauthorizedPublicTransportLane && !previousunauthorizedPublicTransportLane)
             {
                 profile.PublicTransportLaneSegments += 1;
@@ -293,6 +307,88 @@ namespace Traffic_Law_Enforcement
             previousLane = lane;
             previousLaneOwner = laneOwner;
             previousunauthorizedPublicTransportLane = unauthorizedPublicTransportLane;
+        }
+
+        private void MaybeLogPublicTransportLaneDecisionDiagnostic(
+            Entity vehicle,
+            Entity lane,
+            bool hasResolvedPublicTransportLanePolicy,
+            bool allowedOnPublicTransportLane,
+            bool unauthorizedPublicTransportLane)
+        {
+            if (!EnforcementLoggingPolicy.ShouldLogPathfindingPenaltyDiagnostics())
+            {
+                return;
+            }
+
+            if (m_PublicTransportLaneDecisionDiagnosticLogsThisUpdate >=
+                MaxPublicTransportLaneDecisionDiagnosticLogsPerUpdate)
+            {
+                return;
+            }
+
+            if (!m_CarLaneData.TryGetComponent(lane, out CarLane laneData))
+            {
+                return;
+            }
+
+            bool publicOnly = (laneData.m_Flags & Game.Net.CarLaneFlags.PublicOnly) != 0;
+            if (!publicOnly)
+            {
+                return;
+            }
+
+            if (hasResolvedPublicTransportLanePolicy && allowedOnPublicTransportLane)
+            {
+                return;
+            }
+
+            bool hasProfile =
+                m_ProfileData.TryGetComponent(vehicle, out VehicleTrafficLawProfile vehicleProfile);
+
+            bool emergency =
+                EmergencyVehiclePolicy.IsEmergencyVehicle(vehicle, ref m_TypeLookups);
+
+            bool engineHasFlag =
+                PublicTransportLanePolicy.EngineHasPublicTransportLaneFlag(
+                    vehicle,
+                    ref m_TypeLookups);
+
+            string vanillaAllows = hasProfile
+                ? PublicTransportLanePolicy.VanillaAllowsAccess(
+                    vehicleProfile.m_PublicTransportLaneAccessBits).ToString()
+                : "n/a";
+
+            string modAllows = hasProfile
+                ? PublicTransportLanePolicy.ModAllowsAccess(
+                    vehicleProfile.m_PublicTransportLaneAccessBits).ToString()
+                : "n/a";
+
+            string permissionChangedByMod = hasProfile
+                ? PublicTransportLanePolicy.PermissionChangedByMod(
+                    vehicleProfile.m_PublicTransportLaneAccessBits).ToString()
+                : "n/a";
+
+            string accessBits = hasProfile
+                ? vehicleProfile.m_PublicTransportLaneAccessBits.ToString()
+                : "n/a";
+
+            string role =
+                PublicTransportLanePolicy.DescribeVehicleRole(vehicle, ref m_TypeLookups);
+
+            string laneKind = DescribeLaneKind(lane);
+
+            string message =
+                $"PT_ROUTE_DIAG: vehicle={vehicle}, role={role}, lane={lane}, laneKind={laneKind}, " +
+                $"publicOnly={publicOnly}, hasResolvedPolicy={hasResolvedPublicTransportLanePolicy}, " +
+                $"hasProfile={hasProfile}, allowedOnPublicTransportLane={allowedOnPublicTransportLane}, " +
+                $"unauthorizedPublicTransportLane={unauthorizedPublicTransportLane}, engineHasFlag={engineHasFlag}, " +
+                $"emergency={emergency}, vanillaAllows={vanillaAllows}, modAllows={modAllows}, " +
+                $"permissionChangedByMod={permissionChangedByMod}, accessBits={accessBits}";
+
+            EnforcementTelemetry.RecordEvent(message);
+            Mod.log.Info(message);
+            m_PublicTransportLaneDecisionDiagnosticLogsThisUpdate += 1;
         }
 
         private bool TryGetMidBlockPenaltyTag(Entity sourceLane, Entity sourceOwner, Entity targetLane, Entity targetOwner, out string tag)
