@@ -56,6 +56,9 @@ namespace Traffic_Law_Enforcement
             updateSystem.UpdateAfter<CenterlineAccessObsoleteSystem, PublicTransportLaneExitPressureSystem>(SystemUpdatePhase.GameSimulation);
             updateSystem.UpdateBefore<CenterlineAccessObsoleteSystem, CarNavigationSystem>(SystemUpdatePhase.GameSimulation);
             updateSystem.UpdateAfter<EnforcementGameTimeSystem, CarNavigationSystem>(SystemUpdatePhase.GameSimulation);
+            updateSystem.UpdateAfter<RouteAttemptTrackingSystem, CarNavigationSystem>(SystemUpdatePhase.GameSimulation);
+            updateSystem.UpdateBefore<RouteAttemptTrackingSystem, RoutePenaltyRerouteLoggingSystem>(SystemUpdatePhase.GameSimulation);
+            updateSystem.UpdateBefore<RouteAttemptTrackingSystem, PublicTransportLaneViolationApplySystem>(SystemUpdatePhase.GameSimulation);
             updateSystem.UpdateAfter<SettingsChangeLoggingSystem, EnforcementGameTimeSystem>(SystemUpdatePhase.GameSimulation);
             updateSystem.UpdateAfter<MonthlyEnforcementChirperSystem, EnforcementGameTimeSystem>(SystemUpdatePhase.GameSimulation);
             updateSystem.UpdateBefore<MonthlyEnforcementChirperSystem, CreateChirpSystem>(SystemUpdatePhase.GameSimulation);

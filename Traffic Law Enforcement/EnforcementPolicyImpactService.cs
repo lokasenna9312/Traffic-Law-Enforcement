@@ -62,65 +62,55 @@ namespace Traffic_Law_Enforcement
     public readonly struct PathRequestEvent
     {
         public readonly long TimestampMonthTicks;
+        public readonly long PathContextSequence;
 
-        public PathRequestEvent(long timestampMonthTicks)
+        public PathRequestEvent(long timestampMonthTicks, long pathContextSequence)
         {
             TimestampMonthTicks = timestampMonthTicks;
+            PathContextSequence = pathContextSequence;
         }
     }
 
     public readonly struct ActualViolationEvent
     {
         public readonly long TimestampMonthTicks;
+        public readonly long PathContextSequence;
         public readonly string Kind;
         public readonly int FineAmount;
-        public readonly bool CountsTowardTotalPath;
-        public readonly bool CountsTowardKindPath;
 
         public ActualViolationEvent(
             long timestampMonthTicks,
+            long pathContextSequence,
             string kind,
-            int fineAmount,
-            bool countsTowardTotalPath,
-            bool countsTowardKindPath)
+            int fineAmount)
         {
             TimestampMonthTicks = timestampMonthTicks;
+            PathContextSequence = pathContextSequence;
             Kind = kind;
             FineAmount = fineAmount;
-            CountsTowardTotalPath = countsTowardTotalPath;
-            CountsTowardKindPath = countsTowardKindPath;
         }
     }
 
     public readonly struct AvoidedRerouteEvent
     {
         public readonly long TimestampMonthTicks;
+        public readonly long PathContextSequence;
         public readonly bool AvoidedPublicTransportLanePenalty;
         public readonly bool AvoidedMidBlockPenalty;
         public readonly bool AvoidedIntersectionPenalty;
-        public readonly bool CountsTowardTotalPath;
-        public readonly bool CountsTowardPublicTransportLanePath;
-        public readonly bool CountsTowardMidBlockPath;
-        public readonly bool CountsTowardIntersectionPath;
 
         public AvoidedRerouteEvent(
             long timestampMonthTicks,
+            long pathContextSequence,
             bool avoidedPublicTransportLanePenalty,
             bool avoidedMidBlockPenalty,
-            bool avoidedIntersectionPenalty,
-            bool countsTowardTotalPath,
-            bool countsTowardPublicTransportLanePath,
-            bool countsTowardMidBlockPath,
-            bool countsTowardIntersectionPath)
+            bool avoidedIntersectionPenalty)
         {
             TimestampMonthTicks = timestampMonthTicks;
+            PathContextSequence = pathContextSequence;
             AvoidedPublicTransportLanePenalty = avoidedPublicTransportLanePenalty;
             AvoidedMidBlockPenalty = avoidedMidBlockPenalty;
             AvoidedIntersectionPenalty = avoidedIntersectionPenalty;
-            CountsTowardTotalPath = countsTowardTotalPath;
-            CountsTowardPublicTransportLanePath = countsTowardPublicTransportLanePath;
-            CountsTowardMidBlockPath = countsTowardMidBlockPath;
-            CountsTowardIntersectionPath = countsTowardIntersectionPath;
         }
     }
 
@@ -862,15 +852,17 @@ namespace Traffic_Law_Enforcement
             return pathContextSequence;
         }
 
-        private static long EnsureActivePathContext(int vehicleId)
+        private static bool TryGetActivePathContext(int vehicleId, out long pathContextSequence)
         {
             if (vehicleId > 0 &&
-                s_ActivePathContextByVehicle.TryGetValue(vehicleId, out long pathContextSequence))
+                s_ActivePathContextByVehicle.TryGetValue(vehicleId, out pathContextSequence) &&
+                pathContextSequence > 0L)
             {
-                return pathContextSequence;
+                return true;
             }
 
-            return RecordPathRequestInternal(vehicleId);
+            pathContextSequence = 0L;
+            return false;
         }
 
         private static bool TryMarkPathContextAsCounted(
