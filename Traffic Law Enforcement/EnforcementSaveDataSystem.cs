@@ -1,7 +1,9 @@
 using System.Collections.Generic;
 using Colossal.Serialization.Entities;
 using Game;
+using Game.Vehicles;
 using Game.Serialization;
+using Unity.Collections;
 using Unity.Entities;
 
 namespace Traffic_Law_Enforcement
@@ -552,44 +554,47 @@ namespace Traffic_Law_Enforcement
                 actualViolationEvents,
                 avoidedRerouteEvents);
 
-            m_HasDeserializedData = true;
-            m_ShouldClearLegacyRuntimeState = false;
-            Mod.log.Info(
-                $"[SAVELOAD] Deserialize loaded: version={version}, " +
-                $"loadedPtVehicleStates={m_LoadedPublicTransportLaneVehicleStates.Count}, " +
-                $"hasTrackingState={trackingState.HasValue}, " +
-                $"hasPolicyImpactTrackingState={policyImpactTrackingState.HasValue}, " +
-                $"records={records.Count}, timestamps={timestamps.Count}, fineIncomeEvents={fineIncomeEvents.Count}, " +
-                $"pathRequestEvents={pathRequestEvents.Count}, actualViolationEvents={actualViolationEvents.Count}, " +
-                $"avoidedRerouteEvents={avoidedRerouteEvents.Count}, " +
-                $"totalFineAmount={totalFineAmount}, totalPathRequestCount={totalPathRequestCount}, " +
-                $"totalActualPathCount={totalActualPathCount}, totalAvoidedPathCount={totalAvoidedPathCount}");
-            m_LoadedPublicTransportLaneVehicleStates.Clear();
+                m_HasDeserializedData = true;
+                m_ShouldClearLegacyRuntimeState = false;
 
-            if (version >= 8)
-            {
-                reader.Read(out int ptStateCount);
+                m_LoadedPublicTransportLaneVehicleStates.Clear();
 
-                for (int index = 0; index < ptStateCount; index += 1)
+                if (version >= 8)
                 {
-                    Entity vehicle = Entity.Null;
-                    ((IReader)reader).Read(ref vehicle);
+                    reader.Read(out int ptStateCount);
 
-                    reader.Read(out byte shouldTrack);
-                    reader.Read(out byte emergencyVehicle);
-                    reader.Read(out byte accessBitsRaw);
+                    for (int index = 0; index < ptStateCount; index += 1)
+                    {
+                        Entity vehicle = Entity.Null;
+                        ((IReader)reader).Read(ref vehicle);
 
-                    m_LoadedPublicTransportLaneVehicleStates.Add(
-                        new LoadedPublicTransportLaneVehicleState
-                        {
-                            Vehicle = vehicle,
-                            ShouldTrack = shouldTrack,
-                            EmergencyVehicle = emergencyVehicle,
-                            AccessBits = (PublicTransportLaneAccessBits)accessBitsRaw,
-                        });
+                        reader.Read(out byte shouldTrack);
+                        reader.Read(out byte emergencyVehicle);
+                        reader.Read(out byte accessBitsRaw);
+
+                        m_LoadedPublicTransportLaneVehicleStates.Add(
+                            new LoadedPublicTransportLaneVehicleState
+                            {
+                                Vehicle = vehicle,
+                                ShouldTrack = shouldTrack,
+                                EmergencyVehicle = emergencyVehicle,
+                                AccessBits = (PublicTransportLaneAccessBits)accessBitsRaw,
+                            });
+                    }
                 }
-            }
-            m_PendingPostDeserializeApply = true;
+
+                Mod.log.Info(
+                    $"[SAVELOAD] Deserialize loaded: version={version}, " +
+                    $"loadedPtVehicleStates={m_LoadedPublicTransportLaneVehicleStates.Count}, " +
+                    $"hasTrackingState={trackingState.HasValue}, " +
+                    $"hasPolicyImpactTrackingState={policyImpactTrackingState.HasValue}, " +
+                    $"records={records.Count}, timestamps={timestamps.Count}, fineIncomeEvents={fineIncomeEvents.Count}, " +
+                    $"pathRequestEvents={pathRequestEvents.Count}, actualViolationEvents={actualViolationEvents.Count}, " +
+                    $"avoidedRerouteEvents={avoidedRerouteEvents.Count}, " +
+                    $"totalFineAmount={totalFineAmount}, totalPathRequestCount={totalPathRequestCount}, " +
+                    $"totalActualPathCount={totalActualPathCount}, totalAvoidedPathCount={totalAvoidedPathCount}");
+
+                m_PendingPostDeserializeApply = true;
         }
 
         private void ApplyLoadedStateToWorld()
