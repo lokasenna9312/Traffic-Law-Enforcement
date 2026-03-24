@@ -582,26 +582,22 @@ namespace Traffic_Law_Enforcement
             PublicTransportLanePermissionState state,
             bool removeState)
         {
-            CarFlags currentMask = car.m_Flags & PublicTransportLanePolicy.PublicTransportLanePermissionMask;
-            bool flagsChanged = currentMask != state.m_OriginalPublicTransportLaneFlags;
+            bool hadModPermissionChange =
+                PublicTransportLanePolicy.PermissionChangedByMod(
+                    state.m_PublicTransportLaneAccessBits);
 
-            if (flagsChanged)
-            {
-                car.m_Flags =
-                    (car.m_Flags & ~PublicTransportLanePolicy.PublicTransportLanePermissionMask) |
-                    state.m_OriginalPublicTransportLaneFlags;
-                EntityManager.SetComponentData(vehicle, car);
-            }
+            bool hadTrackedEmergency =
+                state.m_EmergencyActive != 0;
 
-            if (flagsChanged || state.m_EmergencyActive != 0)
+            if (hadModPermissionChange || hadTrackedEmergency)
             {
                 string role = PublicTransportLanePolicy.DescribeVehicleRole(vehicle, ref m_TypeLookups);
-                string reason = flagsChanged
-                    ? "restore-original-pt-permission-mask"
+                string reason = hadModPermissionChange
+                    ? "clear-mod-pt-policy-state"
                     : "restore-emergency-state";
                 string extra =
-                    $"restoredMask={state.m_OriginalPublicTransportLaneFlags}, " +
-                    $"hadTrackedEmergency={state.m_EmergencyActive != 0}";
+                    $"hadModPermissionChange={hadModPermissionChange}, " +
+                    $"hadTrackedEmergency={hadTrackedEmergency}";
 
                 MarkPathObsolete(vehicle, car, reason, role, extra);
             }
