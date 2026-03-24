@@ -412,6 +412,37 @@ namespace Traffic_Law_Enforcement
                 }
             }
 
+            long maxLoadedPathContextSequence = 0L;
+
+            for (int index = 0; index < s_PathRequestEvents.Count; index += 1)
+            {
+                long sequence = s_PathRequestEvents[index].PathContextSequence;
+                if (sequence > maxLoadedPathContextSequence)
+                {
+                    maxLoadedPathContextSequence = sequence;
+                }
+            }
+
+            for (int index = 0; index < s_ActualViolationEvents.Count; index += 1)
+            {
+                long sequence = s_ActualViolationEvents[index].PathContextSequence;
+                if (sequence > maxLoadedPathContextSequence)
+                {
+                    maxLoadedPathContextSequence = sequence;
+                }
+            }
+
+            for (int index = 0; index < s_AvoidedRerouteEvents.Count; index += 1)
+            {
+                long sequence = s_AvoidedRerouteEvents[index].PathContextSequence;
+                if (sequence > maxLoadedPathContextSequence)
+                {
+                    maxLoadedPathContextSequence = sequence;
+                }
+            }
+
+            s_NextPathContextSequence = System.Math.Max(1L, maxLoadedPathContextSequence + 1L);
+
             UpdateRollingWindowData();
         }
 

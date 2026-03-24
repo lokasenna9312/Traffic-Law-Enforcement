@@ -568,12 +568,6 @@ namespace Traffic_Law_Enforcement
                     reader.Read(out string kind);
                     reader.Read(out int fineAmount);
 
-                    if (version == 9)
-                    {
-                        reader.Read(out bool _);
-                        reader.Read(out bool _);
-                    }
-
                     actualViolationEvents.Add(
                         new ActualViolationEvent(
                             timestampMonthTicks,
@@ -596,14 +590,6 @@ namespace Traffic_Law_Enforcement
                     reader.Read(out bool avoidedPublicTransportLanePenalty);
                     reader.Read(out bool avoidedMidBlockPenalty);
                     reader.Read(out bool avoidedIntersectionPenalty);
-
-                    if (version == 9)
-                    {
-                        reader.Read(out bool _);
-                        reader.Read(out bool _);
-                        reader.Read(out bool _);
-                        reader.Read(out bool _);
-                    }
 
                     avoidedRerouteEvents.Add(
                         new AvoidedRerouteEvent(
