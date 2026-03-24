@@ -306,11 +306,6 @@ namespace Traffic_Law_Enforcement
                 EntityManager.SetComponentData(vehicle, updatedProfile);
             }
 
-            if (!ProfilesEqual(currentProfile, updatedProfile))
-            {
-                EntityManager.SetComponentData(vehicle, updatedProfile);
-            }
-
             bool hasPersistedState =
                 m_PersistedAccessStateData.TryGetComponent(
                     vehicle,
