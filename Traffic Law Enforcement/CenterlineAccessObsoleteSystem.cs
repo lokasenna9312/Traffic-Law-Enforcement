@@ -132,6 +132,8 @@ namespace Traffic_Law_Enforcement
             m_ConnectionLaneData.Update(this);
             m_TypeLookups.Update(this);
 
+            bool shouldLogEnforcementEvents = EnforcementLoggingPolicy.ShouldLogEnforcementEvents();
+
             m_CandidateVehicles.Clear();
             CollectCandidateVehicles(m_CurrentLaneChangedQuery);
             CollectCandidateVehicles(m_NavigationLaneChangedQuery);
@@ -219,7 +221,7 @@ namespace Traffic_Law_Enforcement
                         $"laneShapeSource={DescribeLaneShape(sourceLane)}, " +
                         $"laneShapeTarget={DescribeLaneShape(targetLane)}";
 
-                    if (repeatCount >= 3 && EnforcementLoggingPolicy.ShouldLogEnforcementEvents())
+                    if (repeatCount >= 3 && shouldLogEnforcementEvents)
                     {
                         Mod.log.Info(
                             $"Repeated identical CENTERLINE invalidation: vehicle={vehicle}, role={role}, repeatCount={repeatCount}, " +
@@ -239,10 +241,11 @@ namespace Traffic_Law_Enforcement
                         extra);
 
                     RecordObservedSnapshot(vehicle, currentLane.m_Lane, sourceLane, targetLane, transitionIndex, evaluationResult, transitionFamily);
-                    RecordInvalidationContext(currentLane.m_Lane);
 
-                    if (EnforcementLoggingPolicy.ShouldLogEnforcementEvents())
+                    if (shouldLogEnforcementEvents)
                     {
+                        RecordInvalidationContext(currentLane.m_Lane);
+
                         Mod.log.Info($"Planned center-line access route invalidated: vehicle={vehicle}, fromLane={sourceLane}, toLane={targetLane}, accessIndex={transitionIndex}, transition={transitionKind}, reason={reason}");
                         LogStructureSample(vehicle, currentLane.m_Lane, sourceLane, targetLane, transitionIndex, transitionKind, reason);
                         LogInvalidationContextSummaryIfNeeded();
