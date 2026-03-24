@@ -358,7 +358,15 @@ namespace Traffic_Law_Enforcement
             bool permissionBeingRevoked =
                 (desiredMask & CarFlags.UsePublicTransportLanes) == 0;
 
-            if (currentLaneStillInExitCorridor && permissionBeingRevoked)
+            bool currentlyHasPublicTransportLaneFlag =
+                (currentMask & CarFlags.UsePublicTransportLanes) != 0;
+
+            bool shouldGrantPendingExitGrace =
+                permissionBeingRevoked &&
+                currentlyHasPublicTransportLaneFlag &&
+                currentLaneStillInExitCorridor;
+
+            if (shouldGrantPendingExitGrace)
             {
                 if (!hasPendingExit)
                 {
@@ -378,23 +386,18 @@ namespace Traffic_Law_Enforcement
                         $"currentLane={currentLaneEntity}, originalMask={originalMask}, currentMask={currentMask}, desiredMaskBeforeGrace={desiredMask}");
                 }
 
-                // Still on PT lane: keep temporary permission.
                 desiredMask = currentMask;
             }
             else if (hasPendingExit)
             {
-                // Permission was re-enabled meanwhile: clear grace immediately.
                 if (!permissionBeingRevoked)
                 {
                     EntityManager.RemoveComponent<PublicTransportLanePendingExit>(vehicle);
                 }
-                // Still inside PT exit corridor (PT lane or intersection connection): keep grace.
                 else if (currentLaneStillInExitCorridor)
                 {
                     desiredMask = currentMask;
                 }
-                // First safe non-corridor lane after leaving PT/connection area:
-                // keep grace for one more step and force one more reroute.
                 else if (pendingExit.m_HasLeftPublicTransportLane == 0)
                 {
                     pendingExit.m_HasLeftPublicTransportLane = 1;
@@ -409,7 +412,6 @@ namespace Traffic_Law_Enforcement
 
                     desiredMask = currentMask;
                 }
-                // Second evaluation on a safe non-corridor lane: now really revoke.
                 else
                 {
                     EntityManager.RemoveComponent<PublicTransportLanePendingExit>(vehicle);

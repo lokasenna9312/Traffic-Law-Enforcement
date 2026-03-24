@@ -143,17 +143,28 @@
 		<XmlPeek XmlInputPath="$(PublishConfigurationFullPathForBuild)" Query="/Publish/ModJsonAuthor/@Value">
 			<Output TaskParameter="Result" PropertyName="ModJsonAuthorFromPublishMetadata" />
 		</XmlPeek>
-
+		<XmlPeek XmlInputPath="$(PublishConfigurationFullPathForBuild)" Query="/Publish/DisplayName/@Value">
+			<Output TaskParameter="Result" PropertyName="ModJsonName" />
+		</XmlPeek>
+		<XmlPeek XmlInputPath="$(PublishConfigurationFullPathForBuild)" Query="/Publish/ShortDescription/@Value">
+			<Output TaskParameter="Result" PropertyName="ModJsonDescription" />
+		</XmlPeek>
 		<PropertyGroup>
 			<ModJsonAuthorResolved Condition="'$(ModJsonAuthorFromPublishMetadata)' != ''">$(ModJsonAuthorFromPublishMetadata)</ModJsonAuthorResolved>
 			<ModJsonAuthorResolved Condition="'$(ModJsonAuthorFromPublishMetadata)' == ''">Pectus Solentis</ModJsonAuthorResolved>
+			<ModJsonEntryPoint>TrafficLawEnforcement.Mod</ModJsonEntryPoint>
+			<ModJsonDll>Traffic Law Enforcement.dll</ModJsonDll>
 		</PropertyGroup>
 
 		<ItemGroup>
 			<ModJsonLines Include="{" />
 			<ModJsonLines Include="    &quot;id&quot;: &quot;$(ModJsonId)&quot;," />
+			<ModJsonLines Include="    &quot;name&quot;: &quot;$(ModJsonName)&quot;," />
 			<ModJsonLines Include="    &quot;author&quot;: &quot;$(ModJsonAuthorResolved)&quot;," />
 			<ModJsonLines Include="    &quot;version&quot;: &quot;$(ModJsonVersion)&quot;," />
+			<ModJsonLines Include="    &quot;description&quot;: &quot;$(ModJsonDescription)&quot;," />
+			<ModJsonLines Include="    &quot;entryPoint&quot;: &quot;$(ModJsonEntryPoint)&quot;," />
+			<ModJsonLines Include="    &quot;dll&quot;: &quot;$(ModJsonDll)&quot;," />
 			<ModJsonLines Include="    &quot;dependencies&quot;: []" />
 			<ModJsonLines Include="}" />
 		</ItemGroup>
