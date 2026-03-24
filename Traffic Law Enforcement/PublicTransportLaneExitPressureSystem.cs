@@ -12,7 +12,9 @@ namespace Traffic_Law_Enforcement
         private EntityQuery m_ViolationQuery;
         private ComponentLookup<CarCurrentLane> m_CurrentLaneData;
         private PublicTransportLaneVehicleTypeLookups m_TypeLookups;
-
+        private ComponentLookup<Car> m_CarData;
+        private ComponentLookup<PathOwner> m_PathOwnerData;
+        private ComponentLookup<PublicTransportLaneViolation> m_ViolationData;
         protected override void OnCreate()
         {
             base.OnCreate();
@@ -22,6 +24,9 @@ namespace Traffic_Law_Enforcement
                 ComponentType.ReadWrite<PublicTransportLaneViolation>());
             RequireForUpdate(m_ViolationQuery);
             m_CurrentLaneData = GetComponentLookup<CarCurrentLane>(true);
+            m_CarData = GetComponentLookup<Car>(true);
+            m_PathOwnerData = GetComponentLookup<PathOwner>();
+            m_ViolationData = GetComponentLookup<PublicTransportLaneViolation>();
             m_TypeLookups = PublicTransportLaneVehicleTypeLookups.Create(this);
         }
 
@@ -33,26 +38,37 @@ namespace Traffic_Law_Enforcement
             }
 
             m_CurrentLaneData.Update(this);
+            m_CarData.Update(this);
+            m_PathOwnerData.Update(this);
+            m_ViolationData.Update(this);
             m_TypeLookups.Update(this);
 
             long thresholdDayTicks = (long)System.Math.Round(System.Math.Max(0f, EnforcementGameplaySettingsService.Current.PublicTransportLaneExitPressureThresholdDays) * EnforcementGameTime.DayTicksPerDay);
             long currentDayTicks = EnforcementGameTime.CurrentTimestampDayTicks;
 
             NativeArray<Entity> vehicles = m_ViolationQuery.ToEntityArray(Allocator.Temp);
-            NativeArray<Car> cars = m_ViolationQuery.ToComponentDataArray<Car>(Allocator.Temp);
-            NativeArray<PathOwner> pathOwners = m_ViolationQuery.ToComponentDataArray<PathOwner>(Allocator.Temp);
-            NativeArray<PublicTransportLaneViolation> violations = m_ViolationQuery.ToComponentDataArray<PublicTransportLaneViolation>(Allocator.Temp);
 
             try
             {
-                for (int index = 0; index < vehicles.Length; index++)
+                for (int index = 0; index < vehicles.Length; index += 1)
                 {
-                    if (EmergencyVehiclePolicy.IsEmergencyVehicle(cars[index]))
+                    Entity vehicle = vehicles[index];
+
+                    if (!m_CarData.TryGetComponent(vehicle, out Car car))
                     {
                         continue;
                     }
 
-                    PublicTransportLaneViolation violation = violations[index];
+                    if (EmergencyVehiclePolicy.IsEmergencyVehicle(car))
+                    {
+                        continue;
+                    }
+
+                    if (!m_ViolationData.TryGetComponent(vehicle, out PublicTransportLaneViolation violation))
+                    {
+                        continue;
+                    }
+
                     if (violation.m_ExitPressureApplied)
                     {
                         continue;
@@ -64,7 +80,11 @@ namespace Traffic_Law_Enforcement
                         continue;
                     }
 
-                    PathOwner pathOwner = pathOwners[index];
+                    if (!m_PathOwnerData.TryGetComponent(vehicle, out PathOwner pathOwner))
+                    {
+                        continue;
+                    }
+
                     if ((pathOwner.m_State & PathFlags.Pending) != 0)
                     {
                         continue;
@@ -74,13 +94,13 @@ namespace Traffic_Law_Enforcement
                     {
                         PathFlags stateBefore = pathOwner.m_State;
                         pathOwner.m_State |= PathFlags.Obsolete;
-                        EntityManager.SetComponentData(vehicles[index], pathOwner);
+                        EntityManager.SetComponentData(vehicle, pathOwner);
 
-                        Entity currentLane = m_CurrentLaneData.TryGetComponent(vehicles[index], out CarCurrentLane currentLaneData)
+                        Entity currentLane = m_CurrentLaneData.TryGetComponent(vehicle, out CarCurrentLane currentLaneData)
                             ? currentLaneData.m_Lane
                             : violation.m_Lane;
 
-                        string role = PublicTransportLanePolicy.DescribeVehicleRole(vehicles[index], ref m_TypeLookups);
+                        string role = PublicTransportLanePolicy.DescribeVehicleRole(vehicle, ref m_TypeLookups);
                         string reason = "PT-lane-exit-pressure-threshold-reached";
                         string extra =
                             $"violationLane={violation.m_Lane}, elapsedDayTicks={elapsedDayTicks}, " +
@@ -88,31 +108,28 @@ namespace Traffic_Law_Enforcement
 
                         PathObsoleteTraceLogging.Record(
                             "PT_EXIT_PRESSURE",
-                            vehicles[index],
+                            vehicle,
                             currentLane,
                             stateBefore,
                             pathOwner.m_State,
                             reason,
-                            cars[index],
+                            car,
                             role,
                             extra);
 
                         if (EnforcementLoggingPolicy.ShouldLogEnforcementEvents())
                         {
-                            Mod.log.Info($"Applied PT-lane exit pressure: vehicle={vehicles[index]}, lane={violation.m_Lane}, elapsedDayTicks={elapsedDayTicks}, thresholdDayTicks={thresholdDayTicks}");
+                            Mod.log.Info($"Applied PT-lane exit pressure: vehicle={vehicle}, lane={violation.m_Lane}, elapsedDayTicks={elapsedDayTicks}, thresholdDayTicks={thresholdDayTicks}");
                         }
                     }
 
                     violation.m_ExitPressureApplied = true;
-                    EntityManager.SetComponentData(vehicles[index], violation);
+                    EntityManager.SetComponentData(vehicle, violation);
                 }
             }
             finally
             {
                 vehicles.Dispose();
-                cars.Dispose();
-                pathOwners.Dispose();
-                violations.Dispose();
             }
         }
     }
