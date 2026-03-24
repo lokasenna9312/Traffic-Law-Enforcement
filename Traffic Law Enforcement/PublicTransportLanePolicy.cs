@@ -168,12 +168,12 @@ namespace Traffic_Law_Enforcement
             return ModAllowsAccess(profile.m_PublicTransportLaneAccessBits);
         }
 
-        public static bool HasPublicTransportLanePermissionFlag(Entity vehicle, ref PublicTransportLaneVehicleTypeLookups lookups)
+        public static bool EngineHasPublicTransportLaneFlag(Entity vehicle, ref PublicTransportLaneVehicleTypeLookups lookups)
         {
-            return lookups.CarData.TryGetComponent(vehicle, out Car car) && HasPublicTransportLanePermissionFlag(car);
+            return lookups.CarData.TryGetComponent(vehicle, out Car car) && EngineHasPublicTransportLaneFlag(car);
         }
 
-        public static bool HasPublicTransportLanePermissionFlag(Car car)
+        public static bool EngineHasPublicTransportLaneFlag(Car car)
         {
             return (car.m_Flags & CarFlags.UsePublicTransportLanes) != 0;
         }

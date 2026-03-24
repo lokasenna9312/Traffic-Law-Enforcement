@@ -171,7 +171,7 @@ namespace Traffic_Law_Enforcement
         private RoutePenaltySnapshot BuildSnapshot(Entity vehicle, CarCurrentLane currentLane)
         {
             RoutePenaltyProfile profile = default;
-            bool allowedOnPublicTransportLane = IsAllowedOnPublicTransportLaneForLogging(vehicle);
+            bool allowedOnPublicTransportLane = PublicTransportLanePolicy.IsAllowedOnPublicTransportLane(vehicle, ref m_TypeLookups, ref m_ProfileData);
             List<string> penaltyTags = new List<string>(MaxPenaltyTags);
             uint hash = 2166136261u;
             int omittedTagCount = 0;
@@ -341,22 +341,6 @@ namespace Traffic_Law_Enforcement
             }
 
             return !allowedOnPublicTransportLane;
-        }
-
-        private bool IsAllowedOnPublicTransportLaneForLogging(Entity vehicle)
-        {
-            if (EmergencyVehiclePolicy.IsEmergencyVehicle(vehicle, ref m_TypeLookups))
-            {
-                return true;
-            }
-
-            if (!m_ProfileData.TryGetComponent(vehicle, out VehicleTrafficLawProfile profile))
-            {
-                return false;
-            }
-
-            return PublicTransportLanePolicy.ModAllowsAccess(
-                profile.m_PublicTransportLaneAccessBits);
         }
 
         private bool ShouldLogReroute(RoutePenaltySnapshot previousSnapshot, RoutePenaltySnapshot currentSnapshot)
