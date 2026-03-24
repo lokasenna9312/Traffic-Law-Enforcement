@@ -23,7 +23,7 @@ namespace Traffic_Law_Enforcement
         private ComponentLookup<Car> m_CarData;
         private ComponentLookup<CarLane> m_CarLaneData;
         private ComponentLookup<PublicTransportLaneViolation> m_ViolationData;
-  
+        private ComponentLookup<VehicleTrafficLawProfile> m_ProfileData;
         private PublicTransportLaneVehicleTypeLookups m_TypeLookups;
         private HashSet<Entity> m_ProcessedThisFrame;
         private bool m_HasEvaluated;
@@ -47,6 +47,7 @@ namespace Traffic_Law_Enforcement
                 ComponentType.ReadOnly<CarCurrentLane>());
             m_ChangedCarQuery.SetChangedVersionFilter(ComponentType.ReadOnly<Car>());
             m_ViolationQuery = GetEntityQuery(ComponentType.ReadOnly<PublicTransportLaneViolation>());
+            m_ProfileData = GetComponentLookup<VehicleTrafficLawProfile>(true);
             m_Type2UsageQuery = GetEntityQuery(ComponentType.ReadOnly<PublicTransportLaneType2UsageState>());
             m_Type3UsageQuery = GetEntityQuery(ComponentType.ReadOnly<PublicTransportLaneType3UsageState>());
             m_Type4UsageQuery = GetEntityQuery(ComponentType.ReadOnly<PublicTransportLaneType4UsageState>());
@@ -108,6 +109,7 @@ namespace Traffic_Law_Enforcement
 
             m_CarData.Update(this);
             m_CarLaneData.Update(this);
+            m_ProfileData.Update(this);
             m_ViolationData.Update(this);
             m_TypeLookups.Update(this);
 
@@ -263,21 +265,24 @@ namespace Traffic_Law_Enforcement
             {
                 if (!IsEmergencyVehicle(vehicle))
                 {
-                    bool hasPermission = PublicTransportLanePolicy.HasPublicTransportLanePermissionFlag(vehicle, ref m_TypeLookups);
-                    isViolation = !hasPermission;
-                    var authorizedCategories = PublicTransportLanePolicy.GetVanillaAuthorizedCategories(vehicle, ref m_TypeLookups);
-                    var additionalRole = PublicTransportLanePolicy.GetFlagGrantExperimentRole(vehicle, ref m_TypeLookups);
+                    if (!m_ProfileData.TryGetComponent(vehicle, out VehicleTrafficLawProfile profile))
+                    {
+                        return;
+                    }
 
-                    // --- Type 2: Vanilla allowed, Mod denied ---
-                    bool isType2 = !hasPermission && authorizedCategories != PublicTransportLaneVehicleCategory.None && !settings.AllowsPublicTransportLaneCategories(authorizedCategories);
+                    PublicTransportLaneAccessBits bits = profile.m_PublicTransportLaneAccessBits;
+
+                    bool modAllowsAccess = PublicTransportLanePolicy.ModAllowsAccess(bits);
+                    bool vanillaAllowsAccess = PublicTransportLanePolicy.VanillaAllowsAccess(bits);
+
+                    isViolation = !modAllowsAccess;
+
+                    bool isType2 = PublicTransportLanePolicy.IsType2(bits);
+                    bool isType3 = PublicTransportLanePolicy.IsType3(bits);
+                    bool isType4 = PublicTransportLanePolicy.IsType4(bits);
+
                     shouldLogType2Usage = isType2;
-
-                    // --- Type 3: Vanilla denied, Mod allowed ---
-                    bool isType3 = hasPermission && PublicTransportLanePolicy.TryGetAllowedType3Role(vehicle, settings, ref m_TypeLookups, out _);
                     shouldLogType3Usage = isType3;
-
-                    // --- Type 4: Vanilla denied, Mod denied ---
-                    bool isType4 = !hasPermission && authorizedCategories == PublicTransportLaneVehicleCategory.None && additionalRole == PublicTransportLaneFlagGrantExperimentRole.None;
                     shouldLogType4Usage = isType4;
                 }
             }

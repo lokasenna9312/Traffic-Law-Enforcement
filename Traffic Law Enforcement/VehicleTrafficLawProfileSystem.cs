@@ -175,7 +175,7 @@ namespace Traffic_Law_Enforcement
         {
             bool hasProfile = m_ProfileData.TryGetComponent(vehicle, out VehicleTrafficLawProfile currentProfile);
             bool shouldTrack;
-            CarFlags desiredMask;
+            PublicTransportLaneAccessBits accessBits;
 
             bool success = PublicTransportLanePolicy.TryGetDesiredPermissionState(
                 vehicle,
@@ -183,7 +183,7 @@ namespace Traffic_Law_Enforcement
                 settings,
                 ref m_TypeLookups,
                 out shouldTrack,
-                out desiredMask);
+                out accessBits);
 
             if (!success || !shouldTrack)
             {
@@ -200,8 +200,7 @@ namespace Traffic_Law_Enforcement
                 m_ShouldTrack = 1,
                 m_EmergencyVehicle =
                     (byte)(EmergencyVehiclePolicy.IsEmergencyVehicle(car) ? 1 : 0),
-                m_DesiredPublicTransportLaneMask =
-                    desiredMask & PublicTransportLanePolicy.PublicTransportLanePermissionMask,
+                m_PublicTransportLaneAccessBits = accessBits,
                 m_VanillaAuthorizedCategories =
                     PublicTransportLanePolicy.GetVanillaAuthorizedCategories(vehicle, ref m_TypeLookups),
                 m_AdditionalRole =
@@ -227,10 +226,10 @@ namespace Traffic_Law_Enforcement
         {
             return left.m_ShouldTrack == right.m_ShouldTrack &&
                    left.m_EmergencyVehicle == right.m_EmergencyVehicle &&
-                   left.m_DesiredPublicTransportLaneMask == right.m_DesiredPublicTransportLaneMask &&
                    left.m_VanillaAuthorizedCategories == right.m_VanillaAuthorizedCategories &&
                    left.m_AdditionalRole == right.m_AdditionalRole &&
-                   left.m_PermissionSettingsMask == right.m_PermissionSettingsMask;
+                   left.m_PermissionSettingsMask == right.m_PermissionSettingsMask &&
+                   left.m_PublicTransportLaneAccessBits == right.m_PublicTransportLaneAccessBits;
         }
     }
 }

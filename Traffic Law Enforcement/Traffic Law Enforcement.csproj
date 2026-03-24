@@ -152,7 +152,7 @@
 		<PropertyGroup>
 			<ModJsonAuthorResolved Condition="'$(ModJsonAuthorFromPublishMetadata)' != ''">$(ModJsonAuthorFromPublishMetadata)</ModJsonAuthorResolved>
 			<ModJsonAuthorResolved Condition="'$(ModJsonAuthorFromPublishMetadata)' == ''">Pectus Solentis</ModJsonAuthorResolved>
-			<ModJsonEntryPoint>TrafficLawEnforcement.Mod</ModJsonEntryPoint>
+			<ModJsonEntryPoint>Traffic Law Enforcement.Mod</ModJsonEntryPoint>
 			<ModJsonDll>Traffic Law Enforcement.dll</ModJsonDll>
 		</PropertyGroup>
 

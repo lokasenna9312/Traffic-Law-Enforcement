@@ -7,7 +7,7 @@ namespace Traffic_Law_Enforcement
     {
         public byte m_ShouldTrack;
         public byte m_EmergencyVehicle;
-        public CarFlags m_DesiredPublicTransportLaneMask;
+        public PublicTransportLaneAccessBits m_PublicTransportLaneAccessBits;
         public PublicTransportLaneVehicleCategory m_VanillaAuthorizedCategories;
         public PublicTransportLaneFlagGrantExperimentRole m_AdditionalRole;
         public int m_PermissionSettingsMask;

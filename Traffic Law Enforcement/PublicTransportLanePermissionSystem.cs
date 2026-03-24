@@ -381,12 +381,16 @@ namespace Traffic_Law_Enforcement
                 return;
             }
 
-            CarFlags desiredMask =
-                profile.m_DesiredPublicTransportLaneMask &
-                PublicTransportLanePolicy.PublicTransportLanePermissionMask;
+            PublicTransportLaneAccessBits accessBits = profile.m_PublicTransportLaneAccessBits;
 
-            CarFlags currentMask =
-                car.m_Flags & PublicTransportLanePolicy.PublicTransportLanePermissionMask;
+            bool modAllowsAccess =
+                PublicTransportLanePolicy.ModAllowsAccess(accessBits);
+
+            bool modPrefersLanes =
+                PublicTransportLanePolicy.ModPrefersLanes(accessBits);
+
+            bool vanillaAllowsAccess =
+                PublicTransportLanePolicy.VanillaAllowsAccess(accessBits);
 
             bool hasCurrentLane = m_CurrentLaneData.TryGetComponent(vehicle, out CarCurrentLane currentLaneData);
             Entity currentLaneEntity = hasCurrentLane
@@ -405,8 +409,7 @@ namespace Traffic_Law_Enforcement
                 vehicle,
                 out PublicTransportLanePendingExit pendingExit);
 
-            bool permissionBeingRevoked =
-                (desiredMask & CarFlags.UsePublicTransportLanes) == 0;
+            bool permissionBeingRevoked = !modAllowsAccess;
 
             if (!permissionBeingRevoked)
             {
@@ -502,21 +505,18 @@ namespace Traffic_Law_Enforcement
             bool emergencyTransition =
                 hasState && state.m_EmergencyActive != (emergencyActive ? (byte)1 : (byte)0);
 
-            bool flagsChanged = currentMask != desiredMask;
+            bool oldModAllowsAccess = hasState &&
+                PublicTransportLanePolicy.ModAllowsAccess(state.m_PublicTransportLaneAccessBits);
 
-            CarFlags obsoleteRelevantMask = CarFlags.UsePublicTransportLanes;
+            bool oldModPrefersLanes = hasState &&
+                PublicTransportLanePolicy.ModPrefersLanes(state.m_PublicTransportLaneAccessBits);
+
             bool obsoleteRelevantFlagsChanged =
-                (currentMask & obsoleteRelevantMask) != (desiredMask & obsoleteRelevantMask);
+                oldModAllowsAccess != modAllowsAccess;
 
-            bool preferenceOnlyChange = flagsChanged && !obsoleteRelevantFlagsChanged;
-
-            if (flagsChanged)
-            {
-                car.m_Flags =
-                    (car.m_Flags & ~PublicTransportLanePolicy.PublicTransportLanePermissionMask) |
-                    desiredMask;
-                EntityManager.SetComponentData(vehicle, car);
-            }
+            bool preferenceOnlyChange =
+                oldModAllowsAccess == modAllowsAccess &&
+                oldModPrefersLanes != modPrefersLanes;
 
             PublicTransportLanePermissionState updatedState = new PublicTransportLanePermissionState
             {
@@ -541,9 +541,11 @@ namespace Traffic_Law_Enforcement
                     ? "pt-permission-capability-changed"
                     : "emergency-state-changed";
                 string extra =
-                    $"currentMaskBefore={currentMask}, desiredMask={desiredMask}, originalMask={originalMask}, " +
-                    $"flagsChanged={flagsChanged}, obsoleteRelevantFlagsChanged={obsoleteRelevantFlagsChanged}, " +
-                    $"preferenceOnlyChange={preferenceOnlyChange}, emergencyTransition={emergencyTransition}";
+                    $"vanillaAllowsAccess={vanillaAllowsAccess}, modAllowsAccess={modAllowsAccess}, " +
+                    $"modPrefersLanes={modPrefersLanes}, obsoleteRelevantFlagsChanged={obsoleteRelevantFlagsChanged}, " +
+                    $"preferenceOnlyChange={preferenceOnlyChange}, emergencyTransition={emergencyTransition}, " +
+                    $"engineUseFlag={(car.m_Flags & CarFlags.UsePublicTransportLanes) != 0}, " +
+                    $"enginePreferFlag={(car.m_Flags & CarFlags.PreferPublicTransportLanes) != 0}";
 
                 MarkPathObsolete(vehicle, car, reason, role, extra);
             }
