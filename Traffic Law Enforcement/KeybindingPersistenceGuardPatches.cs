@@ -14,6 +14,11 @@ namespace Traffic_Law_Enforcement
 
         private static readonly MethodInfo s_KeybindingSettingsBindingsGetter =
             AccessTools.PropertyGetter(typeof(KeybindingSettings), nameof(KeybindingSettings.bindings));
+        private static readonly MethodInfo s_TypeExtensionsGetMemberValueMethod =
+            AccessTools.Method(
+                AccessTools.TypeByName("Colossal.OdinSerializer.Utilities.TypeExtensions"),
+                "GetMemberValue",
+                new[] { typeof(MemberInfo), typeof(object) });
         private static readonly FieldInfo s_KeybindingSettingsIsDefaultField =
             AccessTools.Field(typeof(KeybindingSettings), "m_IsDefault");
 
@@ -33,9 +38,25 @@ namespace Traffic_Law_Enforcement
             try
             {
                 s_Harmony = new Harmony(HarmonyId);
-                HarmonyMethod prefix = new HarmonyMethod(typeof(KeybindingPersistenceGuardPatches), nameof(KeybindingSettingsBindingsPrefix));
-                HarmonyMethod finalizer = new HarmonyMethod(typeof(KeybindingPersistenceGuardPatches), nameof(KeybindingSettingsBindingsFinalizer));
-                s_Harmony.Patch(s_KeybindingSettingsBindingsGetter, prefix: prefix, finalizer: finalizer);
+                HarmonyMethod getterPrefix = new HarmonyMethod(typeof(KeybindingPersistenceGuardPatches), nameof(KeybindingSettingsBindingsPrefix))
+                {
+                    priority = 800
+                };
+                HarmonyMethod getterFinalizer = new HarmonyMethod(typeof(KeybindingPersistenceGuardPatches), nameof(KeybindingSettingsBindingsFinalizer))
+                {
+                    priority = 0
+                };
+                HarmonyMethod memberValuePrefix = new HarmonyMethod(typeof(KeybindingPersistenceGuardPatches), nameof(TypeExtensionsGetMemberValuePrefix))
+                {
+                    priority = 800
+                };
+
+                s_Harmony.Patch(s_KeybindingSettingsBindingsGetter, prefix: getterPrefix, finalizer: getterFinalizer);
+
+                if (s_TypeExtensionsGetMemberValueMethod != null)
+                {
+                    s_Harmony.Patch(s_TypeExtensionsGetMemberValueMethod, prefix: memberValuePrefix);
+                }
             }
             catch (Exception ex)
             {
@@ -75,26 +96,7 @@ namespace Traffic_Law_Enforcement
 
         private static bool KeybindingSettingsBindingsPrefix(KeybindingSettings __instance, ref List<ProxyBinding> __result)
         {
-            InputManager.PathType pathType = IsDefaultSettings(__instance)
-                ? InputManager.PathType.Original
-                : InputManager.PathType.Effective;
-
-            if (TryReadBindings(pathType, out List<ProxyBinding> liveBindings, out Exception failure))
-            {
-                __result = liveBindings;
-                return false;
-            }
-
-            List<ProxyBinding> cachedBindings = GetCachedBindings(pathType);
-            if (cachedBindings != null)
-            {
-                __result = CloneBindings(cachedBindings);
-                LogFallback(pathType, failure, __result.Count);
-                return false;
-            }
-
-            LogFallback(pathType, failure, 0);
-            __result = new List<ProxyBinding>();
+            __result = ResolveBindings(__instance, null);
             return false;
         }
 
@@ -108,21 +110,26 @@ namespace Traffic_Law_Enforcement
                 return null;
             }
 
-            InputManager.PathType pathType = IsDefaultSettings(__instance)
-                ? InputManager.PathType.Original
-                : InputManager.PathType.Effective;
+            __result = ResolveBindings(__instance, __exception);
+            return null;
+        }
 
-            List<ProxyBinding> cachedBindings = GetCachedBindings(pathType);
-            if (cachedBindings != null)
+        private static bool TypeExtensionsGetMemberValuePrefix(MemberInfo member, object obj, ref object __result)
+        {
+            if (obj is not KeybindingSettings settings)
             {
-                __result = CloneBindings(cachedBindings);
-                LogFallback(pathType, __exception, __result.Count);
-                return null;
+                return true;
             }
 
-            __result = new List<ProxyBinding>();
-            LogFallback(pathType, __exception, 0);
-            return null;
+            if (member is not PropertyInfo property ||
+                property.Name != nameof(KeybindingSettings.bindings) ||
+                property.DeclaringType != typeof(KeybindingSettings))
+            {
+                return true;
+            }
+
+            __result = ResolveBindings(settings, null);
+            return false;
         }
 
         private static void CaptureBindings(InputManager.PathType pathType)
@@ -160,6 +167,36 @@ namespace Traffic_Law_Enforcement
                 failure = ex;
                 return false;
             }
+        }
+
+        private static List<ProxyBinding> ResolveBindings(KeybindingSettings settings, Exception failure)
+        {
+            InputManager.PathType pathType = IsDefaultSettings(settings)
+                ? InputManager.PathType.Original
+                : InputManager.PathType.Effective;
+
+            List<ProxyBinding> liveBindings = null;
+            Exception liveFailure = null;
+            if (failure == null && TryReadBindings(pathType, out liveBindings, out liveFailure))
+            {
+                return liveBindings;
+            }
+
+            if (failure == null)
+            {
+                failure = liveFailure;
+            }
+
+            List<ProxyBinding> cachedBindings = GetCachedBindings(pathType);
+            if (cachedBindings != null)
+            {
+                List<ProxyBinding> snapshot = CloneBindings(cachedBindings);
+                LogFallback(pathType, failure, snapshot.Count);
+                return snapshot;
+            }
+
+            LogFallback(pathType, failure, 0);
+            return new List<ProxyBinding>();
         }
 
         private static bool IsDefaultSettings(KeybindingSettings settings)

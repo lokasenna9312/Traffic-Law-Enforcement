@@ -24,6 +24,11 @@ namespace Traffic_Law_Enforcement
         public static int RuntimeWorldGeneration { get; private set; }
         private EntityQuery m_PublicTransportLaneProfileQuery;
         private EntityQuery m_PersistedPublicTransportLaneAccessStateQuery;
+        private static int s_ContextStampCounter;
+        private int m_LastContextStamp;
+        private string m_LastContextStage = "none";
+        private string m_LastContextSummary = "none";
+        private string m_LastKnownSaveContext = "unknown";
 
         private readonly List<LoadedPublicTransportLaneVehicleState> m_LoadedPublicTransportLaneVehicleStates =
             new List<LoadedPublicTransportLaneVehicleState>();
@@ -73,14 +78,20 @@ namespace Traffic_Law_Enforcement
         {
             s_HasLoggedSaveContextMemberDump = false;
             string saveContext = TryDescribeSaveContext(context);
+
+            RememberContext("SetDefaults", context, saveContext);
+
             Mod.log.Info(
-                $"[SAVELOAD] SetDefaults: purpose={context.purpose}, " +
+                $"[SAVELOAD] SetDefaults: contextStamp={m_LastContextStamp}, " +
+                $"stage={m_LastContextStage}, {m_LastContextSummary}, " +
                 $"save={saveContext}, " +
                 $"willClearLegacyRuntimeState={context.purpose == Purpose.LoadGame}");
+
             if (saveContext == "unknown")
             {
                 LogSaveContextMemberDump(context, "SetDefaults");
             }
+
             AdvanceRuntimeWorldGeneration(context);
             ResetRuntimeState();
             EnforcementGameplaySettingsService.Apply(CreateInitialGameplaySettings(context));
@@ -94,14 +105,21 @@ namespace Traffic_Law_Enforcement
         {
             s_HasLoggedSaveContextMemberDump = false;
             string saveContext = TryDescribeSaveContext(context);
+
+            RememberContext("PreDeserialize", context, saveContext);
+
             Mod.log.Info(
-                $"[SAVELOAD] PreDeserialize: purpose={context.purpose}, " +
+                $"[SAVELOAD] PreDeserialize: contextStamp={m_LastContextStamp}, " +
+                $"stage={m_LastContextStage}, {m_LastContextSummary}, " +
                 $"save={saveContext}");
+
             ResetRuntimeState();
+
             if (saveContext == "unknown")
             {
                 LogSaveContextMemberDump(context, "PreDeserialize");
             }
+
             m_LoadedPublicTransportLaneVehicleStates.Clear();
             m_HasDeserializedData = false;
             m_ShouldClearLegacyRuntimeState = false;
@@ -111,13 +129,19 @@ namespace Traffic_Law_Enforcement
         public void PostDeserialize(Context context)
         {
             string saveContext = TryDescribeSaveContext(context);
+
+            RememberContext("PostDeserialize", context, saveContext);
+
             Mod.log.Info(
-                $"[SAVELOAD] PostDeserialize: purpose={context.purpose}, " +
+                $"[SAVELOAD] PostDeserialize: contextStamp={m_LastContextStamp}, " +
+                $"stage={m_LastContextStage}, {m_LastContextSummary}, " +
                 $"save={saveContext}");
+
             if (saveContext == "unknown")
             {
                 LogSaveContextMemberDump(context, "PostDeserialize");
             }
+
             m_PendingPostDeserializeApply = true;
         }
 
@@ -125,6 +149,9 @@ namespace Traffic_Law_Enforcement
         {
             Mod.log.Info(
                 $"[SAVELOAD] Serialize begin: version={kSerializationVersion}, " +
+                $"contextStamp={m_LastContextStamp}, contextStage={m_LastContextStage}, " +
+                $"context={m_LastContextSummary}, lastKnownSave={m_LastKnownSaveContext}, " +
+                $"runtimeGeneration={RuntimeWorldGeneration}, " +
                 $"ptViolations={EnforcementTelemetry.GetStatisticsSnapshot().m_PublicTransportLaneViolationCount}, " +
                 $"type2States={m_PublicTransportLaneType2UsageStateQuery.CalculateEntityCount()}, " +
                 $"type3States={m_PublicTransportLaneType3UsageStateQuery.CalculateEntityCount()}, " +
@@ -311,7 +338,11 @@ namespace Traffic_Law_Enforcement
         public void Deserialize<TReader>(TReader reader) where TReader : IReader
         {
             reader.Read(out int version);
-            Mod.log.Info($"[SAVELOAD] Deserialize begin: version={version}");
+            Mod.log.Info(
+                $"[SAVELOAD] Deserialize begin: version={version}, " +
+                $"contextStamp={m_LastContextStamp}, contextStage={m_LastContextStage}, " +
+                $"context={m_LastContextSummary}, lastKnownSave={m_LastKnownSaveContext}, " +
+                $"runtimeGeneration={RuntimeWorldGeneration}");
             if (version != 3 && version != 4 && version != 5 && version != 6 && version != 7 && version != 8 && version != kSerializationVersion)
             {
                 Mod.log.Info($"Unsupported enforcement save-data version {version}. Falling back to defaults.");
@@ -697,6 +728,9 @@ namespace Traffic_Law_Enforcement
 
                 Mod.log.Info(
                     $"[SAVELOAD] Deserialize loaded: version={version}, " +
+                    $"contextStamp={m_LastContextStamp}, contextStage={m_LastContextStage}, " +
+                    $"context={m_LastContextSummary}, lastKnownSave={m_LastKnownSaveContext}, " +
+                    $"runtimeGeneration={RuntimeWorldGeneration}, " +
                     $"loadedPtVehicleStates={m_LoadedPublicTransportLaneVehicleStates.Count}, " +
                     $"hasTrackingState={trackingState.HasValue}, " +
                     $"hasPolicyImpactTrackingState={policyImpactTrackingState.HasValue}, " +
@@ -884,6 +918,88 @@ namespace Traffic_Law_Enforcement
         private static bool HasInconsistentPathRequestTracking(int totalPathRequestCount, int totalViolationCount, int totalAvoidedPathCount, int totalFineAmount)
         {
             return totalPathRequestCount <= 0 && (totalViolationCount > 0 || totalAvoidedPathCount > 0 || totalFineAmount > 0);
+        }
+
+        private void RememberContext(string stage, Context context, string saveContext)
+        {
+            s_ContextStampCounter += 1;
+            m_LastContextStamp = s_ContextStampCounter;
+            m_LastContextStage = stage;
+            m_LastContextSummary = DescribeContextCore(context);
+            m_LastKnownSaveContext = saveContext;
+        }
+
+        private static string DescribeContextCore(Context context)
+        {
+            object boxed = context;
+            System.Type type = boxed.GetType();
+
+            string versionText =
+                TryReadMemberAsText(boxed, type, "version", "Version");
+
+            string instigatorGuidText =
+                TryReadMemberAsText(boxed, type, "instigatorGuid", "InstigatorGuid");
+
+            string formatText =
+                TryReadMemberAsText(boxed, type, "format", "Format", "m_Format");
+
+            return
+                $"type={type.FullName}, " +
+                $"purpose={context.purpose}, " +
+                $"instigatorGuid={instigatorGuidText}, " +
+                $"format={formatText}, " +
+                $"version={versionText}";
+        }
+
+        private static string TryReadMemberAsText(
+            object boxed,
+            System.Type type,
+            params string[] memberNames)
+        {
+            for (int index = 0; index < memberNames.Length; index += 1)
+            {
+                string memberName = memberNames[index];
+
+                PropertyInfo property = type.GetProperty(
+                    memberName,
+                    BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+
+                if (property != null)
+                {
+                    try
+                    {
+                        object value = property.GetValue(boxed);
+                        if (value != null)
+                        {
+                            return value.ToString();
+                        }
+                    }
+                    catch
+                    {
+                    }
+                }
+
+                FieldInfo field = type.GetField(
+                    memberName,
+                    BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+
+                if (field != null)
+                {
+                    try
+                    {
+                        object value = field.GetValue(boxed);
+                        if (value != null)
+                        {
+                            return value.ToString();
+                        }
+                    }
+                    catch
+                    {
+                    }
+                }
+            }
+
+            return "n/a";
         }
 
         private static string TryDescribeSaveContext(Context context)
