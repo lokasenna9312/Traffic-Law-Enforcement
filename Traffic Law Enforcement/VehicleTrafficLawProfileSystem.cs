@@ -183,6 +183,7 @@ namespace Traffic_Law_Enforcement
                             };
 
                         EntityManager.AddComponentData(vehicle, seededProfile);
+                        EntityManager.RemoveComponent<PersistedPublicTransportLaneAccessState>(vehicle);
                         seededCount += 1;
                     }
                 }
@@ -342,14 +343,6 @@ namespace Traffic_Law_Enforcement
                 m_PermissionSettingsMask = permissionSettingsMask,
             };
 
-            PersistedPublicTransportLaneAccessState updatedPersistedState =
-                new PersistedPublicTransportLaneAccessState
-                {
-                    m_ShouldTrack = updatedProfile.m_ShouldTrack,
-                    m_EmergencyVehicle = updatedProfile.m_EmergencyVehicle,
-                    m_AccessBits = updatedProfile.m_PublicTransportLaneAccessBits,
-                };
-
             if (!hasProfile)
             {
                 EntityManager.AddComponentData(vehicle, updatedProfile);
@@ -358,15 +351,6 @@ namespace Traffic_Law_Enforcement
             {
                 EntityManager.SetComponentData(vehicle, updatedProfile);
             }
-        }
-
-        private static bool PersistedStatesEqual(
-            PersistedPublicTransportLaneAccessState left,
-            PersistedPublicTransportLaneAccessState right)
-        {
-            return left.m_ShouldTrack == right.m_ShouldTrack &&
-                left.m_EmergencyVehicle == right.m_EmergencyVehicle &&
-                left.m_AccessBits == right.m_AccessBits;
         }
 
         private static bool ProfilesEqual(
