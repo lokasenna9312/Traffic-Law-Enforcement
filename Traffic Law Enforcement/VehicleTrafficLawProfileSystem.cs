@@ -11,6 +11,7 @@ namespace Traffic_Law_Enforcement
         private EntityQuery m_AllCarsQuery;
         private EntityQuery m_ChangedCarQuery;
         private PublicTransportLaneVehicleTypeLookups m_TypeLookups;
+        private ComponentLookup<Car> m_CarData;
         private ComponentLookup<VehicleTrafficLawProfile> m_ProfileData;
         private NativeList<Entity> m_PendingRefreshVehicles;
         private const int kVehiclesPerFrame = 512;
@@ -26,6 +27,7 @@ namespace Traffic_Law_Enforcement
             m_ChangedCarQuery.SetChangedVersionFilter(ComponentType.ReadOnly<Car>());
             m_TypeLookups = PublicTransportLaneVehicleTypeLookups.Create(this);
             m_ProfileData = GetComponentLookup<VehicleTrafficLawProfile>(true);
+            m_CarData = GetComponentLookup<Car>(true);
             m_PendingRefreshVehicles = new NativeList<Entity>(Allocator.Persistent);
             RequireForUpdate(m_AllCarsQuery);
         }
@@ -34,6 +36,7 @@ namespace Traffic_Law_Enforcement
         {
             m_TypeLookups.Update(this);
             m_ProfileData.Update(this);
+            m_CarData.Update(this);
             EnforcementGameplaySettingsState settings = EnforcementGameplaySettingsService.Current;
 
             int permissionSettingsMask = PublicTransportLanePolicy.GetPermissionSettingsMask(settings);
@@ -117,12 +120,11 @@ namespace Traffic_Law_Enforcement
             for (int index = m_RefreshCursor; index < end; index += 1)
             {
                 Entity vehicle = m_PendingRefreshVehicles[index];
-                if (!EntityManager.Exists(vehicle) || !EntityManager.HasComponent<Car>(vehicle))
+                if (!m_CarData.TryGetComponent(vehicle, out Car car))
                 {
                     continue;
                 }
 
-                Car car = EntityManager.GetComponentData<Car>(vehicle);
                 EvaluateVehicle(vehicle, car, settings, permissionSettingsMask);
             }
 
