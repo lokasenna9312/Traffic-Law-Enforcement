@@ -108,6 +108,13 @@ namespace Traffic_Law_Enforcement
                 return;
             }
 
+            if (m_CurrentLaneChangedQuery.IsEmptyIgnoreFilter &&
+                m_NavigationLaneChangedQuery.IsEmptyIgnoreFilter &&
+                m_AccessOriginWatchQuery.IsEmptyIgnoreFilter)
+            {
+                return;
+            }
+
             m_NavigationLaneData.Update(this);
             m_CurrentLaneData.Update(this);
             m_PathOwnerData.Update(this);
