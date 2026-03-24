@@ -30,9 +30,7 @@ namespace Traffic_Law_Enforcement
 
         private static readonly MethodInfo s_CalculateCostMethod = AccessTools.FirstMethod(
             s_PathfindExecutorType,
-            method => method.Name == "CalculateCost" &&
-                      method.ReturnType == typeof(float) &&
-                      method.GetParameters().Length == 4);
+            method => method.Name == "CalculateCost" && method.ReturnType == typeof(float) && method.GetParameters().Length == 4);
 
         private static Harmony s_Harmony;
         private static int s_CachedPublicTransportLaneFine;
@@ -53,12 +51,10 @@ namespace Traffic_Law_Enforcement
 
                 InvalidateCachedPenaltyValues();
 
-                HarmonyMethod prefix =
-                    new HarmonyMethod(typeof(VehicleUtilsPatches), nameof(SetupPathfindPrefix));
+                HarmonyMethod prefix = new HarmonyMethod(typeof(VehicleUtilsPatches), nameof(SetupPathfindPrefix));
                 s_Harmony.Patch(s_SetupPathfindMethod, prefix: prefix);
 
-                HarmonyMethod calculateCostPostfix =
-                    new HarmonyMethod(typeof(VehicleUtilsPatches), nameof(CalculateCostPostfix));
+                HarmonyMethod calculateCostPostfix = new HarmonyMethod(typeof(VehicleUtilsPatches), nameof(CalculateCostPostfix));
                 s_Harmony.Patch(s_CalculateCostMethod, postfix: calculateCostPostfix);
             }
             catch (Exception ex)
@@ -115,11 +111,7 @@ namespace Traffic_Law_Enforcement
             item.m_Parameters.m_Weights.m_Value.z = 0f;
         }
 
-        private static void CalculateCostPostfix(
-            ref float __result,
-            RuleFlags rules,
-            float2 delta,
-            PathfindParameters ___m_Parameters)
+        private static void CalculateCostPostfix(ref float __result, RuleFlags rules, float2 delta, PathfindParameters ___m_Parameters)
         {
             if (!s_CachedPublicTransportLaneEnforcementEnabled)
             {
@@ -153,9 +145,7 @@ namespace Traffic_Law_Enforcement
                 ? EnforcementGameplaySettingsService.Current.PublicTransportLaneFineAmount
                 : 0;
 
-            if (s_HasCachedPenaltyValues &&
-                s_CachedPublicTransportLaneEnforcementEnabled == enforcementEnabled &&
-                s_CachedConfiguredPublicTransportLaneFine == configuredFineAmount)
+            if (s_HasCachedPenaltyValues && s_CachedPublicTransportLaneEnforcementEnabled == enforcementEnabled && s_CachedConfiguredPublicTransportLaneFine == configuredFineAmount)
             {
                 return;
             }
@@ -166,38 +156,26 @@ namespace Traffic_Law_Enforcement
             s_CachedPublicTransportLaneFine = configuredFineAmount;
         }
 
-        private static void SyncPrivateTrafficIgnoredRules(
-            EntityManager entityManager,
-            Entity owner,
-            ref SetupQueueItem item)
+        private static void SyncPrivateTrafficIgnoredRules(EntityManager entityManager, Entity owner, ref SetupQueueItem item)
         {
             if (!entityManager.HasComponent<VehicleTrafficLawProfile>(owner))
             {
                 return;
             }
 
-            VehicleTrafficLawProfile profile =
-                entityManager.GetComponentData<VehicleTrafficLawProfile>(owner);
+            VehicleTrafficLawProfile profile = entityManager.GetComponentData<VehicleTrafficLawProfile>(owner);
 
-            bool allowOnPublicTransportLane =
-                (profile.m_DesiredPublicTransportLaneMask & CarFlags.UsePublicTransportLanes) != 0;
+            bool allowOnPublicTransportLane = (profile.m_DesiredPublicTransportLaneMask & CarFlags.UsePublicTransportLanes) != 0;
 
-            if (!allowOnPublicTransportLane &&
-                entityManager.HasComponent<PublicTransportLanePendingExit>(owner))
+            if (!allowOnPublicTransportLane && entityManager.HasComponent<PublicTransportLanePendingExit>(owner))
             {
                 PublicTransportLanePendingExit pendingExit = entityManager.GetComponentData<PublicTransportLanePendingExit>(owner);
                 allowOnPublicTransportLane = pendingExit.m_HasLeftPublicTransportLane == 0;
             }
 
-            SetRuleFlag(
-                ref item.m_Parameters.m_IgnoredRules,
-                RuleFlags.ForbidPrivateTraffic,
-                allowOnPublicTransportLane);
+            SetRuleFlag(ref item.m_Parameters.m_IgnoredRules, RuleFlags.ForbidPrivateTraffic, allowOnPublicTransportLane);
 
-            SetRuleFlag(
-                ref item.m_Parameters.m_TaxiIgnoredRules,
-                RuleFlags.ForbidPrivateTraffic,
-                allowOnPublicTransportLane);
+            SetRuleFlag(ref item.m_Parameters.m_TaxiIgnoredRules, RuleFlags.ForbidPrivateTraffic, allowOnPublicTransportLane);
         }
 
         private static void SetRuleFlag(ref RuleFlags rules, RuleFlags flag, bool enabled)
