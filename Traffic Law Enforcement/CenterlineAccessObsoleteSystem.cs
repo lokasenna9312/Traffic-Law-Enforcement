@@ -143,127 +143,121 @@ namespace Traffic_Law_Enforcement
             CollectCandidateVehicles(m_NavigationLaneChangedQuery);
             CollectCandidateVehicles(m_AccessOriginWatchQuery);
 
-            try
+            foreach (Entity vehicle in m_CandidateVehicles)
             {
-                foreach (Entity vehicle in m_CandidateVehicles)
+                if (!m_CurrentLaneData.TryGetComponent(vehicle, out CarCurrentLane currentLane) ||
+                    !m_PathOwnerData.TryGetComponent(vehicle, out PathOwner pathOwner) ||
+                    !m_NavigationLaneData.TryGetBuffer(vehicle, out DynamicBuffer<CarNavigationLane> navigationLanes) ||
+                    !m_CarData.TryGetComponent(vehicle, out Car car))
                 {
-                    if (!m_CurrentLaneData.TryGetComponent(vehicle, out CarCurrentLane currentLane) ||
-                        !m_PathOwnerData.TryGetComponent(vehicle, out PathOwner pathOwner) ||
-                        !m_NavigationLaneData.TryGetBuffer(vehicle, out DynamicBuffer<CarNavigationLane> navigationLanes) ||
-                        !m_CarData.TryGetComponent(vehicle, out Car car))
-                    {
-                        continue;
-                    }
-
-                    // Exclude emergency vehicles
-                    if (EmergencyVehiclePolicy.IsEmergencyVehicle(car))
-                    {
-                        continue;
-                    }
-
-                    // Exclude vehicles allowed on PT lanes
-                    if ((car.m_Flags & CarFlags.UsePublicTransportLanes) != 0)
-                    {
-                        continue;
-                    }
-
-                    SyncAccessOriginWatch(vehicle, currentLane.m_Lane);
-
-                    ResetDuplicateSuppressionIfPathChanged(vehicle, pathOwner);
-                    if ((pathOwner.m_State & (PathFlags.Pending | PathFlags.Obsolete)) != 0)
-                    {
-                        continue;
-                    }
-
-                    if (navigationLanes.Length == 0)
-                    {
-                        ClearRepeatInvalidation(vehicle);
-                        continue;
-                    }
-
-                    if (!TryGetFirstPlannedAccessTransition(currentLane.m_Lane, navigationLanes, out Entity sourceLane, out Entity targetLane, out int transitionIndex, out string transitionKind))
-                    {
-                        ClearRepeatInvalidation(vehicle);
-                                            if (!ShouldSuppressObservedSnapshot(vehicle, currentLane.m_Lane, Entity.Null, Entity.Null, -1, EvaluationNoAccessTransition, TransitionFamilyNone))
-                        {
-                            RecordObservedSnapshot(vehicle, currentLane.m_Lane, Entity.Null, Entity.Null, -1, EvaluationNoAccessTransition, TransitionFamilyNone);
-                        }
-
-                        continue;
-                    }
-
-                    bool illegalTransition = IsIllegalIngress(sourceLane, targetLane, out string reason) || IsIllegalEgress(sourceLane, targetLane, out reason);
-                    byte evaluationResult = illegalTransition ? EvaluationInvalidatedAccessTransition : EvaluationCleanAccessTransition;
-                    byte transitionFamily = GetTransitionFamily(sourceLane, targetLane, evaluationResult);
-                    if (ShouldSuppressObservedSnapshot(vehicle, currentLane.m_Lane, sourceLane, targetLane, transitionIndex, evaluationResult, transitionFamily))
-                    {
-                        continue;
-                    }
-
-                    if (!illegalTransition)
-                    {
-                        ClearRepeatInvalidation(vehicle);
-                        RecordObservedSnapshot(vehicle, currentLane.m_Lane, sourceLane, targetLane, transitionIndex, evaluationResult, transitionFamily);
-                        continue;
-                    }
-
-                    int repeatCount = RecordRepeatInvalidation(
-                        vehicle,
-                        sourceLane,
-                        targetLane,
-                        transitionFamily,
-                        reason);
-
-                    PathFlags stateBefore = pathOwner.m_State;
-                    pathOwner.m_State |= PathFlags.Obsolete;
-                    EntityManager.SetComponentData(vehicle, pathOwner);
-
-                    string role = null;
-                    if (shouldLogEnforcementEvents || shouldLogPathObsoleteSources)
-                    {
-                        role = PublicTransportLanePolicy.DescribeVehicleRole(vehicle, ref m_TypeLookups);
-                    }
-
-                    if (repeatCount >= 3 && shouldLogEnforcementEvents)
-                    {
-                        Mod.log.Info(
-                            $"Repeated identical CENTERLINE invalidation: vehicle={vehicle}, role={role}, repeatCount={repeatCount}, " +
-                            $"reason={reason}, currentLane={currentLane.m_Lane}, sourceLane={sourceLane}, targetLane={targetLane}, " +
-                            $"transitionIndex={transitionIndex}, transitionKind={transitionKind}, transitionFamily={transitionFamily}");
-                    }
-
-                    if (shouldLogPathObsoleteSources)
-                    {
-                        string extra =
-                            $"sourceLane={sourceLane}, targetLane={targetLane}, transitionIndex={transitionIndex}, " +
-                            $"transitionKind={transitionKind}, transitionFamily={transitionFamily}, repeatCount={repeatCount}, " +
-                            $"laneShapeCurrent={DescribeLaneShape(currentLane.m_Lane)}, " +
-                            $"laneShapeSource={DescribeLaneShape(sourceLane)}, " +
-                            $"laneShapeTarget={DescribeLaneShape(targetLane)}";
-                            
-                        PathObsoleteTraceLogging.Record(
-                            "CENTERLINE",
-                            vehicle,
-                            currentLane.m_Lane,
-                            stateBefore,
-                            pathOwner.m_State,
-                            reason,
-                            car,
-                            role,
-                            extra);
-                    }
-
-                    RecordObservedSnapshot(vehicle, currentLane.m_Lane, sourceLane, targetLane, transitionIndex, evaluationResult, transitionFamily);
-
-                    if (shouldLogEnforcementEvents)
-                    {
-                        Mod.log.Info($"Planned center-line access route invalidated: vehicle={vehicle}, fromLane={sourceLane}, toLane={targetLane}, accessIndex={transitionIndex}, transition={transitionKind}, reason={reason}");
-                        LogStructureSample(currentLane.m_Lane, sourceLane, targetLane, transitionKind);
-                    }
+                    continue;
                 }
-            }
-            finally
-            {
+
+                // Exclude emergency vehicles
+                if (EmergencyVehiclePolicy.IsEmergencyVehicle(car))
+                {
+                    continue;
+                }
+
+                // Exclude vehicles allowed on PT lanes
+                if ((car.m_Flags & CarFlags.UsePublicTransportLanes) != 0)
+                {
+                    continue;
+                }
+
+                SyncAccessOriginWatch(vehicle, currentLane.m_Lane);
+
+                ResetDuplicateSuppressionIfPathChanged(vehicle, pathOwner);
+                if ((pathOwner.m_State & (PathFlags.Pending | PathFlags.Obsolete)) != 0)
+                {
+                    continue;
+                }
+
+                if (navigationLanes.Length == 0)
+                {
+                    ClearRepeatInvalidation(vehicle);
+                    continue;
+                }
+
+                if (!TryGetFirstPlannedAccessTransition(currentLane.m_Lane, navigationLanes, out Entity sourceLane, out Entity targetLane, out int transitionIndex, out string transitionKind))
+                {
+                    ClearRepeatInvalidation(vehicle);
+                                        if (!ShouldSuppressObservedSnapshot(vehicle, currentLane.m_Lane, Entity.Null, Entity.Null, -1, EvaluationNoAccessTransition, TransitionFamilyNone))
+                    {
+                        RecordObservedSnapshot(vehicle, currentLane.m_Lane, Entity.Null, Entity.Null, -1, EvaluationNoAccessTransition, TransitionFamilyNone);
+                    }
+
+                    continue;
+                }
+
+                bool illegalTransition = IsIllegalIngress(sourceLane, targetLane, out string reason) || IsIllegalEgress(sourceLane, targetLane, out reason);
+                byte evaluationResult = illegalTransition ? EvaluationInvalidatedAccessTransition : EvaluationCleanAccessTransition;
+                byte transitionFamily = GetTransitionFamily(sourceLane, targetLane, evaluationResult);
+                if (ShouldSuppressObservedSnapshot(vehicle, currentLane.m_Lane, sourceLane, targetLane, transitionIndex, evaluationResult, transitionFamily))
+                {
+                    continue;
+                }
+
+                if (!illegalTransition)
+                {
+                    ClearRepeatInvalidation(vehicle);
+                    RecordObservedSnapshot(vehicle, currentLane.m_Lane, sourceLane, targetLane, transitionIndex, evaluationResult, transitionFamily);
+                    continue;
+                }
+
+                int repeatCount = RecordRepeatInvalidation(
+                    vehicle,
+                    sourceLane,
+                    targetLane,
+                    transitionFamily,
+                    reason);
+
+                PathFlags stateBefore = pathOwner.m_State;
+                pathOwner.m_State |= PathFlags.Obsolete;
+                EntityManager.SetComponentData(vehicle, pathOwner);
+
+                string role = null;
+                if (shouldLogEnforcementEvents || shouldLogPathObsoleteSources)
+                {
+                    role = PublicTransportLanePolicy.DescribeVehicleRole(vehicle, ref m_TypeLookups);
+                }
+
+                if (repeatCount >= 3 && shouldLogEnforcementEvents)
+                {
+                    Mod.log.Info(
+                        $"Repeated identical CENTERLINE invalidation: vehicle={vehicle}, role={role}, repeatCount={repeatCount}, " +
+                        $"reason={reason}, currentLane={currentLane.m_Lane}, sourceLane={sourceLane}, targetLane={targetLane}, " +
+                        $"transitionIndex={transitionIndex}, transitionKind={transitionKind}, transitionFamily={transitionFamily}");
+                }
+
+                if (shouldLogPathObsoleteSources)
+                {
+                    string extra =
+                        $"sourceLane={sourceLane}, targetLane={targetLane}, transitionIndex={transitionIndex}, " +
+                        $"transitionKind={transitionKind}, transitionFamily={transitionFamily}, repeatCount={repeatCount}, " +
+                        $"laneShapeCurrent={DescribeLaneShape(currentLane.m_Lane)}, " +
+                        $"laneShapeSource={DescribeLaneShape(sourceLane)}, " +
+                        $"laneShapeTarget={DescribeLaneShape(targetLane)}";
+                        
+                    PathObsoleteTraceLogging.Record(
+                        "CENTERLINE",
+                        vehicle,
+                        currentLane.m_Lane,
+                        stateBefore,
+                        pathOwner.m_State,
+                        reason,
+                        car,
+                        role,
+                        extra);
+                }
+
+                RecordObservedSnapshot(vehicle, currentLane.m_Lane, sourceLane, targetLane, transitionIndex, evaluationResult, transitionFamily);
+
+                if (shouldLogEnforcementEvents)
+                {
+                    Mod.log.Info($"Planned center-line access route invalidated: vehicle={vehicle}, fromLane={sourceLane}, toLane={targetLane}, accessIndex={transitionIndex}, transition={transitionKind}, reason={reason}");
+                    LogStructureSample(currentLane.m_Lane, sourceLane, targetLane, transitionKind);
+                }
             }
         }
 
