@@ -108,9 +108,9 @@ namespace Traffic_Law_Enforcement
                 return;
             }
 
-            if (m_CurrentLaneChangedQuery.IsEmptyIgnoreFilter &&
-                m_NavigationLaneChangedQuery.IsEmptyIgnoreFilter &&
-                m_AccessOriginWatchQuery.IsEmptyIgnoreFilter)
+            if (m_CurrentLaneChangedQuery.IsEmpty &&
+                m_NavigationLaneChangedQuery.IsEmpty &&
+                m_AccessOriginWatchQuery.IsEmpty)
             {
                 return;
             }
@@ -263,7 +263,7 @@ namespace Traffic_Law_Enforcement
 
         private void CollectCandidateVehicles(EntityQuery query)
         {
-            if (query.IsEmptyIgnoreFilter)
+            if (query.IsEmpty)
             {
                 return;
             }
