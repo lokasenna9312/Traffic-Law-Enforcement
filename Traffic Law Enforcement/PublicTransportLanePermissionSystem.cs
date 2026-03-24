@@ -507,9 +507,11 @@ namespace Traffic_Law_Enforcement
                 PublicTransportLanePolicy.ModPrefersLanes(state.m_PublicTransportLaneAccessBits);
 
             bool obsoleteRelevantFlagsChanged =
+                hasState &&
                 oldModAllowsAccess != modAllowsAccess;
 
             bool preferenceOnlyChange =
+                hasState &&
                 oldModAllowsAccess == modAllowsAccess &&
                 oldModPrefersLanes != modPrefersLanes;
 

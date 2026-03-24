@@ -52,7 +52,7 @@ The following options can be configured either for the currently loaded save fil
 - I would like serious habitual traffic offenders to face harsher penalties, such as having their driver's licenses suspended or revoked, or having them sent to jail, but I could not implement that either because of my limited coding skills.
 
 ### 6. Known Issues : Investigation and Fixing in Progress
-- If the PT lane allowance option is disabled for a certain type of vehicle while some of those vehicles are already on the PT lanes, some of them will keep rerouting meaninglessly and effectively become stuck.
+- Violation rates are calculated weirdly.
 
 ## 한국어 설명
 
@@ -88,7 +88,7 @@ The following options can be configured either for the currently loaded save fil
 - 심각한 상습 교통법규 위반자들에게는 더욱 강한 처벌(예: 운전면허 정지 또는 취소, 교도소 수감)을 적용하고 싶었지만, 그 기능 역시 제 코딩 실력이 부족해서 구현하지 못했습니다.
 
 ### 6. 알려진 문제점 : 조사 및 수정 진행 중
-- 어떤 종류의 차량이 대중교통 전용차선에 진입했을 때 대중교통 전용차선 진입 허가 옵션을 끄면, 일부 차량이 무의미한 재경로 설정을 계속해서 사실상 멈춰버리는 문제가 있습니다.
+- 위반율이 이상하게 집계됩니다.
 	</LongDescription>
 	<!--Thumbnail-->
 	<Thumbnail Value="Properties/Thumbnail.jpg" />
@@ -107,7 +107,7 @@ The following options can be configured either for the currently loaded save fil
 	<!--Link to the forum post where the mod can be discussed-->
 	<ForumLink Value="https://forum.paradoxplaza.com/forum/threads/traffic-law-enforcement.1909882/" />
 	<!--Version of the mod-->
-	<ModVersion Value="0.2.1" />
+	<ModVersion Value="0.2.2" />
 	<!--Recommended version of the base game to use the mod-->
 	<GameVersion Value="1.5.6f1" />
 	<!--Dependency for the mod, can be set multiple times-->
@@ -117,7 +117,7 @@ The following options can be configured either for the currently loaded save fil
 	<!--Change log for new version. Single line or multi line. Supports minimal markdown subset-->
 	<ChangeLog>
 - More opmtimization applied.
-- The variables about logging are now updated only when logging is enabled, instead of every frame.
+- Now changing PT-lane allowance won't make the affected vehicles stuck.
 	</ChangeLog>
 	<!--External link, can be set multiple times. supported types are "discord", "github", "youtube", "twitch", "x", "paypal", "patreon", "buymeacoffee", "kofi", "crowdin", "gitlab", "gofundme"-->
 	<ExternalLink Type="github" Url="https://github.com/lokasenna9312/Traffic-Law-Enforcement/" />
