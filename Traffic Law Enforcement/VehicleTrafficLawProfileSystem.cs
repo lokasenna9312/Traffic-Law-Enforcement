@@ -22,6 +22,10 @@ namespace Traffic_Law_Enforcement
         private bool m_HasEvaluated;
         private int m_LastPermissionSettingsMask;
         private int m_LastObservedRuntimeWorldGeneration = -1;
+        private int m_LastLoggedPersistedCount = -1;
+        private int m_LastLoggedPersistedWithoutProfileCount = -1;
+        private int m_LastLoggedSeededCount = -1;
+        private int m_LastLoggedSeedPermissionSettingsMask = -1;
 
         protected override void OnCreate()
         {
@@ -123,6 +127,11 @@ namespace Traffic_Law_Enforcement
             m_HasEvaluated = false;
             m_LastPermissionSettingsMask = 0;
 
+            m_LastLoggedPersistedCount = -1;
+            m_LastLoggedPersistedWithoutProfileCount = -1;
+            m_LastLoggedSeededCount = -1;
+            m_LastLoggedSeedPermissionSettingsMask = -1;
+
             Mod.log.Info(
                 $"[SAVELOAD] VehicleTrafficLawProfileSystem runtime reset: generation={currentGeneration}");
         }
@@ -189,11 +198,22 @@ namespace Traffic_Law_Enforcement
             {
                 vehicles.Dispose();
             }
-            Mod.log.Info(
-                $"[SAVELOAD] SeedProfilesFromPersistedState: seededProfiles={seededCount}, " +
-                $"persistedStates={persistedCount}, " +
-                $"persistedWithoutProfile={persistedWithoutProfileCount}, " +
-                $"permissionSettingsMask={permissionSettingsMask}");
+            if (seededCount != m_LastLoggedSeededCount ||
+                persistedCount != m_LastLoggedPersistedCount ||
+                persistedWithoutProfileCount != m_LastLoggedPersistedWithoutProfileCount ||
+                permissionSettingsMask != m_LastLoggedSeedPermissionSettingsMask)
+            {
+                Mod.log.Info(
+                    $"[SAVELOAD] SeedProfilesFromPersistedState: seededProfiles={seededCount}, " +
+                    $"persistedStates={persistedCount}, " +
+                    $"persistedWithoutProfile={persistedWithoutProfileCount}, " +
+                    $"permissionSettingsMask={permissionSettingsMask}");
+
+                m_LastLoggedSeededCount = seededCount;
+                m_LastLoggedPersistedCount = persistedCount;
+                m_LastLoggedPersistedWithoutProfileCount = persistedWithoutProfileCount;
+                m_LastLoggedSeedPermissionSettingsMask = permissionSettingsMask;
+            }
         }
 
         private void BuildPendingRefreshList()

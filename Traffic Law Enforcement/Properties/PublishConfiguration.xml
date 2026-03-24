@@ -118,6 +118,7 @@
 	<ChangeLog>
 - More opmtimization applied.
 - Now changing PT-lane allowance won't make the affected vehicles freezed.
+- Save/load related code refactored, and some untested features related to save/load are now tested and verified to be working.
 	</ChangeLog>
 	<!--External link, can be set multiple times. supported types are "discord", "github", "youtube", "twitch", "x", "paypal", "patreon", "buymeacoffee", "kofi", "crowdin", "gitlab", "gofundme"-->
 	<ExternalLink Type="github" Url="https://github.com/lokasenna9312/Traffic-Law-Enforcement/" />
