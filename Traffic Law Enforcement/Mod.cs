@@ -153,6 +153,46 @@ namespace Traffic_Law_Enforcement
                     systemLanguage = SystemLanguage.Korean;
                     return true;
 
+                case "de-DE":
+                    localizedName = "Deutsch";
+                    systemLanguage = SystemLanguage.German;
+                    return true;
+
+                case "es-ES":
+                    localizedName = "Español";
+                    systemLanguage = SystemLanguage.Spanish;
+                    return true;
+
+                case "fr-FR":
+                    localizedName = "Français";
+                    systemLanguage = SystemLanguage.French;
+                    return true;
+
+                case "it-IT":
+                    localizedName = "Italiano";
+                    systemLanguage = SystemLanguage.Italian;
+                    return true;
+
+                case "ja-JP":
+                    localizedName = "日本語";
+                    systemLanguage = SystemLanguage.Japanese;
+                    return true;
+
+                case "pl-PL":
+                    localizedName = "Polski";
+                    systemLanguage = SystemLanguage.Polish;
+                    return true;
+
+                case "pt-BR":
+                    localizedName = "Português (Brasil)";
+                    systemLanguage = SystemLanguage.Portuguese;
+                    return true;
+
+                case "ru-RU":
+                    localizedName = "Русский";
+                    systemLanguage = SystemLanguage.Russian;
+                    return true;
+
                 default:
                     localizedName = localeId;
                     systemLanguage = SystemLanguage.English;
