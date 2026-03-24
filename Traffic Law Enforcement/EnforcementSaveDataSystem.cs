@@ -1,3 +1,4 @@
+using System.Reflection;
 using System.Collections.Generic;
 using Colossal.Serialization.Entities;
 using Game;
@@ -5,7 +6,6 @@ using Game.Vehicles;
 using Game.Serialization;
 using Unity.Collections;
 using Unity.Entities;
-
 namespace Traffic_Law_Enforcement
 {
     public partial class EnforcementSaveDataSystem : GameSystemBase, IDefaultSerializable, ISerializable, IPreDeserialize, IPostDeserialize
@@ -73,6 +73,7 @@ namespace Traffic_Law_Enforcement
         {
             Mod.log.Info(
                 $"[SAVELOAD] SetDefaults: purpose={context.purpose}, " +
+                $"save={saveContext}, " +
                 $"willClearLegacyRuntimeState={context.purpose == Purpose.LoadGame}");
             AdvanceRuntimeWorldGeneration(context);
             ResetRuntimeState();
@@ -85,7 +86,9 @@ namespace Traffic_Law_Enforcement
 
         public void PreDeserialize(Context context)
         {
-            Mod.log.Info($"[SAVELOAD] PreDeserialize: purpose={context.purpose}");
+            Mod.log.Info(
+                $"[SAVELOAD] PreDeserialize: purpose={context.purpose}, " +
+                $"save={TryDescribeSaveContext(context)}");
             ResetRuntimeState();
             m_LoadedPublicTransportLaneVehicleStates.Clear();
             m_HasDeserializedData = false;
@@ -95,7 +98,9 @@ namespace Traffic_Law_Enforcement
 
         public void PostDeserialize(Context context)
         {
-            Mod.log.Info($"[SAVELOAD] PostDeserialize: purpose={context.purpose}");
+            Mod.log.Info(
+                $"[SAVELOAD] PostDeserialize: purpose={context.purpose}, " +
+                $"save={TryDescribeSaveContext(context)}");
             m_PendingPostDeserializeApply = true;
         }
 
@@ -782,6 +787,59 @@ namespace Traffic_Law_Enforcement
             return totalPathRequestCount <= 0 && (totalViolationCount > 0 || totalAvoidedPathCount > 0 || totalFineAmount > 0);
         }
 
+        private static string TryDescribeSaveContext(Context context)
+        {
+            object boxed = context;
+
+            string[] memberNames =
+            {
+                "saveName",
+                "SaveName",
+                "name",
+                "Name",
+                "fileName",
+                "FileName",
+                "path",
+                "Path",
+                "filePath",
+                "FilePath"
+            };
+
+            System.Type type = boxed.GetType();
+
+            for (int index = 0; index < memberNames.Length; index += 1)
+            {
+                string memberName = memberNames[index];
+
+                PropertyInfo property = type.GetProperty(
+                    memberName,
+                    BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+
+                if (property != null)
+                {
+                    object value = property.GetValue(boxed);
+                    if (value is string propertyText && !string.IsNullOrWhiteSpace(propertyText))
+                    {
+                        return propertyText;
+                    }
+                }
+
+                FieldInfo field = type.GetField(
+                    memberName,
+                    BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+
+                if (field != null)
+                {
+                    object value = field.GetValue(boxed);
+                    if (value is string fieldText && !string.IsNullOrWhiteSpace(fieldText))
+                    {
+                        return fieldText;
+                    }
+                }
+            }
+
+            return "unknown";
+        }
         private static void WriteGameplaySettings<TWriter>(TWriter writer, EnforcementGameplaySettingsState state) where TWriter : IWriter
         {
             writer.Write(state.EnablePublicTransportLaneEnforcement);
