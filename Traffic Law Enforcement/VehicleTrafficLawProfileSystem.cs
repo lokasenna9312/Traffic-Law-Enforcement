@@ -11,8 +11,9 @@ namespace Traffic_Law_Enforcement
         private EntityQuery m_AllCarsQuery;
         private EntityQuery m_ChangedCarQuery;
         private PublicTransportLaneVehicleTypeLookups m_TypeLookups;
-        private const int kVehiclesPerFrame = 512;
+        private ComponentLookup<VehicleTrafficLawProfile> m_ProfileData;
         private NativeList<Entity> m_PendingRefreshVehicles;
+        private const int kVehiclesPerFrame = 512;
         private int m_RefreshCursor;
         private bool m_HasEvaluated;
         private int m_LastPermissionSettingsMask;
@@ -20,28 +21,22 @@ namespace Traffic_Law_Enforcement
         protected override void OnCreate()
         {
             base.OnCreate();
-
-            m_AllCarsQuery = GetEntityQuery(
-                ComponentType.ReadOnly<Car>());
-
-            m_ChangedCarQuery = GetEntityQuery(
-                ComponentType.ReadOnly<Car>());
+            m_AllCarsQuery = GetEntityQuery(ComponentType.ReadOnly<Car>());
+            m_ChangedCarQuery = GetEntityQuery(ComponentType.ReadOnly<Car>());
             m_ChangedCarQuery.SetChangedVersionFilter(ComponentType.ReadOnly<Car>());
-
             m_TypeLookups = PublicTransportLaneVehicleTypeLookups.Create(this);
-
+            m_ProfileData = GetComponentLookup<VehicleTrafficLawProfile>(true);
             m_PendingRefreshVehicles = new NativeList<Entity>(Allocator.Persistent);
-
             RequireForUpdate(m_AllCarsQuery);
         }
 
         protected override void OnUpdate()
         {
             m_TypeLookups.Update(this);
-
+            m_ProfileData.Update(this);
             EnforcementGameplaySettingsState settings = EnforcementGameplaySettingsService.Current;
-            int permissionSettingsMask = PublicTransportLanePolicy.GetPermissionSettingsMask(settings);
 
+            int permissionSettingsMask = PublicTransportLanePolicy.GetPermissionSettingsMask(settings);
             bool fullRefresh =
                 !m_HasEvaluated ||
                 permissionSettingsMask != m_LastPermissionSettingsMask;
@@ -165,14 +160,9 @@ namespace Traffic_Law_Enforcement
             }
         }
 
-        private void EvaluateVehicle(
-            Entity vehicle,
-            Car car,
-            EnforcementGameplaySettingsState settings,
-            int permissionSettingsMask)
+        private void EvaluateVehicle(Entity vehicle, Car car, EnforcementGameplaySettingsState settings, int permissionSettingsMask)
         {
-            bool hasProfile = EntityManager.HasComponent<VehicleTrafficLawProfile>(vehicle);
-
+            bool hasProfile = m_ProfileData.TryGetComponent(vehicle, out VehicleTrafficLawProfile currentProfile);
             bool shouldTrack;
             CarFlags desiredMask;
 
@@ -213,9 +203,6 @@ namespace Traffic_Law_Enforcement
                 EntityManager.AddComponentData(vehicle, updatedProfile);
                 return;
             }
-
-            VehicleTrafficLawProfile currentProfile =
-                EntityManager.GetComponentData<VehicleTrafficLawProfile>(vehicle);
 
             if (!ProfilesEqual(currentProfile, updatedProfile))
             {
