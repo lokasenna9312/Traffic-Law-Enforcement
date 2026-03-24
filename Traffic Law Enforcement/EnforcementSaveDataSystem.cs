@@ -71,6 +71,7 @@ namespace Traffic_Law_Enforcement
 
         public void SetDefaults(Context context)
         {
+            s_HasLoggedSaveContextMemberDump = false;
             string saveContext = TryDescribeSaveContext(context);
             Mod.log.Info(
                 $"[SAVELOAD] SetDefaults: purpose={context.purpose}, " +
@@ -91,10 +92,11 @@ namespace Traffic_Law_Enforcement
 
         public void PreDeserialize(Context context)
         {
+            s_HasLoggedSaveContextMemberDump = false;
             string saveContext = TryDescribeSaveContext(context);
             Mod.log.Info(
                 $"[SAVELOAD] PreDeserialize: purpose={context.purpose}, " +
-                $"save={TryDescribeSaveContext(context)}");
+                $"save={saveContext}");
             ResetRuntimeState();
             if (saveContext == "unknown")
             {
@@ -111,7 +113,7 @@ namespace Traffic_Law_Enforcement
             string saveContext = TryDescribeSaveContext(context);
             Mod.log.Info(
                 $"[SAVELOAD] PostDeserialize: purpose={context.purpose}, " +
-                $"save={TryDescribeSaveContext(context)}");
+                $"save={saveContext}");
             if (saveContext == "unknown")
             {
                 LogSaveContextMemberDump(context, "PostDeserialize");
