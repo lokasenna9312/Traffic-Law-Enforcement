@@ -21,6 +21,7 @@ namespace Traffic_Law_Enforcement
 
         private ComponentLookup<PathOwner> m_PathOwnerData;
         private int m_LastObservedRuntimeWorldGeneration = -1;
+        private bool m_SuppressPendingBackfillForCurrentUpdate;
 
         protected override void OnCreate()
         {
@@ -63,6 +64,7 @@ namespace Traffic_Law_Enforcement
 
         protected override void OnUpdate()
         {
+            m_SuppressPendingBackfillForCurrentUpdate = false;
             HandleRuntimeWorldReload();
             m_PathOwnerData.Update(this);
 
@@ -79,6 +81,7 @@ namespace Traffic_Law_Enforcement
             }
 
             m_LastObservedRuntimeWorldGeneration = currentGeneration;
+            m_SuppressPendingBackfillForCurrentUpdate = true;
 
             if (!m_TrackingStateQuery.IsEmptyIgnoreFilter)
             {
@@ -111,6 +114,11 @@ namespace Traffic_Law_Enforcement
                     }
 
                     bool isPending = (pathOwner.m_State & PathFlags.Pending) != 0;
+
+                    if (isPending && !m_SuppressPendingBackfillForCurrentUpdate)
+                    {
+                        EnforcementPolicyImpactService.RecordPathRequest(vehicle.Index);
+                    }
 
                     EntityManager.AddComponentData(
                         vehicle,

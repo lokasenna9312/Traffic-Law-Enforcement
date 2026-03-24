@@ -498,12 +498,19 @@ namespace Traffic_Law_Enforcement
             if (hasPolicyImpactTrackingState)
             {
                 reader.Read(out long policyImpactMonthIndex);
+
                 int trackingTotalPathRequestCount = 0;
                 if (version >= 4)
                 {
                     reader.Read(out trackingTotalPathRequestCount);
                 }
-                reader.Read(out int trackingTotalActualPathCount);
+
+                int trackingTotalActualPathCount = 0;
+                if (version >= 9)
+                {
+                    reader.Read(out trackingTotalActualPathCount);
+                }
+
                 reader.Read(out int trackingTotalAvoidedPathCount);
                 reader.Read(out int trackingTotalFineAmount);
                 reader.Read(out int trackingPublicTransportLaneActualCount);
@@ -515,6 +522,15 @@ namespace Traffic_Law_Enforcement
                 reader.Read(out int trackingPublicTransportLaneAvoidedEventCount);
                 reader.Read(out int trackingMidBlockCrossingAvoidedEventCount);
                 reader.Read(out int trackingIntersectionMovementAvoidedEventCount);
+
+                if (version < 9)
+                {
+                    trackingTotalActualPathCount =
+                        trackingPublicTransportLaneActualCount +
+                        trackingMidBlockCrossingActualCount +
+                        trackingIntersectionMovementActualCount;
+                }
+
                 policyImpactTrackingState = new EnforcementPolicyImpactTrackingState(
                     policyImpactMonthIndex,
                     trackingTotalPathRequestCount,
@@ -531,7 +547,12 @@ namespace Traffic_Law_Enforcement
                     trackingMidBlockCrossingAvoidedEventCount,
                     trackingIntersectionMovementAvoidedEventCount);
 
-                if (migratedLegacyPathRequestTracking || HasInconsistentPathRequestTracking(policyImpactTrackingState.Value.m_TotalPathRequestCount, policyImpactTrackingState.Value.m_TotalActualPathCount, policyImpactTrackingState.Value.m_TotalAvoidedPathCount, policyImpactTrackingState.Value.m_TotalFineAmount))
+                if (migratedLegacyPathRequestTracking ||
+                    HasInconsistentPathRequestTracking(
+                        policyImpactTrackingState.Value.m_TotalPathRequestCount,
+                        policyImpactTrackingState.Value.m_TotalActualPathCount,
+                        policyImpactTrackingState.Value.m_TotalAvoidedPathCount,
+                        policyImpactTrackingState.Value.m_TotalFineAmount))
                 {
                     policyImpactTrackingState = null;
                 }
