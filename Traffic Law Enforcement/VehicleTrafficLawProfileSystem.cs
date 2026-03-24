@@ -140,64 +140,58 @@ namespace Traffic_Law_Enforcement
         {
             int persistedCount = m_PersistedStateQuery.CalculateEntityCount();
             int persistedWithoutProfileCount = m_PersistedWithoutProfileQuery.CalculateEntityCount();
-
-            if (persistedWithoutProfileCount == 0)
-            {
-                Mod.log.Info(
-                    $"[SAVELOAD] SeedProfilesFromPersistedState: seededProfiles=0, " +
-                    $"persistedStates={persistedCount}, " +
-                    $"persistedWithoutProfile={persistedWithoutProfileCount}, " +
-                    $"permissionSettingsMask={permissionSettingsMask}");
-                return;
-            }
-
-            NativeArray<Entity> vehicles =
-                m_PersistedWithoutProfileQuery.ToEntityArray(Allocator.Temp);
             int seededCount = 0;
 
-            try
+            if (persistedWithoutProfileCount > 0)
             {
-                for (int index = 0; index < vehicles.Length; index += 1)
+                NativeArray<Entity> vehicles =
+                    m_PersistedWithoutProfileQuery.ToEntityArray(Allocator.Temp);
+
+                try
                 {
-                    Entity vehicle = vehicles[index];
-
-                    if (!m_CarData.TryGetComponent(vehicle, out Car car))
+                    for (int index = 0; index < vehicles.Length; index += 1)
                     {
-                        continue;
-                    }
+                        Entity vehicle = vehicles[index];
 
-                    if (!m_PersistedAccessStateData.TryGetComponent(
-                            vehicle,
-                            out PersistedPublicTransportLaneAccessState persisted))
-                    {
-                        continue;
-                    }
-
-                    VehicleTrafficLawProfile seededProfile =
-                        new VehicleTrafficLawProfile
+                        if (!m_CarData.TryGetComponent(vehicle, out Car car))
                         {
-                            m_ShouldTrack = persisted.m_ShouldTrack,
-                            m_EmergencyVehicle = persisted.m_EmergencyVehicle,
-                            m_PublicTransportLaneAccessBits = persisted.m_AccessBits,
-                            m_VanillaAuthorizedCategories =
-                                PublicTransportLanePolicy.GetVanillaAuthorizedCategories(
-                                    vehicle,
-                                    ref m_TypeLookups),
-                            m_AdditionalRole =
-                                PublicTransportLanePolicy.GetFlagGrantExperimentRole(
-                                    vehicle,
-                                    ref m_TypeLookups),
-                            m_PermissionSettingsMask = permissionSettingsMask,
-                        };
+                            continue;
+                        }
 
-                    EntityManager.AddComponentData(vehicle, seededProfile);
-                    seededCount++;
+                        if (!m_PersistedAccessStateData.TryGetComponent(
+                                vehicle,
+                                out PersistedPublicTransportLaneAccessState persisted))
+                        {
+                            continue;
+                        }
+
+                        VehicleTrafficLawProfile seededProfile =
+                            new VehicleTrafficLawProfile
+                            {
+                                m_ShouldTrack = persisted.m_ShouldTrack,
+                                m_EmergencyVehicle = persisted.m_EmergencyVehicle,
+                                m_PublicTransportLaneAccessBits = persisted.m_AccessBits,
+                                m_VanillaAuthorizedCategories =
+                                    PublicTransportLanePolicy.GetVanillaAuthorizedCategories(
+                                        vehicle,
+                                        ref m_TypeLookups),
+                                m_AdditionalRole =
+                                    PublicTransportLanePolicy.GetFlagGrantExperimentRole(
+                                        vehicle,
+                                        ref m_TypeLookups),
+                                m_PermissionSettingsMask = permissionSettingsMask,
+                            };
+
+                        EntityManager.AddComponentData(vehicle, seededProfile);
+                        seededCount += 1;
+                    }
+                }
+                finally
+                {
+                    vehicles.Dispose();
                 }
             }
-            finally
-            {
-                vehicles.Dispose();
-            }
+
             if (seededCount != m_LastLoggedSeededCount ||
                 persistedCount != m_LastLoggedPersistedCount ||
                 persistedWithoutProfileCount != m_LastLoggedPersistedWithoutProfileCount ||
