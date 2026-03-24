@@ -74,11 +74,11 @@ namespace Traffic_Law_Enforcement
         public void OnDispose()
         {
             log.Info(nameof(OnDispose));
+            KeybindingPersistenceGuardPatches.CaptureCurrentBindings();
             BudgetUIPatches.Remove();
             VehicleUtilsPatches.Remove();
             IntersectionMovementPathfindPatches.Remove();
             IntersectionMovementPathfindReflectionPatches.Remove();
-            KeybindingPersistenceGuardPatches.Remove();
             if (m_Setting != null)
             {
                 m_Setting.UnregisterInOptionsUI();

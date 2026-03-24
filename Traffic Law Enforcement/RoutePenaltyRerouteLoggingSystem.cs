@@ -117,26 +117,30 @@ namespace Traffic_Law_Enforcement
             CollectCandidateVehicles(m_NavigationLaneChangedQuery);
             CollectCandidateVehicles(m_CarChangedQuery);
 
-            var candidateVehicles = m_CandidateVehicles.ToList();
             int logsEmitted = 0;
-            for (int i = 0; i < candidateVehicles.Count; i++)
+            foreach (Entity vehicle in m_CandidateVehicles)
             {
-                Entity vehicle = candidateVehicles[i];
                 if (!m_CurrentLaneData.TryGetComponent(vehicle, out CarCurrentLane currentLane))
+                {
                     continue;
+                }
 
-                RoutePenaltySnapshot snapshot = BuildSnapshot(vehicle, currentLane);
+                RoutePenaltySnapshot snapshot =
+                    BuildSnapshot(vehicle, currentLane, captureDebugStrings: loggingEnabled);
+
                 if (m_LastSnapshots.TryGetValue(vehicle, out RoutePenaltySnapshot previousSnapshot))
                 {
                     if (ShouldLogReroute(previousSnapshot, snapshot))
                     {
                         RecordRerouteTelemetry(previousSnapshot, snapshot);
+
                         if (loggingEnabled && logsEmitted < MaxLogsPerUpdate)
                         {
                             LogReroute(vehicle, previousSnapshot, snapshot);
-                            logsEmitted++;
+                            logsEmitted += 1;
                         }
                     }
+
                     m_LastSnapshots[vehicle] = snapshot;
                 }
                 else
@@ -146,6 +150,7 @@ namespace Traffic_Law_Enforcement
                     m_LastSnapshots[vehicle] = snapshot;
                 }
             }
+
             int emittedLogs = logsEmitted;
 
             m_UpdateCount += 1;
@@ -192,14 +197,16 @@ namespace Traffic_Law_Enforcement
             }
         }
 
-        private RoutePenaltySnapshot BuildSnapshot(Entity vehicle, CarCurrentLane currentLane)
+        private RoutePenaltySnapshot BuildSnapshot(Entity vehicle, CarCurrentLane currentLane, bool captureDebugStrings)
         {
             RoutePenaltyProfile profile = default;
             bool hasResolvedPublicTransportLanePolicy =
                 TryResolveAllowedOnPublicTransportLaneForLogging(
                     vehicle,
                     out bool allowedOnPublicTransportLane);
-            List<string> penaltyTags = new List<string>(MaxPenaltyTags);
+            List<string> penaltyTags = captureDebugStrings
+                ? new List<string>(MaxPenaltyTags)
+                : null;
             uint hash = 2166136261u;
             int omittedTagCount = 0;
             bool previousUnauthorizedPublicTransportLane = false;
@@ -252,8 +259,8 @@ namespace Traffic_Law_Enforcement
             return new RoutePenaltySnapshot(
                 hash,
                 profile,
-                BuildBreakdown(profile),
-                BuildTagSummary(penaltyTags, omittedTagCount),
+                captureDebugStrings ? BuildBreakdown(profile) : null,
+                captureDebugStrings ? BuildTagSummary(penaltyTags, omittedTagCount) : null,
                 hasResolvedPublicTransportLanePolicy);
         }
 
@@ -763,8 +770,16 @@ namespace Traffic_Law_Enforcement
             return (lane.m_Flags & (Game.Net.CarLaneFlags.SideConnection | Game.Net.CarLaneFlags.ParkingLeft | Game.Net.CarLaneFlags.ParkingRight)) != 0;
         }
 
-        private static void AppendPenaltyTag(List<string> penaltyTags, string tag, ref int omittedTagCount)
+        private static void AppendPenaltyTag(
+            List<string> penaltyTags,
+            string tag,
+            ref int omittedTagCount)
         {
+            if (penaltyTags == null)
+            {
+                return;
+            }
+
             if (string.IsNullOrEmpty(tag) || penaltyTags.Contains(tag))
             {
                 return;
@@ -778,7 +793,7 @@ namespace Traffic_Law_Enforcement
 
             penaltyTags.Add(tag);
         }
-
+        
         private static string BuildTagSummary(List<string> penaltyTags, int omittedTagCount)
         {
             if (penaltyTags.Count == 0)

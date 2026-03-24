@@ -14,10 +14,14 @@ namespace Traffic_Law_Enforcement
 
         private static readonly MethodInfo s_KeybindingSettingsBindingsGetter =
             AccessTools.PropertyGetter(typeof(KeybindingSettings), nameof(KeybindingSettings.bindings));
+        private static readonly FieldInfo s_KeybindingSettingsIsDefaultField =
+            AccessTools.Field(typeof(KeybindingSettings), "m_IsDefault");
 
         private static Harmony s_Harmony;
-        private static List<ProxyBinding> s_LastKnownBuiltInBindings;
-        private static bool s_LoggedMissingBuiltInBindingCache;
+        private static List<ProxyBinding> s_LastKnownEffectiveBuiltInBindings;
+        private static List<ProxyBinding> s_LastKnownOriginalBuiltInBindings;
+        private static bool s_LoggedEffectiveBindingFallback;
+        private static bool s_LoggedOriginalBindingFallback;
 
         public static void Apply()
         {
@@ -30,8 +34,7 @@ namespace Traffic_Law_Enforcement
             {
                 s_Harmony = new Harmony(HarmonyId);
                 HarmonyMethod prefix = new HarmonyMethod(typeof(KeybindingPersistenceGuardPatches), nameof(KeybindingSettingsBindingsPrefix));
-                HarmonyMethod postfix = new HarmonyMethod(typeof(KeybindingPersistenceGuardPatches), nameof(KeybindingSettingsBindingsPostfix));
-                s_Harmony.Patch(s_KeybindingSettingsBindingsGetter, prefix: prefix, postfix: postfix);
+                s_Harmony.Patch(s_KeybindingSettingsBindingsGetter, prefix: prefix);
             }
             catch (Exception ex)
             {
@@ -60,12 +63,8 @@ namespace Traffic_Law_Enforcement
                     return;
                 }
 
-                List<ProxyBinding> builtInBindings = InputManager.instance
-                    .GetBindings(InputManager.PathType.Effective, InputManager.BindingOptions.OnlyRebound | InputManager.BindingOptions.OnlyBuiltIn)
-                    .ToList();
-
-                s_LastKnownBuiltInBindings = CloneBindings(builtInBindings);
-                s_LoggedMissingBuiltInBindingCache = false;
+                CaptureBindings(InputManager.PathType.Effective);
+                CaptureBindings(InputManager.PathType.Original);
             }
             catch (Exception ex)
             {
@@ -73,41 +72,131 @@ namespace Traffic_Law_Enforcement
             }
         }
 
-        private static bool KeybindingSettingsBindingsPrefix(ref List<ProxyBinding> __result)
+        private static bool KeybindingSettingsBindingsPrefix(KeybindingSettings __instance, ref List<ProxyBinding> __result)
         {
-            if (InputManager.instance != null)
-            {
-                return true;
-            }
+            InputManager.PathType pathType = IsDefaultSettings(__instance)
+                ? InputManager.PathType.Original
+                : InputManager.PathType.Effective;
 
-            if (s_LastKnownBuiltInBindings != null)
+            if (TryReadBindings(pathType, out List<ProxyBinding> liveBindings, out Exception failure))
             {
-                __result = CloneBindings(s_LastKnownBuiltInBindings);
-                Mod.log.Warn(
-                    $"[KEYBIND_GUARD] KeybindingSettings.bindings requested after InputManager disposal. Returning cached bindings count={__result.Count}.");
+                __result = liveBindings;
                 return false;
             }
 
-            if (!s_LoggedMissingBuiltInBindingCache)
+            List<ProxyBinding> cachedBindings = GetCachedBindings(pathType);
+            if (cachedBindings != null)
             {
-                s_LoggedMissingBuiltInBindingCache = true;
-                Mod.log.Warn(
-                    "[KEYBIND_GUARD] KeybindingSettings.bindings requested after InputManager disposal without a cache. Returning an empty list to avoid crashing settings save.");
+                __result = CloneBindings(cachedBindings);
+                LogFallback(pathType, failure, __result.Count);
+                return false;
             }
 
+            LogFallback(pathType, failure, 0);
             __result = new List<ProxyBinding>();
             return false;
         }
 
-        private static void KeybindingSettingsBindingsPostfix(List<ProxyBinding> __result)
+        private static void CaptureBindings(InputManager.PathType pathType)
         {
-            if (InputManager.instance == null || __result == null)
+            if (!TryReadBindings(pathType, out _, out Exception failure) && failure != null)
+            {
+                throw failure;
+            }
+        }
+
+        private static bool TryReadBindings(InputManager.PathType pathType, out List<ProxyBinding> bindings, out Exception failure)
+        {
+            bindings = null;
+            failure = null;
+
+            try
+            {
+                if (InputManager.instance == null)
+                {
+                    return false;
+                }
+
+                List<ProxyBinding> snapshot = CloneBindings(
+                    InputManager.instance.GetBindings(
+                        pathType,
+                        InputManager.BindingOptions.OnlyRebound | InputManager.BindingOptions.OnlyBuiltIn));
+
+                SetCachedBindings(pathType, snapshot);
+                ResetFallbackLog(pathType);
+                bindings = snapshot;
+                return true;
+            }
+            catch (Exception ex)
+            {
+                failure = ex;
+                return false;
+            }
+        }
+
+        private static bool IsDefaultSettings(KeybindingSettings settings)
+        {
+            return settings != null &&
+                   s_KeybindingSettingsIsDefaultField != null &&
+                   s_KeybindingSettingsIsDefaultField.GetValue(settings) is bool isDefault &&
+                   isDefault;
+        }
+
+        private static List<ProxyBinding> GetCachedBindings(InputManager.PathType pathType)
+        {
+            return pathType == InputManager.PathType.Original
+                ? s_LastKnownOriginalBuiltInBindings
+                : s_LastKnownEffectiveBuiltInBindings;
+        }
+
+        private static void SetCachedBindings(InputManager.PathType pathType, List<ProxyBinding> bindings)
+        {
+            if (pathType == InputManager.PathType.Original)
+            {
+                s_LastKnownOriginalBuiltInBindings = bindings;
+                return;
+            }
+
+            s_LastKnownEffectiveBuiltInBindings = bindings;
+        }
+
+        private static void ResetFallbackLog(InputManager.PathType pathType)
+        {
+            if (pathType == InputManager.PathType.Original)
+            {
+                s_LoggedOriginalBindingFallback = false;
+                return;
+            }
+
+            s_LoggedEffectiveBindingFallback = false;
+        }
+
+        private static void LogFallback(InputManager.PathType pathType, Exception failure, int bindingCount)
+        {
+            bool alreadyLogged = pathType == InputManager.PathType.Original
+                ? s_LoggedOriginalBindingFallback
+                : s_LoggedEffectiveBindingFallback;
+
+            if (alreadyLogged)
             {
                 return;
             }
 
-            s_LastKnownBuiltInBindings = CloneBindings(__result);
-            s_LoggedMissingBuiltInBindingCache = false;
+            if (pathType == InputManager.PathType.Original)
+            {
+                s_LoggedOriginalBindingFallback = true;
+            }
+            else
+            {
+                s_LoggedEffectiveBindingFallback = true;
+            }
+
+            string failureText = failure == null
+                ? "InputManager was unavailable."
+                : $"{failure.GetType().Name}: {failure.Message}";
+
+            Mod.log.Warn(
+                $"[KEYBIND_GUARD] Falling back to cached {pathType} bindings. count={bindingCount}, reason={failureText}");
         }
 
         private static List<ProxyBinding> CloneBindings(IEnumerable<ProxyBinding> bindings)
