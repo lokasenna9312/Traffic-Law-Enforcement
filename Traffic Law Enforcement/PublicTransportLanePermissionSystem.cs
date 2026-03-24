@@ -22,6 +22,8 @@ namespace Traffic_Law_Enforcement
         private ComponentLookup<PathOwner> m_PathOwnerData;
         private ComponentLookup<CarCurrentLane> m_CurrentLaneData;
         private ComponentLookup<VehicleTrafficLawProfile> m_ProfileData;
+        private ComponentLookup<PublicTransportLanePermissionState> m_PermissionStateData;
+        private ComponentLookup<PublicTransportLanePendingExit> m_PendingExitData;
         private PublicTransportLaneVehicleTypeLookups m_TypeLookups;
         private NativeList<Entity> m_PendingRefreshVehicles;
         private HashSet<Entity> m_ProcessedThisFrame;
@@ -60,6 +62,8 @@ namespace Traffic_Law_Enforcement
             m_PathOwnerData = GetComponentLookup<PathOwner>();
             m_CurrentLaneData = GetComponentLookup<CarCurrentLane>(true);
             m_ProfileData = GetComponentLookup<VehicleTrafficLawProfile>(true);
+            m_PermissionStateData = GetComponentLookup<PublicTransportLanePermissionState>(true);
+            m_PendingExitData = GetComponentLookup<PublicTransportLanePendingExit>(true);
             m_TypeLookups = PublicTransportLaneVehicleTypeLookups.Create(this);
             m_PendingRefreshVehicles = new NativeList<Entity>(Allocator.Persistent);
             m_ProcessedThisFrame = new HashSet<Entity>();
@@ -83,6 +87,8 @@ namespace Traffic_Law_Enforcement
             m_CurrentLaneData.Update(this);
             m_ProfileData.Update(this);
             m_TypeLookups.Update(this);
+            m_PermissionStateData.Update(this);
+            m_PendingExitData.Update(this);
 
             EnforcementGameplaySettingsState settings = EnforcementGameplaySettingsService.Current;
             bool enforcementEnabled = Mod.IsPublicTransportLaneEnforcementEnabled;
@@ -144,7 +150,7 @@ namespace Traffic_Law_Enforcement
 
         private void RemovePendingExitIfPresent(Entity vehicle)
         {
-            if (EntityManager.HasComponent<PublicTransportLanePendingExit>(vehicle))
+            if (m_PendingExitData.HasComponent(vehicle))
             {
                 EntityManager.RemoveComponent<PublicTransportLanePendingExit>(vehicle);
             }
@@ -323,10 +329,9 @@ namespace Traffic_Law_Enforcement
 
         private void EvaluateVehicle(Entity vehicle, Car car)
         {
-            bool hasState = EntityManager.HasComponent<PublicTransportLanePermissionState>(vehicle);
-            PublicTransportLanePermissionState state = hasState
-                ? EntityManager.GetComponentData<PublicTransportLanePermissionState>(vehicle)
-                : default;
+            bool hasState = m_PermissionStateData.TryGetComponent(
+                vehicle,
+                out PublicTransportLanePermissionState state);
 
             CarFlags originalMask = hasState
                 ? state.m_OriginalPublicTransportLaneFlags
@@ -365,11 +370,9 @@ namespace Traffic_Law_Enforcement
             bool currentLaneStillInExitCorridor =
                 currentLaneIsPublicOnly || currentLaneIsConnection;
 
-            bool hasPendingExit = EntityManager.HasComponent<PublicTransportLanePendingExit>(vehicle);
-
-            PublicTransportLanePendingExit pendingExit = hasPendingExit
-                ? EntityManager.GetComponentData<PublicTransportLanePendingExit>(vehicle)
-                : default;
+            bool hasPendingExit = m_PendingExitData.TryGetComponent(
+                vehicle,
+                out PublicTransportLanePendingExit pendingExit);
 
             bool currentlyUsingPTLane =
                 currentLaneIsPublicOnly &&
@@ -545,7 +548,7 @@ namespace Traffic_Law_Enforcement
                 MarkPathObsolete(vehicle, car, reason, role, extra);
             }
 
-            if (removeState && EntityManager.HasComponent<PublicTransportLanePermissionState>(vehicle))
+            if (removeState && m_PermissionStateData.HasComponent(vehicle))
             {
                 EntityManager.RemoveComponent<PublicTransportLanePermissionState>(vehicle);
             }
