@@ -142,19 +142,20 @@ namespace Traffic_Law_Enforcement
                 {
                     if (!m_CurrentLaneData.TryGetComponent(vehicle, out CarCurrentLane currentLane) ||
                         !m_PathOwnerData.TryGetComponent(vehicle, out PathOwner pathOwner) ||
-                        !m_NavigationLaneData.TryGetBuffer(vehicle, out DynamicBuffer<CarNavigationLane> navigationLanes))
+                        !m_NavigationLaneData.TryGetBuffer(vehicle, out DynamicBuffer<CarNavigationLane> navigationLanes) ||
+                        !m_CarData.TryGetComponent(vehicle, out Car car))
                     {
                         continue;
                     }
 
                     // Exclude emergency vehicles
-                    if (EmergencyVehiclePolicy.IsEmergencyVehicle(m_CarData[vehicle]))
+                    if (EmergencyVehiclePolicy.IsEmergencyVehicle(car))
                     {
                         continue;
                     }
 
                     // Exclude vehicles allowed on PT lanes
-                    if ((m_CarData[vehicle].m_Flags & CarFlags.UsePublicTransportLanes) != 0)
+                    if ((car.m_Flags & CarFlags.UsePublicTransportLanes) != 0)
                     {
                         continue;
                     }
@@ -232,7 +233,7 @@ namespace Traffic_Law_Enforcement
                             $"laneShapeCurrent={DescribeLaneShape(currentLane.m_Lane)}, " +
                             $"laneShapeSource={DescribeLaneShape(sourceLane)}, " +
                             $"laneShapeTarget={DescribeLaneShape(targetLane)}";
-
+                            
                         PathObsoleteTraceLogging.Record(
                             "CENTERLINE",
                             vehicle,
@@ -240,7 +241,7 @@ namespace Traffic_Law_Enforcement
                             stateBefore,
                             pathOwner.m_State,
                             reason,
-                            m_CarData[vehicle],
+                            car,
                             role,
                             extra);
                     }
