@@ -16,7 +16,6 @@ namespace Traffic_Law_Enforcement
     {
         private const int MaxStructureSampleLogs = 64;
         private const int ContextSummaryLogInterval = 512;
-        private const byte EvaluationNone = 0;
         private const byte EvaluationNoAccessTransition = 1;
         private const byte EvaluationCleanAccessTransition = 2;
         private const byte EvaluationInvalidatedAccessTransition = 3;
@@ -247,7 +246,7 @@ namespace Traffic_Law_Enforcement
                         RecordInvalidationContext(currentLane.m_Lane);
 
                         Mod.log.Info($"Planned center-line access route invalidated: vehicle={vehicle}, fromLane={sourceLane}, toLane={targetLane}, accessIndex={transitionIndex}, transition={transitionKind}, reason={reason}");
-                        LogStructureSample(vehicle, currentLane.m_Lane, sourceLane, targetLane, transitionIndex, transitionKind, reason);
+                        LogStructureSample(currentLane.m_Lane, sourceLane, targetLane, transitionKind);
                         LogInvalidationContextSummaryIfNeeded();
                     }
                 }
@@ -321,7 +320,7 @@ namespace Traffic_Law_Enforcement
             return false;
         }
 
-        private void LogStructureSample(Entity vehicle, Entity currentLane, Entity sourceLane, Entity targetLane, int transitionIndex, string transitionKind, string reason)
+        private void LogStructureSample(Entity currentLane, Entity sourceLane, Entity targetLane, string transitionKind)
         {
             if (m_StructureSampleSignatures.Count >= MaxStructureSampleLogs)
             {
@@ -336,10 +335,6 @@ namespace Traffic_Law_Enforcement
             string targetOwnerChain = DescribeOwnerChain(targetLane);
             Entity accessLane = IsAccessOrigin(sourceLane) ? sourceLane : targetLane;
             Entity roadLane = accessLane == sourceLane ? targetLane : sourceLane;
-            string accessLaneShape = DescribeLaneShape(accessLane);
-            string roadLaneShape = DescribeLaneShape(roadLane);
-            string accessOwnerChain = DescribeOwnerChain(accessLane);
-            string roadOwnerChain = DescribeOwnerChain(roadLane);
             string signature = $"{transitionKind}|{currentLaneShape}|{sourceLaneShape}|{targetLaneShape}|{currentOwnerChain}|{sourceOwnerChain}|{targetOwnerChain}";
             if (!m_StructureSampleSignatures.Add(signature))
             {
@@ -617,16 +612,6 @@ namespace Traffic_Law_Enforcement
 
             return prefabName.IndexOf("Public Transport", System.StringComparison.OrdinalIgnoreCase) >= 0 ||
                 prefabName.IndexOf("Tram", System.StringComparison.OrdinalIgnoreCase) >= 0;
-        }
-
-        private static string FormatPercent(int numerator, int denominator)
-        {
-            if (denominator <= 0)
-            {
-                return "0.0%";
-            }
-
-            return ((100.0 * numerator) / denominator).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) + "%";
         }
 
         private void ResetDuplicateSuppressionIfPathChanged(Entity vehicle, PathOwner pathOwner)
