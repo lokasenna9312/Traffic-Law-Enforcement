@@ -185,7 +185,8 @@ namespace Traffic_Law_Enforcement
             if (!allowOnPublicTransportLane &&
                 entityManager.HasComponent<PublicTransportLanePendingExit>(owner))
             {
-                allowOnPublicTransportLane = true;
+                PublicTransportLanePendingExit pendingExit = entityManager.GetComponentData<PublicTransportLanePendingExit>(owner);
+                allowOnPublicTransportLane = pendingExit.m_HasLeftPublicTransportLane == 0;
             }
 
             SetRuleFlag(
