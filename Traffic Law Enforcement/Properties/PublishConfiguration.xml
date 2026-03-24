@@ -107,7 +107,7 @@ The following options can be configured either for the currently loaded save fil
 	<!--Link to the forum post where the mod can be discussed-->
 	<ForumLink Value="https://forum.paradoxplaza.com/forum/threads/traffic-law-enforcement.1909882/" />
 	<!--Version of the mod-->
-	<ModVersion Value="0.2.1." />
+	<ModVersion Value="0.2.1" />
 	<!--Recommended version of the base game to use the mod-->
 	<GameVersion Value="1.5.6f1" />
 	<!--Dependency for the mod, can be set multiple times-->
