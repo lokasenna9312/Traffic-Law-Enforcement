@@ -76,6 +76,10 @@ namespace Traffic_Law_Enforcement
                 $"[SAVELOAD] SetDefaults: purpose={context.purpose}, " +
                 $"save={saveContext}, " +
                 $"willClearLegacyRuntimeState={context.purpose == Purpose.LoadGame}");
+            if (saveContext == "unknown")
+            {
+                LogSaveContextMemberDump(context, "SetDefaults");
+            }
             AdvanceRuntimeWorldGeneration(context);
             ResetRuntimeState();
             EnforcementGameplaySettingsService.Apply(CreateInitialGameplaySettings(context));
@@ -87,10 +91,15 @@ namespace Traffic_Law_Enforcement
 
         public void PreDeserialize(Context context)
         {
+            string saveContext = TryDescribeSaveContext(context);
             Mod.log.Info(
                 $"[SAVELOAD] PreDeserialize: purpose={context.purpose}, " +
                 $"save={TryDescribeSaveContext(context)}");
             ResetRuntimeState();
+            if (saveContext == "unknown")
+            {
+                LogSaveContextMemberDump(context, "PreDeserialize");
+            }
             m_LoadedPublicTransportLaneVehicleStates.Clear();
             m_HasDeserializedData = false;
             m_ShouldClearLegacyRuntimeState = false;
@@ -99,9 +108,14 @@ namespace Traffic_Law_Enforcement
 
         public void PostDeserialize(Context context)
         {
+            string saveContext = TryDescribeSaveContext(context);
             Mod.log.Info(
                 $"[SAVELOAD] PostDeserialize: purpose={context.purpose}, " +
                 $"save={TryDescribeSaveContext(context)}");
+            if (saveContext == "unknown")
+            {
+                LogSaveContextMemberDump(context, "PostDeserialize");
+            }
             m_PendingPostDeserializeApply = true;
         }
 
@@ -670,6 +684,67 @@ namespace Traffic_Law_Enforcement
                     $"totalActualPathCount={totalActualPathCount}, totalAvoidedPathCount={totalAvoidedPathCount}");
 
                 m_PendingPostDeserializeApply = true;
+        }
+
+        private static bool s_HasLoggedSaveContextMemberDump;
+
+        private static void LogSaveContextMemberDump(Context context, string stage)
+        {
+            if (s_HasLoggedSaveContextMemberDump)
+            {
+                return;
+            }
+
+            s_HasLoggedSaveContextMemberDump = true;
+
+            object boxed = context;
+            System.Type type = boxed.GetType();
+
+            Mod.log.Info($"[SAVELOAD] Context dump begin: stage={stage}, type={type.FullName}");
+
+            PropertyInfo[] properties =
+                type.GetProperties(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+
+            for (int index = 0; index < properties.Length; index += 1)
+            {
+                PropertyInfo property = properties[index];
+
+                object value;
+                try
+                {
+                    value = property.GetValue(boxed);
+                }
+                catch
+                {
+                    continue;
+                }
+
+                string rendered = value == null ? "<null>" : value.ToString();
+                Mod.log.Info($"[SAVELOAD] Context property: {property.Name} = {rendered}");
+            }
+
+            FieldInfo[] fields =
+                type.GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+
+            for (int index = 0; index < fields.Length; index += 1)
+            {
+                FieldInfo field = fields[index];
+
+                object value;
+                try
+                {
+                    value = field.GetValue(boxed);
+                }
+                catch
+                {
+                    continue;
+                }
+
+                string rendered = value == null ? "<null>" : value.ToString();
+                Mod.log.Info($"[SAVELOAD] Context field: {field.Name} = {rendered}");
+            }
+
+            Mod.log.Info($"[SAVELOAD] Context dump end: stage={stage}");
         }
 
         private void ApplyLoadedStateToWorld()

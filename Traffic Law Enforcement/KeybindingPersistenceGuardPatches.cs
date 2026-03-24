@@ -34,7 +34,8 @@ namespace Traffic_Law_Enforcement
             {
                 s_Harmony = new Harmony(HarmonyId);
                 HarmonyMethod prefix = new HarmonyMethod(typeof(KeybindingPersistenceGuardPatches), nameof(KeybindingSettingsBindingsPrefix));
-                s_Harmony.Patch(s_KeybindingSettingsBindingsGetter, prefix: prefix);
+                HarmonyMethod finalizer = new HarmonyMethod(typeof(KeybindingPersistenceGuardPatches), nameof(KeybindingSettingsBindingsFinalizer));
+                s_Harmony.Patch(s_KeybindingSettingsBindingsGetter, prefix: prefix, finalizer: finalizer);
             }
             catch (Exception ex)
             {
@@ -95,6 +96,33 @@ namespace Traffic_Law_Enforcement
             LogFallback(pathType, failure, 0);
             __result = new List<ProxyBinding>();
             return false;
+        }
+
+        private static Exception KeybindingSettingsBindingsFinalizer(
+            KeybindingSettings __instance,
+            ref List<ProxyBinding> __result,
+            Exception __exception)
+        {
+            if (__exception == null)
+            {
+                return null;
+            }
+
+            InputManager.PathType pathType = IsDefaultSettings(__instance)
+                ? InputManager.PathType.Original
+                : InputManager.PathType.Effective;
+
+            List<ProxyBinding> cachedBindings = GetCachedBindings(pathType);
+            if (cachedBindings != null)
+            {
+                __result = CloneBindings(cachedBindings);
+                LogFallback(pathType, __exception, __result.Count);
+                return null;
+            }
+
+            __result = new List<ProxyBinding>();
+            LogFallback(pathType, __exception, 0);
+            return null;
         }
 
         private static void CaptureBindings(InputManager.PathType pathType)
