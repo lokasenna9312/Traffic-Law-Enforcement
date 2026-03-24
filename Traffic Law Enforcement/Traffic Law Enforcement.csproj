@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 	<PropertyGroup>
 		<NeedBuild Condition="'$(NeedBuild)' == ''">true</NeedBuild>
+		<EnableGeneratedModJson Condition="'$(EnableGeneratedModJson)' == ''">false</EnableGeneratedModJson>
 	</PropertyGroup>
 
 	<PropertyGroup>
@@ -127,7 +128,12 @@
 
 	<Target Name="CheckEntityPackagePath" Condition="Exists('$(EntityPackagePath)')" />
 
-	<Target Name="GenerateModJson" AfterTargets="AfterBuild" Condition="'$(NeedBuild)'">
+	<Target Name="PrepareLegacyModMetadata" BeforeTargets="DeployWIP" Condition="'$(NeedBuild)'">
+		<Delete Files="$(OutDir)mod.json" />
+		<Copy SourceFiles="$(MSBuildProjectDirectory)\Properties\PublishConfiguration.xml" DestinationFiles="$(OutDir)PublishConfiguration.xml" SkipUnchangedFiles="true" />
+	</Target>
+
+	<Target Name="GenerateModJson" AfterTargets="AfterBuild" Condition="'$(NeedBuild)' and '$(EnableGeneratedModJson)' == 'true'">
 		<PropertyGroup>
 			<PublishConfigurationFullPathForBuild Condition="'$(PublishConfigurationPath)' != ''">$([System.IO.Path]::GetFullPath('$(PublishConfigurationPath)'))</PublishConfigurationFullPathForBuild>
 			<PublishConfigurationFullPathForBuild Condition="'$(PublishConfigurationPath)' == ''">$([System.IO.Path]::GetFullPath('Properties\PublishConfiguration.xml'))</PublishConfigurationFullPathForBuild>

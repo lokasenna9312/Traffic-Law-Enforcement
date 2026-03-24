@@ -15,6 +15,7 @@ namespace Traffic_Law_Enforcement
         private ComponentLookup<VehicleTrafficLawProfile> m_ProfileData;
         private ComponentLookup<PersistedPublicTransportLaneAccessState> m_PersistedAccessStateData;
         private EntityQuery m_PersistedWithoutProfileQuery;
+        private EntityQuery m_PersistedStateQuery;
         private NativeList<Entity> m_PendingRefreshVehicles;
         private const int kVehiclesPerFrame = 512;
         private int m_RefreshCursor;
@@ -42,6 +43,14 @@ namespace Traffic_Law_Enforcement
                 None = new[]
                 {
                     ComponentType.ReadOnly<VehicleTrafficLawProfile>(),
+                },
+            });
+            m_PersistedStateQuery = GetEntityQuery(new EntityQueryDesc
+            {
+                All = new[]
+                {
+                    ComponentType.ReadOnly<Car>(),
+                    ComponentType.ReadOnly<PersistedPublicTransportLaneAccessState>(),
                 },
             });
             RequireForUpdate(m_AllCarsQuery);
@@ -100,8 +109,16 @@ namespace Traffic_Law_Enforcement
 
         private void SeedProfilesFromPersistedState(int permissionSettingsMask)
         {
-            if (m_PersistedWithoutProfileQuery.IsEmptyIgnoreFilter)
+            int persistedCount = m_PersistedStateQuery.CalculateEntityCount();
+            int persistedWithoutProfileCount = m_PersistedWithoutProfileQuery.CalculateEntityCount();
+
+            if (persistedWithoutProfileCount == 0)
             {
+                Mod.log.Info(
+                    $"[SAVELOAD] SeedProfilesFromPersistedState: seededProfiles=0, " +
+                    $"persistedStates={persistedCount}, " +
+                    $"persistedWithoutProfile={persistedWithoutProfileCount}, " +
+                    $"permissionSettingsMask={permissionSettingsMask}");
                 return;
             }
 
@@ -154,6 +171,8 @@ namespace Traffic_Law_Enforcement
             }
             Mod.log.Info(
                 $"[SAVELOAD] SeedProfilesFromPersistedState: seededProfiles={seededCount}, " +
+                $"persistedStates={persistedCount}, " +
+                $"persistedWithoutProfile={persistedWithoutProfileCount}, " +
                 $"permissionSettingsMask={permissionSettingsMask}");
         }
 
