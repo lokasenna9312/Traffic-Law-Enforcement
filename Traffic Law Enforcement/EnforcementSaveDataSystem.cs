@@ -290,7 +290,7 @@ namespace Traffic_Law_Enforcement
         {
             reader.Read(out int version);
             Mod.log.Info($"[SAVELOAD] Deserialize begin: version={version}");
-            if (version != 3 && version != 4 && version != 5 && version != 6 && version != 7 && version != 8 && version != 10 && version != kSerializationVersion)
+            if (version != 3 && version != 4 && version != 5 && version != 6 && version != 7 && version != 8 && version != kSerializationVersion)
             {
                 Mod.log.Info($"Unsupported enforcement save-data version {version}. Falling back to defaults.");
                 return;
