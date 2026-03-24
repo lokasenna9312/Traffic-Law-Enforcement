@@ -6,7 +6,6 @@ using Game.Vehicles;
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Burst;
-using System.Linq;
 using Entity = Unity.Entities.Entity;
 
 namespace Traffic_Law_Enforcement
@@ -793,7 +792,7 @@ namespace Traffic_Law_Enforcement
 
             penaltyTags.Add(tag);
         }
-        
+
         private static string BuildTagSummary(List<string> penaltyTags, int omittedTagCount)
         {
             if (penaltyTags.Count == 0)
