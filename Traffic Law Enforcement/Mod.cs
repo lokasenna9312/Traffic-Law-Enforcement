@@ -119,7 +119,7 @@ namespace Traffic_Law_Enforcement
 
             foreach (string filePath in files)
             {
-                string localeId = Path.GetFileNameWithoutExtension(filePath);
+                string localeId = NormalizeLocaleId(Path.GetFileNameWithoutExtension(filePath));
                 Dictionary<string, string> entries = PropertiesLocaleSource.LoadKeyValueFile(filePath);
 
                 ValidateTextLocaleFile(localeId, entries, englishEntries, keyMap);
