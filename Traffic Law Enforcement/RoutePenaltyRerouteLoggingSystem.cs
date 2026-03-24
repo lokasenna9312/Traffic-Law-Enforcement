@@ -202,7 +202,7 @@ namespace Traffic_Law_Enforcement
             List<string> penaltyTags = new List<string>(MaxPenaltyTags);
             uint hash = 2166136261u;
             int omittedTagCount = 0;
-            bool previousunauthorizedPublicTransportLane = false;
+            bool previousUnauthorizedPublicTransportLane = false;
             Entity previousLane = Entity.Null;
             Entity previousLaneOwner = Entity.Null;
 
@@ -213,7 +213,7 @@ namespace Traffic_Law_Enforcement
                 allowedOnPublicTransportLane,
                 ref previousLane,
                 ref previousLaneOwner,
-                ref previousunauthorizedPublicTransportLane,
+                ref previousUnauthorizedPublicTransportLane,
                 ref profile,
                 ref hash,
                 penaltyTags,
@@ -241,7 +241,7 @@ namespace Traffic_Law_Enforcement
                         allowedOnPublicTransportLane,
                         ref previousLane,
                         ref previousLaneOwner,
-                        ref previousunauthorizedPublicTransportLane,
+                        ref previousUnauthorizedPublicTransportLane,
                         ref profile,
                         ref hash,
                         penaltyTags,
@@ -259,7 +259,7 @@ namespace Traffic_Law_Enforcement
             bool allowedOnPublicTransportLane,
             ref Entity previousLane,
             ref Entity previousLaneOwner,
-            ref bool previousunauthorizedPublicTransportLane,
+            ref bool previousUnauthorizedPublicTransportLane,
             ref RoutePenaltyProfile profile,
             ref uint hash,
             List<string> penaltyTags,
@@ -297,7 +297,7 @@ namespace Traffic_Law_Enforcement
                 allowedOnPublicTransportLane,
                 unauthorizedPublicTransportLane);
 
-            if (unauthorizedPublicTransportLane && !previousunauthorizedPublicTransportLane)
+            if (unauthorizedPublicTransportLane && !previousUnauthorizedPublicTransportLane)
             {
                 profile.PublicTransportLaneSegments += 1;
                 AppendPenaltyTag(penaltyTags, DescribeunauthorizedPublicTransportLaneTag(lane), ref omittedTagCount);
@@ -306,7 +306,7 @@ namespace Traffic_Law_Enforcement
             hash = HashLane(hash, lane, unauthorizedPublicTransportLane);
             previousLane = lane;
             previousLaneOwner = laneOwner;
-            previousunauthorizedPublicTransportLane = unauthorizedPublicTransportLane;
+            previousUnauthorizedPublicTransportLane = unauthorizedPublicTransportLane;
         }
 
         private void MaybeLogPublicTransportLaneDecisionDiagnostic(

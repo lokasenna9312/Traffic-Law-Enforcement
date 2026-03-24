@@ -107,7 +107,7 @@ The following options can be configured either for the currently loaded save fil
 	<!--Link to the forum post where the mod can be discussed-->
 	<ForumLink Value="https://forum.paradoxplaza.com/forum/threads/traffic-law-enforcement.1909882/" />
 	<!--Version of the mod-->
-	<ModVersion Value="0.2.3" />
+	<ModVersion Value="0.2.4" />
 	<!--Recommended version of the base game to use the mod-->
 	<GameVersion Value="1.5.6f1" />
 	<!--Dependency for the mod, can be set multiple times-->
@@ -116,8 +116,7 @@ The following options can be configured either for the currently loaded save fil
 	<RequiredDLC Value="" />
 	<!--Change log for new version. Single line or multi line. Supports minimal markdown subset-->
 	<ChangeLog>
-- More opmtimization applied.
-- Save/load related codes are refactored, and some untested features related to save/load are tested and verified to be working.
+- Save/load related codes are refactored, and some untested features related to save/load are tested and verified to be working. (0.2.3 was misuploaded.)
 	</ChangeLog>
 	<!--External link, can be set multiple times. supported types are "discord", "github", "youtube", "twitch", "x", "paypal", "patreon", "buymeacoffee", "kofi", "crowdin", "gitlab", "gofundme"-->
 	<ExternalLink Type="github" Url="https://github.com/lokasenna9312/Traffic-Law-Enforcement/" />
