@@ -21,6 +21,7 @@ namespace Traffic_Law_Enforcement
         private BufferLookup<CarNavigationLane> m_NavigationLaneData;
         private ComponentLookup<ConnectionLane> m_ConnectionLaneData;
         private ComponentLookup<CarLane> m_CarLaneData;
+        private ComponentLookup<EdgeLane> m_EdgeLaneData;
         private ComponentLookup<PathOwner> m_PathOwnerData;
         private ComponentLookup<CarCurrentLane> m_CurrentLaneData;
         private ComponentLookup<VehicleTrafficLawProfile> m_ProfileData;
@@ -44,6 +45,7 @@ namespace Traffic_Law_Enforcement
                 ComponentType.ReadOnly<CarCurrentLane>(),
                 ComponentType.ReadOnly<PublicTransportLanePendingExit>());
             m_CarLaneData = GetComponentLookup<CarLane>(true);
+            m_EdgeLaneData = GetComponentLookup<EdgeLane>(true);
             m_NavigationLaneData = GetBufferLookup<CarNavigationLane>(true);
             m_ConnectionLaneData = GetComponentLookup<ConnectionLane>(true);
             m_ChangedCarQuery = GetEntityQuery(ComponentType.ReadWrite<Car>());
@@ -95,6 +97,7 @@ namespace Traffic_Law_Enforcement
             m_PendingExitData.Update(this);
             m_NavigationLaneData.Update(this);
             m_ConnectionLaneData.Update(this);
+            m_EdgeLaneData.Update(this);
 
             EnforcementGameplaySettingsState settings = EnforcementGameplaySettingsService.Current;
             bool enforcementEnabled = Mod.IsPublicTransportLaneEnforcementEnabled;
@@ -161,9 +164,6 @@ namespace Traffic_Law_Enforcement
                 return false;
             }
 
-            Entity firstUpcomingLane = Entity.Null;
-            Entity secondUpcomingLane = Entity.Null;
-
             for (int index = 0; index < navigationLanes.Length; index += 1)
             {
                 Entity nextLane = navigationLanes[index].m_Lane;
@@ -172,28 +172,26 @@ namespace Traffic_Law_Enforcement
                     continue;
                 }
 
-                if (firstUpcomingLane == Entity.Null)
+                if (IsPublicOnlyLane(nextLane))
                 {
-                    firstUpcomingLane = nextLane;
+                    return true;
+                }
+
+                if (m_ConnectionLaneData.HasComponent(nextLane))
+                {
                     continue;
                 }
 
-                secondUpcomingLane = nextLane;
-                break;
-            }
+                if (m_EdgeLaneData.HasComponent(nextLane) &&
+                    m_CarLaneData.HasComponent(nextLane))
+                {
+                    return false;
+                }
 
-            if (firstUpcomingLane == Entity.Null)
-            {
                 return false;
             }
 
-            if (IsPublicOnlyLane(firstUpcomingLane))
-            {
-                return true;
-            }
-
-            bool firstIsConnection = m_ConnectionLaneData.HasComponent(firstUpcomingLane);
-            return firstIsConnection && IsPublicOnlyLane(secondUpcomingLane);
+            return false;
         }
 
         private void RemovePendingExitIfPresent(Entity vehicle)
