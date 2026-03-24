@@ -299,7 +299,7 @@ namespace Traffic_Law_Enforcement
 
             bool unauthorizedPublicTransportLane =
                 hasResolvedPublicTransportLanePolicy &&
-                IsunauthorizedPublicTransportLane(lane, allowedOnPublicTransportLane);
+                IsUnauthorizedPublicTransportLane(lane, allowedOnPublicTransportLane);
 
             MaybeLogPublicTransportLaneDecisionDiagnostic(
                 vehicle,
@@ -311,7 +311,7 @@ namespace Traffic_Law_Enforcement
             if (unauthorizedPublicTransportLane && !previousUnauthorizedPublicTransportLane)
             {
                 profile.PublicTransportLaneSegments += 1;
-                AppendPenaltyTag(penaltyTags, DescribeunauthorizedPublicTransportLaneTag(lane), ref omittedTagCount);
+                AppendPenaltyTag(penaltyTags, DescribeUnauthorizedPublicTransportLaneTag(lane), ref omittedTagCount);
             }
 
             hash = HashLane(hash, lane, unauthorizedPublicTransportLane);
@@ -514,7 +514,7 @@ namespace Traffic_Law_Enforcement
             return true;
         }
 
-        private bool IsunauthorizedPublicTransportLane(Entity lane, bool allowedOnPublicTransportLane)
+        private bool IsUnauthorizedPublicTransportLane(Entity lane, bool allowedOnPublicTransportLane)
         {
             if (lane == Entity.Null || !m_CarLaneData.TryGetComponent(lane, out CarLane laneData))
             {
@@ -665,7 +665,7 @@ namespace Traffic_Law_Enforcement
             return Entity.Null;
         }
 
-        private string DescribeunauthorizedPublicTransportLaneTag(Entity lane)
+        private string DescribeUnauthorizedPublicTransportLaneTag(Entity lane)
         {
             return DescribeLaneKind(lane) + "(public-only, illegal)";
         }
