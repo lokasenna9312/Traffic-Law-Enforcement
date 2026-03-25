@@ -338,11 +338,6 @@ namespace Traffic_Law_Enforcement
             string localizationId = GetReportLocalizationId(report.m_MonthIndex);
             bool localizationChanged = EnsureLocalizationEntriesForLocales(localizationId, report, periodStart, periodEnd);
 
-            if (localizationChanged)
-            {
-                ReloadActiveLocale();
-            }
-
             if (m_ReportTriggerEntities.TryGetValue(report.m_MonthIndex, out triggerEntity) &&
                 triggerEntity != Entity.Null &&
                 EntityManager.Exists(triggerEntity))
@@ -363,11 +358,6 @@ namespace Traffic_Law_Enforcement
             string assetKey = $"{kPrefabNamePrefix}.Preview.{periodEnd}.{previewSequence}";
             string localizationId = GetPreviewLocalizationId(periodEnd, previewSequence);
             bool localizationChanged = EnsureLocalizationEntriesForLocales(localizationId, report, periodStart, periodEnd);
-
-            if (localizationChanged)
-            {
-                ReloadActiveLocale();
-            }
 
             triggerEntity = CreateChirpTriggerEntity(assetKey, localizationId);
             return localizationChanged;

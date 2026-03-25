@@ -81,6 +81,7 @@ namespace Traffic_Law_Enforcement
             SaveLoadTracePatches.Remove();
             SaveLoadTraceService.Reset();
             KeybindingPersistenceGuardPatches.CaptureCurrentBindings();
+            ShutdownSettingsSnapshotGuard.Prepare();
             KeybindingPersistenceGuardPatches.Remove();
             BudgetUIPatches.Remove();
             VehicleUtilsPatches.Remove();
