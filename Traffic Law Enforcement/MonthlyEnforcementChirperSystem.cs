@@ -127,7 +127,7 @@ namespace Traffic_Law_Enforcement
 
             if (MonthlyEnforcementChirperService.TryAdvanceMonth(currentMonthIndex, out MonthlyEnforcementReport completedReport))
             {
-                // PublishCompletedMonthReport(completedReport);
+                PublishCompletedMonthReport(completedReport);
             }
 
             while (MonthlyEnforcementChirperService.TryConsumeManualPreviewRequest())
