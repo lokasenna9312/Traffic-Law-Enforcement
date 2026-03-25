@@ -58,7 +58,7 @@ namespace Traffic_Law_Enforcement
                 source,
                 "unknown");
 
-            Mod.log.Info(
+            EnforcementLoggingPolicy.RecordSaveIdentification(
                 $"[SAVELOAD] Pending load captured: " +
                 $"source={LastRequestSource}, " +
                 $"name={LastRequestedSaveName}, " +

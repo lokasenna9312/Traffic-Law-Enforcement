@@ -27,6 +27,7 @@ namespace Traffic_Law_Enforcement
         private static List<ProxyBinding> s_LastKnownOriginalBuiltInBindings;
         private static bool s_LoggedEffectiveBindingFallback;
         private static bool s_LoggedOriginalBindingFallback;
+        private static bool s_LoggedMemberValueSuppression;
 
         public static void Apply()
         {
@@ -50,12 +51,16 @@ namespace Traffic_Law_Enforcement
                 {
                     priority = 800
                 };
+                HarmonyMethod memberValueFinalizer = new HarmonyMethod(typeof(KeybindingPersistenceGuardPatches), nameof(TypeExtensionsGetMemberValueFinalizer))
+                {
+                    priority = 0
+                };
 
                 s_Harmony.Patch(s_KeybindingSettingsBindingsGetter, prefix: getterPrefix, finalizer: getterFinalizer);
 
                 if (s_TypeExtensionsGetMemberValueMethod != null)
                 {
-                    s_Harmony.Patch(s_TypeExtensionsGetMemberValueMethod, prefix: memberValuePrefix);
+                    s_Harmony.Patch(s_TypeExtensionsGetMemberValueMethod, prefix: memberValuePrefix, finalizer: memberValueFinalizer);
                 }
             }
             catch (Exception ex)
@@ -116,19 +121,34 @@ namespace Traffic_Law_Enforcement
 
         private static bool TypeExtensionsGetMemberValuePrefix(MemberInfo member, object obj, ref object __result)
         {
-            if (obj is not KeybindingSettings settings)
-            {
-                return true;
-            }
-
-            if (member == null ||
-                !string.Equals(member.Name, nameof(KeybindingSettings.bindings), StringComparison.Ordinal))
+            if (!TryGetBindingMemberTarget(member, obj, out KeybindingSettings settings))
             {
                 return true;
             }
 
             __result = ResolveBindings(settings, null);
             return false;
+        }
+
+        private static Exception TypeExtensionsGetMemberValueFinalizer(
+            MemberInfo member,
+            object obj,
+            ref object __result,
+            Exception __exception)
+        {
+            if (__exception == null)
+            {
+                return null;
+            }
+
+            if (!TryGetBindingMemberTarget(member, obj, out KeybindingSettings settings))
+            {
+                return __exception;
+            }
+
+            __result = ResolveBindings(settings, __exception);
+            LogMemberValueSuppression(member, obj, __exception);
+            return null;
         }
 
         private static void CaptureBindings(InputManager.PathType pathType)
@@ -206,6 +226,14 @@ namespace Traffic_Law_Enforcement
                    isDefault;
         }
 
+        private static bool TryGetBindingMemberTarget(MemberInfo member, object obj, out KeybindingSettings settings)
+        {
+            settings = obj as KeybindingSettings;
+            return settings != null &&
+                   member != null &&
+                   string.Equals(member.Name, nameof(KeybindingSettings.bindings), StringComparison.Ordinal);
+        }
+
         private static List<ProxyBinding> GetCachedBindings(InputManager.PathType pathType)
         {
             return pathType == InputManager.PathType.Original
@@ -261,6 +289,23 @@ namespace Traffic_Law_Enforcement
 
             Mod.log.Warn(
                 $"[KEYBIND_GUARD] Falling back to cached {pathType} bindings. count={bindingCount}, reason={failureText}");
+        }
+
+        private static void LogMemberValueSuppression(MemberInfo member, object obj, Exception failure)
+        {
+            if (s_LoggedMemberValueSuppression)
+            {
+                return;
+            }
+
+            s_LoggedMemberValueSuppression = true;
+
+            Mod.log.Warn(
+                "[KEYBIND_GUARD] Suppressed TypeExtensions.GetMemberValue exception " +
+                $"for member={member?.DeclaringType?.FullName}.{member?.Name}, " +
+                $"memberInfoType={member?.GetType().FullName}, " +
+                $"objType={obj?.GetType().FullName}, " +
+                $"reason={failure.GetType().Name}: {failure.Message}");
         }
 
         private static List<ProxyBinding> CloneBindings(IEnumerable<ProxyBinding> bindings)

@@ -71,14 +71,13 @@ namespace Traffic_Law_Enforcement
                 return;
             }
 
-            if (!m_HasDeserializeBeenCalledForCurrentLoad)
+            if (!m_HasDeserializeBeenCalledForCurrentLoad &&
+                EnforcementLoggingPolicy.ShouldLogSaveIdentification())
             {
                 Mod.log.Info(
-                    $"[SAVELOAD] Apply requested without Deserialize call: " +
-                    $"contextStamp={m_LastContextStamp}, contextStage={m_LastContextStage}, " +
-                    $"context={m_LastContextSummary}, lastKnownSave={m_LastKnownSaveContext}, " +
-                    $"{SaveLoadTraceService.DescribePendingLoad()}, " +
-                    $"runtimeGeneration={RuntimeWorldGeneration}");
+                    $"[SAVELOAD] Loaded save without Traffic Law Enforcement save-data block: " +
+                    $"runtimeGeneration={RuntimeWorldGeneration}" +
+                    $"{EnforcementLoggingPolicy.FormatSaveIdentificationSuffix()}");
             }
 
             ApplyLoadedStateToWorld();
@@ -356,8 +355,8 @@ namespace Traffic_Law_Enforcement
                 $"[SAVELOAD] Deserialize begin: version={version}, " +
                 $"contextStamp={m_LastContextStamp}, contextStage={m_LastContextStage}, " +
                 $"context={m_LastContextSummary}, lastKnownSave={m_LastKnownSaveContext}, " +
-                $"{SaveLoadTraceService.DescribePendingLoad()}, " +
-                $"runtimeGeneration={RuntimeWorldGeneration}");
+                $"runtimeGeneration={RuntimeWorldGeneration}" +
+                $"{EnforcementLoggingPolicy.FormatSaveIdentificationSuffix()}");
             if (version != 3 && version != 4 && version != 5 && version != 6 && version != 7 && version != 8 && version != kSerializationVersion)
             {
                 Mod.log.Info($"Unsupported enforcement save-data version {version}. Falling back to defaults.");
@@ -745,8 +744,8 @@ namespace Traffic_Law_Enforcement
                     $"[SAVELOAD] Deserialize loaded: version={version}, " +
                     $"contextStamp={m_LastContextStamp}, contextStage={m_LastContextStage}, " +
                     $"context={m_LastContextSummary}, lastKnownSave={m_LastKnownSaveContext}, " +
-                    $"{SaveLoadTraceService.DescribePendingLoad()}, " +
                     $"runtimeGeneration={RuntimeWorldGeneration}, " +
+                    $"{EnforcementLoggingPolicy.FormatSaveIdentificationSuffix()}, " +
                     $"loadedPtVehicleStates={m_LoadedPublicTransportLaneVehicleStates.Count}, " +
                     $"hasTrackingState={trackingState.HasValue}, " +
                     $"hasPolicyImpactTrackingState={policyImpactTrackingState.HasValue}, " +

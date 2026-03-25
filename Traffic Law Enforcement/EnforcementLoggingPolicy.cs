@@ -52,6 +52,23 @@ namespace Traffic_Law_Enforcement
             return EnablePathObsoleteSourceLogging;
         }
 
+        public static bool EnableSaveIdentificationLogging => Mod.Settings?.EnableSaveIdentificationLogging ?? false;
+
+        public static bool ShouldLogSaveIdentification()
+        {
+            return EnableSaveIdentificationLogging;
+        }
+
+        public static void RecordSaveIdentification(string message)
+        {
+            if (!ShouldLogSaveIdentification() || string.IsNullOrWhiteSpace(message))
+            {
+                return;
+            }
+
+            Mod.log.Info(message);
+        }
+
         public static void RecordEnforcementEvent(string message)
         {
             if (!ShouldLogEnforcementEvents() || string.IsNullOrWhiteSpace(message))
@@ -92,6 +109,13 @@ namespace Traffic_Law_Enforcement
             }
             EnforcementTelemetry.RecordEvent(message);
             Mod.log.Info(message);
+        }
+
+        public static string FormatSaveIdentificationSuffix()
+        {
+            return ShouldLogSaveIdentification()
+                ? ", " + SaveLoadTraceService.DescribePendingLoad()
+                : string.Empty;
         }
     }
 }

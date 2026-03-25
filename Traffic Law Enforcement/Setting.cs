@@ -594,6 +594,10 @@ namespace Traffic_Law_Enforcement
         public bool EnablePathObsoleteSourceLogging { get; set; }
 
         [Exclude]
+        [SettingsUISection(kDebugTab, kDebugGroup)]
+        public bool EnableSaveIdentificationLogging { get; set; }
+
+        [Exclude]
         [SettingsUISection(kDebugTab, kLogPathGroup)]
         public string ModLogPath => GetModLogPath();
 
@@ -623,6 +627,7 @@ namespace Traffic_Law_Enforcement
             EnableType4PublicTransportLaneUsageLogging = false;
             EnablePathfindingPenaltyDiagnosticLogging = false;
             EnablePathObsoleteSourceLogging = false;
+            EnableSaveIdentificationLogging = false;
         }
 
         public EnforcementGameplaySettingsState GetNewSaveDefaultSettings()
