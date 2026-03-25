@@ -811,34 +811,19 @@ namespace Traffic_Law_Enforcement
             EnforcementPolicyImpactService.GetPersistentTotalsSnapshot();
         WritePolicyImpactPersistentTotals(writer, totals);
 
-            IReadOnlyCollection<PathRequestEvent> pathRequestEvents = EnforcementPolicyImpactService.GetPathRequestEventSnapshot();
-            writer.Write(pathRequestEvents.Count);
-            foreach (PathRequestEvent entry in pathRequestEvents)
-            {
-                writer.Write(entry.TimestampMonthTicks);
-                writer.Write(entry.PathContextSequence);
-            }
+            IReadOnlyCollection<PathRequestEvent> pathRequestEvents =
+                EnforcementPolicyImpactService.GetPathRequestEventSnapshot();
+            IReadOnlyCollection<ActualViolationEvent> actualViolationEvents =
+                EnforcementPolicyImpactService.GetActualViolationEventSnapshot();
+            IReadOnlyCollection<AvoidedRerouteEvent> avoidedRerouteEvents =
+                EnforcementPolicyImpactService.GetAvoidedRerouteEventSnapshot();
 
-            IReadOnlyCollection<ActualViolationEvent> actualViolationEvents = EnforcementPolicyImpactService.GetActualViolationEventSnapshot();
-            writer.Write(actualViolationEvents.Count);
-            foreach (ActualViolationEvent entry in actualViolationEvents)
-            {
-                writer.Write(entry.TimestampMonthTicks);
-                writer.Write(entry.PathContextSequence);
-                writer.Write(entry.Kind);
-                writer.Write(entry.FineAmount);
-            }
-
-            IReadOnlyCollection<AvoidedRerouteEvent> avoidedRerouteEvents = EnforcementPolicyImpactService.GetAvoidedRerouteEventSnapshot();
-            writer.Write(avoidedRerouteEvents.Count);
-            foreach (AvoidedRerouteEvent entry in avoidedRerouteEvents)
-            {
-                writer.Write(entry.TimestampMonthTicks);
-                writer.Write(entry.PathContextSequence);
-                writer.Write(entry.AvoidedPublicTransportLanePenalty);
-                writer.Write(entry.AvoidedMidBlockPenalty);
-                writer.Write(entry.AvoidedIntersectionPenalty);
-            }
+            WritePolicyImpactEvents(
+                writer,
+                pathRequestEvents,
+                actualViolationEvents,
+                avoidedRerouteEvents);
+                
             NativeArray<Entity> ptVehicles =
                 m_PublicTransportLaneProfileQuery.ToEntityArray(Allocator.Temp);
             NativeArray<VehicleTrafficLawProfile> ptProfiles =
@@ -1217,6 +1202,40 @@ namespace Traffic_Law_Enforcement
             writer.Write(totals.PublicTransportLaneActualOrAvoidedPathCount);
             writer.Write(totals.MidBlockCrossingActualOrAvoidedPathCount);
             writer.Write(totals.IntersectionMovementActualOrAvoidedPathCount);
+        }
+
+        private static void WritePolicyImpactEvents<TWriter>(
+            TWriter writer,
+            IReadOnlyCollection<PathRequestEvent> pathRequestEvents,
+            IReadOnlyCollection<ActualViolationEvent> actualViolationEvents,
+            IReadOnlyCollection<AvoidedRerouteEvent> avoidedRerouteEvents)
+            where TWriter : IWriter
+        {
+            writer.Write(pathRequestEvents.Count);
+            foreach (PathRequestEvent entry in pathRequestEvents)
+            {
+                writer.Write(entry.TimestampMonthTicks);
+                writer.Write(entry.PathContextSequence);
+            }
+
+            writer.Write(actualViolationEvents.Count);
+            foreach (ActualViolationEvent entry in actualViolationEvents)
+            {
+                writer.Write(entry.TimestampMonthTicks);
+                writer.Write(entry.PathContextSequence);
+                writer.Write(entry.Kind);
+                writer.Write(entry.FineAmount);
+            }
+
+            writer.Write(avoidedRerouteEvents.Count);
+            foreach (AvoidedRerouteEvent entry in avoidedRerouteEvents)
+            {
+                writer.Write(entry.TimestampMonthTicks);
+                writer.Write(entry.PathContextSequence);
+                writer.Write(entry.AvoidedPublicTransportLanePenalty);
+                writer.Write(entry.AvoidedMidBlockPenalty);
+                writer.Write(entry.AvoidedIntersectionPenalty);
+            }
         }
 
         private static void WritePolicyImpactTrackingState<TWriter>(TWriter writer)
