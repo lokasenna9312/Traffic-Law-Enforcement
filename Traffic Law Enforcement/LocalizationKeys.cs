@@ -16,9 +16,9 @@ namespace Traffic_Law_Enforcement
             map["Tab.Debug"] = setting.GetOptionTabLocaleID(Setting.kDebugTab);
 
             map["Group.General"] = setting.GetOptionGroupLocaleID(Setting.kGeneralGroup);
-            map["Group.BusLaneAuthorized"] = setting.GetOptionGroupLocaleID(Setting.kBusLaneAuthorizedGroup);
-            map["Group.BusLaneAdditional"] = setting.GetOptionGroupLocaleID(Setting.kBusLaneAdditionalGroup);
-            map["Group.BusLanePressure"] = setting.GetOptionGroupLocaleID(Setting.kBusLanePressureGroup);
+            map["Group.BusLaneAuthorized"] = setting.GetOptionGroupLocaleID(Setting.kPublicTransportLaneAuthorizedGroup);
+            map["Group.BusLaneAdditional"] = setting.GetOptionGroupLocaleID(Setting.kPublicTransportLaneAdditionalGroup);
+            map["Group.BusLanePressure"] = setting.GetOptionGroupLocaleID(Setting.kPublicTransportLanePressureGroup);
             map["Group.FineAmounts"] = setting.GetOptionGroupLocaleID(Setting.kFineGroup);
             map["Group.RepeatOffenders"] = setting.GetOptionGroupLocaleID(Setting.kRepeatOffenderGroup);
             map["Group.TemplateActions"] = setting.GetOptionGroupLocaleID(Setting.kTemplateActionsGroup);

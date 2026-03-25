@@ -15,8 +15,8 @@ namespace Traffic_Law_Enforcement
 {
     [FileLocation(nameof(Traffic_Law_Enforcement))]
     [SettingsUITabOrder(kCurrentSaveTab, kNewSaveDefaultsTab, kPolicyImpactTab, kDebugTab)]
-    [SettingsUIGroupOrder(kGeneralGroup, kBusLaneAuthorizedGroup, kBusLaneAdditionalGroup, kBusLanePressureGroup, kFineGroup, kRepeatOffenderGroup, kTemplateActionsGroup, kPolicyImpactGroup, kDebugGroup, kLogPathGroup)]
-    [SettingsUIShowGroupName(kGeneralGroup, kBusLaneAuthorizedGroup, kBusLaneAdditionalGroup, kBusLanePressureGroup, kFineGroup, kRepeatOffenderGroup, kTemplateActionsGroup, kPolicyImpactGroup, kDebugGroup, kLogPathGroup)]
+    [SettingsUIGroupOrder(kGeneralGroup, kPublicTransportLaneAuthorizedGroup, kPublicTransportLaneAdditionalGroup, kPublicTransportLanePressureGroup, kFineGroup, kRepeatOffenderGroup, kTemplateActionsGroup, kPolicyImpactGroup, kDebugGroup, kLogPathGroup)]
+    [SettingsUIShowGroupName(kGeneralGroup, kPublicTransportLaneAuthorizedGroup, kPublicTransportLaneAdditionalGroup, kPublicTransportLanePressureGroup, kFineGroup, kRepeatOffenderGroup, kTemplateActionsGroup, kPolicyImpactGroup, kDebugGroup, kLogPathGroup)]
     public class Setting : ModSetting
     {
         // --- Debug logging toggles for save/load ---
@@ -26,9 +26,9 @@ namespace Traffic_Law_Enforcement
         public const string kDebugTab = "Debug";
 
         public const string kGeneralGroup = "General";
-        public const string kBusLaneAuthorizedGroup = "BusLaneAuthorized";
-        public const string kBusLaneAdditionalGroup = "BusLaneAdditional";
-        public const string kBusLanePressureGroup = "BusLanePressure";
+        public const string kPublicTransportLaneAuthorizedGroup = "PublicTransportLaneAuthorized";
+        public const string kPublicTransportLaneAdditionalGroup = "PublicTransportLaneAdditional";
+        public const string kPublicTransportLanePressureGroup = "PublicTransportLanePressure";
         public const string kFineGroup = "FineAmounts";
         public const string kRepeatOffenderGroup = "RepeatOffenders";
         public const string kTemplateActionsGroup = "TemplateActions";
@@ -85,7 +85,7 @@ namespace Traffic_Law_Enforcement
         }
 
         [Exclude]
-        [SettingsUISection(kCurrentSaveTab, kBusLaneAuthorizedGroup)]
+        [SettingsUISection(kCurrentSaveTab, kPublicTransportLaneAuthorizedGroup)]
         [SettingsUIDisableByCondition(typeof(Setting), nameof(IsCurrentSaveSettingsDisabled))]
         public bool AllowRoadPublicTransportVehicles
         {
@@ -94,7 +94,7 @@ namespace Traffic_Law_Enforcement
         }
 
         [Exclude]
-        [SettingsUISection(kCurrentSaveTab, kBusLaneAuthorizedGroup)]
+        [SettingsUISection(kCurrentSaveTab, kPublicTransportLaneAuthorizedGroup)]
         [SettingsUIDisableByCondition(typeof(Setting), nameof(IsCurrentSaveSettingsDisabled))]
         public bool AllowTaxis
         {
@@ -103,7 +103,7 @@ namespace Traffic_Law_Enforcement
         }
 
         [Exclude]
-        [SettingsUISection(kCurrentSaveTab, kBusLaneAuthorizedGroup)]
+        [SettingsUISection(kCurrentSaveTab, kPublicTransportLaneAuthorizedGroup)]
         [SettingsUIDisableByCondition(typeof(Setting), nameof(IsCurrentSaveSettingsDisabled))]
         public bool AllowPoliceCars
         {
@@ -112,7 +112,7 @@ namespace Traffic_Law_Enforcement
         }
 
         [Exclude]
-        [SettingsUISection(kCurrentSaveTab, kBusLaneAuthorizedGroup)]
+        [SettingsUISection(kCurrentSaveTab, kPublicTransportLaneAuthorizedGroup)]
         [SettingsUIDisableByCondition(typeof(Setting), nameof(IsCurrentSaveSettingsDisabled))]
         public bool AllowFireEngines
         {
@@ -121,7 +121,7 @@ namespace Traffic_Law_Enforcement
         }
 
         [Exclude]
-        [SettingsUISection(kCurrentSaveTab, kBusLaneAuthorizedGroup)]
+        [SettingsUISection(kCurrentSaveTab, kPublicTransportLaneAuthorizedGroup)]
         [SettingsUIDisableByCondition(typeof(Setting), nameof(IsCurrentSaveSettingsDisabled))]
         public bool AllowAmbulances
         {
@@ -130,7 +130,7 @@ namespace Traffic_Law_Enforcement
         }
 
         [Exclude]
-        [SettingsUISection(kCurrentSaveTab, kBusLaneAuthorizedGroup)]
+        [SettingsUISection(kCurrentSaveTab, kPublicTransportLaneAuthorizedGroup)]
         [SettingsUIDisableByCondition(typeof(Setting), nameof(IsCurrentSaveSettingsDisabled))]
         public bool AllowGarbageTrucks
         {
@@ -139,7 +139,7 @@ namespace Traffic_Law_Enforcement
         }
 
         [Exclude]
-        [SettingsUISection(kCurrentSaveTab, kBusLaneAuthorizedGroup)]
+        [SettingsUISection(kCurrentSaveTab, kPublicTransportLaneAuthorizedGroup)]
         [SettingsUIDisableByCondition(typeof(Setting), nameof(IsCurrentSaveSettingsDisabled))]
         public bool AllowPostVans
         {
@@ -148,7 +148,7 @@ namespace Traffic_Law_Enforcement
         }
 
         [Exclude]
-        [SettingsUISection(kCurrentSaveTab, kBusLaneAuthorizedGroup)]
+        [SettingsUISection(kCurrentSaveTab, kPublicTransportLaneAuthorizedGroup)]
         [SettingsUIDisableByCondition(typeof(Setting), nameof(IsCurrentSaveSettingsDisabled))]
         public bool AllowRoadMaintenanceVehicles
         {
@@ -157,7 +157,7 @@ namespace Traffic_Law_Enforcement
         }
 
         [Exclude]
-        [SettingsUISection(kCurrentSaveTab, kBusLaneAuthorizedGroup)]
+        [SettingsUISection(kCurrentSaveTab, kPublicTransportLaneAuthorizedGroup)]
         [SettingsUIDisableByCondition(typeof(Setting), nameof(IsCurrentSaveSettingsDisabled))]
         public bool AllowSnowplows
         {
@@ -166,7 +166,7 @@ namespace Traffic_Law_Enforcement
         }
 
         [Exclude]
-        [SettingsUISection(kCurrentSaveTab, kBusLaneAuthorizedGroup)]
+        [SettingsUISection(kCurrentSaveTab, kPublicTransportLaneAuthorizedGroup)]
         [SettingsUIDisableByCondition(typeof(Setting), nameof(IsCurrentSaveSettingsDisabled))]
         public bool AllowVehicleMaintenanceVehicles
         {
@@ -175,7 +175,7 @@ namespace Traffic_Law_Enforcement
         }
 
         [Exclude]
-        [SettingsUISection(kCurrentSaveTab, kBusLaneAdditionalGroup)]
+        [SettingsUISection(kCurrentSaveTab, kPublicTransportLaneAdditionalGroup)]
         [SettingsUIDisableByCondition(typeof(Setting), nameof(IsCurrentSaveSettingsDisabled))]
         public bool AllowPersonalCars
         {
@@ -184,7 +184,7 @@ namespace Traffic_Law_Enforcement
         }
 
         [Exclude]
-        [SettingsUISection(kCurrentSaveTab, kBusLaneAdditionalGroup)]
+        [SettingsUISection(kCurrentSaveTab, kPublicTransportLaneAdditionalGroup)]
         [SettingsUIDisableByCondition(typeof(Setting), nameof(IsCurrentSaveSettingsDisabled))]
         public bool AllowDeliveryTrucks
         {
@@ -193,7 +193,7 @@ namespace Traffic_Law_Enforcement
         }
 
         [Exclude]
-        [SettingsUISection(kCurrentSaveTab, kBusLaneAdditionalGroup)]
+        [SettingsUISection(kCurrentSaveTab, kPublicTransportLaneAdditionalGroup)]
         [SettingsUIDisableByCondition(typeof(Setting), nameof(IsCurrentSaveSettingsDisabled))]
         public bool AllowCargoTransportVehicles
         {
@@ -202,7 +202,7 @@ namespace Traffic_Law_Enforcement
         }
 
         [Exclude]
-        [SettingsUISection(kCurrentSaveTab, kBusLaneAdditionalGroup)]
+        [SettingsUISection(kCurrentSaveTab, kPublicTransportLaneAdditionalGroup)]
         [SettingsUIDisableByCondition(typeof(Setting), nameof(IsCurrentSaveSettingsDisabled))]
         public bool AllowHearses
         {
@@ -211,7 +211,7 @@ namespace Traffic_Law_Enforcement
         }
 
         [Exclude]
-        [SettingsUISection(kCurrentSaveTab, kBusLaneAdditionalGroup)]
+        [SettingsUISection(kCurrentSaveTab, kPublicTransportLaneAdditionalGroup)]
         [SettingsUIDisableByCondition(typeof(Setting), nameof(IsCurrentSaveSettingsDisabled))]
         public bool AllowPrisonerTransports
         {
@@ -220,7 +220,7 @@ namespace Traffic_Law_Enforcement
         }
 
         [Exclude]
-        [SettingsUISection(kCurrentSaveTab, kBusLaneAdditionalGroup)]
+        [SettingsUISection(kCurrentSaveTab, kPublicTransportLaneAdditionalGroup)]
         [SettingsUIDisableByCondition(typeof(Setting), nameof(IsCurrentSaveSettingsDisabled))]
         public bool AllowParkMaintenanceVehicles
         {
@@ -230,7 +230,7 @@ namespace Traffic_Law_Enforcement
 
         [Exclude]
         [SettingsUISlider(min = 0f, max = 1f, step = 0.01f, unit = Unit.kFloatThreeFractions)]
-        [SettingsUISection(kCurrentSaveTab, kBusLanePressureGroup)]
+        [SettingsUISection(kCurrentSaveTab, kPublicTransportLanePressureGroup)]
         [SettingsUIDisableByCondition(typeof(Setting), nameof(IsCurrentSaveSettingsDisabled))]
         public float PublicTransportLaneExitPressureThresholdDays
         {
@@ -394,56 +394,56 @@ namespace Traffic_Law_Enforcement
         [SettingsUISection(kNewSaveDefaultsTab, kGeneralGroup)]
         public bool DefaultEnableIntersectionMovementEnforcement { get; set; }
 
-        [SettingsUISection(kNewSaveDefaultsTab, kBusLaneAuthorizedGroup)]
+        [SettingsUISection(kNewSaveDefaultsTab, kPublicTransportLaneAuthorizedGroup)]
         public bool DefaultAllowRoadPublicTransportVehicles { get; set; }
 
-        [SettingsUISection(kNewSaveDefaultsTab, kBusLaneAuthorizedGroup)]
+        [SettingsUISection(kNewSaveDefaultsTab, kPublicTransportLaneAuthorizedGroup)]
         public bool DefaultAllowTaxis { get; set; }
 
-        [SettingsUISection(kNewSaveDefaultsTab, kBusLaneAuthorizedGroup)]
+        [SettingsUISection(kNewSaveDefaultsTab, kPublicTransportLaneAuthorizedGroup)]
         public bool DefaultAllowPoliceCars { get; set; }
 
-        [SettingsUISection(kNewSaveDefaultsTab, kBusLaneAuthorizedGroup)]
+        [SettingsUISection(kNewSaveDefaultsTab, kPublicTransportLaneAuthorizedGroup)]
         public bool DefaultAllowFireEngines { get; set; }
 
-        [SettingsUISection(kNewSaveDefaultsTab, kBusLaneAuthorizedGroup)]
+        [SettingsUISection(kNewSaveDefaultsTab, kPublicTransportLaneAuthorizedGroup)]
         public bool DefaultAllowAmbulances { get; set; }
 
-        [SettingsUISection(kNewSaveDefaultsTab, kBusLaneAuthorizedGroup)]
+        [SettingsUISection(kNewSaveDefaultsTab, kPublicTransportLaneAuthorizedGroup)]
         public bool DefaultAllowGarbageTrucks { get; set; }
 
-        [SettingsUISection(kNewSaveDefaultsTab, kBusLaneAuthorizedGroup)]
+        [SettingsUISection(kNewSaveDefaultsTab, kPublicTransportLaneAuthorizedGroup)]
         public bool DefaultAllowPostVans { get; set; }
 
-        [SettingsUISection(kNewSaveDefaultsTab, kBusLaneAuthorizedGroup)]
+        [SettingsUISection(kNewSaveDefaultsTab, kPublicTransportLaneAuthorizedGroup)]
         public bool DefaultAllowRoadMaintenanceVehicles { get; set; }
 
-        [SettingsUISection(kNewSaveDefaultsTab, kBusLaneAuthorizedGroup)]
+        [SettingsUISection(kNewSaveDefaultsTab, kPublicTransportLaneAuthorizedGroup)]
         public bool DefaultAllowSnowplows { get; set; }
 
-        [SettingsUISection(kNewSaveDefaultsTab, kBusLaneAuthorizedGroup)]
+        [SettingsUISection(kNewSaveDefaultsTab, kPublicTransportLaneAuthorizedGroup)]
         public bool DefaultAllowVehicleMaintenanceVehicles { get; set; }
 
-        [SettingsUISection(kNewSaveDefaultsTab, kBusLaneAdditionalGroup)]
+        [SettingsUISection(kNewSaveDefaultsTab, kPublicTransportLaneAdditionalGroup)]
         public bool DefaultAllowPersonalCars { get; set; }
 
-        [SettingsUISection(kNewSaveDefaultsTab, kBusLaneAdditionalGroup)]
+        [SettingsUISection(kNewSaveDefaultsTab, kPublicTransportLaneAdditionalGroup)]
         public bool DefaultAllowDeliveryTrucks { get; set; }
 
-        [SettingsUISection(kNewSaveDefaultsTab, kBusLaneAdditionalGroup)]
+        [SettingsUISection(kNewSaveDefaultsTab, kPublicTransportLaneAdditionalGroup)]
         public bool DefaultAllowCargoTransportVehicles { get; set; }
 
-        [SettingsUISection(kNewSaveDefaultsTab, kBusLaneAdditionalGroup)]
+        [SettingsUISection(kNewSaveDefaultsTab, kPublicTransportLaneAdditionalGroup)]
         public bool DefaultAllowHearses { get; set; }
 
-        [SettingsUISection(kNewSaveDefaultsTab, kBusLaneAdditionalGroup)]
+        [SettingsUISection(kNewSaveDefaultsTab, kPublicTransportLaneAdditionalGroup)]
         public bool DefaultAllowPrisonerTransports { get; set; }
 
-        [SettingsUISection(kNewSaveDefaultsTab, kBusLaneAdditionalGroup)]
+        [SettingsUISection(kNewSaveDefaultsTab, kPublicTransportLaneAdditionalGroup)]
         public bool DefaultAllowParkMaintenanceVehicles { get; set; }
 
         [SettingsUISlider(min = 0f, max = 1f, step = 0.01f, unit = Unit.kFloatThreeFractions)]
-        [SettingsUISection(kNewSaveDefaultsTab, kBusLanePressureGroup)]
+        [SettingsUISection(kNewSaveDefaultsTab, kPublicTransportLanePressureGroup)]
         public float DefaultPublicTransportLaneExitPressureThresholdDays { get; set; }
 
         [SettingsUISlider(min = 0, max = 5000, step = 25, scalarMultiplier = 1, unit = Unit.kMoney)]
