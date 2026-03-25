@@ -798,70 +798,113 @@ namespace Traffic_Law_Enforcement
 
         public static string GetTotalStatisticsLine()
         {
-            if (!IsGameplayContextAvailable())
-                return LocalizeText(kLoadedSaveOnlyLocaleId, "Available only in a loaded save.");
-            if (!EnforcementGameTime.IsInitialized)
-                return LocalizeText(kWaitingForTimeLocaleId, "Waiting for in-game time initialization.");
-            var snapshot = GetRollingWindowSnapshot();
-            int violationNumeratorTotal = snapshot.TotalActualPathCount;
-            int vehicleRouteDenominatorTotal = snapshot.TotalPathRequestCount;
-            int suppressionFailureDenominatorTotal = snapshot.TotalActualOrAvoidedPathCount;
-            string violationRateTotal = FormatRatio(violationNumeratorTotal, vehicleRouteDenominatorTotal);
-            string suppressionFailureRateTotal = FormatRatio(violationNumeratorTotal, suppressionFailureDenominatorTotal);
-            string finesTotal = FormatMoney(snapshot.TotalFineAmount);
-            string lineFormat = LocalizeText(kStatisticsLineFormat, "violation rate {0}, suppression failure rate {1}, fines {2}₡.");
-            return string.Format(lineFormat, violationRateTotal, suppressionFailureRateTotal, finesTotal);
+            string unavailableText = GetStatisticsUnavailableText();
+            if (unavailableText != null)
+            {
+                return unavailableText;
+            }
+
+            RollingWindowSnapshot snapshot = GetRollingWindowSnapshot();
+
+            return BuildStatisticsLine(
+                snapshot,
+                snapshot.TotalActualPathCount,
+                snapshot.TotalActualOrAvoidedPathCount,
+                snapshot.TotalFineAmount);
         }
 
         public static string GetPublicTransportLaneStatisticsLine()
         {
-            if (!IsGameplayContextAvailable())
-                return LocalizeText(kLoadedSaveOnlyLocaleId, "Available only in a loaded save.");
-            if (!EnforcementGameTime.IsInitialized)
-                return LocalizeText(kWaitingForTimeLocaleId, "Waiting for in-game time initialization.");
-            var snapshot = GetRollingWindowSnapshot();
-            int vehicleRouteDenominatorTotal = snapshot.TotalPathRequestCount;
-            int violationNumerator1 = snapshot.PublicTransportLaneActualCount;
-            int suppressionFailureDenominator1 = snapshot.PublicTransportLaneActualOrAvoidedPathCount;
-            string violationRate1 = FormatRatio(violationNumerator1, vehicleRouteDenominatorTotal);
-            string suppressionFailureRate1 = FormatRatio(violationNumerator1, suppressionFailureDenominator1);
-            string fines1 = FormatMoney(snapshot.PublicTransportLaneFineAmount);
-            string lineFormat = LocalizeText(kStatisticsLineFormat, "violation rate {0}, suppression failure rate {1}, fines {2}₡.");
-            return string.Format(lineFormat, violationRate1, suppressionFailureRate1, fines1);
+            string unavailableText = GetStatisticsUnavailableText();
+            if (unavailableText != null)
+            {
+                return unavailableText;
+            }
+
+            RollingWindowSnapshot snapshot = GetRollingWindowSnapshot();
+
+            return BuildStatisticsLine(
+                snapshot,
+                snapshot.PublicTransportLaneActualCount,
+                snapshot.PublicTransportLaneActualOrAvoidedPathCount,
+                snapshot.PublicTransportLaneFineAmount);
         }
 
         public static string GetMidBlockCrossingStatisticsLine()
         {
-            if (!IsGameplayContextAvailable())
-                return LocalizeText(kLoadedSaveOnlyLocaleId, "Available only in a loaded save.");
-            if (!EnforcementGameTime.IsInitialized)
-                return LocalizeText(kWaitingForTimeLocaleId, "Waiting for in-game time initialization.");
-            var snapshot = GetRollingWindowSnapshot();
-            int vehicleRouteDenominatorTotal = snapshot.TotalPathRequestCount;
-            int violationNumerator2 = snapshot.MidBlockCrossingActualCount;
-            int suppressionFailureDenominator2 = snapshot.MidBlockCrossingActualOrAvoidedPathCount;
-            string violationRate2 = FormatRatio(violationNumerator2, vehicleRouteDenominatorTotal);
-            string suppressionFailureRate2 = FormatRatio(violationNumerator2, suppressionFailureDenominator2);
-            string fines2 = FormatMoney(snapshot.MidBlockCrossingFineAmount);
-            string lineFormat = LocalizeText(kStatisticsLineFormat, "violation rate {0}, suppression failure rate {1}, fines {2}₡.");
-            return string.Format(lineFormat, violationRate2, suppressionFailureRate2, fines2);
-        }
+            string unavailableText = GetStatisticsUnavailableText();
+            if (unavailableText != null)
+            {
+                return unavailableText;
+            }
 
+            RollingWindowSnapshot snapshot = GetRollingWindowSnapshot();
+
+            return BuildStatisticsLine(
+                snapshot,
+                snapshot.MidBlockCrossingActualCount,
+                snapshot.MidBlockCrossingActualOrAvoidedPathCount,
+                snapshot.MidBlockCrossingFineAmount);
+        }
         public static string GetIntersectionMovementStatisticsLine()
         {
+            string unavailableText = GetStatisticsUnavailableText();
+            if (unavailableText != null)
+            {
+                return unavailableText;
+            }
+
+            RollingWindowSnapshot snapshot = GetRollingWindowSnapshot();
+
+            return BuildStatisticsLine(
+                snapshot,
+                snapshot.IntersectionMovementActualCount,
+                snapshot.IntersectionMovementActualOrAvoidedPathCount,
+                snapshot.IntersectionMovementFineAmount);
+        }
+
+        private static string GetStatisticsUnavailableText()
+        {
             if (!IsGameplayContextAvailable())
-                return LocalizeText(kLoadedSaveOnlyLocaleId, "Available only in a loaded save.");
+            {
+                return LocalizeText(
+                    kLoadedSaveOnlyLocaleId,
+                    "Available only in a loaded save.");
+            }
+
             if (!EnforcementGameTime.IsInitialized)
-                return LocalizeText(kWaitingForTimeLocaleId, "Waiting for in-game time initialization.");
-            var snapshot = GetRollingWindowSnapshot();
-            int vehicleRouteDenominatorTotal = snapshot.TotalPathRequestCount;
-            int violationNumerator3 = snapshot.IntersectionMovementActualCount;
-            int suppressionFailureDenominator3 = snapshot.IntersectionMovementActualOrAvoidedPathCount;
-            string violationRate3 = FormatRatio(violationNumerator3, vehicleRouteDenominatorTotal);
-            string suppressionFailureRate3 = FormatRatio(violationNumerator3, suppressionFailureDenominator3);
-            string fines3 = FormatMoney(snapshot.IntersectionMovementFineAmount);
-            string lineFormat = LocalizeText(kStatisticsLineFormat, "violation rate {0}, suppression failure rate {1}, fines {2}₡.");
-            return string.Format(lineFormat, violationRate3, suppressionFailureRate3, fines3);
+            {
+                return LocalizeText(
+                    kWaitingForTimeLocaleId,
+                    "Waiting for in-game time initialization.");
+            }
+
+            return null;
+        }
+
+        private static string BuildStatisticsLine(
+            RollingWindowSnapshot snapshot,
+            int actualCount,
+            int actualOrAvoidedPathCount,
+            int fineAmount)
+        {
+            string violationRate =
+                FormatRatio(actualCount, snapshot.TotalPathRequestCount);
+
+            string suppressionFailureRate =
+                FormatRatio(actualCount, actualOrAvoidedPathCount);
+
+            string fines = FormatMoney(fineAmount);
+
+            string lineFormat = LocalizeText(
+                kStatisticsLineFormat,
+                "violation rate {0}, suppression failure rate {1}, fines {2}₡.");
+
+            return string.Format(
+                lineFormat,
+                violationRate,
+                suppressionFailureRate,
+                fines);
         }
 
         public static RollingWindowSnapshot GetRollingWindowSnapshot()
