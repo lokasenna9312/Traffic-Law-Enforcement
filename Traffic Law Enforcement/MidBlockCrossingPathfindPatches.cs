@@ -31,9 +31,13 @@ namespace Traffic_Law_Enforcement
 
             try
             {
-                if (s_PathfindExecutorType == null && EnforcementLoggingPolicy.ShouldLogEnforcementEvents())
+                if (s_PathfindExecutorType == null)
                 {
-                    Mod.log.Info("Mid-block pathfind hook skipped: PathfindExecutor type not found.");
+                    if (EnforcementLoggingPolicy.ShouldLogEnforcementEvents())
+                    {
+                        Mod.log.Info("Mid-block pathfind hook skipped: PathfindExecutor type not found.");
+                    }
+
                     return;
                 }
 
@@ -41,10 +45,14 @@ namespace Traffic_Law_Enforcement
                     out s_SourceLaneArgIndex,
                     out s_TargetLaneArgIndex);
 
-                if ((s_TargetMethod == null || s_SourceLaneArgIndex < 0 || s_TargetLaneArgIndex < 0) && EnforcementLoggingPolicy.ShouldLogEnforcementEvents())
+                if (s_TargetMethod == null || s_SourceLaneArgIndex < 0 || s_TargetLaneArgIndex < 0)
                 {
-                    LogCandidateMethods();
-                    Mod.log.Info("Mid-block pathfind hook skipped: no suitable transition-cost method found.");
+                    if (EnforcementLoggingPolicy.ShouldLogEnforcementEvents())
+                    {
+                        LogCandidateMethods();
+                        Mod.log.Info("Mid-block pathfind hook skipped: no suitable transition-cost method found.");
+                    }
+
                     return;
                 }
 
@@ -285,7 +293,7 @@ namespace Traffic_Law_Enforcement
                 }
 
                 string signature = DescribeMethod(method);
-                Mod.log.Info($"Intersection movement hook candidate: {signature}");
+                Mod.log.Info($"Mid-block movement hook candidate: {signature}");
             }
         }
 
@@ -295,8 +303,5 @@ namespace Traffic_Law_Enforcement
             string parameterList = string.Join(", ", parameters.Select(p => $"{p.ParameterType.Name} {p.Name}").ToArray());
             return $"{method.DeclaringType?.FullName}.{method.Name}({parameterList})";
         }
-
-        // FindBestTransitionCostMethod / helper methods:
-        // IntersectionMovementPathfindPatches.cs에서 그대로 복제
     }
 }
