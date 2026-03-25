@@ -118,9 +118,11 @@ The following options can be configured either for the currently loaded save fil
 	<RequiredDLC Value="" />
 	<!--Change log for new version. Single line or multi line. Supports minimal markdown subset-->
 	<ChangeLog>
-- Fixed violation rate, suppression failure rate being calculated and reported incorrectly.
-- Fixed the issue that Chirper messages were not sent when the button was pressed in the mod options.
-- Save state will be logged in the log file when the mod is loaded, when this option is selected in the mod options.
+- Improved save/load reliability for enforcement-related data.
+- Fixed issues that could cause monthly enforcement reports, policy-impact statistics, and tracking state to restore incorrectly after loading a save.
+- Improved persistence of public transport lane tracking data.
+- Refactored internal save-data handling for better stability.
+- Refactored codes related to Chirper message creation for better maintainability and performance.
 	</ChangeLog>
 	<!--External link, can be set multiple times. supported types are "discord", "github", "youtube", "twitch", "x", "paypal", "patreon", "buymeacoffee", "kofi", "crowdin", "gitlab", "gofundme"-->
 	<ExternalLink Type="github" Url="https://github.com/lokasenna9312/Traffic-Law-Enforcement/" />

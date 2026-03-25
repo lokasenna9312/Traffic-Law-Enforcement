@@ -344,7 +344,7 @@ namespace Traffic_Law_Enforcement
             }
 
             string localizationId = GetReportLocalizationId(monthIndex);
-            triggerEntity = CreateChirpTriggerEntity($"{kPrefabNamePrefix}.Report.{monthIndex}", localizationId);
+            triggerEntity = CreateTriggerEntityForLocalizedChirp($"{kPrefabNamePrefix}.Report.{monthIndex}", localizationId);
             m_ReportTriggerEntities[monthIndex] = triggerEntity;
             return triggerEntity;
         }
@@ -361,10 +361,10 @@ namespace Traffic_Law_Enforcement
 
             string assetKey = $"{kPrefabNamePrefix}.Preview.{periodEnd}.{previewSequence}";
             string localizationId = GetPreviewLocalizationId(periodEnd, previewSequence);
-            return CreateChirpTriggerEntity(assetKey, localizationId);
+            return CreateTriggerEntityForLocalizedChirp(assetKey, localizationId);
         }
 
-        private Entity CreateChirpTriggerEntity(string assetKey, string localizationId)
+        private Entity CreateTriggerEntityForLocalizedChirp(string assetKey, string localizationId)
         {
             ServiceChirpPrefab chirpPrefab = ScriptableObject.CreateInstance<ServiceChirpPrefab>();
             chirpPrefab.name = $"{assetKey}.Chirp";
@@ -625,39 +625,60 @@ namespace Traffic_Law_Enforcement
             return $"{monthName} {year} {hour:00}:{minute:00}";
         }
 
+        private string BuildLocalizedStatisticsLine(
+            string localeId,
+            string lineFormatLocaleId,
+            int finedViolationCount,
+            int totalPathRequestCount,
+            int actualOrAvoidedPathCount,
+            int fineAmount)
+        {
+            return FormatLocalizedTextForLocale(
+                localeId,
+                lineFormatLocaleId,
+                FormatViolationRate(localeId, finedViolationCount, totalPathRequestCount),
+                FormatSuppressionFailureRate(localeId, finedViolationCount, actualOrAvoidedPathCount),
+                FormatMoney(localeId, fineAmount));
+        }
+
         private string BuildLocalizedMessage(string localeId, MonthlyEnforcementReport report, long periodStartMonthTicks, long periodEndMonthTicks)
         {
-            return
+            return string.Join(
+                "\n",
                 FormatLocalizedTextForLocale(
                     localeId,
                     kReportHeaderFormatLocaleId,
                     FormatPeriodPoint(localeId, periodStartMonthTicks),
                     FormatPeriodPoint(localeId, periodEndMonthTicks),
-                    report.TotalViolationCount) + "\n" +
-                FormatLocalizedTextForLocale(
+                    report.TotalViolationCount),
+                BuildLocalizedStatisticsLine(
                     localeId,
                     kTotalLineFormatLocaleId,
-                    FormatViolationRate(localeId, report.m_TotalActualPathCount, report.m_TotalPathRequestCount),
-                    FormatSuppressionFailureRate(localeId, report.m_TotalActualPathCount, report.m_TotalActualOrAvoidedPathCount),
-                    FormatMoney(localeId, report.m_TotalFineAmount)) + "\n" +
-                FormatLocalizedTextForLocale(
+                    report.m_TotalActualPathCount,
+                    report.m_TotalPathRequestCount,
+                    report.m_TotalActualOrAvoidedPathCount,
+                    report.m_TotalFineAmount),
+                BuildLocalizedStatisticsLine(
                     localeId,
                     kPublicTransportLaneLineFormatLocaleId,
-                    FormatViolationRate(localeId, report.m_PublicTransportLaneCount, report.m_TotalPathRequestCount),
-                    FormatSuppressionFailureRate(localeId, report.m_PublicTransportLaneCount, report.m_PublicTransportLaneActualOrAvoidedPathCount),
-                    FormatMoney(localeId, report.m_PublicTransportLaneFineAmount)) + "\n" +
-                FormatLocalizedTextForLocale(
+                    report.m_PublicTransportLaneCount,
+                    report.m_TotalPathRequestCount,
+                    report.m_PublicTransportLaneActualOrAvoidedPathCount,
+                    report.m_PublicTransportLaneFineAmount),
+                BuildLocalizedStatisticsLine(
                     localeId,
                     kMidBlockLineFormatLocaleId,
-                    FormatViolationRate(localeId, report.m_MidBlockCrossingCount, report.m_TotalPathRequestCount),
-                    FormatSuppressionFailureRate(localeId, report.m_MidBlockCrossingCount, report.m_MidBlockCrossingActualOrAvoidedPathCount),
-                    FormatMoney(localeId, report.m_MidBlockCrossingFineAmount)) + "\n" +
-                FormatLocalizedTextForLocale(
+                    report.m_MidBlockCrossingCount,
+                    report.m_TotalPathRequestCount,
+                    report.m_MidBlockCrossingActualOrAvoidedPathCount,
+                    report.m_MidBlockCrossingFineAmount),
+                BuildLocalizedStatisticsLine(
                     localeId,
                     kIntersectionLineFormatLocaleId,
-                    FormatViolationRate(localeId, report.m_IntersectionMovementCount, report.m_TotalPathRequestCount),
-                    FormatSuppressionFailureRate(localeId, report.m_IntersectionMovementCount, report.m_IntersectionMovementActualOrAvoidedPathCount),
-                    FormatMoney(localeId, report.m_IntersectionMovementFineAmount));
+                    report.m_IntersectionMovementCount,
+                    report.m_TotalPathRequestCount,
+                    report.m_IntersectionMovementActualOrAvoidedPathCount,
+                    report.m_IntersectionMovementFineAmount));
         }
 
         private string FormatPeriodPoint(string localeId, long monthTicks)
