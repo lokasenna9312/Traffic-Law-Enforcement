@@ -34,11 +34,9 @@ namespace Traffic_Law_Enforcement
             EnforcementGameTime.Reset();
             SaveLoadTraceService.Reset();
             SaveLoadTracePatches.Apply();
-            KeybindingPersistenceGuardPatches.Apply();
             m_Setting = new Setting(this);
             Settings = m_Setting;
             AssetDatabase.global.LoadSettings(nameof(Traffic_Law_Enforcement), m_Setting, new Setting(this));
-            KeybindingPersistenceGuardPatches.CaptureCurrentBindings();
             m_Setting.RegisterInOptionsUI();
             RegisterTextLocales();
             BudgetUIPatches.Apply();
@@ -80,8 +78,6 @@ namespace Traffic_Law_Enforcement
             log.Info(nameof(OnDispose));
             SaveLoadTracePatches.Remove();
             SaveLoadTraceService.Reset();
-            KeybindingPersistenceGuardPatches.CaptureCurrentBindings();
-            KeybindingPersistenceGuardPatches.Remove();
             BudgetUIPatches.Remove();
             VehicleUtilsPatches.Remove();
             IntersectionMovementPathfindPatches.Remove();
