@@ -133,6 +133,11 @@ namespace Traffic_Law_Enforcement
         {
             bool migratedLegacyPathRequestTracking = version < 4;
 
+            reader.Read(out bool hasTrackingState);
+            if (!hasTrackingState)
+            {
+                return new MonthlyTrackingReadResult(null, migratedLegacyPathRequestTracking);
+            }
             reader.Read(out long monthIndex);
 
             int trackingTotalPathRequestCount = 0;
@@ -746,6 +751,32 @@ namespace Traffic_Law_Enforcement
                 writer.Write(entry.TimestampMonthTicks);
                 writer.Write(entry.Amount);
                 writer.Write(entry.Kind);
+            }
+
+            bool hasTrackingState =
+                MonthlyEnforcementChirperService.TryGetTrackingState(out MonthlyEnforcementTrackingState trackingState);
+
+            writer.Write(hasTrackingState);
+            if (hasTrackingState)
+            {
+                writer.Write(trackingState.m_MonthIndex);
+                writer.Write(trackingState.m_TotalPathRequestCount);
+                writer.Write(trackingState.m_TotalActualPathCount);
+                writer.Write(trackingState.m_PublicTransportLaneCount);
+                writer.Write(trackingState.m_MidBlockCrossingCount);
+                writer.Write(trackingState.m_IntersectionMovementCount);
+                writer.Write(trackingState.m_TotalFineAmount);
+                writer.Write(trackingState.m_TotalAvoidedPathCount);
+                writer.Write(trackingState.m_PublicTransportLaneFineAmount);
+                writer.Write(trackingState.m_MidBlockCrossingFineAmount);
+                writer.Write(trackingState.m_IntersectionMovementFineAmount);
+                writer.Write(trackingState.m_PublicTransportLaneAvoidedEventCount);
+                writer.Write(trackingState.m_MidBlockCrossingAvoidedEventCount);
+                writer.Write(trackingState.m_IntersectionMovementAvoidedEventCount);
+                writer.Write(trackingState.m_TotalActualOrAvoidedPathCount);
+                writer.Write(trackingState.m_PublicTransportLaneActualOrAvoidedPathCount);
+                writer.Write(trackingState.m_MidBlockCrossingActualOrAvoidedPathCount);
+                writer.Write(trackingState.m_IntersectionMovementActualOrAvoidedPathCount);
             }
 
             IReadOnlyCollection<MonthlyEnforcementReport> reports = MonthlyEnforcementChirperService.GetReportHistorySnapshot();
