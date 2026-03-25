@@ -195,17 +195,19 @@ namespace Traffic_Law_Enforcement
 
     public static class EnforcementPolicyImpactService
     {
-        // Active vehicle route aggregation (ECS query based)
         public static int GetActiveVehicleRouteCount()
         {
-            var world = World.DefaultGameObjectInjectionWorld;
+            World world = World.DefaultGameObjectInjectionWorld;
             if (world == null)
+            {
                 return 0;
-            var entityManager = world.EntityManager;
-            var vehicleQuery = entityManager.CreateEntityQuery(
-                ComponentType.ReadOnly<Car>(),
-                ComponentType.ReadOnly<CarCurrentLane>());
-            return vehicleQuery.CalculateEntityCount();
+            }
+
+            ActiveVehicleRouteCountSystem system =
+                world.GetExistingSystemManaged<ActiveVehicleRouteCountSystem>() ??
+                world.GetOrCreateSystemManaged<ActiveVehicleRouteCountSystem>();
+
+            return system.GetActiveVehicleRouteCount();
         }
         public const string kLoadedSaveOnlyLocaleId = "TrafficLawEnforcement.PolicyImpact.Text.LoadedSaveOnly";
         public const string kWaitingForTimeLocaleId = "TrafficLawEnforcement.PolicyImpact.Text.WaitingForTime";
