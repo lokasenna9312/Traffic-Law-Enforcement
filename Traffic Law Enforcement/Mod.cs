@@ -43,6 +43,7 @@ namespace Traffic_Law_Enforcement
             EnforcementGameTime.Reset();
             SaveLoadTraceService.Reset();
             SaveLoadTracePatches.Apply();
+            KeybindingSaveDiagnosticsPatches.Apply();
             m_Setting = new Setting(this);
             Settings = m_Setting;
             AssetDatabase.global.LoadSettings(nameof(Traffic_Law_Enforcement), m_Setting, new Setting(this));
@@ -56,6 +57,8 @@ namespace Traffic_Law_Enforcement
             VehicleUtilsPatches.Apply();
             IntersectionMovementPathfindPatches.Apply();
             IntersectionMovementPathfindReflectionPatches.Apply();
+            MidBlockCrossingPathfindPatches.Apply();
+            MidBlockCrossingPathfindReflectionPatches.Apply();
             updateSystem.UpdateAfter<EnforcementSaveDataSystem, EnforcementGameTimeSystem>(SystemUpdatePhase.GameSimulation);
             updateSystem.UpdateBefore<EnforcementSaveDataSystem, VehicleTrafficLawProfileSystem>(SystemUpdatePhase.GameSimulation);
             updateSystem.UpdateBefore<VehicleTrafficLawProfileSystem, PublicTransportLanePermissionSystem>(SystemUpdatePhase.GameSimulation);
@@ -64,9 +67,6 @@ namespace Traffic_Law_Enforcement
             updateSystem.UpdateBefore<PublicTransportLanePermissionSystem, CarNavigationSystem>(SystemUpdatePhase.GameSimulation);
             updateSystem.UpdateBefore<PublicTransportLanePermissionSystem, PublicTransportLaneViolationSystem>(SystemUpdatePhase.GameSimulation);
             updateSystem.UpdateBefore<IntersectionMovementPenaltyCacheSystem, CarNavigationSystem>(SystemUpdatePhase.GameSimulation);
-            updateSystem.UpdateAfter<CenterlineAccessObsoleteSystem, PublicTransportLanePermissionSystem>(SystemUpdatePhase.GameSimulation);
-            updateSystem.UpdateAfter<CenterlineAccessObsoleteSystem, PublicTransportLaneExitPressureSystem>(SystemUpdatePhase.GameSimulation);
-            updateSystem.UpdateBefore<CenterlineAccessObsoleteSystem, CarNavigationSystem>(SystemUpdatePhase.GameSimulation);
             updateSystem.UpdateAfter<EnforcementGameTimeSystem, CarNavigationSystem>(SystemUpdatePhase.GameSimulation);
             updateSystem.UpdateAfter<RouteAttemptTrackingSystem, CarNavigationSystem>(SystemUpdatePhase.GameSimulation);
             updateSystem.UpdateBefore<RouteAttemptTrackingSystem, RoutePenaltyRerouteLoggingSystem>(SystemUpdatePhase.GameSimulation);
@@ -90,11 +90,14 @@ namespace Traffic_Law_Enforcement
         {
             log.Info(nameof(OnDispose));
             SaveLoadTracePatches.Remove();
+            log.Info("[KEYBIND_DIAG] Leaving diagnostics patches applied until process exit to observe async settings-save failures after OnDispose.");
             SaveLoadTraceService.Reset();
             BudgetUIPatches.Remove();
             VehicleUtilsPatches.Remove();
             IntersectionMovementPathfindPatches.Remove();
             IntersectionMovementPathfindReflectionPatches.Remove();
+            MidBlockCrossingPathfindPatches.Remove();
+            MidBlockCrossingPathfindReflectionPatches.Remove();
             if (m_Setting != null)
             {
                 m_Setting.UnregisterInOptionsUI();

@@ -217,7 +217,7 @@ namespace Traffic_Law_Enforcement
                     reason);
 
                 PathFlags stateBefore = pathOwner.m_State;
-                pathOwner.m_State |= PathFlags.Obsolete;
+                // pathOwner.m_State |= PathFlags.Obsolete;
                 EntityManager.SetComponentData(vehicle, pathOwner);
 
                 string role = null;
