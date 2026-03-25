@@ -506,7 +506,7 @@ namespace Traffic_Law_Enforcement
                 }
 
                 int trackingTotalActualPathCount = 0;
-                if (version >= 9)
+                if (version >= 8)
                 {
                     reader.Read(out trackingTotalActualPathCount);
                 }
@@ -523,7 +523,7 @@ namespace Traffic_Law_Enforcement
                 reader.Read(out int trackingMidBlockCrossingAvoidedEventCount);
                 reader.Read(out int trackingIntersectionMovementAvoidedEventCount);
 
-                if (version < 9)
+                if (version < 8)
                 {
                     trackingTotalActualPathCount =
                         trackingPublicTransportLaneActualCount +
@@ -546,6 +546,14 @@ namespace Traffic_Law_Enforcement
                     trackingPublicTransportLaneAvoidedEventCount,
                     trackingMidBlockCrossingAvoidedEventCount,
                     trackingIntersectionMovementAvoidedEventCount);
+
+                Mod.log.Info(
+                    $@"[SAVELOAD] PolicyImpact tracking state read: version={version}, " +
+                    $@"month={policyImpactMonthIndex}, " +
+                    $@"totalPathRequests={trackingTotalPathRequestCount}, " +
+                    $@"totalActualPaths={trackingTotalActualPathCount}, " +
+                    $@"totalAvoidedPaths={trackingTotalAvoidedPathCount}, " +
+                    $@"totalFineAmount={trackingTotalFineAmount}");
 
                 if (migratedLegacyPathRequestTracking ||
                     HasInconsistentPathRequestTracking(

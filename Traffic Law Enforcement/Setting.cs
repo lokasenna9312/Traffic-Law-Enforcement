@@ -611,6 +611,11 @@ namespace Traffic_Law_Enforcement
             {
                 if (value)
                 {
+                    Mod.log.Info(
+                        $@"Monthly chirper preview button pressed. " +
+                        $@"gameplayContextAvailable={IsGameplayContextAvailable()}, " +
+                        $@"anyEnforcementEnabled={EnforcementGameplaySettingsService.Current.HasAnyEnforcementEnabled()}");
+
                     MonthlyEnforcementChirperService.RequestManualPreview();
                 }
             }

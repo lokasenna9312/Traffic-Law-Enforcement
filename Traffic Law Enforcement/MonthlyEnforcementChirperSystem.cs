@@ -153,6 +153,12 @@ namespace Traffic_Law_Enforcement
 
             long currentTimestampMonthTicks = EnforcementGameTime.CurrentTimestampMonthTicks;
             long currentMonthIndex = EnforcementGameTime.GetMonthIndex(currentTimestampMonthTicks);
+
+            Mod.log.Info(
+                $@"Monthly chirper manual preview begin. " +
+                $@"currentTimestampMonthTicks={currentTimestampMonthTicks}, " +
+                $@"currentMonthIndex={currentMonthIndex}");
+
             if (MonthlyEnforcementChirperService.EnsureTrackingInitialized(currentMonthIndex))
             {
                 Mod.log.Info($"Monthly chirper tracking initialized from manual preview. month={currentMonthIndex}");
@@ -305,6 +311,15 @@ namespace Traffic_Law_Enforcement
             MonthlyEnforcementReport previewReport = MonthlyEnforcementChirperService.BuildCurrentPeriodPreview();
             long periodStart = MonthlyEnforcementChirperService.GetCurrentPeriodStartMonthTicks(currentTimestampMonthTicks);
             long periodEnd = currentTimestampMonthTicks;
+
+            Mod.log.Info(
+                $@"Monthly chirper manual preview build. " +
+                $@"openPanel={openPanel}, " +
+                $@"period={FormatEnglishPeriodPoint(periodStart)} -> {FormatEnglishPeriodPoint(periodEnd)}, " +
+                $@"totalPathRequests={previewReport.m_TotalPathRequestCount}, " +
+                $@"totalActualPaths={previewReport.m_TotalActualPathCount}, " +
+                $@"totalAvoidedPaths={previewReport.m_TotalAvoidedPathCount}, " +
+                $@"totalFineAmount={previewReport.m_TotalFineAmount}");
 
             bool updatedLocalization = EnsurePreviewAssets(previewReport, periodStart, periodEnd, out Entity triggerEntity);
             if (updatedLocalization)
@@ -495,11 +510,18 @@ namespace Traffic_Law_Enforcement
             });
 
             m_CreateChirpSystem.AddQueueWriter(default);
+
+            Mod.log.Info(
+                $@"Monthly chirper enqueue submitted. " +
+                $@"trigger={triggerEntity.Index}:{triggerEntity.Version}, " +
+                $@"sender={m_SenderAccountEntity.Index}:{m_SenderAccountEntity.Version}");
+
             return true;
         }
 
         private bool TryOpenChirperPanel()
         {
+            Mod.log.Info("Monthly chirper panel open requested.");
             try
             {
                 GamePanelUISystem gamePanelSystem = World.GetOrCreateSystemManaged<GamePanelUISystem>();
