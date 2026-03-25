@@ -328,7 +328,7 @@ namespace Traffic_Law_Enforcement
                 $"[SAVELOAD] Deserialize begin: version={version}, " +
                 $"runtimeGeneration={RuntimeWorldGeneration}" +
                 $"{EnforcementLoggingPolicy.FormatSaveIdentificationSuffix()}");
-            if (version != 3 && version != 4 && version != 5 && version != 6 && version != 7 && version != 8 && version != 9 &&version != kSerializationVersion)
+            if (version != 3 && version != 4 && version != 5 && version != 6 && version != 7 && version != 8 && version != 9 && version != kSerializationVersion)
             {
                 Mod.log.Info($"Unsupported enforcement save-data version {version}. Falling back to defaults.");
                 return;

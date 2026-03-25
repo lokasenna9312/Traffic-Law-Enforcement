@@ -609,7 +609,7 @@ namespace Traffic_Law_Enforcement
                 !string.IsNullOrWhiteSpace(kind) &&
                 pathContextSequence > 0L)
             {
-                s_ActualViolationEvents .Add(
+                s_ActualViolationEvents.Add(
                     new ActualViolationEvent(
                         EnforcementGameTime.CurrentTimestampMonthTicks,
                         pathContextSequence,
