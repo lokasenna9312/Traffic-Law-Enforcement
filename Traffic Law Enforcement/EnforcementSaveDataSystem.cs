@@ -753,63 +753,12 @@ namespace Traffic_Law_Enforcement
                 writer.Write(entry.Kind);
             }
 
-            bool hasTrackingState =
-                MonthlyEnforcementChirperService.TryGetTrackingState(out MonthlyEnforcementTrackingState trackingState);
-
-            writer.Write(hasTrackingState);
-            if (hasTrackingState)
-            {
-                writer.Write(trackingState.m_MonthIndex);
-                writer.Write(trackingState.m_TotalPathRequestCount);
-                writer.Write(trackingState.m_TotalActualPathCount);
-                writer.Write(trackingState.m_PublicTransportLaneCount);
-                writer.Write(trackingState.m_MidBlockCrossingCount);
-                writer.Write(trackingState.m_IntersectionMovementCount);
-                writer.Write(trackingState.m_TotalFineAmount);
-                writer.Write(trackingState.m_TotalAvoidedPathCount);
-                writer.Write(trackingState.m_PublicTransportLaneFineAmount);
-                writer.Write(trackingState.m_MidBlockCrossingFineAmount);
-                writer.Write(trackingState.m_IntersectionMovementFineAmount);
-                writer.Write(trackingState.m_PublicTransportLaneAvoidedEventCount);
-                writer.Write(trackingState.m_MidBlockCrossingAvoidedEventCount);
-                writer.Write(trackingState.m_IntersectionMovementAvoidedEventCount);
-                writer.Write(trackingState.m_TotalActualOrAvoidedPathCount);
-                writer.Write(trackingState.m_PublicTransportLaneActualOrAvoidedPathCount);
-                writer.Write(trackingState.m_MidBlockCrossingActualOrAvoidedPathCount);
-                writer.Write(trackingState.m_IntersectionMovementActualOrAvoidedPathCount);
-            }
-
-            IReadOnlyCollection<MonthlyEnforcementReport> reports =
-                MonthlyEnforcementChirperService.GetReportHistorySnapshot();
+            WriteMonthlyEnforcementTrackingState(writer);
+            IReadOnlyCollection<MonthlyEnforcementReport> reports = MonthlyEnforcementChirperService.GetReportHistorySnapshot();
             WriteMonthlyEnforcementReports(writer, reports);
-
-            bool hasPolicyImpactTrackingState = EnforcementPolicyImpactService.TryGetTrackingState(out EnforcementPolicyImpactTrackingState policyImpactTrackingState);
-            writer.Write(hasPolicyImpactTrackingState);
-            if (hasPolicyImpactTrackingState)
-            {
-                writer.Write(policyImpactTrackingState.m_MonthIndex);
-                writer.Write(policyImpactTrackingState.m_TotalPathRequestCount);
-                writer.Write(policyImpactTrackingState.m_TotalActualPathCount);
-                writer.Write(policyImpactTrackingState.m_TotalAvoidedPathCount);
-                writer.Write(policyImpactTrackingState.m_TotalFineAmount);
-                writer.Write(policyImpactTrackingState.m_PublicTransportLaneActualCount);
-                writer.Write(policyImpactTrackingState.m_MidBlockCrossingActualCount);
-                writer.Write(policyImpactTrackingState.m_IntersectionMovementActualCount);
-                writer.Write(policyImpactTrackingState.m_PublicTransportLaneFineAmount);
-                writer.Write(policyImpactTrackingState.m_MidBlockCrossingFineAmount);
-                writer.Write(policyImpactTrackingState.m_IntersectionMovementFineAmount);
-                writer.Write(policyImpactTrackingState.m_PublicTransportLaneAvoidedEventCount);
-                writer.Write(policyImpactTrackingState.m_MidBlockCrossingAvoidedEventCount);
-                writer.Write(policyImpactTrackingState.m_IntersectionMovementAvoidedEventCount);
-                writer.Write(policyImpactTrackingState.m_TotalActualOrAvoidedPathCount);
-                writer.Write(policyImpactTrackingState.m_PublicTransportLaneActualOrAvoidedPathCount);
-                writer.Write(policyImpactTrackingState.m_MidBlockCrossingActualOrAvoidedPathCount);
-                writer.Write(policyImpactTrackingState.m_IntersectionMovementActualOrAvoidedPathCount);
-            }
-
-        EnforcementPolicyImpactService.PersistentTotalsSnapshot totals =
-            EnforcementPolicyImpactService.GetPersistentTotalsSnapshot();
-        WritePolicyImpactPersistentTotals(writer, totals);
+            WritePolicyImpactTrackingState(writer);
+            EnforcementPolicyImpactService.PersistentTotalsSnapshot totals = EnforcementPolicyImpactService.GetPersistentTotalsSnapshot();
+            WritePolicyImpactPersistentTotals(writer, totals);
 
             IReadOnlyCollection<PathRequestEvent> pathRequestEvents =
                 EnforcementPolicyImpactService.GetPathRequestEventSnapshot();
@@ -818,11 +767,7 @@ namespace Traffic_Law_Enforcement
             IReadOnlyCollection<AvoidedRerouteEvent> avoidedRerouteEvents =
                 EnforcementPolicyImpactService.GetAvoidedRerouteEventSnapshot();
 
-            WritePolicyImpactEvents(
-                writer,
-                pathRequestEvents,
-                actualViolationEvents,
-                avoidedRerouteEvents);
+            WritePolicyImpactEvents(writer, pathRequestEvents, actualViolationEvents, avoidedRerouteEvents);
 
             WriteLoadedPublicTransportLaneVehicleStates(writer);
         }
@@ -1085,7 +1030,33 @@ namespace Traffic_Law_Enforcement
         private static void WriteMonthlyEnforcementTrackingState<TWriter>(TWriter writer)
             where TWriter : IWriter
         {
-            WriteMonthlyEnforcementTrackingState(writer);
+            bool hasTrackingState =
+                MonthlyEnforcementChirperService.TryGetTrackingState(out MonthlyEnforcementTrackingState trackingState);
+
+            writer.Write(hasTrackingState);
+            if (!hasTrackingState)
+            {
+                return;
+            }
+
+            writer.Write(trackingState.m_MonthIndex);
+            writer.Write(trackingState.m_TotalPathRequestCount);
+            writer.Write(trackingState.m_TotalActualPathCount);
+            writer.Write(trackingState.m_PublicTransportLaneCount);
+            writer.Write(trackingState.m_MidBlockCrossingCount);
+            writer.Write(trackingState.m_IntersectionMovementCount);
+            writer.Write(trackingState.m_TotalFineAmount);
+            writer.Write(trackingState.m_TotalAvoidedPathCount);
+            writer.Write(trackingState.m_PublicTransportLaneFineAmount);
+            writer.Write(trackingState.m_MidBlockCrossingFineAmount);
+            writer.Write(trackingState.m_IntersectionMovementFineAmount);
+            writer.Write(trackingState.m_PublicTransportLaneAvoidedEventCount);
+            writer.Write(trackingState.m_MidBlockCrossingAvoidedEventCount);
+            writer.Write(trackingState.m_IntersectionMovementAvoidedEventCount);
+            writer.Write(trackingState.m_TotalActualOrAvoidedPathCount);
+            writer.Write(trackingState.m_PublicTransportLaneActualOrAvoidedPathCount);
+            writer.Write(trackingState.m_MidBlockCrossingActualOrAvoidedPathCount);
+            writer.Write(trackingState.m_IntersectionMovementActualOrAvoidedPathCount);
         }
 
         private static void WriteGameplaySettings<TWriter>(TWriter writer, EnforcementGameplaySettingsState state) where TWriter : IWriter
@@ -1247,7 +1218,34 @@ namespace Traffic_Law_Enforcement
         private static void WritePolicyImpactTrackingState<TWriter>(TWriter writer)
             where TWriter : IWriter
         {
-            WritePolicyImpactTrackingState(writer);
+            bool hasPolicyImpactTrackingState =
+                EnforcementPolicyImpactService.TryGetTrackingState(
+                    out EnforcementPolicyImpactTrackingState policyImpactTrackingState);
+
+            writer.Write(hasPolicyImpactTrackingState);
+            if (!hasPolicyImpactTrackingState)
+            {
+                return;
+            }
+
+            writer.Write(policyImpactTrackingState.m_MonthIndex);
+            writer.Write(policyImpactTrackingState.m_TotalPathRequestCount);
+            writer.Write(policyImpactTrackingState.m_TotalActualPathCount);
+            writer.Write(policyImpactTrackingState.m_TotalAvoidedPathCount);
+            writer.Write(policyImpactTrackingState.m_TotalFineAmount);
+            writer.Write(policyImpactTrackingState.m_PublicTransportLaneActualCount);
+            writer.Write(policyImpactTrackingState.m_MidBlockCrossingActualCount);
+            writer.Write(policyImpactTrackingState.m_IntersectionMovementActualCount);
+            writer.Write(policyImpactTrackingState.m_PublicTransportLaneFineAmount);
+            writer.Write(policyImpactTrackingState.m_MidBlockCrossingFineAmount);
+            writer.Write(policyImpactTrackingState.m_IntersectionMovementFineAmount);
+            writer.Write(policyImpactTrackingState.m_PublicTransportLaneAvoidedEventCount);
+            writer.Write(policyImpactTrackingState.m_MidBlockCrossingAvoidedEventCount);
+            writer.Write(policyImpactTrackingState.m_IntersectionMovementAvoidedEventCount);
+            writer.Write(policyImpactTrackingState.m_TotalActualOrAvoidedPathCount);
+            writer.Write(policyImpactTrackingState.m_PublicTransportLaneActualOrAvoidedPathCount);
+            writer.Write(policyImpactTrackingState.m_MidBlockCrossingActualOrAvoidedPathCount);
+            writer.Write(policyImpactTrackingState.m_IntersectionMovementActualOrAvoidedPathCount);
         }
 
         private static EnforcementGameplaySettingsState ReadGameplaySettings<TReader>(TReader reader, int version) where TReader : IReader
