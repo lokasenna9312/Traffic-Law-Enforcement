@@ -779,29 +779,9 @@ namespace Traffic_Law_Enforcement
                 writer.Write(trackingState.m_IntersectionMovementActualOrAvoidedPathCount);
             }
 
-            IReadOnlyCollection<MonthlyEnforcementReport> reports = MonthlyEnforcementChirperService.GetReportHistorySnapshot();
-            writer.Write(reports.Count);
-            foreach (MonthlyEnforcementReport report in reports)
-            {
-                writer.Write(report.m_MonthIndex);
-                writer.Write(report.m_TotalPathRequestCount);
-                writer.Write(report.m_TotalActualPathCount);
-                writer.Write(report.m_PublicTransportLaneCount);
-                writer.Write(report.m_MidBlockCrossingCount);
-                writer.Write(report.m_IntersectionMovementCount);
-                writer.Write(report.m_TotalFineAmount);
-                writer.Write(report.m_TotalAvoidedPathCount);
-                writer.Write(report.m_PublicTransportLaneFineAmount);
-                writer.Write(report.m_MidBlockCrossingFineAmount);
-                writer.Write(report.m_IntersectionMovementFineAmount);
-                writer.Write(report.m_PublicTransportLaneAvoidedEventCount);
-                writer.Write(report.m_MidBlockCrossingAvoidedEventCount);
-                writer.Write(report.m_IntersectionMovementAvoidedEventCount);
-                writer.Write(report.m_TotalActualOrAvoidedPathCount);
-                writer.Write(report.m_PublicTransportLaneActualOrAvoidedPathCount);
-                writer.Write(report.m_MidBlockCrossingActualOrAvoidedPathCount);
-                writer.Write(report.m_IntersectionMovementActualOrAvoidedPathCount);
-            }
+            IReadOnlyCollection<MonthlyEnforcementReport> reports =
+                MonthlyEnforcementChirperService.GetReportHistorySnapshot();
+            WriteMonthlyEnforcementReports(writer, reports);
 
             bool hasPolicyImpactTrackingState = EnforcementPolicyImpactService.TryGetTrackingState(out EnforcementPolicyImpactTrackingState policyImpactTrackingState);
             writer.Write(hasPolicyImpactTrackingState);
@@ -1199,6 +1179,35 @@ namespace Traffic_Law_Enforcement
             writer.Write(state.IntersectionMovementRepeatWindowMonths);
             writer.Write(state.IntersectionMovementRepeatThreshold);
             writer.Write(state.IntersectionMovementRepeatMultiplierPercent);
+        }
+
+        private static void WriteMonthlyEnforcementReports<TWriter>(
+            TWriter writer,
+            IReadOnlyCollection<MonthlyEnforcementReport> reports)
+            where TWriter : IWriter
+        {
+            writer.Write(reports.Count);
+            foreach (MonthlyEnforcementReport report in reports)
+            {
+                writer.Write(report.m_MonthIndex);
+                writer.Write(report.m_TotalPathRequestCount);
+                writer.Write(report.m_TotalActualPathCount);
+                writer.Write(report.m_PublicTransportLaneCount);
+                writer.Write(report.m_MidBlockCrossingCount);
+                writer.Write(report.m_IntersectionMovementCount);
+                writer.Write(report.m_TotalFineAmount);
+                writer.Write(report.m_TotalAvoidedPathCount);
+                writer.Write(report.m_PublicTransportLaneFineAmount);
+                writer.Write(report.m_MidBlockCrossingFineAmount);
+                writer.Write(report.m_IntersectionMovementFineAmount);
+                writer.Write(report.m_PublicTransportLaneAvoidedEventCount);
+                writer.Write(report.m_MidBlockCrossingAvoidedEventCount);
+                writer.Write(report.m_IntersectionMovementAvoidedEventCount);
+                writer.Write(report.m_TotalActualOrAvoidedPathCount);
+                writer.Write(report.m_PublicTransportLaneActualOrAvoidedPathCount);
+                writer.Write(report.m_MidBlockCrossingActualOrAvoidedPathCount);
+                writer.Write(report.m_IntersectionMovementActualOrAvoidedPathCount);
+            }
         }
 
         private static EnforcementGameplaySettingsState ReadGameplaySettings<TReader>(TReader reader, int version) where TReader : IReader
