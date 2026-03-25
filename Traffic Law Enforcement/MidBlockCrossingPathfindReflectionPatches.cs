@@ -69,7 +69,7 @@ namespace Traffic_Law_Enforcement
             {
                 s_Harmony = new Harmony(HarmonyId);
                 s_Harmony.PatchAll(typeof(MidBlockCrossingPathfindReflectionPatches).Assembly);
-                if (EnforcementLoggingPolicy.ShouldLogEnforcementEvents())
+                if (EnforcementLoggingPolicy.ShouldLogPathfindingPenaltyDiagnostics())
                 {
                     Mod.log.Info("Mid-block reflection fallback patches applied.");
                 }
@@ -99,7 +99,7 @@ namespace Traffic_Law_Enforcement
             MethodBase __originalMethod)
         {
             string methodKey = __originalMethod?.ToString() ?? "(null)";
-            if (s_ActivatedMethods.Add(methodKey) && EnforcementLoggingPolicy.ShouldLogEnforcementEvents())
+            if (s_ActivatedMethods.Add(methodKey) && EnforcementLoggingPolicy.ShouldLogPathfindingPenaltyDiagnostics())
             {
                 Mod.log.Info(
                     $"Mid-block reflection fallback active: method={methodKey}, argCount={__args?.Length ?? 0}");
