@@ -123,6 +123,7 @@ The following options can be configured either for the currently loaded save fil
 - Improved persistence of public transport lane tracking data.
 - Refactored internal save-data handling for better stability.
 - Refactored codes related to Chirper message creation for better maintainability and performance.
+- Game's mod version and savefile's mod version will be logged in the log files, even if all logging options are turned off.
 	</ChangeLog>
 	<!--External link, can be set multiple times. supported types are "discord", "github", "youtube", "twitch", "x", "paypal", "patreon", "buymeacoffee", "kofi", "crowdin", "gitlab", "gofundme"-->
 	<ExternalLink Type="github" Url="https://github.com/lokasenna9312/Traffic-Law-Enforcement/" />

@@ -11,7 +11,7 @@ namespace Traffic_Law_Enforcement {
                                                      ISerializable,
                                                      IPreDeserialize,
                                                      IPostDeserialize {
-        private const int kSerializationVersion = 10;
+        private const int kSerializationVersion = 11;
 
         private EntityQuery m_StatisticsQuery;
         private EntityQuery m_PublicTransportLaneViolationQuery;
@@ -673,11 +673,11 @@ namespace Traffic_Law_Enforcement {
                 $"type4States={m_PublicTransportLaneType4UsageStateQuery.CalculateEntityCount()}, " +
                 $"permissionStates={m_PublicTransportLanePermissionStateQuery.CalculateEntityCount()}");
             writer.Write(kSerializationVersion);
-            WriteGameplaySettings(writer,
-                                  EnforcementGameplaySettingsService.Current);
+            writer.Write(string.IsNullOrWhiteSpace(Mod.CurrentModVersion) ? "unknown" : Mod.CurrentModVersion);
+            writer.Write(string.IsNullOrWhiteSpace(Mod.CurrentGameVersion) ? "unknown" : Mod.CurrentGameVersion);
+            WriteGameplaySettings(writer, EnforcementGameplaySettingsService.Current);
 
-            TrafficLawEnforcementStatistics statistics =
-                EnforcementTelemetry.GetStatisticsSnapshot();
+            TrafficLawEnforcementStatistics statistics = EnforcementTelemetry.GetStatisticsSnapshot();
             writer.Write(statistics.m_PublicTransportLaneViolationCount);
             writer.Write(statistics.m_ActivePublicTransportLaneViolatorCount);
             writer.Write(statistics.m_MidBlockCrossingViolationCount);
@@ -767,8 +767,25 @@ namespace Traffic_Law_Enforcement {
                 return;
             }
 
-            EnforcementGameplaySettingsState gameplaySettings =
-                ReadGameplaySettings(reader, version);
+                string savedByModVersion = "unknown";
+                string savedByGameVersion = "unknown";
+
+                if (version >= 11)
+                {
+                    reader.Read(out savedByModVersion);
+                    reader.Read(out savedByGameVersion);
+                }
+
+                Mod.log.Info(
+                    "[MODINFO] Save compatibility: " +
+                    $"currentModVersion={Mod.CurrentModVersion}, " +
+                    $"currentGameVersion={Mod.CurrentGameVersion}, " +
+                    $"savedByModVersion={savedByModVersion}, " +
+                    $"savedByGameVersion={savedByGameVersion}, " +
+                    $"saveDataVersion={version}, " +
+                    SaveLoadTraceService.DescribePendingLoad());
+
+            EnforcementGameplaySettingsState gameplaySettings = ReadGameplaySettings(reader, version);
 
             TrafficLawEnforcementStatistics statistics = default;
             reader.Read(out statistics.m_PublicTransportLaneViolationCount);

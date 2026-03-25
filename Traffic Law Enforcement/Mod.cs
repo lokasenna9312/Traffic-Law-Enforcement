@@ -10,6 +10,8 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using UnityEngine;
+using System.Reflection;
+using System.Xml.Linq;
 
 namespace Traffic_Law_Enforcement
 {
@@ -22,14 +24,21 @@ namespace Traffic_Law_Enforcement
         public static bool IsPublicTransportLaneEnforcementEnabled => EnforcementGameplaySettingsService.Current.EnablePublicTransportLaneEnforcement;
         public static bool IsMidBlockCrossingEnforcementEnabled => EnforcementGameplaySettingsService.Current.EnableMidBlockCrossingEnforcement;
         public static bool IsIntersectionMovementEnforcementEnabled => EnforcementGameplaySettingsService.Current.EnableIntersectionMovementEnforcement;
+        public static string CurrentModDisplayName { get; private set; } = "unknown";
+        public static string CurrentModVersion { get; private set; } = "unknown";
+        public static string CurrentGameVersion { get; private set; } = "unknown";
         private Setting m_Setting;
 
         public void OnLoad(UpdateSystem updateSystem)
         {
             log.Info(nameof(OnLoad));
 
+            string modAssetPath = null;
             if (GameManager.instance.modManager.TryGetExecutableAsset(this, out var asset))
+            {
+                modAssetPath = asset.path;
                 log.Info($"Current mod asset at {asset.path}");
+            }
 
             EnforcementGameTime.Reset();
             SaveLoadTraceService.Reset();
@@ -37,6 +46,10 @@ namespace Traffic_Law_Enforcement
             m_Setting = new Setting(this);
             Settings = m_Setting;
             AssetDatabase.global.LoadSettings(nameof(Traffic_Law_Enforcement), m_Setting, new Setting(this));
+
+            ResolveAndCacheModMetadata(modAssetPath);
+            LogModVersionInfo(modAssetPath);
+
             m_Setting.RegisterInOptionsUI();
             RegisterTextLocales();
             BudgetUIPatches.Apply();
@@ -231,6 +244,7 @@ namespace Traffic_Law_Enforcement
                     return true;
             }
         }
+
         private string GetLocalizationDirectory()
         {
             if (GameManager.instance.modManager.TryGetExecutableAsset(this, out var asset) &&
@@ -303,6 +317,176 @@ namespace Traffic_Law_Enforcement
             {
                 log.Warn($"[{localeId}] Extra locale key not present in en-US: {extraKey}");
             }
+        }
+
+        private void LogModVersionInfo(string modAssetPath)
+        {
+            Assembly assembly = typeof(Mod).Assembly;
+            string assemblyVersion = assembly.GetName().Version?.ToString() ?? "unknown";
+            string informationalVersion =
+                assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
+            string fileVersion =
+                assembly.GetCustomAttribute<AssemblyFileVersionAttribute>()?.Version;
+
+            string modRootDirectory = GetModRootDirectory(modAssetPath);
+            string displayName = ReadPublishConfigurationValue(modRootDirectory, "DisplayName") ?? "unknown";
+            string modVersion =
+                ReadPublishConfigurationValue(modRootDirectory, "ModVersion") ??
+                informationalVersion ??
+                fileVersion ??
+                assemblyVersion;
+            string gameVersion =
+                ReadPublishConfigurationValue(modRootDirectory, "GameVersion") ??
+                "unknown";
+
+            log.Info(
+                "[MODINFO] " +
+                $"name={displayName}, " +
+                $"modVersion={modVersion}, " +
+                $"gameVersion={gameVersion}, " +
+                $"assemblyVersion={assemblyVersion}, " +
+                $"assetPath={FirstNonBlank(modAssetPath, "unknown")}" +
+                SaveLoadTraceService.DescribePendingLoad());
+        }
+
+        private void ResolveAndCacheModMetadata(string modAssetPath)
+        {
+            Assembly assembly = typeof(Mod).Assembly;
+            string assemblyVersion = assembly.GetName().Version?.ToString();
+
+            string modRootDirectory = GetModRootDirectory(modAssetPath);
+
+            CurrentModDisplayName =
+                ReadPublishConfigurationValue(modRootDirectory, "DisplayName") ??
+                "unknown";
+
+            CurrentModVersion =
+                ReadPublishConfigurationValue(modRootDirectory, "ModVersion") ??
+                assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ??
+                assembly.GetCustomAttribute<AssemblyFileVersionAttribute>()?.Version ??
+                assemblyVersion ??
+                "unknown";
+
+            CurrentGameVersion =
+                ReadPublishConfigurationValue(modRootDirectory, "GameVersion") ??
+                "unknown";
+        }
+
+        private void LogModVersionInfo(string modAssetPath)
+        {
+            Assembly assembly = typeof(Mod).Assembly;
+            string assemblyVersion = assembly.GetName().Version?.ToString() ?? "unknown";
+
+            log.Info(
+                "[MODINFO] " +
+                $"name={CurrentModDisplayName}, " +
+                $"modVersion={CurrentModVersion}, " +
+                $"gameVersion={CurrentGameVersion}, " +
+                $"assemblyVersion={assemblyVersion}, " +
+                $"assetPath={FirstNonBlank(modAssetPath, "unknown")}, " +
+                SaveLoadTraceService.DescribePendingLoad());
+        }
+
+        private static string GetModRootDirectory(string modAssetPath)
+        {
+            if (string.IsNullOrWhiteSpace(modAssetPath))
+            {
+                return null;
+            }
+
+            return File.Exists(modAssetPath)
+                ? Path.GetDirectoryName(modAssetPath)
+                : modAssetPath;
+        }
+
+        private static string ReadPublishConfigurationValue(string modRootDirectory, string elementName)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(modRootDirectory) || string.IsNullOrWhiteSpace(elementName))
+                {
+                    return null;
+                }
+
+                string publishConfigurationPath = Path.Combine(modRootDirectory, "PublishConfiguration.xml");
+                if (!File.Exists(publishConfigurationPath))
+                {
+                    return null;
+                }
+
+                XElement root = XDocument.Load(publishConfigurationPath).Root;
+                XElement element = root?.Element(elementName);
+                return element?.Attribute("Value")?.Value;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private static string FirstNonBlank(params string[] values)
+        {
+            for (int index = 0; index < values.Length; index += 1)
+            {
+                string value = values[index];
+                if (!string.IsNullOrWhiteSpace(value))
+                {
+                    return value;
+                }
+            }
+
+            return null;
+        }
+
+        private static string GetModRootDirectory(string modAssetPath)
+        {
+            if (string.IsNullOrWhiteSpace(modAssetPath))
+            {
+                return null;
+            }
+
+            return File.Exists(modAssetPath)
+                ? Path.GetDirectoryName(modAssetPath)
+                : modAssetPath;
+        }
+
+        private static string ReadPublishConfigurationValue(string modRootDirectory, string elementName)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(modRootDirectory) || string.IsNullOrWhiteSpace(elementName))
+                {
+                    return null;
+                }
+
+                string publishConfigurationPath = Path.Combine(modRootDirectory, "PublishConfiguration.xml");
+                if (!File.Exists(publishConfigurationPath))
+                {
+                    return null;
+                }
+
+                XElement root = XDocument.Load(publishConfigurationPath).Root;
+                XElement element = root?.Element(elementName);
+                return element?.Attribute("Value")?.Value;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private static string FirstNonBlank(params string[] values)
+        {
+            for (int index = 0; index < values.Length; index += 1)
+            {
+                string value = values[index];
+                if (!string.IsNullOrWhiteSpace(value))
+                {
+                    return value;
+                }
+            }
+
+            return null;
         }
     }
 }
