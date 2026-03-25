@@ -313,6 +313,9 @@ namespace Traffic_Law_Enforcement
         private static readonly Dictionary<int, long> s_PublicTransportLaneActualOrAvoidedPathContextByVehicle = new Dictionary<int, long>();
         private static readonly Dictionary<int, long> s_MidBlockCrossingActualOrAvoidedPathContextByVehicle = new Dictionary<int, long>();
         private static readonly Dictionary<int, long> s_IntersectionMovementActualOrAvoidedPathContextByVehicle = new Dictionary<int, long>();
+        private static bool s_RollingWindowSnapshotDirty = true;
+        private static long s_LastSnapshotTimestampMonthTicks = -1L;
+        private static RollingWindowSnapshot s_CachedRollingWindowSnapshot;
 
         public static bool TryGetTrackingState(out EnforcementPolicyImpactTrackingState trackingState)
         {
@@ -374,6 +377,9 @@ namespace Traffic_Law_Enforcement
             s_PublicTransportLaneActualOrAvoidedPathContextByVehicle.Clear();
             s_MidBlockCrossingActualOrAvoidedPathContextByVehicle.Clear();
             s_IntersectionMovementActualOrAvoidedPathContextByVehicle.Clear();
+            s_CachedRollingWindowSnapshot = default;
+            s_LastSnapshotTimestampMonthTicks = -1L;
+            s_RollingWindowSnapshotDirty = true;
         }
 
         public static void LoadPersistentData(
@@ -492,6 +498,9 @@ namespace Traffic_Law_Enforcement
             s_NextPathContextSequence = System.Math.Max(1L, maxLoadedPathContextSequence + 1L);
 
             UpdateRollingWindowData();
+            s_CachedRollingWindowSnapshot = default;
+            s_LastSnapshotTimestampMonthTicks = -1L;
+            s_RollingWindowSnapshotDirty = true;
         }
 
         public static PersistentTotalsSnapshot GetPersistentTotalsSnapshot()
@@ -530,13 +539,13 @@ namespace Traffic_Law_Enforcement
 
             UpdateRollingWindowData();
 
-            // Real-time route count and category logs (recent 1 month)
-            var snapshot = GetRollingWindowSnapshot();
-            int violationTotal = snapshot.TotalActualPathCount;
-            int avoidanceTotal = snapshot.TotalAvoidedPathCount;
-            int vehicleRouteDenominator = snapshot.TotalPathRequestCount; // Unified denominator for all statistics
             if (EnforcementLoggingPolicy.EnableEnforcementEventLogging)
             {
+                RollingWindowSnapshot snapshot = GetRollingWindowSnapshot();
+                int violationTotal = snapshot.TotalActualPathCount;
+                int avoidanceTotal = snapshot.TotalAvoidedPathCount;
+                int vehicleRouteDenominator = snapshot.TotalPathRequestCount;
+
                 Mod.log.Info($"[RouteCount] vehicleRouteDenominator={vehicleRouteDenominator}, violationTotal={violationTotal}, avoidanceTotal={avoidanceTotal}");
                 Mod.log.Info($"[ViolationCount] PublicTransport={snapshot.PublicTransportLaneActualCount}, MidBlock={snapshot.MidBlockCrossingActualCount}, Intersection={snapshot.IntersectionMovementActualCount}");
                 Mod.log.Info($"[AvoidanceCount] PublicTransport={snapshot.PublicTransportLaneAvoidedEventCount}, MidBlock={snapshot.MidBlockCrossingAvoidedEventCount}, Intersection={snapshot.IntersectionMovementAvoidedEventCount}");
@@ -615,6 +624,8 @@ namespace Traffic_Law_Enforcement
                         pathContextSequence,
                         kind,
                         fineAmount));
+
+                s_RollingWindowSnapshotDirty = true;
             }
 
             switch (kind)
@@ -750,6 +761,8 @@ namespace Traffic_Law_Enforcement
                         avoidedPublicTransportLanePenalty,
                         avoidedMidBlockPenalty,
                         avoidedIntersectionPenalty));
+
+                s_RollingWindowSnapshotDirty = true;
             }
 
             if (countsTowardPublicTransportLanePath)
@@ -852,6 +865,28 @@ namespace Traffic_Law_Enforcement
         }
 
         public static RollingWindowSnapshot GetRollingWindowSnapshot()
+        {
+            if (!EnforcementGameTime.IsInitialized)
+            {
+                return default;
+            }
+
+            UpdateRollingWindowData();
+
+            long currentTimestampMonthTicks = EnforcementGameTime.CurrentTimestampMonthTicks;
+            if (!s_RollingWindowSnapshotDirty &&
+                s_LastSnapshotTimestampMonthTicks == currentTimestampMonthTicks)
+            {
+                return s_CachedRollingWindowSnapshot;
+            }
+
+            s_CachedRollingWindowSnapshot = BuildRollingWindowSnapshot();
+            s_LastSnapshotTimestampMonthTicks = currentTimestampMonthTicks;
+            s_RollingWindowSnapshotDirty = false;
+            return s_CachedRollingWindowSnapshot;
+        }
+
+        public static RollingWindowSnapshot BuildRollingWindowSnapshot()
         {
             if (!EnforcementGameTime.IsInitialized)
             {
@@ -1118,9 +1153,16 @@ namespace Traffic_Law_Enforcement
 
             long currentTimestampMonthTicks = EnforcementGameTime.CurrentTimestampMonthTicks;
             long cutoffTimestamp = System.Math.Max(0L, currentTimestampMonthTicks - EnforcementGameTime.CurrentMonthTicksPerMonth);
-            PrunePathRequestEvents(cutoffTimestamp);
-            PruneActualViolationEvents(cutoffTimestamp);
-            PruneAvoidedRerouteEvents(cutoffTimestamp);
+
+            bool removedAny = false;
+            removedAny |= PrunePathRequestEvents(cutoffTimestamp);
+            removedAny |= PruneActualViolationEvents(cutoffTimestamp);
+            removedAny |= PruneAvoidedRerouteEvents(cutoffTimestamp);
+
+            if (removedAny)
+            {
+                s_RollingWindowSnapshotDirty = true;
+            }
         }
 
 
@@ -1134,6 +1176,7 @@ namespace Traffic_Law_Enforcement
             }
 
             long timestampMonthTicks = EnforcementGameTime.CurrentTimestampMonthTicks;
+            bool addedAny = false;
 
             for (int index = 0; index < s_PendingPathRequestSequencesUntilTimeInitialization.Count; index += 1)
             {
@@ -1146,10 +1189,16 @@ namespace Traffic_Law_Enforcement
                         new PathRequestEvent(
                             timestampMonthTicks,
                             pathContextSequence));
+                    addedAny = true;
                 }
             }
 
             s_PendingPathRequestSequencesUntilTimeInitialization.Clear();
+
+            if (addedAny)
+            {
+                s_RollingWindowSnapshotDirty = true;
+            }
         }
 
         private static long RecordPathRequestInternal(int vehicleId)
@@ -1181,6 +1230,8 @@ namespace Traffic_Law_Enforcement
                     new PathRequestEvent(
                         EnforcementGameTime.CurrentTimestampMonthTicks,
                         pathContextSequence));
+
+                s_RollingWindowSnapshotDirty = true;
             }
 
             return pathContextSequence;
@@ -1285,37 +1336,52 @@ namespace Traffic_Law_Enforcement
             return amount.ToString("N0", CultureInfo.InvariantCulture);
         }
 
-        private static void PrunePathRequestEvents(long cutoffTimestamp)
+        private static bool PrunePathRequestEvents(long cutoffTimestamp)
         {
+            bool removedAny = false;
+
             for (int index = s_PathRequestEvents.Count - 1; index >= 0; index -= 1)
             {
                 if (s_PathRequestEvents[index].TimestampMonthTicks < cutoffTimestamp)
                 {
                     s_PathRequestEvents.RemoveAt(index);
+                    removedAny = true;
                 }
             }
+
+            return removedAny;
         }
 
-        private static void PruneActualViolationEvents(long cutoffTimestamp)
+        private static bool PruneActualViolationEvents(long cutoffTimestamp)
         {
+            bool removedAny = false;
+
             for (int index = s_ActualViolationEvents.Count - 1; index >= 0; index -= 1)
             {
                 if (s_ActualViolationEvents[index].TimestampMonthTicks < cutoffTimestamp)
                 {
                     s_ActualViolationEvents.RemoveAt(index);
+                    removedAny = true;
                 }
             }
+
+            return removedAny;
         }
 
-        private static void PruneAvoidedRerouteEvents(long cutoffTimestamp)
+        private static bool PruneAvoidedRerouteEvents(long cutoffTimestamp)
         {
+            bool removedAny = false;
+
             for (int index = s_AvoidedRerouteEvents.Count - 1; index >= 0; index -= 1)
             {
                 if (s_AvoidedRerouteEvents[index].TimestampMonthTicks < cutoffTimestamp)
                 {
                     s_AvoidedRerouteEvents.RemoveAt(index);
+                    removedAny = true;
                 }
             }
+
+            return removedAny;
         }
     }
 }
