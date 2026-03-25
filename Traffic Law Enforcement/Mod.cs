@@ -81,7 +81,7 @@ namespace Traffic_Law_Enforcement
             SaveLoadTracePatches.Remove();
             SaveLoadTraceService.Reset();
             KeybindingPersistenceGuardPatches.CaptureCurrentBindings();
-            // AssetDatabase can still save settings after mod disposal during shutdown.
+            KeybindingPersistenceGuardPatches.Remove();
             BudgetUIPatches.Remove();
             VehicleUtilsPatches.Remove();
             IntersectionMovementPathfindPatches.Remove();
