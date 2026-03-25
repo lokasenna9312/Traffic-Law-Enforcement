@@ -323,29 +323,14 @@ namespace Traffic_Law_Enforcement
         {
             Assembly assembly = typeof(Mod).Assembly;
             string assemblyVersion = assembly.GetName().Version?.ToString() ?? "unknown";
-            string informationalVersion =
-                assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
-            string fileVersion =
-                assembly.GetCustomAttribute<AssemblyFileVersionAttribute>()?.Version;
-
-            string modRootDirectory = GetModRootDirectory(modAssetPath);
-            string displayName = ReadPublishConfigurationValue(modRootDirectory, "DisplayName") ?? "unknown";
-            string modVersion =
-                ReadPublishConfigurationValue(modRootDirectory, "ModVersion") ??
-                informationalVersion ??
-                fileVersion ??
-                assemblyVersion;
-            string gameVersion =
-                ReadPublishConfigurationValue(modRootDirectory, "GameVersion") ??
-                "unknown";
 
             log.Info(
                 "[MODINFO] " +
-                $"name={displayName}, " +
-                $"modVersion={modVersion}, " +
-                $"gameVersion={gameVersion}, " +
+                $"name={CurrentModDisplayName}, " +
+                $"modVersion={CurrentModVersion}, " +
+                $"gameVersion={CurrentGameVersion}, " +
                 $"assemblyVersion={assemblyVersion}, " +
-                $"assetPath={FirstNonBlank(modAssetPath, "unknown")}" +
+                $"assetPath={FirstNonBlank(modAssetPath, "unknown")}, " +
                 SaveLoadTraceService.DescribePendingLoad());
         }
 
