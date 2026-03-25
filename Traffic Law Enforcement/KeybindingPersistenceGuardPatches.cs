@@ -229,9 +229,24 @@ namespace Traffic_Law_Enforcement
         private static bool TryGetBindingMemberTarget(MemberInfo member, object obj, out KeybindingSettings settings)
         {
             settings = obj as KeybindingSettings;
-            return settings != null &&
-                   member != null &&
-                   string.Equals(member.Name, nameof(KeybindingSettings.bindings), StringComparison.Ordinal);
+            if (settings == null || member == null)
+            {
+                return false;
+            }
+
+            Type declaringType = member.DeclaringType;
+            if (declaringType == null || !typeof(KeybindingSettings).IsAssignableFrom(declaringType))
+            {
+                return false;
+            }
+
+            if (string.Equals(member.Name, nameof(KeybindingSettings.bindings), StringComparison.Ordinal))
+            {
+                return true;
+            }
+
+            return s_KeybindingSettingsBindingsGetter != null &&
+                   string.Equals(member.Name, s_KeybindingSettingsBindingsGetter.Name, StringComparison.Ordinal);
         }
 
         private static List<ProxyBinding> GetCachedBindings(InputManager.PathType pathType)
