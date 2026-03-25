@@ -741,6 +741,16 @@ namespace Traffic_Law_Enforcement
             HashSet<long> midBlockAvoidedPaths = new HashSet<long>();
             HashSet<long> intersectionAvoidedPaths = new HashSet<long>();
 
+            int legacyRequestPathCount = 0;
+            int legacyTotalActualPathCount = 0;
+            int legacyTotalAvoidedPathCount = 0;
+            int legacyPublicTransportActualCount = 0;
+            int legacyMidBlockActualCount = 0;
+            int legacyIntersectionActualCount = 0;
+            int legacyPublicTransportAvoidedCount = 0;
+            int legacyMidBlockAvoidedCount = 0;
+            int legacyIntersectionAvoidedCount = 0;
+
             int totalFineAmount = 0;
             int publicTransportLaneFineAmount = 0;
             int midBlockCrossingFineAmount = 0;
@@ -753,6 +763,10 @@ namespace Traffic_Law_Enforcement
                 {
                     requestPaths.Add(entry.PathContextSequence);
                 }
+                else
+                {
+                    legacyRequestPathCount += 1;
+                }
             }
 
             for (int index = 0; index < s_ActualViolationEvents.Count; index += 1)
@@ -762,6 +776,26 @@ namespace Traffic_Law_Enforcement
 
                 if (entry.PathContextSequence <= 0L)
                 {
+                    legacyTotalActualPathCount += 1;
+
+                    switch (entry.Kind)
+                    {
+                        case EnforcementKinds.PublicTransportLane:
+                            legacyPublicTransportActualCount += 1;
+                            publicTransportLaneFineAmount += entry.FineAmount;
+                            break;
+
+                        case EnforcementKinds.MidBlockCrossing:
+                            legacyMidBlockActualCount += 1;
+                            midBlockCrossingFineAmount += entry.FineAmount;
+                            break;
+
+                        case EnforcementKinds.IntersectionMovement:
+                            legacyIntersectionActualCount += 1;
+                            intersectionMovementFineAmount += entry.FineAmount;
+                            break;
+                    }
+
                     continue;
                 }
 
@@ -792,6 +826,23 @@ namespace Traffic_Law_Enforcement
 
                 if (entry.PathContextSequence <= 0L)
                 {
+                    legacyTotalAvoidedPathCount += 1;
+
+                    if (entry.AvoidedPublicTransportLanePenalty)
+                    {
+                        legacyPublicTransportAvoidedCount += 1;
+                    }
+
+                    if (entry.AvoidedMidBlockPenalty)
+                    {
+                        legacyMidBlockAvoidedCount += 1;
+                    }
+
+                    if (entry.AvoidedIntersectionPenalty)
+                    {
+                        legacyIntersectionAvoidedCount += 1;
+                    }
+
                     continue;
                 }
 
@@ -828,24 +879,61 @@ namespace Traffic_Law_Enforcement
                 new HashSet<long>(intersectionActualPaths);
             intersectionActualOrAvoidedPaths.UnionWith(intersectionAvoidedPaths);
 
+            int totalPathRequestCount = requestPaths.Count + legacyRequestPathCount;
+            int totalActualPathCount = totalActualPaths.Count + legacyTotalActualPathCount;
+            int totalAvoidedPathCount = totalAvoidedPaths.Count + legacyTotalAvoidedPathCount;
+            int totalActualOrAvoidedPathCount =
+                totalActualOrAvoidedPaths.Count +
+                legacyTotalActualPathCount +
+                legacyTotalAvoidedPathCount;
+
+            int publicTransportLaneActualCount =
+                publicTransportActualPaths.Count + legacyPublicTransportActualCount;
+            int midBlockCrossingActualCount =
+                midBlockActualPaths.Count + legacyMidBlockActualCount;
+            int intersectionMovementActualCount =
+                intersectionActualPaths.Count + legacyIntersectionActualCount;
+
+            int publicTransportLaneAvoidedEventCount =
+                publicTransportAvoidedPaths.Count + legacyPublicTransportAvoidedCount;
+            int midBlockCrossingAvoidedEventCount =
+                midBlockAvoidedPaths.Count + legacyMidBlockAvoidedCount;
+            int intersectionMovementAvoidedEventCount =
+                intersectionAvoidedPaths.Count + legacyIntersectionAvoidedCount;
+
+            int publicTransportLaneActualOrAvoidedPathCount =
+                publicTransportActualOrAvoidedPaths.Count +
+                legacyPublicTransportActualCount +
+                legacyPublicTransportAvoidedCount;
+
+            int midBlockCrossingActualOrAvoidedPathCount =
+                midBlockActualOrAvoidedPaths.Count +
+                legacyMidBlockActualCount +
+                legacyMidBlockAvoidedCount;
+
+            int intersectionMovementActualOrAvoidedPathCount =
+                intersectionActualOrAvoidedPaths.Count +
+                legacyIntersectionActualCount +
+                legacyIntersectionAvoidedCount;
+
             return new RollingWindowSnapshot(
-                requestPaths.Count,
-                totalActualPaths.Count,
-                totalAvoidedPaths.Count,
-                totalActualOrAvoidedPaths.Count,
+                totalPathRequestCount,
+                totalActualPathCount,
+                totalAvoidedPathCount,
+                totalActualOrAvoidedPathCount,
                 totalFineAmount,
-                publicTransportActualPaths.Count,
-                midBlockActualPaths.Count,
-                intersectionActualPaths.Count,
+                publicTransportLaneActualCount,
+                midBlockCrossingActualCount,
+                intersectionMovementActualCount,
                 publicTransportLaneFineAmount,
                 midBlockCrossingFineAmount,
                 intersectionMovementFineAmount,
-                publicTransportAvoidedPaths.Count,
-                midBlockAvoidedPaths.Count,
-                intersectionAvoidedPaths.Count,
-                publicTransportActualOrAvoidedPaths.Count,
-                midBlockActualOrAvoidedPaths.Count,
-                intersectionActualOrAvoidedPaths.Count);
+                publicTransportLaneAvoidedEventCount,
+                midBlockCrossingAvoidedEventCount,
+                intersectionMovementAvoidedEventCount,
+                publicTransportLaneActualOrAvoidedPathCount,
+                midBlockCrossingActualOrAvoidedPathCount,
+                intersectionMovementActualOrAvoidedPathCount);
         }
 
         private static EnforcementPolicyImpactTrackingState CaptureCurrentState(long monthIndex)
