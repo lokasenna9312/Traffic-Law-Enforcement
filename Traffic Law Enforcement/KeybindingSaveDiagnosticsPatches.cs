@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Reflection;
 using System.Threading;
 using HarmonyLib;
+using UnityEngine;
 
 namespace Traffic_Law_Enforcement
 {
@@ -10,9 +12,11 @@ namespace Traffic_Law_Enforcement
     {
         private const string HarmonyId = "Traffic_Law_Enforcement.KeybindingSaveDiagnosticsPatches";
         private const int kMaxTrackedDepth = 12;
+        private const int kMaxSaveBreadcrumbs = 20;
 
         private static readonly AsyncLocal<List<string>> s_DiffObjectStack = new AsyncLocal<List<string>>();
         private static readonly AsyncLocal<string> s_CurrentSettingAsset = new AsyncLocal<string>();
+        private static readonly AsyncLocal<List<string>> s_SaveBreadcrumbs = new AsyncLocal<List<string>>();
         private static readonly HashSet<string> s_LoggedFailures = new HashSet<string>(StringComparer.Ordinal);
         private static readonly object s_LogGate = new object();
 
@@ -87,12 +91,12 @@ namespace Traffic_Law_Enforcement
                     s_SettingAssetSaveMethod,
                     prefix: new HarmonyMethod(typeof(KeybindingSaveDiagnosticsPatches), nameof(SettingAssetSavePrefix)));
 
-                Mod.log.Info("[KEYBIND_DIAG] Keybinding save diagnostics patches applied.");
+                WriteDiagnosticLine("Keybinding save diagnostics patches applied.");
             }
             catch (Exception ex)
             {
                 s_Harmony = null;
-                Mod.log.Error(ex, "[KEYBIND_DIAG] Failed to apply keybinding save diagnostics patches.");
+                WriteDiagnosticLine("Failed to apply keybinding save diagnostics patches.", ex);
             }
         }
 
@@ -106,17 +110,18 @@ namespace Traffic_Law_Enforcement
             try
             {
                 s_Harmony.UnpatchAll(HarmonyId);
-                Mod.log.Info("[KEYBIND_DIAG] Keybinding save diagnostics patches removed.");
+                WriteDiagnosticLine("Keybinding save diagnostics patches removed.");
             }
             catch (Exception ex)
             {
-                Mod.log.Error(ex, "[KEYBIND_DIAG] Failed to remove keybinding save diagnostics patches.");
+                WriteDiagnosticLine("Failed to remove keybinding save diagnostics patches.", ex);
             }
             finally
             {
                 s_Harmony = null;
                 s_DiffObjectStack.Value = null;
                 s_CurrentSettingAsset.Value = null;
+                s_SaveBreadcrumbs.Value = null;
                 lock (s_LogGate)
                 {
                     s_LoggedFailures.Clear();
@@ -179,15 +184,17 @@ namespace Traffic_Law_Enforcement
             }
 
             string keybindingContext = DescribeKeybindingContext(obj);
-            Mod.log.Error(
-                "[KEYBIND_DIAG] Exception while resolving a keybinding member during settings save. " +
+            WriteDiagnosticLine(
+                "Exception while resolving a keybinding member during settings save. " +
                 $"settingAsset={s_CurrentSettingAsset.Value ?? "<unknown>"}, " +
                 $"member={DescribeMember(member)}, " +
                 $"object={DescribeObject(obj)}, " +
                 $"keybindingContext={keybindingContext}, " +
                 $"diffStack={FormatCurrentDiffStack()}, " +
+                $"saveBreadcrumbs={FormatSaveBreadcrumbs()}, " +
                 $"exception={DescribeException(__exception)}, " +
-                $"rootCause={DescribeException(rootCause)}");
+                $"rootCause={DescribeException(rootCause)}",
+                __exception);
 
             return __exception;
         }
@@ -331,7 +338,23 @@ namespace Traffic_Law_Enforcement
 
         private static void SettingAssetSavePrefix(object __instance)
         {
-            s_CurrentSettingAsset.Value = DescribeSettingAsset(__instance);
+            string settingAsset = DescribeSettingAsset(__instance);
+            s_CurrentSettingAsset.Value = settingAsset;
+
+            List<string> breadcrumbs = s_SaveBreadcrumbs.Value;
+            if (breadcrumbs == null)
+            {
+                breadcrumbs = new List<string>();
+                s_SaveBreadcrumbs.Value = breadcrumbs;
+            }
+
+            breadcrumbs.Add(settingAsset);
+            if (breadcrumbs.Count > kMaxSaveBreadcrumbs)
+            {
+                breadcrumbs.RemoveAt(0);
+            }
+
+            WriteDiagnosticLine($"SettingAsset.Save started. settingAsset={settingAsset}");
         }
 
         private static string DescribeSettingAsset(object settingAsset)
@@ -381,6 +404,80 @@ namespace Traffic_Law_Enforcement
             }
 
             return null;
+        }
+
+        private static string FormatSaveBreadcrumbs()
+        {
+            List<string> breadcrumbs = s_SaveBreadcrumbs.Value;
+            if (breadcrumbs == null || breadcrumbs.Count == 0)
+            {
+                return "<empty>";
+            }
+
+            return string.Join(" -> ", breadcrumbs);
+        }
+
+        private static void WriteDiagnosticLine(string message, Exception exception = null)
+        {
+            string line = $"[KEYBIND_DIAG] {message}";
+
+            try
+            {
+                if (exception == null)
+                {
+                    Mod.log.Info(line);
+                }
+                else
+                {
+                    Mod.log.Error(exception, line);
+                }
+            }
+            catch
+            {
+            }
+
+            try
+            {
+                string logPath = ResolveAuxiliaryLogPath();
+                string directory = Path.GetDirectoryName(logPath);
+                if (!string.IsNullOrWhiteSpace(directory))
+                {
+                    Directory.CreateDirectory(directory);
+                }
+
+                string timestampedLine = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss,fff}] {line}";
+                lock (s_LogGate)
+                {
+                    File.AppendAllText(logPath, timestampedLine + Environment.NewLine);
+                    if (exception != null)
+                    {
+                        File.AppendAllText(logPath, exception + Environment.NewLine);
+                    }
+                }
+            }
+            catch
+            {
+            }
+        }
+
+        private static string ResolveAuxiliaryLogPath()
+        {
+            string persistentDataPath = null;
+
+            try
+            {
+                persistentDataPath = Application.persistentDataPath;
+            }
+            catch
+            {
+            }
+
+            if (!string.IsNullOrWhiteSpace(persistentDataPath))
+            {
+                return Path.Combine(persistentDataPath, "Logs", "Traffic_Law_Enforcement.KeybindDiag.log");
+            }
+
+            return Path.Combine(AppContext.BaseDirectory, "Traffic_Law_Enforcement.KeybindDiag.log");
         }
     }
 }
