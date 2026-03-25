@@ -133,12 +133,6 @@ namespace Traffic_Law_Enforcement
         {
             bool migratedLegacyPathRequestTracking = version < 4;
 
-            reader.Read(out bool hasTrackingState);
-            if (!hasTrackingState)
-            {
-                return new MonthlyTrackingReadResult(null, migratedLegacyPathRequestTracking);
-            }
-
             reader.Read(out long monthIndex);
 
             int trackingTotalPathRequestCount = 0;
@@ -951,88 +945,6 @@ namespace Traffic_Law_Enforcement
 
             bool migratedLegacyPathRequestTracking =
                 monthlyTrackingReadResult.MigratedLegacyPathRequestTracking;
-
-            reader.Read(out bool hasTrackingState);
-            if (hasTrackingState)
-            {
-                reader.Read(out long monthIndex);
-                int trackingTotalPathRequestCount = 0;
-                if (version >= 4)
-                {
-                    reader.Read(out trackingTotalPathRequestCount);
-                }
-                int trackingTotalActualPathCount = 0;
-                if (version >= 9)
-                {
-                    reader.Read(out trackingTotalActualPathCount);
-                }
-                reader.Read(out int publicTransportLaneCount);
-                reader.Read(out int midBlockCrossingCount);
-                reader.Read(out int intersectionMovementCount);
-                reader.Read(out int trackingFineAmount);
-                reader.Read(out int trackingTotalAvoidedPathCount);
-                reader.Read(out int trackingPublicTransportLaneFineAmount);
-                reader.Read(out int trackingMidBlockCrossingFineAmount);
-                reader.Read(out int trackingIntersectionMovementFineAmount);
-                reader.Read(out int trackingPublicTransportLaneAvoidedEventCount);
-                reader.Read(out int trackingMidBlockCrossingAvoidedEventCount);
-                reader.Read(out int trackingIntersectionMovementAvoidedEventCount);
-                int trackingTotalActualOrAvoidedPathCount;
-                int trackingPublicTransportLaneActualOrAvoidedPathCount;
-                int trackingMidBlockCrossingActualOrAvoidedPathCount;
-                int trackingIntersectionMovementActualOrAvoidedPathCount;
-
-                if (version >= 10)
-                {
-                    reader.Read(out trackingTotalActualOrAvoidedPathCount);
-                    reader.Read(out trackingPublicTransportLaneActualOrAvoidedPathCount);
-                    reader.Read(out trackingMidBlockCrossingActualOrAvoidedPathCount);
-                    reader.Read(out trackingIntersectionMovementActualOrAvoidedPathCount);
-                }
-                else
-                {
-                    trackingTotalActualOrAvoidedPathCount =
-                        trackingTotalActualPathCount + trackingTotalAvoidedPathCount;
-                    trackingPublicTransportLaneActualOrAvoidedPathCount =
-                        publicTransportLaneCount + trackingPublicTransportLaneAvoidedEventCount;
-                    trackingMidBlockCrossingActualOrAvoidedPathCount =
-                        midBlockCrossingCount + trackingMidBlockCrossingAvoidedEventCount;
-                    trackingIntersectionMovementActualOrAvoidedPathCount =
-                        intersectionMovementCount + trackingIntersectionMovementAvoidedEventCount;
-                }
-                if (version < 9)
-                {
-                    trackingTotalActualPathCount =
-                        publicTransportLaneCount +
-                        midBlockCrossingCount +
-                        intersectionMovementCount;
-                }
-
-                trackingState = new MonthlyEnforcementTrackingState(
-                    monthIndex,
-                    trackingTotalPathRequestCount,
-                    trackingTotalActualPathCount,
-                    publicTransportLaneCount,
-                    midBlockCrossingCount,
-                    intersectionMovementCount,
-                    trackingFineAmount,
-                    trackingTotalAvoidedPathCount,
-                    trackingPublicTransportLaneFineAmount,
-                    trackingMidBlockCrossingFineAmount,
-                    trackingIntersectionMovementFineAmount,
-                    trackingPublicTransportLaneAvoidedEventCount,
-                    trackingMidBlockCrossingAvoidedEventCount,
-                    trackingIntersectionMovementAvoidedEventCount,
-                    trackingTotalActualOrAvoidedPathCount,
-                    trackingPublicTransportLaneActualOrAvoidedPathCount,
-                    trackingMidBlockCrossingActualOrAvoidedPathCount,
-                    trackingIntersectionMovementActualOrAvoidedPathCount);
-
-                if (migratedLegacyPathRequestTracking || HasInconsistentPathRequestTracking(trackingState.Value.m_TotalPathRequestCount, trackingState.Value.m_TotalActualPathCount, trackingState.Value.m_TotalAvoidedPathCount, trackingState.Value.m_TotalFineAmount))
-                {
-                    trackingState = null;
-                }
-            }
 
             List<MonthlyEnforcementReport> reports =
                 ReadMonthlyEnforcementReports(reader, version);
