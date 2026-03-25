@@ -278,6 +278,29 @@ namespace Traffic_Law_Enforcement
             }
         }
 
+        public readonly struct PersistentDataSnapshot
+        {
+            public readonly EnforcementPolicyImpactTrackingState? TrackingState;
+            public readonly PersistentTotalsSnapshot Totals;
+            public readonly IEnumerable<PathRequestEvent> PathRequestEvents;
+            public readonly IEnumerable<ActualViolationEvent> ActualViolationEvents;
+            public readonly IEnumerable<AvoidedRerouteEvent> AvoidedRerouteEvents;
+
+            public PersistentDataSnapshot(
+                EnforcementPolicyImpactTrackingState? trackingState,
+                PersistentTotalsSnapshot totals,
+                IEnumerable<PathRequestEvent> pathRequestEvents,
+                IEnumerable<ActualViolationEvent> actualViolationEvents,
+                IEnumerable<AvoidedRerouteEvent> avoidedRerouteEvents)
+            {
+                TrackingState = trackingState;
+                Totals = totals;
+                PathRequestEvents = pathRequestEvents;
+                ActualViolationEvents = actualViolationEvents;
+                AvoidedRerouteEvents = avoidedRerouteEvents;
+            }
+        }
+
         private static bool s_HasTrackingState;
         private static EnforcementPolicyImpactTrackingState s_TrackingState;
         private static int s_TotalPathRequestCount;
@@ -384,58 +407,37 @@ namespace Traffic_Law_Enforcement
             s_RollingWindowSnapshotDirty = true;
         }
 
-        public static void LoadPersistentData(
-            EnforcementPolicyImpactTrackingState? trackingState,
-            int totalPathRequestCount,
-            int totalActualPathCount,
-            int totalAvoidedPathCount,
-            int totalFineAmount,
-            int publicTransportLaneActualCount,
-            int midBlockCrossingActualCount,
-            int intersectionMovementActualCount,
-            int publicTransportLaneFineAmount,
-            int midBlockCrossingFineAmount,
-            int intersectionMovementFineAmount,
-            int publicTransportLaneAvoidedEventCount,
-            int midBlockCrossingAvoidedEventCount,
-            int intersectionMovementAvoidedEventCount,
-            int totalActualOrAvoidedPathCount,
-            int publicTransportLaneActualOrAvoidedPathCount,
-            int midBlockCrossingActualOrAvoidedPathCount,
-            int intersectionMovementActualOrAvoidedPathCount,
-            IEnumerable<PathRequestEvent> pathRequestEvents,
-            IEnumerable<ActualViolationEvent> actualViolationEvents,
-            IEnumerable<AvoidedRerouteEvent> avoidedRerouteEvents)
+        public static void LoadPersistentData(PersistentDataSnapshot data)
         {
             ResetPersistentData();
 
-            if (trackingState.HasValue)
+            if (data.TrackingState.HasValue)
             {
-                s_TrackingState = trackingState.Value;
+                s_TrackingState = data.TrackingState.Value;
                 s_HasTrackingState = true;
             }
 
-            s_TotalPathRequestCount = totalPathRequestCount;
-            s_TotalActualPathCount = totalActualPathCount;
-            s_TotalAvoidedPathCount = totalAvoidedPathCount;
-            s_TotalFineAmount = totalFineAmount;
-            s_PublicTransportLaneActualCount = publicTransportLaneActualCount;
-            s_MidBlockCrossingActualCount = midBlockCrossingActualCount;
-            s_IntersectionMovementActualCount = intersectionMovementActualCount;
-            s_PublicTransportLaneFineAmount = publicTransportLaneFineAmount;
-            s_MidBlockCrossingFineAmount = midBlockCrossingFineAmount;
-            s_IntersectionMovementFineAmount = intersectionMovementFineAmount;
-            s_PublicTransportLaneAvoidedEventCount = publicTransportLaneAvoidedEventCount;
-            s_MidBlockCrossingAvoidedEventCount = midBlockCrossingAvoidedEventCount;
-            s_IntersectionMovementAvoidedEventCount = intersectionMovementAvoidedEventCount;
-            s_TotalActualOrAvoidedPathCount = totalActualOrAvoidedPathCount;
-            s_PublicTransportLaneActualOrAvoidedPathCount = publicTransportLaneActualOrAvoidedPathCount;
-            s_MidBlockCrossingActualOrAvoidedPathCount = midBlockCrossingActualOrAvoidedPathCount;
-            s_IntersectionMovementActualOrAvoidedPathCount = intersectionMovementActualOrAvoidedPathCount;
+            s_TotalPathRequestCount = data.Totals.TotalPathRequestCount;
+            s_TotalActualPathCount = data.Totals.TotalActualPathCount;
+            s_TotalAvoidedPathCount = data.Totals.TotalAvoidedPathCount;
+            s_TotalFineAmount = data.Totals.TotalFineAmount;
+            s_PublicTransportLaneActualCount = data.Totals.PublicTransportLaneActualCount;
+            s_MidBlockCrossingActualCount = data.Totals.MidBlockCrossingActualCount;
+            s_IntersectionMovementActualCount = data.Totals.IntersectionMovementActualCount;
+            s_PublicTransportLaneFineAmount = data.Totals.PublicTransportLaneFineAmount;
+            s_MidBlockCrossingFineAmount = data.Totals.MidBlockCrossingFineAmount;
+            s_IntersectionMovementFineAmount = data.Totals.IntersectionMovementFineAmount;
+            s_PublicTransportLaneAvoidedEventCount = data.Totals.PublicTransportLaneAvoidedEventCount;
+            s_MidBlockCrossingAvoidedEventCount = data.Totals.MidBlockCrossingAvoidedEventCount;
+            s_IntersectionMovementAvoidedEventCount = data.Totals.IntersectionMovementAvoidedEventCount;
+            s_TotalActualOrAvoidedPathCount = data.Totals.TotalActualOrAvoidedPathCount;
+            s_PublicTransportLaneActualOrAvoidedPathCount = data.Totals.PublicTransportLaneActualOrAvoidedPathCount;
+            s_MidBlockCrossingActualOrAvoidedPathCount = data.Totals.MidBlockCrossingActualOrAvoidedPathCount;
+            s_IntersectionMovementActualOrAvoidedPathCount = data.Totals.IntersectionMovementActualOrAvoidedPathCount;
 
-            if (pathRequestEvents != null)
+            if (data.PathRequestEvents != null)
             {
-                foreach (PathRequestEvent entry in pathRequestEvents)
+                foreach (PathRequestEvent entry in data.PathRequestEvents)
                 {
                     if (entry.TimestampMonthTicks >= 0L)
                     {
@@ -444,9 +446,9 @@ namespace Traffic_Law_Enforcement
                 }
             }
 
-            if (actualViolationEvents != null)
+            if (data.ActualViolationEvents != null)
             {
-                foreach (ActualViolationEvent entry in actualViolationEvents)
+                foreach (ActualViolationEvent entry in data.ActualViolationEvents)
                 {
                     if (entry.TimestampMonthTicks >= 0L &&
                         !string.IsNullOrWhiteSpace(entry.Kind) &&
@@ -457,11 +459,14 @@ namespace Traffic_Law_Enforcement
                 }
             }
 
-            if (avoidedRerouteEvents != null)
+            if (data.AvoidedRerouteEvents != null)
             {
-                foreach (AvoidedRerouteEvent entry in avoidedRerouteEvents)
+                foreach (AvoidedRerouteEvent entry in data.AvoidedRerouteEvents)
                 {
-                    if (entry.TimestampMonthTicks >= 0L && (entry.AvoidedPublicTransportLanePenalty || entry.AvoidedMidBlockPenalty || entry.AvoidedIntersectionPenalty))
+                    if (entry.TimestampMonthTicks >= 0L &&
+                        (entry.AvoidedPublicTransportLanePenalty ||
+                        entry.AvoidedMidBlockPenalty ||
+                        entry.AvoidedIntersectionPenalty))
                     {
                         s_AvoidedRerouteEvents.Add(entry);
                     }

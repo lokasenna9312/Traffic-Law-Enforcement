@@ -854,27 +854,29 @@ namespace Traffic_Law_Enforcement {
             MonthlyEnforcementChirperService.LoadPersistentData(trackingState,
                                                                 reports);
             EnforcementPolicyImpactService.LoadPersistentData(
-                policyImpactTrackingState,
-                totalsReadResult.TotalPathRequestCount,
-                totalsReadResult.TotalActualPathCount,
-                totalsReadResult.TotalAvoidedPathCount,
-                totalsReadResult.TotalPolicyImpactFineAmount,
-                totalsReadResult.PublicTransportLaneActualCount,
-                totalsReadResult.MidBlockCrossingActualCount,
-                totalsReadResult.IntersectionMovementActualCount,
-                totalsReadResult.PublicTransportLaneFineAmount,
-                totalsReadResult.MidBlockCrossingFineAmount,
-                totalsReadResult.IntersectionMovementFineAmount,
-                totalsReadResult.PublicTransportLaneAvoidedEventCount,
-                totalsReadResult.MidBlockCrossingAvoidedEventCount,
-                totalsReadResult.IntersectionMovementAvoidedEventCount,
-                totalsReadResult.TotalActualOrAvoidedPathCount,
-                totalsReadResult.PublicTransportLaneActualOrAvoidedPathCount,
-                totalsReadResult.MidBlockCrossingActualOrAvoidedPathCount,
-                totalsReadResult.IntersectionMovementActualOrAvoidedPathCount,
-                policyImpactEventsReadResult.PathRequestEvents,
-                policyImpactEventsReadResult.ActualViolationEvents,
-                policyImpactEventsReadResult.AvoidedRerouteEvents);
+                new EnforcementPolicyImpactService.PersistentDataSnapshot(
+                    policyImpactTrackingState,
+                    new EnforcementPolicyImpactService.PersistentTotalsSnapshot(
+                        totalsReadResult.TotalPathRequestCount,
+                        totalsReadResult.TotalActualPathCount,
+                        totalsReadResult.TotalAvoidedPathCount,
+                        totalsReadResult.TotalPolicyImpactFineAmount,
+                        totalsReadResult.PublicTransportLaneActualCount,
+                        totalsReadResult.MidBlockCrossingActualCount,
+                        totalsReadResult.IntersectionMovementActualCount,
+                        totalsReadResult.PublicTransportLaneFineAmount,
+                        totalsReadResult.MidBlockCrossingFineAmount,
+                        totalsReadResult.IntersectionMovementFineAmount,
+                        totalsReadResult.PublicTransportLaneAvoidedEventCount,
+                        totalsReadResult.MidBlockCrossingAvoidedEventCount,
+                        totalsReadResult.IntersectionMovementAvoidedEventCount,
+                        totalsReadResult.TotalActualOrAvoidedPathCount,
+                        totalsReadResult.PublicTransportLaneActualOrAvoidedPathCount,
+                        totalsReadResult.MidBlockCrossingActualOrAvoidedPathCount,
+                        totalsReadResult.IntersectionMovementActualOrAvoidedPathCount),
+                    policyImpactEventsReadResult.PathRequestEvents,
+                    policyImpactEventsReadResult.ActualViolationEvents,
+                    policyImpactEventsReadResult.AvoidedRerouteEvents));
 
             m_HasDeserializedData = true;
             m_ShouldClearLegacyRuntimeState = false;
