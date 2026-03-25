@@ -807,24 +807,9 @@ namespace Traffic_Law_Enforcement
                 writer.Write(policyImpactTrackingState.m_IntersectionMovementActualOrAvoidedPathCount);
             }
 
-            EnforcementPolicyImpactService.PersistentTotalsSnapshot totals = EnforcementPolicyImpactService.GetPersistentTotalsSnapshot();
-            writer.Write(totals.TotalPathRequestCount);
-            writer.Write(totals.TotalActualPathCount);
-            writer.Write(totals.TotalAvoidedPathCount);
-            writer.Write(totals.TotalFineAmount);
-            writer.Write(totals.PublicTransportLaneActualCount);
-            writer.Write(totals.MidBlockCrossingActualCount);
-            writer.Write(totals.IntersectionMovementActualCount);
-            writer.Write(totals.PublicTransportLaneFineAmount);
-            writer.Write(totals.MidBlockCrossingFineAmount);
-            writer.Write(totals.IntersectionMovementFineAmount);
-            writer.Write(totals.PublicTransportLaneAvoidedEventCount);
-            writer.Write(totals.MidBlockCrossingAvoidedEventCount);
-            writer.Write(totals.IntersectionMovementAvoidedEventCount);
-            writer.Write(totals.TotalActualOrAvoidedPathCount);
-            writer.Write(totals.PublicTransportLaneActualOrAvoidedPathCount);
-            writer.Write(totals.MidBlockCrossingActualOrAvoidedPathCount);
-            writer.Write(totals.IntersectionMovementActualOrAvoidedPathCount);
+        EnforcementPolicyImpactService.PersistentTotalsSnapshot totals =
+            EnforcementPolicyImpactService.GetPersistentTotalsSnapshot();
+        WritePolicyImpactPersistentTotals(writer, totals);
 
             IReadOnlyCollection<PathRequestEvent> pathRequestEvents = EnforcementPolicyImpactService.GetPathRequestEventSnapshot();
             writer.Write(pathRequestEvents.Count);
@@ -1208,6 +1193,30 @@ namespace Traffic_Law_Enforcement
                 writer.Write(report.m_MidBlockCrossingActualOrAvoidedPathCount);
                 writer.Write(report.m_IntersectionMovementActualOrAvoidedPathCount);
             }
+        }
+
+        private static void WritePolicyImpactPersistentTotals<TWriter>(
+            TWriter writer,
+            EnforcementPolicyImpactService.PersistentTotalsSnapshot totals)
+            where TWriter : IWriter
+        {
+            writer.Write(totals.TotalPathRequestCount);
+            writer.Write(totals.TotalActualPathCount);
+            writer.Write(totals.TotalAvoidedPathCount);
+            writer.Write(totals.TotalFineAmount);
+            writer.Write(totals.PublicTransportLaneActualCount);
+            writer.Write(totals.MidBlockCrossingActualCount);
+            writer.Write(totals.IntersectionMovementActualCount);
+            writer.Write(totals.PublicTransportLaneFineAmount);
+            writer.Write(totals.MidBlockCrossingFineAmount);
+            writer.Write(totals.IntersectionMovementFineAmount);
+            writer.Write(totals.PublicTransportLaneAvoidedEventCount);
+            writer.Write(totals.MidBlockCrossingAvoidedEventCount);
+            writer.Write(totals.IntersectionMovementAvoidedEventCount);
+            writer.Write(totals.TotalActualOrAvoidedPathCount);
+            writer.Write(totals.PublicTransportLaneActualOrAvoidedPathCount);
+            writer.Write(totals.MidBlockCrossingActualOrAvoidedPathCount);
+            writer.Write(totals.IntersectionMovementActualOrAvoidedPathCount);
         }
 
         private static void WritePolicyImpactTrackingState<TWriter>(TWriter writer)
