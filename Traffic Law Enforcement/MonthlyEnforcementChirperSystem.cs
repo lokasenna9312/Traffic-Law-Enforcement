@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
-using System.Reflection;
 using Colossal.Localization;
 using Game;
 using Game.Common;
@@ -60,7 +59,6 @@ namespace Traffic_Law_Enforcement
             m_InfoviewPrefabQuery = GetEntityQuery(ComponentType.ReadOnly<InfoviewData>(), ComponentType.ReadOnly<PrefabData>());
 
             CacheStaticChirperTemplates();
-            RegisterLocalizationSources();
             EnsureSenderAccount();
 
             bool rebuiltLocalization = false;
@@ -159,18 +157,6 @@ namespace Traffic_Law_Enforcement
             MonthlyEnforcementChirperService.EnsureTrackingInitialized(currentMonthIndex);
 
             return TryPublishCurrentPeriodPreview(currentTimestampMonthTicks, openPanel: true, out failureReason);
-        }
-
-        private void RegisterLocalizationSources()
-        {
-            LocalizationManager localizationManager = GameManager.instance?.localizationManager;
-            if (localizationManager == null)
-            {
-                Mod.log.Info("Monthly chirper localization manager unavailable during initialization.");
-                return;
-            }
-
-            ReloadActiveLocale();
         }
 
         private void CacheStaticChirperTemplates()
