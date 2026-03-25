@@ -40,7 +40,7 @@ namespace Traffic_Law_Enforcement
         {
             RuntimeWorldGeneration += 1;
 
-            Mod.log.Info(
+            EnforcementLoggingPolicy.RecordSaveLoadInfo(
                 $"[SAVELOAD] RuntimeWorldGeneration advanced: generation={RuntimeWorldGeneration}, " +
                 $"purpose={context.purpose}");
         }
@@ -80,7 +80,7 @@ namespace Traffic_Law_Enforcement
 
         public void SetDefaults(Context context)
         {
-            Mod.log.Info(
+            EnforcementLoggingPolicy.RecordSaveLoadInfo(
                 $"[SAVELOAD] SetDefaults: purpose={context.purpose}, " +
                 $"willClearLegacyRuntimeState={context.purpose == Purpose.LoadGame}");
 
@@ -96,7 +96,7 @@ namespace Traffic_Law_Enforcement
 
         public void PreDeserialize(Context context)
         {
-            Mod.log.Info(
+            EnforcementLoggingPolicy.RecordSaveLoadInfo(
                 $"[SAVELOAD] PreDeserialize: purpose={context.purpose}");
 
             ResetRuntimeState();
@@ -110,7 +110,7 @@ namespace Traffic_Law_Enforcement
 
         public void PostDeserialize(Context context)
         {
-            Mod.log.Info(
+            EnforcementLoggingPolicy.RecordSaveLoadInfo(
                 $"[SAVELOAD] PostDeserialize: purpose={context.purpose}");
 
             m_PendingPostDeserializeApply = true;
@@ -118,7 +118,7 @@ namespace Traffic_Law_Enforcement
 
         public void Serialize<TWriter>(TWriter writer) where TWriter : IWriter
         {
-            Mod.log.Info(
+            EnforcementLoggingPolicy.RecordSaveLoadInfo(
                 $"[SAVELOAD] Serialize begin: version={kSerializationVersion}, " +
                 $"runtimeGeneration={RuntimeWorldGeneration}, " +
                 $"ptViolations={EnforcementTelemetry.GetStatisticsSnapshot().m_PublicTransportLaneViolationCount}, " +
@@ -324,7 +324,7 @@ namespace Traffic_Law_Enforcement
         {
             reader.Read(out int version);
             m_HasDeserializeBeenCalledForCurrentLoad = true;
-            Mod.log.Info(
+            EnforcementLoggingPolicy.RecordSaveLoadInfo(
                 $"[SAVELOAD] Deserialize begin: version={version}, " +
                 $"runtimeGeneration={RuntimeWorldGeneration}" +
                 $"{EnforcementLoggingPolicy.FormatSaveIdentificationSuffix()}");
@@ -645,7 +645,7 @@ namespace Traffic_Law_Enforcement
                     trackingMidBlockCrossingActualOrAvoidedPathCount,
                     trackingIntersectionMovementActualOrAvoidedPathCount);
 
-                Mod.log.Info(
+                EnforcementLoggingPolicy.RecordSaveLoadInfo(
                     $@"[SAVELOAD] PolicyImpact tracking state read: version={version}, " +
                     $@"month={policyImpactMonthIndex}, " +
                     $@"totalPathRequests={trackingTotalPathRequestCount}, " +
@@ -828,7 +828,7 @@ namespace Traffic_Law_Enforcement
                     }
                 }
 
-                Mod.log.Info(
+                EnforcementLoggingPolicy.RecordSaveLoadInfo(
                     $"[SAVELOAD] Deserialize loaded: version={version}, " +
                     $"runtimeGeneration={RuntimeWorldGeneration}" +
                     $"{EnforcementLoggingPolicy.FormatSaveIdentificationSuffix()}, " +
@@ -907,12 +907,13 @@ namespace Traffic_Law_Enforcement
                 appliedPublicTransportLaneStateCount += 1;
             }
 
-            Mod.log.Info(
+            EnforcementLoggingPolicy.RecordSaveLoadInfo(
                 $"[SAVELOAD] Applied loaded PT vehicle states: loaded={m_LoadedPublicTransportLaneVehicleStates.Count}, " +
                 $"applied={appliedPublicTransportLaneStateCount}");
 
             m_LoadedPublicTransportLaneVehicleStates.Clear();
-            Mod.log.Info(
+            
+            EnforcementLoggingPolicy.RecordSaveLoadInfo(
                 $"[SAVELOAD] ApplyLoadedStateToWorld complete: " +
                 $"appliedPtVehicleStates={appliedPublicTransportLaneStateCount}, " +
                 $"hasDeserializedData={m_HasDeserializedData}, " +
