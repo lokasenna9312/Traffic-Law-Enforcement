@@ -886,14 +886,12 @@ namespace Traffic_Law_Enforcement
             return s_CachedRollingWindowSnapshot;
         }
 
-        public static RollingWindowSnapshot BuildRollingWindowSnapshot()
+        private static RollingWindowSnapshot BuildRollingWindowSnapshot()
         {
             if (!EnforcementGameTime.IsInitialized)
             {
                 return default;
             }
-
-            UpdateRollingWindowData();
 
             HashSet<long> requestPaths = new HashSet<long>();
             HashSet<long> totalActualPaths = new HashSet<long>();
