@@ -33,7 +33,7 @@ namespace Traffic_Law_Enforcement
             {
                 if (s_PathfindExecutorType == null)
                 {
-                    if (EnforcementLoggingPolicy.ShouldLogEnforcementEvents())
+                    if (EnforcementLoggingPolicy.ShouldLogPathfindingPenaltyDiagnostics())
                     {
                         Mod.log.Info("Mid-block pathfind hook skipped: PathfindExecutor type not found.");
                     }
@@ -47,7 +47,7 @@ namespace Traffic_Law_Enforcement
 
                 if (s_TargetMethod == null || s_SourceLaneArgIndex < 0 || s_TargetLaneArgIndex < 0)
                 {
-                    if (EnforcementLoggingPolicy.ShouldLogEnforcementEvents())
+                    if (EnforcementLoggingPolicy.ShouldLogPathfindingPenaltyDiagnostics())
                     {
                         LogCandidateMethods();
                         Mod.log.Info("Mid-block pathfind hook skipped: no suitable transition-cost method found.");
@@ -63,7 +63,7 @@ namespace Traffic_Law_Enforcement
 
                 s_Harmony.Patch(s_TargetMethod, postfix: postfix);
 
-                if (EnforcementLoggingPolicy.ShouldLogEnforcementEvents())
+                if (EnforcementLoggingPolicy.ShouldLogPathfindingPenaltyDiagnostics())
                 {
                     Mod.log.Info(
                         $"Mid-block pathfind hook patched: {DescribeMethod(s_TargetMethod)}, " +
@@ -146,7 +146,7 @@ namespace Traffic_Law_Enforcement
 
             __result += penalty * moneyWeight;
 
-            if (EnforcementLoggingPolicy.ShouldLogEnforcementEvents())
+            if (EnforcementLoggingPolicy.ShouldLogPathfindingPenaltyDiagnostics())
             {
                 Mod.log.Info(
                     $"Mid-block pre-penalty applied: method={__originalMethod?.Name}, " +

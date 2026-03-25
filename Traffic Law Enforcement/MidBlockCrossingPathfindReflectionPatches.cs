@@ -141,7 +141,7 @@ namespace Traffic_Law_Enforcement
             float addedCost = penalty * moneyWeight;
             __result += addedCost;
 
-            if (EnforcementLoggingPolicy.ShouldLogEnforcementEvents() &&
+            if (EnforcementLoggingPolicy.ShouldLogPathfindingPenaltyDiagnostics() &&
                 s_DiagnosticLogCount < MaxDiagnosticLogs)
             {
                 s_DiagnosticLogCount += 1;
