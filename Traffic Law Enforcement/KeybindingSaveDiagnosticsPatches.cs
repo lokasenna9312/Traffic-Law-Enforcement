@@ -161,13 +161,14 @@ namespace Traffic_Law_Enforcement
             object obj,
             Exception __exception)
         {
-            if (__exception == null || !IsKeybindingBindingsFailure(member, obj))
+            if (__exception == null ||
+                !ShouldLogKeybindingMemberValueFailure(member, obj, __exception, out Exception rootCause))
             {
                 return __exception;
             }
 
             string key =
-                $"{__exception.GetType().FullName}|{member?.DeclaringType?.FullName}|{member?.Name}|{obj?.GetType().FullName}|{s_CurrentSettingAsset.Value}|{FormatCurrentDiffStack()}";
+                $"{rootCause.GetType().FullName}|{member?.DeclaringType?.FullName}|{member?.Name}|{obj?.GetType().FullName}|{s_CurrentSettingAsset.Value}|{FormatCurrentDiffStack()}";
 
             lock (s_LogGate)
             {
@@ -185,21 +186,70 @@ namespace Traffic_Law_Enforcement
                 $"object={DescribeObject(obj)}, " +
                 $"keybindingContext={keybindingContext}, " +
                 $"diffStack={FormatCurrentDiffStack()}, " +
-                $"exception={__exception.GetType().Name}: {__exception.Message}");
+                $"exception={DescribeException(__exception)}, " +
+                $"rootCause={DescribeException(rootCause)}");
 
             return __exception;
         }
 
-        private static bool IsKeybindingBindingsFailure(MemberInfo member, object obj)
+        private static bool ShouldLogKeybindingMemberValueFailure(
+            MemberInfo member,
+            object obj,
+            Exception exception,
+            out Exception rootCause)
         {
-            if (!string.Equals(member?.Name, "bindings", StringComparison.Ordinal))
-            {
-                return false;
-            }
+            rootCause = UnwrapException(exception);
 
             Type objectType = obj?.GetType();
-            return objectType != null &&
-                   typeof(Game.Settings.KeybindingSettings).IsAssignableFrom(objectType);
+            if (IsKeybindingSettingsType(objectType) ||
+                IsKeybindingSettingsType(member?.DeclaringType))
+            {
+                return true;
+            }
+
+            if (string.Equals(member?.Name, "bindings", StringComparison.Ordinal))
+            {
+                return true;
+            }
+
+            string exceptionText = exception.ToString();
+            return
+                exceptionText.IndexOf("KeybindingSettings", StringComparison.Ordinal) >= 0 ||
+                exceptionText.IndexOf("get_bindings", StringComparison.Ordinal) >= 0;
+        }
+
+        private static bool IsKeybindingSettingsType(Type type)
+        {
+            return type != null &&
+                   typeof(Game.Settings.KeybindingSettings).IsAssignableFrom(type);
+        }
+
+        private static Exception UnwrapException(Exception exception)
+        {
+            Exception current = exception;
+            while (current is TargetInvocationException && current.InnerException != null)
+            {
+                current = current.InnerException;
+            }
+
+            return current ?? exception;
+        }
+
+        private static string DescribeException(Exception exception)
+        {
+            if (exception == null)
+            {
+                return "<null>";
+            }
+
+            if (exception.InnerException == null)
+            {
+                return $"{exception.GetType().Name}: {exception.Message}";
+            }
+
+            return
+                $"{exception.GetType().Name}: {exception.Message} " +
+                $"-> {DescribeException(exception.InnerException)}";
         }
 
         private static string DescribeKeybindingContext(object obj)
