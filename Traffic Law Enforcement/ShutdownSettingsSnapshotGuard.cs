@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using System.Reflection;
 using Colossal.IO.AssetDatabase;
 using Colossal.Json;
 using Game.Modding;
@@ -8,6 +9,9 @@ namespace Traffic_Law_Enforcement
 {
     internal static class ShutdownSettingsSnapshotGuard
     {
+        private static readonly PropertyInfo s_ModSettingKeyBindingPropertiesProperty =
+            typeof(ModSetting).GetProperty("keyBindingProperties", BindingFlags.Instance | BindingFlags.NonPublic);
+
         private static bool s_Prepared;
 
         public static void Prepare()
@@ -70,17 +74,13 @@ namespace Traffic_Law_Enforcement
 
         private static bool ShouldSnapshot(SettingAsset.Fragment fragment)
         {
-            if (fragment?.source is not ModSetting modSetting)
+            if (fragment == null || !fragment.asset.database.canWriteSettings)
             {
                 return false;
             }
 
-            if (!fragment.asset.database.canWriteSettings)
-            {
-                return false;
-            }
-
-            return modSetting.keyBindingProperties != null && modSetting.keyBindingProperties.Length > 0;
+            ModSetting modSetting = fragment.source as ModSetting;
+            return modSetting != null && HasKeyBindingProperties(modSetting);
         }
 
         private static bool TrySnapshotFragment(SettingAsset.Fragment fragment)
@@ -98,6 +98,26 @@ namespace Traffic_Law_Enforcement
                     "[SHUTDOWN_SAVE_GUARD] Failed to snapshot setting fragment before dispose. " +
                     $"asset={fragment?.asset?.name}, sourceType={fragment?.source?.GetType().FullName}, " +
                     $"reason={ex.GetType().Name}: {ex.Message}");
+                return false;
+            }
+        }
+
+        private static bool HasKeyBindingProperties(ModSetting modSetting)
+        {
+            if (modSetting == null || s_ModSettingKeyBindingPropertiesProperty == null)
+            {
+                return false;
+            }
+
+            try
+            {
+                PropertyInfo[] keyBindingProperties =
+                    s_ModSettingKeyBindingPropertiesProperty.GetValue(modSetting) as PropertyInfo[];
+
+                return keyBindingProperties != null && keyBindingProperties.Length > 0;
+            }
+            catch
+            {
                 return false;
             }
         }
