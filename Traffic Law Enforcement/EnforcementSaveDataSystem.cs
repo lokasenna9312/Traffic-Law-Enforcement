@@ -823,32 +823,8 @@ namespace Traffic_Law_Enforcement
                 pathRequestEvents,
                 actualViolationEvents,
                 avoidedRerouteEvents);
-                
-            NativeArray<Entity> ptVehicles =
-                m_PublicTransportLaneProfileQuery.ToEntityArray(Allocator.Temp);
-            NativeArray<VehicleTrafficLawProfile> ptProfiles =
-                m_PublicTransportLaneProfileQuery.ToComponentDataArray<VehicleTrafficLawProfile>(Allocator.Temp);
 
-            try
-            {
-                writer.Write(ptVehicles.Length);
-
-                for (int index = 0; index < ptVehicles.Length; index += 1)
-                {
-                    Entity vehicle = ptVehicles[index];
-                    VehicleTrafficLawProfile profile = ptProfiles[index];
-
-                    ((IWriter)writer).Write(vehicle);
-                    writer.Write(profile.m_ShouldTrack);
-                    writer.Write(profile.m_EmergencyVehicle);
-                    writer.Write((byte)profile.m_PublicTransportLaneAccessBits);
-                }
-            }
-            finally
-            {
-                ptVehicles.Dispose();
-                ptProfiles.Dispose();
-            }
+            WriteLoadedPublicTransportLaneVehicleStates(writer);
         }
 
         public void Deserialize<TReader>(TReader reader) where TReader : IReader
@@ -1235,6 +1211,36 @@ namespace Traffic_Law_Enforcement
                 writer.Write(entry.AvoidedPublicTransportLanePenalty);
                 writer.Write(entry.AvoidedMidBlockPenalty);
                 writer.Write(entry.AvoidedIntersectionPenalty);
+            }
+        }
+
+        private void WriteLoadedPublicTransportLaneVehicleStates<TWriter>(TWriter writer)
+            where TWriter : IWriter
+        {
+            NativeArray<Entity> ptVehicles =
+                m_PublicTransportLaneProfileQuery.ToEntityArray(Allocator.Temp);
+            NativeArray<VehicleTrafficLawProfile> ptProfiles =
+                m_PublicTransportLaneProfileQuery.ToComponentDataArray<VehicleTrafficLawProfile>(Allocator.Temp);
+
+            try
+            {
+                writer.Write(ptVehicles.Length);
+
+                for (int index = 0; index < ptVehicles.Length; index += 1)
+                {
+                    Entity vehicle = ptVehicles[index];
+                    VehicleTrafficLawProfile profile = ptProfiles[index];
+
+                    ((IWriter)writer).Write(vehicle);
+                    writer.Write(profile.m_ShouldTrack);
+                    writer.Write(profile.m_EmergencyVehicle);
+                    writer.Write((byte)profile.m_PublicTransportLaneAccessBits);
+                }
+            }
+            finally
+            {
+                ptVehicles.Dispose();
+                ptProfiles.Dispose();
             }
         }
 
