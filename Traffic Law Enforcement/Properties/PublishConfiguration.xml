@@ -119,6 +119,7 @@ The following options can be configured either for the currently loaded save fil
 	<!--Change log for new version. Single line or multi line. Supports minimal markdown subset-->
 	<ChangeLog>
 - Fixed violation rate, suppression failure rate being calculated and reported incorrectly.
+- Fixed the issue that Chirper messages were not sent when the button was pressed in the mod options.
 - Save state will be logged in the log file when the mod is loaded, when this option is selected in the mod options.
 	</ChangeLog>
 	<!--External link, can be set multiple times. supported types are "discord", "github", "youtube", "twitch", "x", "paypal", "patreon", "buymeacoffee", "kofi", "crowdin", "gitlab", "gofundme"-->
