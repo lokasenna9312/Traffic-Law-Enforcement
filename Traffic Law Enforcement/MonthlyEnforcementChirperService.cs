@@ -23,6 +23,10 @@ namespace Traffic_Law_Enforcement
         public int m_PublicTransportLaneAvoidedEventCount;
         public int m_MidBlockCrossingAvoidedEventCount;
         public int m_IntersectionMovementAvoidedEventCount;
+        public int m_TotalActualOrAvoidedPathCount;
+        public int m_PublicTransportLaneActualOrAvoidedPathCount;
+        public int m_MidBlockCrossingActualOrAvoidedPathCount;
+        public int m_IntersectionMovementActualOrAvoidedPathCount;
 
         public MonthlyEnforcementTrackingState(
             long monthIndex,
@@ -38,7 +42,11 @@ namespace Traffic_Law_Enforcement
             int intersectionMovementFineAmount,
             int publicTransportLaneAvoidedEventCount,
             int midBlockCrossingAvoidedEventCount,
-            int intersectionMovementAvoidedEventCount)
+            int intersectionMovementAvoidedEventCount,
+            int totalActualOrAvoidedPathCount,
+            int publicTransportLaneActualOrAvoidedPathCount,
+            int midBlockCrossingActualOrAvoidedPathCount,
+            int intersectionMovementActualOrAvoidedPathCount)
         {
             m_MonthIndex = monthIndex;
             m_TotalPathRequestCount = totalPathRequestCount;
@@ -54,6 +62,10 @@ namespace Traffic_Law_Enforcement
             m_PublicTransportLaneAvoidedEventCount = publicTransportLaneAvoidedEventCount;
             m_MidBlockCrossingAvoidedEventCount = midBlockCrossingAvoidedEventCount;
             m_IntersectionMovementAvoidedEventCount = intersectionMovementAvoidedEventCount;
+            m_TotalActualOrAvoidedPathCount = totalActualOrAvoidedPathCount;
+            m_PublicTransportLaneActualOrAvoidedPathCount = publicTransportLaneActualOrAvoidedPathCount;
+            m_MidBlockCrossingActualOrAvoidedPathCount = midBlockCrossingActualOrAvoidedPathCount;
+            m_IntersectionMovementActualOrAvoidedPathCount = intersectionMovementActualOrAvoidedPathCount;
         }
     }
 
@@ -73,6 +85,10 @@ namespace Traffic_Law_Enforcement
         public int m_PublicTransportLaneAvoidedEventCount;
         public int m_MidBlockCrossingAvoidedEventCount;
         public int m_IntersectionMovementAvoidedEventCount;
+        public int m_TotalActualOrAvoidedPathCount;
+        public int m_PublicTransportLaneActualOrAvoidedPathCount;
+        public int m_MidBlockCrossingActualOrAvoidedPathCount;
+        public int m_IntersectionMovementActualOrAvoidedPathCount;
 
         public MonthlyEnforcementReport(
             long monthIndex,
@@ -88,7 +104,11 @@ namespace Traffic_Law_Enforcement
             int intersectionMovementFineAmount,
             int publicTransportLaneAvoidedEventCount,
             int midBlockCrossingAvoidedEventCount,
-            int intersectionMovementAvoidedEventCount)
+            int intersectionMovementAvoidedEventCount,
+            int totalActualOrAvoidedPathCount,
+            int publicTransportLaneActualOrAvoidedPathCount,
+            int midBlockCrossingActualOrAvoidedPathCount,
+            int intersectionMovementActualOrAvoidedPathCount)
         {
             m_MonthIndex = monthIndex;
             m_TotalPathRequestCount = totalPathRequestCount;
@@ -104,10 +124,14 @@ namespace Traffic_Law_Enforcement
             m_PublicTransportLaneAvoidedEventCount = publicTransportLaneAvoidedEventCount;
             m_MidBlockCrossingAvoidedEventCount = midBlockCrossingAvoidedEventCount;
             m_IntersectionMovementAvoidedEventCount = intersectionMovementAvoidedEventCount;
+            m_TotalActualOrAvoidedPathCount = totalActualOrAvoidedPathCount;
+            m_PublicTransportLaneActualOrAvoidedPathCount = publicTransportLaneActualOrAvoidedPathCount;
+            m_MidBlockCrossingActualOrAvoidedPathCount = midBlockCrossingActualOrAvoidedPathCount;
+            m_IntersectionMovementActualOrAvoidedPathCount = intersectionMovementActualOrAvoidedPathCount;
         }
 
         public int TotalViolationCount => m_TotalActualPathCount;
-        public int TotalDecisionCount => m_TotalActualPathCount + m_TotalAvoidedPathCount;
+        public int TotalDecisionCount => m_TotalActualOrAvoidedPathCount;
     }
 
     public static class MonthlyEnforcementChirperService
@@ -224,8 +248,11 @@ namespace Traffic_Law_Enforcement
                 ClampToNonNegative(totals.IntersectionMovementFineAmount - s_TrackingState.m_IntersectionMovementFineAmount),
                 ClampToNonNegative(totals.PublicTransportLaneAvoidedEventCount - s_TrackingState.m_PublicTransportLaneAvoidedEventCount),
                 ClampToNonNegative(totals.MidBlockCrossingAvoidedEventCount - s_TrackingState.m_MidBlockCrossingAvoidedEventCount),
-                ClampToNonNegative(totals.IntersectionMovementAvoidedEventCount - s_TrackingState.m_IntersectionMovementAvoidedEventCount));
-
+                ClampToNonNegative(totals.IntersectionMovementAvoidedEventCount - s_TrackingState.m_IntersectionMovementAvoidedEventCount),
+                ClampToNonNegative(totals.TotalActualOrAvoidedPathCount - s_TrackingState.m_TotalActualOrAvoidedPathCount),
+                ClampToNonNegative(totals.PublicTransportLaneActualOrAvoidedPathCount - s_TrackingState.m_PublicTransportLaneActualOrAvoidedPathCount),
+                ClampToNonNegative(totals.MidBlockCrossingActualOrAvoidedPathCount - s_TrackingState.m_MidBlockCrossingActualOrAvoidedPathCount),
+                ClampToNonNegative(totals.IntersectionMovementActualOrAvoidedPathCount - s_TrackingState.m_IntersectionMovementActualOrAvoidedPathCount));
             UpsertReport(report);
             s_TrackingState = CaptureCurrentState(currentMonthIndex);
             return true;
@@ -253,7 +280,11 @@ namespace Traffic_Law_Enforcement
                 snapshot.IntersectionMovementFineAmount,
                 snapshot.PublicTransportLaneAvoidedEventCount,
                 snapshot.MidBlockCrossingAvoidedEventCount,
-                snapshot.IntersectionMovementAvoidedEventCount);
+                snapshot.IntersectionMovementAvoidedEventCount,
+                snapshot.TotalActualOrAvoidedPathCount,
+                snapshot.PublicTransportLaneActualOrAvoidedPathCount,
+                snapshot.MidBlockCrossingActualOrAvoidedPathCount,
+                snapshot.IntersectionMovementActualOrAvoidedPathCount);
         }
 
         public static long GetCurrentPeriodStartMonthTicks(long currentTimestampMonthTicks)
@@ -359,7 +390,11 @@ namespace Traffic_Law_Enforcement
                 totals.IntersectionMovementFineAmount,
                 totals.PublicTransportLaneAvoidedEventCount,
                 totals.MidBlockCrossingAvoidedEventCount,
-                totals.IntersectionMovementAvoidedEventCount);
+                totals.IntersectionMovementAvoidedEventCount,
+                totals.TotalActualOrAvoidedPathCount,
+                totals.PublicTransportLaneActualOrAvoidedPathCount,
+                totals.MidBlockCrossingActualOrAvoidedPathCount,
+                totals.IntersectionMovementActualOrAvoidedPathCount);
         }
 
         private static MonthlyEnforcementReport CreateDeltaReport(MonthlyEnforcementTrackingState trackingState)
@@ -380,7 +415,11 @@ namespace Traffic_Law_Enforcement
                 ClampToNonNegative(totals.IntersectionMovementFineAmount - trackingState.m_IntersectionMovementFineAmount),
                 ClampToNonNegative(totals.PublicTransportLaneAvoidedEventCount - trackingState.m_PublicTransportLaneAvoidedEventCount),
                 ClampToNonNegative(totals.MidBlockCrossingAvoidedEventCount - trackingState.m_MidBlockCrossingAvoidedEventCount),
-                ClampToNonNegative(totals.IntersectionMovementAvoidedEventCount - trackingState.m_IntersectionMovementAvoidedEventCount));
+                ClampToNonNegative(totals.IntersectionMovementAvoidedEventCount - trackingState.m_IntersectionMovementAvoidedEventCount),
+                ClampToNonNegative(totals.TotalActualOrAvoidedPathCount - trackingState.m_TotalActualOrAvoidedPathCount),
+                ClampToNonNegative(totals.PublicTransportLaneActualOrAvoidedPathCount - trackingState.m_PublicTransportLaneActualOrAvoidedPathCount),
+                ClampToNonNegative(totals.MidBlockCrossingActualOrAvoidedPathCount - trackingState.m_MidBlockCrossingActualOrAvoidedPathCount),
+                ClampToNonNegative(totals.IntersectionMovementActualOrAvoidedPathCount - trackingState.m_IntersectionMovementActualOrAvoidedPathCount));
         }
 
         private static void UpsertReport(MonthlyEnforcementReport report)
@@ -413,7 +452,11 @@ namespace Traffic_Law_Enforcement
                 && left.m_IntersectionMovementFineAmount == right.m_IntersectionMovementFineAmount
                 && left.m_PublicTransportLaneAvoidedEventCount == right.m_PublicTransportLaneAvoidedEventCount
                 && left.m_MidBlockCrossingAvoidedEventCount == right.m_MidBlockCrossingAvoidedEventCount
-                && left.m_IntersectionMovementAvoidedEventCount == right.m_IntersectionMovementAvoidedEventCount;
+                && left.m_IntersectionMovementAvoidedEventCount == right.m_IntersectionMovementAvoidedEventCount
+                && left.m_TotalActualOrAvoidedPathCount == right.m_TotalActualOrAvoidedPathCount
+                && left.m_PublicTransportLaneActualOrAvoidedPathCount == right.m_PublicTransportLaneActualOrAvoidedPathCount
+                && left.m_MidBlockCrossingActualOrAvoidedPathCount == right.m_MidBlockCrossingActualOrAvoidedPathCount
+                && left.m_IntersectionMovementActualOrAvoidedPathCount == right.m_IntersectionMovementActualOrAvoidedPathCount;
         }
 
         private static int ClampToNonNegative(int value)

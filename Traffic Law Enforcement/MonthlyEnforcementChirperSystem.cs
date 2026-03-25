@@ -688,25 +688,25 @@ namespace Traffic_Law_Enforcement
                     localeId,
                     kTotalLineFormatLocaleId,
                     FormatViolationRate(localeId, report.m_TotalActualPathCount, report.m_TotalPathRequestCount),
-                    FormatSuppressionFailureRate(localeId, report.m_TotalActualPathCount, report.m_TotalAvoidedPathCount),
+                    FormatSuppressionFailureRate(localeId, report.m_TotalActualPathCount, report.m_TotalActualOrAvoidedPathCount),
                     FormatMoney(localeId, report.m_TotalFineAmount)) + "\n" +
                 FormatLocalizedTextForLocale(
                     localeId,
                     kPublicTransportLaneLineFormatLocaleId,
                     FormatViolationRate(localeId, report.m_PublicTransportLaneCount, report.m_TotalPathRequestCount),
-                    FormatSuppressionFailureRate(localeId, report.m_PublicTransportLaneCount, report.m_PublicTransportLaneAvoidedEventCount),
+                    FormatSuppressionFailureRate(localeId, report.m_PublicTransportLaneCount, report.m_PublicTransportLaneActualOrAvoidedPathCount),
                     FormatMoney(localeId, report.m_PublicTransportLaneFineAmount)) + "\n" +
                 FormatLocalizedTextForLocale(
                     localeId,
                     kMidBlockLineFormatLocaleId,
                     FormatViolationRate(localeId, report.m_MidBlockCrossingCount, report.m_TotalPathRequestCount),
-                    FormatSuppressionFailureRate(localeId, report.m_MidBlockCrossingCount, report.m_MidBlockCrossingAvoidedEventCount),
+                    FormatSuppressionFailureRate(localeId, report.m_MidBlockCrossingCount, report.m_MidBlockCrossingActualOrAvoidedPathCount),
                     FormatMoney(localeId, report.m_MidBlockCrossingFineAmount)) + "\n" +
                 FormatLocalizedTextForLocale(
                     localeId,
                     kIntersectionLineFormatLocaleId,
                     FormatViolationRate(localeId, report.m_IntersectionMovementCount, report.m_TotalPathRequestCount),
-                    FormatSuppressionFailureRate(localeId, report.m_IntersectionMovementCount, report.m_IntersectionMovementAvoidedEventCount),
+                    FormatSuppressionFailureRate(localeId, report.m_IntersectionMovementCount, report.m_IntersectionMovementActualOrAvoidedPathCount),
                     FormatMoney(localeId, report.m_IntersectionMovementFineAmount));
         }
 
@@ -734,10 +734,10 @@ namespace Traffic_Law_Enforcement
             return (100d * finedViolationCount / denominator).ToString("0.0", culture) + "%";
         }
 
-        private static string FormatSuppressionFailureRate(string localeId, int finedViolationCount, int avoidedPathCount)
+        private static string FormatSuppressionFailureRate(string localeId, int finedViolationCount, int actualOrAvoidedPathCount)
         {
             CultureInfo culture = GetCultureForLocale(localeId);
-            int denominator = finedViolationCount + avoidedPathCount;
+            int denominator = actualOrAvoidedPathCount;
             if (denominator <= 0)
             {
                 return 0d.ToString("0.0", culture) + "%";
