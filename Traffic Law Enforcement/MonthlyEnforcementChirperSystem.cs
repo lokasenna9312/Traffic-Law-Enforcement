@@ -129,7 +129,7 @@ namespace Traffic_Law_Enforcement
 
             while (MonthlyEnforcementChirperService.TryConsumeManualPreviewRequest())
             {
-                TryPublishCurrentPeriodPreview(currentTimestampMonthTicks, openPanel: false, out _);
+                TryPublishCurrentPeriodPreview(currentTimestampMonthTicks, openPanel: true, out _);
             }
         }
 
@@ -153,12 +153,9 @@ namespace Traffic_Law_Enforcement
 
             long currentTimestampMonthTicks = EnforcementGameTime.CurrentTimestampMonthTicks;
             long currentMonthIndex = EnforcementGameTime.GetMonthIndex(currentTimestampMonthTicks);
-            if (MonthlyEnforcementChirperService.EnsureTrackingInitialized(currentMonthIndex))
-            {
-                Mod.log.Info($"Monthly chirper tracking initialized from manual preview. month={currentMonthIndex}");
-            }
+            MonthlyEnforcementChirperService.EnsureTrackingInitialized(currentMonthIndex);
 
-            return TryPublishCurrentPeriodPreview(currentTimestampMonthTicks, openPanel: false, out failureReason);
+            return TryPublishCurrentPeriodPreview(currentTimestampMonthTicks, openPanel: true, out failureReason);
         }
 
         private void RegisterLocalizationSources()
@@ -302,26 +299,34 @@ namespace Traffic_Law_Enforcement
         {
             failureReason = null;
 
-            MonthlyEnforcementReport previewReport = MonthlyEnforcementChirperService.BuildCurrentPeriodPreview();
-            long periodStart = MonthlyEnforcementChirperService.GetCurrentPeriodStartMonthTicks(currentTimestampMonthTicks);
-            long periodEnd = currentTimestampMonthTicks;
-
-            bool updatedLocalization = EnsurePreviewAssets(previewReport, periodStart, periodEnd, out Entity triggerEntity);
-            if (updatedLocalization)
+            try
             {
-                ReloadActiveLocale();
-            }
+                MonthlyEnforcementReport previewReport = MonthlyEnforcementChirperService.BuildCurrentPeriodPreview();
+                long periodStart = MonthlyEnforcementChirperService.GetCurrentPeriodStartMonthTicks(currentTimestampMonthTicks);
+                long periodEnd = currentTimestampMonthTicks;
 
-            if (EnqueueChirp(triggerEntity))
+                bool updatedLocalization = EnsurePreviewAssets(previewReport, periodStart, periodEnd, out Entity triggerEntity);
+
+                if (updatedLocalization)
+                {
+                    ReloadActiveLocale();
+                }
+
+                if (EnqueueChirp(triggerEntity))
+                {
+                    _ = openPanel && TryOpenChirperPanel();
+                    return true;
+                }
+
+                failureReason = "chirp enqueue failed";
+                return false;
+            }
+            catch (Exception ex)
             {
-                bool panelOpened = openPanel && TryOpenChirperPanel();
-                Mod.log.Info($"Monthly chirper manual preview enqueued. period={FormatEnglishPeriodPoint(periodStart)} -> {FormatEnglishPeriodPoint(periodEnd)}, total={previewReport.TotalViolationCount}, bus={previewReport.m_PublicTransportLaneCount}, mid={previewReport.m_MidBlockCrossingCount}, intersection={previewReport.m_IntersectionMovementCount}, fine={previewReport.m_TotalFineAmount}, panelOpened={panelOpened}");
-                return true;
+                failureReason = $"preview exception: {ex.GetType().Name}: {ex.Message}";
+                Mod.log.Error(ex, "Monthly chirper manual preview failed.");
+                return false;
             }
-
-            failureReason = "chirp enqueue failed";
-            Mod.log.Info($"Monthly chirper manual preview skipped. reason={failureReason}");
-            return false;
         }
 
         private bool EnsureReportAssets(MonthlyEnforcementReport report, out Entity triggerEntity)
@@ -397,7 +402,6 @@ namespace Traffic_Law_Enforcement
                 m_Chirp = chirpEntity
             });
 
-            Mod.log.Info($"Monthly chirper prefab assets created. key={assetKey}");
             return triggerEntity;
         }
 
@@ -495,6 +499,7 @@ namespace Traffic_Law_Enforcement
             });
 
             m_CreateChirpSystem.AddQueueWriter(default);
+
             return true;
         }
 
@@ -510,7 +515,6 @@ namespace Traffic_Law_Enforcement
                 }
 
                 gamePanelSystem.ShowPanel(new ChirperPanel());
-                Mod.log.Info("Monthly chirper panel opened.");
                 return true;
             }
             catch (Exception ex)
@@ -642,26 +646,26 @@ namespace Traffic_Law_Enforcement
                 FormatLocalizedTextForLocale(
                     localeId,
                     kTotalLineFormatLocaleId,
-                    FormatViolationRate(localeId, report.TotalViolationCount, report.m_TotalPathRequestCount),
-                    FormatSuppressionFailureRate(localeId, report.TotalViolationCount, report.m_TotalAvoidedPathCount),
+                    FormatViolationRate(localeId, report.m_TotalActualPathCount, report.m_TotalPathRequestCount),
+                    FormatSuppressionFailureRate(localeId, report.m_TotalActualPathCount, report.m_TotalActualOrAvoidedPathCount),
                     FormatMoney(localeId, report.m_TotalFineAmount)) + "\n" +
                 FormatLocalizedTextForLocale(
                     localeId,
                     kPublicTransportLaneLineFormatLocaleId,
                     FormatViolationRate(localeId, report.m_PublicTransportLaneCount, report.m_TotalPathRequestCount),
-                    FormatSuppressionFailureRate(localeId, report.m_PublicTransportLaneCount, report.m_PublicTransportLaneAvoidedEventCount),
+                    FormatSuppressionFailureRate(localeId, report.m_PublicTransportLaneCount, report.m_PublicTransportLaneActualOrAvoidedPathCount),
                     FormatMoney(localeId, report.m_PublicTransportLaneFineAmount)) + "\n" +
                 FormatLocalizedTextForLocale(
                     localeId,
                     kMidBlockLineFormatLocaleId,
                     FormatViolationRate(localeId, report.m_MidBlockCrossingCount, report.m_TotalPathRequestCount),
-                    FormatSuppressionFailureRate(localeId, report.m_MidBlockCrossingCount, report.m_MidBlockCrossingAvoidedEventCount),
+                    FormatSuppressionFailureRate(localeId, report.m_MidBlockCrossingCount, report.m_MidBlockCrossingActualOrAvoidedPathCount),
                     FormatMoney(localeId, report.m_MidBlockCrossingFineAmount)) + "\n" +
                 FormatLocalizedTextForLocale(
                     localeId,
                     kIntersectionLineFormatLocaleId,
                     FormatViolationRate(localeId, report.m_IntersectionMovementCount, report.m_TotalPathRequestCount),
-                    FormatSuppressionFailureRate(localeId, report.m_IntersectionMovementCount, report.m_IntersectionMovementAvoidedEventCount),
+                    FormatSuppressionFailureRate(localeId, report.m_IntersectionMovementCount, report.m_IntersectionMovementActualOrAvoidedPathCount),
                     FormatMoney(localeId, report.m_IntersectionMovementFineAmount));
         }
 
@@ -678,21 +682,21 @@ namespace Traffic_Law_Enforcement
             return FormatLocalizedTextForLocale(localeId, kPeriodPointFormatLocaleId, monthText, year, hour, minute);
         }
 
-        private static string FormatViolationRate(string localeId, int finedViolationCount, int avoidedPathCount)
+        private static string FormatViolationRate(string localeId, int finedViolationCount, int denominator)
         {
             CultureInfo culture = GetCultureForLocale(localeId);
-            if (avoidedPathCount <= 0)
+            if (denominator <= 0)
             {
                 return 0d.ToString("0.0", culture) + "%";
             }
 
-            return (100d * finedViolationCount / avoidedPathCount).ToString("0.0", culture) + "%";
+            return (100d * finedViolationCount / denominator).ToString("0.0", culture) + "%";
         }
 
-        private static string FormatSuppressionFailureRate(string localeId, int finedViolationCount, int avoidedPathCount)
+        private static string FormatSuppressionFailureRate(string localeId, int finedViolationCount, int actualOrAvoidedPathCount)
         {
             CultureInfo culture = GetCultureForLocale(localeId);
-            int denominator = finedViolationCount + avoidedPathCount;
+            int denominator = actualOrAvoidedPathCount;
             if (denominator <= 0)
             {
                 return 0d.ToString("0.0", culture) + "%";

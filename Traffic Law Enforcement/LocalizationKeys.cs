@@ -16,9 +16,9 @@ namespace Traffic_Law_Enforcement
             map["Tab.Debug"] = setting.GetOptionTabLocaleID(Setting.kDebugTab);
 
             map["Group.General"] = setting.GetOptionGroupLocaleID(Setting.kGeneralGroup);
-            map["Group.BusLaneAuthorized"] = setting.GetOptionGroupLocaleID(Setting.kBusLaneAuthorizedGroup);
-            map["Group.BusLaneAdditional"] = setting.GetOptionGroupLocaleID(Setting.kBusLaneAdditionalGroup);
-            map["Group.BusLanePressure"] = setting.GetOptionGroupLocaleID(Setting.kBusLanePressureGroup);
+            map["Group.PublicTransportLaneAuthorized"] = setting.GetOptionGroupLocaleID(Setting.kPublicTransportLaneAuthorizedGroup);
+            map["Group.PublicTransportLaneAdditional"] = setting.GetOptionGroupLocaleID(Setting.kPublicTransportLaneAdditionalGroup);
+            map["Group.PublicTransportLanePressure"] = setting.GetOptionGroupLocaleID(Setting.kPublicTransportLanePressureGroup);
             map["Group.FineAmounts"] = setting.GetOptionGroupLocaleID(Setting.kFineGroup);
             map["Group.RepeatOffenders"] = setting.GetOptionGroupLocaleID(Setting.kRepeatOffenderGroup);
             map["Group.TemplateActions"] = setting.GetOptionGroupLocaleID(Setting.kTemplateActionsGroup);
@@ -121,6 +121,7 @@ namespace Traffic_Law_Enforcement
             AddOption(map, setting, nameof(Setting.EnableType3PublicTransportLaneUsageLogging));
             AddOption(map, setting, nameof(Setting.EnableType4PublicTransportLaneUsageLogging));
             AddOption(map, setting, nameof(Setting.EnablePathObsoleteSourceLogging));
+            AddOption(map, setting, nameof(Setting.EnableSaveIdentificationLogging));
             AddOption(map, setting, nameof(Setting.ModLogPath));
 
             AddOption(map, setting, nameof(Setting.PolicyImpactTotalStatistics));

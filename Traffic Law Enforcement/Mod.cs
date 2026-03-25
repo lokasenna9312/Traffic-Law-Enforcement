@@ -32,7 +32,8 @@ namespace Traffic_Law_Enforcement
                 log.Info($"Current mod asset at {asset.path}");
 
             EnforcementGameTime.Reset();
-
+            SaveLoadTraceService.Reset();
+            SaveLoadTracePatches.Apply();
             KeybindingPersistenceGuardPatches.Apply();
             m_Setting = new Setting(this);
             Settings = m_Setting;
@@ -56,6 +57,9 @@ namespace Traffic_Law_Enforcement
             updateSystem.UpdateAfter<CenterlineAccessObsoleteSystem, PublicTransportLaneExitPressureSystem>(SystemUpdatePhase.GameSimulation);
             updateSystem.UpdateBefore<CenterlineAccessObsoleteSystem, CarNavigationSystem>(SystemUpdatePhase.GameSimulation);
             updateSystem.UpdateAfter<EnforcementGameTimeSystem, CarNavigationSystem>(SystemUpdatePhase.GameSimulation);
+            updateSystem.UpdateAfter<RouteAttemptTrackingSystem, CarNavigationSystem>(SystemUpdatePhase.GameSimulation);
+            updateSystem.UpdateBefore<RouteAttemptTrackingSystem, RoutePenaltyRerouteLoggingSystem>(SystemUpdatePhase.GameSimulation);
+            updateSystem.UpdateBefore<RouteAttemptTrackingSystem, PublicTransportLaneViolationApplySystem>(SystemUpdatePhase.GameSimulation);
             updateSystem.UpdateAfter<SettingsChangeLoggingSystem, EnforcementGameTimeSystem>(SystemUpdatePhase.GameSimulation);
             updateSystem.UpdateAfter<MonthlyEnforcementChirperSystem, EnforcementGameTimeSystem>(SystemUpdatePhase.GameSimulation);
             updateSystem.UpdateBefore<MonthlyEnforcementChirperSystem, CreateChirpSystem>(SystemUpdatePhase.GameSimulation);
@@ -74,11 +78,14 @@ namespace Traffic_Law_Enforcement
         public void OnDispose()
         {
             log.Info(nameof(OnDispose));
+            SaveLoadTracePatches.Remove();
+            SaveLoadTraceService.Reset();
+            KeybindingPersistenceGuardPatches.CaptureCurrentBindings();
+            KeybindingPersistenceGuardPatches.Remove();
             BudgetUIPatches.Remove();
             VehicleUtilsPatches.Remove();
             IntersectionMovementPathfindPatches.Remove();
             IntersectionMovementPathfindReflectionPatches.Remove();
-            KeybindingPersistenceGuardPatches.Remove();
             if (m_Setting != null)
             {
                 m_Setting.UnregisterInOptionsUI();

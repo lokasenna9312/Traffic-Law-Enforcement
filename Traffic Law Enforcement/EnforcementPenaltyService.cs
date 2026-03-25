@@ -118,7 +118,7 @@ namespace Traffic_Law_Enforcement
                 : $"{reason} Repeat offender multiplier applied: {fineAmount} -> {adjustedFine}.";
 
             EnforcementTelemetry.RecordFine(kind, vehicle.Index, lane.Index, adjustedFine, adjustedReason);
-            EnforcementPolicyImpactService.RecordActualViolation(kind, adjustedFine);
+            EnforcementPolicyImpactService.RecordActualViolation(kind, adjustedFine, vehicle.Index);
             EnforcementFineMoneyService.EnqueueCharge(vehicle, adjustedFine, kind);
         }
 

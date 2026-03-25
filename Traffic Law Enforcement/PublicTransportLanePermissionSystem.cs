@@ -30,6 +30,7 @@ namespace Traffic_Law_Enforcement
         private PublicTransportLaneVehicleTypeLookups m_TypeLookups;
         private NativeList<Entity> m_PendingRefreshVehicles;
         private HashSet<Entity> m_ProcessedThisFrame;
+        private ComponentLookup<Car> m_CarData;
         private int m_RefreshCursor;
         private int m_LastObservedRuntimeWorldGeneration = -1;
         private bool m_HasEvaluated;
@@ -45,6 +46,7 @@ namespace Traffic_Law_Enforcement
                 ComponentType.ReadWrite<Car>(),
                 ComponentType.ReadOnly<CarCurrentLane>(),
                 ComponentType.ReadOnly<PublicTransportLanePendingExit>());
+            m_CarData = GetComponentLookup<Car>(true);
             m_CarLaneData = GetComponentLookup<CarLane>(true);
             m_EdgeLaneData = GetComponentLookup<EdgeLane>(true);
             m_NavigationLaneData = GetBufferLookup<CarNavigationLane>(true);
@@ -89,6 +91,7 @@ namespace Traffic_Law_Enforcement
 
         protected override void OnUpdate()
         {
+            m_CarData.Update(this);
             m_CarLaneData.Update(this);
             m_PathOwnerData.Update(this);
             m_CurrentLaneData.Update(this);
@@ -271,12 +274,11 @@ namespace Traffic_Law_Enforcement
             for (int index = m_RefreshCursor; index < end; index += 1)
             {
                 Entity vehicle = m_PendingRefreshVehicles[index];
-                if (!EntityManager.Exists(vehicle) || !EntityManager.HasComponent<Car>(vehicle))
+                if (!m_CarData.TryGetComponent(vehicle, out Car car))
                 {
                     continue;
                 }
 
-                Car car = EntityManager.GetComponentData<Car>(vehicle);
                 EvaluateVehicle(vehicle, car);
             }
 

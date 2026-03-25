@@ -20,6 +20,7 @@ namespace Traffic_Law_Enforcement
         private NativeList<Entity> m_PendingRefreshVehicles;
         private const int kVehiclesPerFrame = 512;
         private int m_RefreshCursor;
+        private bool m_ShouldAttemptPersistedSeed = true;
         private bool m_HasEvaluated;
         private int m_LastPermissionSettingsMask;
         private int m_LastObservedRuntimeWorldGeneration = -1;
@@ -80,7 +81,10 @@ namespace Traffic_Law_Enforcement
             EnforcementGameplaySettingsState settings = EnforcementGameplaySettingsService.Current;
 
             int permissionSettingsMask = PublicTransportLanePolicy.GetPermissionSettingsMask(settings);
-            SeedProfilesFromPersistedState(permissionSettingsMask);
+            if (m_ShouldAttemptPersistedSeed)
+            {
+                SeedProfilesFromPersistedState(permissionSettingsMask);
+            }
             bool fullRefresh =
                 !m_HasEvaluated ||
                 permissionSettingsMask != m_LastPermissionSettingsMask;
@@ -139,6 +143,7 @@ namespace Traffic_Law_Enforcement
             }
             m_HasEvaluated = false;
             m_LastPermissionSettingsMask = 0;
+            m_ShouldAttemptPersistedSeed = true;
 
             m_LastLoggedPersistedCount = -1;
             m_LastLoggedPersistedWithoutProfileCount = -1;
@@ -221,6 +226,11 @@ namespace Traffic_Law_Enforcement
                 m_LastLoggedPersistedCount = persistedCount;
                 m_LastLoggedPersistedWithoutProfileCount = persistedWithoutProfileCount;
                 m_LastLoggedSeedPermissionSettingsMask = permissionSettingsMask;
+            }
+
+            if (persistedWithoutProfileCount == 0 && seededCount == 0)
+            {
+                m_ShouldAttemptPersistedSeed = false;
             }
         }
 
