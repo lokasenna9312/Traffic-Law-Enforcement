@@ -308,35 +308,58 @@ namespace Traffic_Law_Enforcement
         {
             failureReason = null;
 
-            MonthlyEnforcementReport previewReport = MonthlyEnforcementChirperService.BuildCurrentPeriodPreview();
-            long periodStart = MonthlyEnforcementChirperService.GetCurrentPeriodStartMonthTicks(currentTimestampMonthTicks);
-            long periodEnd = currentTimestampMonthTicks;
-
-            Mod.log.Info(
-                $@"Monthly chirper manual preview build. " +
-                $@"openPanel={openPanel}, " +
-                $@"period={FormatEnglishPeriodPoint(periodStart)} -> {FormatEnglishPeriodPoint(periodEnd)}, " +
-                $@"totalPathRequests={previewReport.m_TotalPathRequestCount}, " +
-                $@"totalActualPaths={previewReport.m_TotalActualPathCount}, " +
-                $@"totalAvoidedPaths={previewReport.m_TotalAvoidedPathCount}, " +
-                $@"totalFineAmount={previewReport.m_TotalFineAmount}");
-
-            bool updatedLocalization = EnsurePreviewAssets(previewReport, periodStart, periodEnd, out Entity triggerEntity);
-            if (updatedLocalization)
+            try
             {
-                ReloadActiveLocale();
-            }
+                MonthlyEnforcementReport previewReport = MonthlyEnforcementChirperService.BuildCurrentPeriodPreview();
+                long periodStart = MonthlyEnforcementChirperService.GetCurrentPeriodStartMonthTicks(currentTimestampMonthTicks);
+                long periodEnd = currentTimestampMonthTicks;
 
-            if (EnqueueChirp(triggerEntity))
+                Mod.log.Info(
+                    $@"Monthly chirper manual preview build. " +
+                    $@"openPanel={openPanel}, " +
+                    $@"period={FormatEnglishPeriodPoint(periodStart)} -> {FormatEnglishPeriodPoint(periodEnd)}, " +
+                    $@"totalPathRequests={previewReport.m_TotalPathRequestCount}, " +
+                    $@"totalActualPaths={previewReport.m_TotalActualPathCount}, " +
+                    $@"totalAvoidedPaths={previewReport.m_TotalAvoidedPathCount}, " +
+                    $@"totalFineAmount={previewReport.m_TotalFineAmount}");
+
+                Mod.log.Info("Monthly chirper preview asset preparation begin.");
+                bool updatedLocalization = EnsurePreviewAssets(previewReport, periodStart, periodEnd, out Entity triggerEntity);
+                Mod.log.Info(
+                    $@"Monthly chirper preview asset preparation complete. " +
+                    $@"updatedLocalization={updatedLocalization}, " +
+                    $@"trigger={triggerEntity.Index}:{triggerEntity.Version}");
+
+                if (updatedLocalization)
+                {
+                    ReloadActiveLocale();
+                }
+
+                if (EnqueueChirp(triggerEntity))
+                {
+                    bool panelOpened = openPanel && TryOpenChirperPanel();
+                    Mod.log.Info(
+                        $@"Monthly chirper manual preview enqueued. " +
+                        $@"period={FormatEnglishPeriodPoint(periodStart)} -> {FormatEnglishPeriodPoint(periodEnd)}, " +
+                        $@"total={previewReport.TotalViolationCount}, " +
+                        $@"bus={previewReport.m_PublicTransportLaneCount}, " +
+                        $@"mid={previewReport.m_MidBlockCrossingCount}, " +
+                        $@"intersection={previewReport.m_IntersectionMovementCount}, " +
+                        $@"fine={previewReport.m_TotalFineAmount}, " +
+                        $@"panelOpened={panelOpened}");
+                    return true;
+                }
+
+                failureReason = "chirp enqueue failed";
+                Mod.log.Info($@"Monthly chirper manual preview skipped. reason={failureReason}");
+                return false;
+            }
+            catch (Exception ex)
             {
-                bool panelOpened = openPanel && TryOpenChirperPanel();
-                Mod.log.Info($"Monthly chirper manual preview enqueued. period={FormatEnglishPeriodPoint(periodStart)} -> {FormatEnglishPeriodPoint(periodEnd)}, total={previewReport.TotalViolationCount}, bus={previewReport.m_PublicTransportLaneCount}, mid={previewReport.m_MidBlockCrossingCount}, intersection={previewReport.m_IntersectionMovementCount}, fine={previewReport.m_TotalFineAmount}, panelOpened={panelOpened}");
-                return true;
+                failureReason = $"preview exception: {ex.GetType().Name}: {ex.Message}";
+                Mod.log.Error(ex, "Monthly chirper manual preview failed.");
+                return false;
             }
-
-            failureReason = "chirp enqueue failed";
-            Mod.log.Info($"Monthly chirper manual preview skipped. reason={failureReason}");
-            return false;
         }
 
         private bool EnsureReportAssets(MonthlyEnforcementReport report, out Entity triggerEntity)
