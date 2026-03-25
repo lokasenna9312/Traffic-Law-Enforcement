@@ -1021,22 +1021,22 @@ namespace Traffic_Law_Enforcement
                 m_HasDeserializedData = true;
                 m_ShouldClearLegacyRuntimeState = false;
 
-                ReadLoadedPublicTransportLaneVehicleStates(reader, version);
+            ReadLoadedPublicTransportLaneVehicleStates(reader, version);
 
-                EnforcementLoggingPolicy.RecordSaveLoadInfo(
-                    $"[SAVELOAD] Deserialize loaded: version={version}, " +
-                    $"runtimeGeneration={RuntimeWorldGeneration}" +
-                    $"{EnforcementLoggingPolicy.FormatSaveIdentificationSuffix()}, " +
-                    $"loadedPtVehicleStates={m_LoadedPublicTransportLaneVehicleStates.Count}, " +
-                    $"hasTrackingState={trackingState.HasValue}, " +
-                    $"hasPolicyImpactTrackingState={policyImpactTrackingState.HasValue}, " +
-                    $"records={records.Count}, timestamps={timestamps.Count}, fineIncomeEvents={fineIncomeEvents.Count}, " +
-                    $"pathRequestEvents={policyImpactEventsReadResult.PathRequestEvents.Count}, actualViolationEvents={policyImpactEventsReadResult.ActualViolationEvents.Count}, " +
-                    $"avoidedRerouteEvents={policyImpactEventsReadResult.AvoidedRerouteEvents.Count}, " +
-                    $"totalFineAmount={totalFineAmount}, totalPathRequestCount={totalsReadResult.TotalPathRequestCount}, " +
-                    $"totalActualPathCount={totalsReadResult.TotalActualPathCount}, totalAvoidedPathCount={totalsReadResult.TotalAvoidedPathCount}");
+            EnforcementLoggingPolicy.RecordSaveLoadInfo(
+                $"[SAVELOAD] Deserialize loaded: version={version}, " +
+                $"runtimeGeneration={RuntimeWorldGeneration}" +
+                $"{EnforcementLoggingPolicy.FormatSaveIdentificationSuffix()}, " +
+                $"loadedPtVehicleStates={m_LoadedPublicTransportLaneVehicleStates.Count}, " +
+                $"hasTrackingState={trackingState.HasValue}, " +
+                $"hasPolicyImpactTrackingState={policyImpactTrackingState.HasValue}, " +
+                $"records={records.Count}, timestamps={timestamps.Count}, fineIncomeEvents={fineIncomeEvents.Count}, " +
+                $"pathRequestEvents={policyImpactEventsReadResult.PathRequestEvents.Count}, actualViolationEvents={policyImpactEventsReadResult.ActualViolationEvents.Count}, " +
+                $"avoidedRerouteEvents={policyImpactEventsReadResult.AvoidedRerouteEvents.Count}, " +
+                $"totalFineAmount={totalFineAmount}, totalPathRequestCount={totalsReadResult.TotalPathRequestCount}, " +
+                $"totalActualPathCount={totalsReadResult.TotalActualPathCount}, totalAvoidedPathCount={totalsReadResult.TotalAvoidedPathCount}");
 
-                m_PendingPostDeserializeApply = true;
+            m_PendingPostDeserializeApply = true;
         }
 
         private void ApplyLoadedStateToWorld()
@@ -1154,6 +1154,12 @@ namespace Traffic_Law_Enforcement
         private static bool HasInconsistentPathRequestTracking(int totalPathRequestCount, int totalViolationCount, int totalAvoidedPathCount, int totalFineAmount)
         {
             return totalPathRequestCount <= 0 && (totalViolationCount > 0 || totalAvoidedPathCount > 0 || totalFineAmount > 0);
+        }
+
+        private static void WriteMonthlyEnforcementTrackingState<TWriter>(TWriter writer)
+            where TWriter : IWriter
+        {
+            WriteMonthlyEnforcementTrackingState(writer);
         }
 
         private static void WriteGameplaySettings<TWriter>(TWriter writer, EnforcementGameplaySettingsState state) where TWriter : IWriter
