@@ -153,16 +153,7 @@ namespace Traffic_Law_Enforcement
 
             long currentTimestampMonthTicks = EnforcementGameTime.CurrentTimestampMonthTicks;
             long currentMonthIndex = EnforcementGameTime.GetMonthIndex(currentTimestampMonthTicks);
-
-            Mod.log.Info(
-                $@"Monthly chirper manual preview begin. " +
-                $@"currentTimestampMonthTicks={currentTimestampMonthTicks}, " +
-                $@"currentMonthIndex={currentMonthIndex}");
-
-            if (MonthlyEnforcementChirperService.EnsureTrackingInitialized(currentMonthIndex))
-            {
-                Mod.log.Info($"Monthly chirper tracking initialized from manual preview. month={currentMonthIndex}");
-            }
+            MonthlyEnforcementChirperService.EnsureTrackingInitialized(currentMonthIndex);
 
             return TryPublishCurrentPeriodPreview(currentTimestampMonthTicks, openPanel: true, out failureReason);
         }
@@ -314,21 +305,7 @@ namespace Traffic_Law_Enforcement
                 long periodStart = MonthlyEnforcementChirperService.GetCurrentPeriodStartMonthTicks(currentTimestampMonthTicks);
                 long periodEnd = currentTimestampMonthTicks;
 
-                Mod.log.Info(
-                    $@"Monthly chirper manual preview build. " +
-                    $@"openPanel={openPanel}, " +
-                    $@"period={FormatEnglishPeriodPoint(periodStart)} -> {FormatEnglishPeriodPoint(periodEnd)}, " +
-                    $@"totalPathRequests={previewReport.m_TotalPathRequestCount}, " +
-                    $@"totalActualPaths={previewReport.m_TotalActualPathCount}, " +
-                    $@"totalAvoidedPaths={previewReport.m_TotalAvoidedPathCount}, " +
-                    $@"totalFineAmount={previewReport.m_TotalFineAmount}");
-
-                Mod.log.Info("Monthly chirper preview asset preparation begin.");
                 bool updatedLocalization = EnsurePreviewAssets(previewReport, periodStart, periodEnd, out Entity triggerEntity);
-                Mod.log.Info(
-                    $@"Monthly chirper preview asset preparation complete. " +
-                    $@"updatedLocalization={updatedLocalization}, " +
-                    $@"trigger={triggerEntity.Index}:{triggerEntity.Version}");
 
                 if (updatedLocalization)
                 {
@@ -337,21 +314,11 @@ namespace Traffic_Law_Enforcement
 
                 if (EnqueueChirp(triggerEntity))
                 {
-                    bool panelOpened = openPanel && TryOpenChirperPanel();
-                    Mod.log.Info(
-                        $@"Monthly chirper manual preview enqueued. " +
-                        $@"period={FormatEnglishPeriodPoint(periodStart)} -> {FormatEnglishPeriodPoint(periodEnd)}, " +
-                        $@"total={previewReport.TotalViolationCount}, " +
-                        $@"bus={previewReport.m_PublicTransportLaneCount}, " +
-                        $@"mid={previewReport.m_MidBlockCrossingCount}, " +
-                        $@"intersection={previewReport.m_IntersectionMovementCount}, " +
-                        $@"fine={previewReport.m_TotalFineAmount}, " +
-                        $@"panelOpened={panelOpened}");
+                    _ = openPanel && TryOpenChirperPanel();
                     return true;
                 }
 
                 failureReason = "chirp enqueue failed";
-                Mod.log.Info($@"Monthly chirper manual preview skipped. reason={failureReason}");
                 return false;
             }
             catch (Exception ex)
@@ -435,7 +402,6 @@ namespace Traffic_Law_Enforcement
                 m_Chirp = chirpEntity
             });
 
-            Mod.log.Info($"Monthly chirper prefab assets created. key={assetKey}");
             return triggerEntity;
         }
 
@@ -534,17 +500,11 @@ namespace Traffic_Law_Enforcement
 
             m_CreateChirpSystem.AddQueueWriter(default);
 
-            Mod.log.Info(
-                $@"Monthly chirper enqueue submitted. " +
-                $@"trigger={triggerEntity.Index}:{triggerEntity.Version}, " +
-                $@"sender={m_SenderAccountEntity.Index}:{m_SenderAccountEntity.Version}");
-
             return true;
         }
 
         private bool TryOpenChirperPanel()
         {
-            Mod.log.Info("Monthly chirper panel open requested.");
             try
             {
                 GamePanelUISystem gamePanelSystem = World.GetOrCreateSystemManaged<GamePanelUISystem>();
@@ -555,7 +515,6 @@ namespace Traffic_Law_Enforcement
                 }
 
                 gamePanelSystem.ShowPanel(new ChirperPanel());
-                Mod.log.Info("Monthly chirper panel opened.");
                 return true;
             }
             catch (Exception ex)

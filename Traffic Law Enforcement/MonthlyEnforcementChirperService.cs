@@ -338,18 +338,11 @@ namespace Traffic_Law_Enforcement
 
         public static void RequestManualPreview()
         {
-            Mod.log.Info("Monthly chirper manual preview requested.");
-
             if (TryPublishManualPreviewNow(out string failureReason))
             {
-                Mod.log.Info("Monthly chirper manual preview handled immediately.");
                 return;
             }
-
-            int queuedCount = Interlocked.Increment(ref s_ManualPreviewRequestCount);
-            Mod.log.Info(
-                $@"Monthly chirper manual preview direct execution unavailable. " +
-                $@"Queued request for next simulation update. reason={failureReason}, queuedCount={queuedCount}");
+            Interlocked.Increment(ref s_ManualPreviewRequestCount);
         }
 
         public static bool TryConsumeManualPreviewRequest()
@@ -364,9 +357,6 @@ namespace Traffic_Law_Enforcement
 
                 if (Interlocked.CompareExchange(ref s_ManualPreviewRequestCount, currentCount - 1, currentCount) == currentCount)
                 {
-                    Mod.log.Info(
-                        $@"Monthly chirper manual preview request consumed. " +
-                        $@"remainingQueuedCount={currentCount - 1}");
                     return true;
                 }
             }
