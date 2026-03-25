@@ -767,23 +767,23 @@ namespace Traffic_Law_Enforcement {
                 return;
             }
 
-                string savedByModVersion = "unknown";
-                string savedByGameVersion = "unknown";
+            string savedByModVersion = "unknown";
+            string savedByGameVersion = "unknown";
 
-                if (version >= 11)
-                {
-                    reader.Read(out savedByModVersion);
-                    reader.Read(out savedByGameVersion);
-                }
+            if (version >= 11)
+            {
+                reader.Read(out savedByModVersion);
+                reader.Read(out savedByGameVersion);
+            }
 
-                Mod.log.Info(
-                    "[MODINFO] Save compatibility: " +
-                    $"currentModVersion={Mod.CurrentModVersion}, " +
-                    $"currentGameVersion={Mod.CurrentGameVersion}, " +
-                    $"savedByModVersion={savedByModVersion}, " +
-                    $"savedByGameVersion={savedByGameVersion}, " +
-                    $"saveDataVersion={version}, " +
-                    SaveLoadTraceService.DescribePendingLoad());
+            Mod.log.Info(
+                "[MODINFO] Save compatibility: " +
+                $"currentModVersion={Mod.CurrentModVersion}, " +
+                $"currentGameVersion={Mod.CurrentGameVersion}, " +
+                $"savedByModVersion={savedByModVersion}, " +
+                $"savedByGameVersion={savedByGameVersion}, " +
+                $"saveDataVersion={version}, " +
+                SaveLoadTraceService.DescribePendingLoad());
 
             EnforcementGameplaySettingsState gameplaySettings = ReadGameplaySettings(reader, version);
 
