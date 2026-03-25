@@ -29,21 +29,44 @@ namespace Traffic_Law_Enforcement
                 return;
             }
 
-            s_TargetMethod = FindBestTransitionCostMethod(
-                out s_SourceLaneArgIndex,
-                out s_TargetLaneArgIndex);
-
-            if (s_TargetMethod == null)
+            try
             {
-                return;
+                if (s_PathfindExecutorType == null && EnforcementLoggingPolicy.ShouldLogEnforcementEvents())
+                {
+                    Mod.log.Info("Mid-block pathfind hook skipped: PathfindExecutor type not found.");
+                    return;
+                }
+
+                s_TargetMethod = FindBestTransitionCostMethod(
+                    out s_SourceLaneArgIndex,
+                    out s_TargetLaneArgIndex);
+
+                if ((s_TargetMethod == null || s_SourceLaneArgIndex < 0 || s_TargetLaneArgIndex < 0) && EnforcementLoggingPolicy.ShouldLogEnforcementEvents())
+                {
+                    LogCandidateMethods();
+                    Mod.log.Info("Mid-block pathfind hook skipped: no suitable transition-cost method found.");
+                    return;
+                }
+
+                s_Harmony = new Harmony(HarmonyId);
+                HarmonyMethod postfix = new HarmonyMethod(
+                    typeof(MidBlockCrossingPathfindPatches),
+                    nameof(TransitionCostPostfix));
+
+                s_Harmony.Patch(s_TargetMethod, postfix: postfix);
+
+                if (EnforcementLoggingPolicy.ShouldLogEnforcementEvents())
+                {
+                    Mod.log.Info(
+                        $"Mid-block pathfind hook patched: {DescribeMethod(s_TargetMethod)}, " +
+                        $"sourceArgIndex={s_SourceLaneArgIndex}, targetArgIndex={s_TargetLaneArgIndex}");
+                }
             }
-
-            s_Harmony = new Harmony(HarmonyId);
-            HarmonyMethod postfix = new HarmonyMethod(
-                typeof(MidBlockCrossingPathfindPatches),
-                nameof(TransitionCostPostfix));
-
-            s_Harmony.Patch(s_TargetMethod, postfix: postfix);
+            catch (Exception ex)
+            {
+                s_Harmony = null;
+                Mod.log.Error(ex, "Failed to apply mid-block pathfind hook.");
+            }
         }
 
         public static void Remove()
@@ -115,7 +138,7 @@ namespace Traffic_Law_Enforcement
 
             __result += penalty * moneyWeight;
 
-            if (EnforcementLoggingPolicy.ShouldLogPathfindingPenaltyDiagnostics())
+            if (EnforcementLoggingPolicy.ShouldLogEnforcementEvents())
             {
                 Mod.log.Info(
                     $"Mid-block pre-penalty applied: method={__originalMethod?.Name}, " +
@@ -272,7 +295,7 @@ namespace Traffic_Law_Enforcement
             string parameterList = string.Join(", ", parameters.Select(p => $"{p.ParameterType.Name} {p.Name}").ToArray());
             return $"{method.DeclaringType?.FullName}.{method.Name}({parameterList})";
         }
-        
+
         // FindBestTransitionCostMethod / helper methods:
         // IntersectionMovementPathfindPatches.cs에서 그대로 복제
     }

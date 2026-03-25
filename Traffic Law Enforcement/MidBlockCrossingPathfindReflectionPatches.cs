@@ -69,7 +69,10 @@ namespace Traffic_Law_Enforcement
             {
                 s_Harmony = new Harmony(HarmonyId);
                 s_Harmony.PatchAll(typeof(MidBlockCrossingPathfindReflectionPatches).Assembly);
-                Mod.log.Info("Mid-block reflection fallback patches applied.");
+                if (EnforcementLoggingPolicy.ShouldLogEnforcementEvents())
+                {
+                    Mod.log.Info("Mid-block reflection fallback patches applied.");
+                }
             }
             catch (Exception ex)
             {
@@ -96,7 +99,7 @@ namespace Traffic_Law_Enforcement
             MethodBase __originalMethod)
         {
             string methodKey = __originalMethod?.ToString() ?? "(null)";
-            if (s_ActivatedMethods.Add(methodKey))
+            if (s_ActivatedMethods.Add(methodKey) && EnforcementLoggingPolicy.ShouldLogEnforcementEvents())
             {
                 Mod.log.Info(
                     $"Mid-block reflection fallback active: method={methodKey}, argCount={__args?.Length ?? 0}");
@@ -138,7 +141,7 @@ namespace Traffic_Law_Enforcement
             float addedCost = penalty * moneyWeight;
             __result += addedCost;
 
-            if (EnforcementLoggingPolicy.ShouldLogPathfindingPenaltyDiagnostics() &&
+            if (EnforcementLoggingPolicy.ShouldLogEnforcementEvents() &&
                 s_DiagnosticLogCount < MaxDiagnosticLogs)
             {
                 s_DiagnosticLogCount += 1;
