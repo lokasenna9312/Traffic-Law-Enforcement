@@ -232,27 +232,7 @@ namespace Traffic_Law_Enforcement
                 return false;
             }
 
-            EnforcementPolicyImpactService.PersistentTotalsSnapshot totals = EnforcementPolicyImpactService.GetPersistentTotalsSnapshot();
-
-            report = new MonthlyEnforcementReport(
-                s_TrackingState.m_MonthIndex,
-                ClampToNonNegative(totals.TotalPathRequestCount - s_TrackingState.m_TotalPathRequestCount),
-                ClampToNonNegative(totals.TotalActualPathCount - s_TrackingState.m_TotalActualPathCount),
-                ClampToNonNegative(totals.PublicTransportLaneActualCount - s_TrackingState.m_PublicTransportLaneCount),
-                ClampToNonNegative(totals.MidBlockCrossingActualCount - s_TrackingState.m_MidBlockCrossingCount),
-                ClampToNonNegative(totals.IntersectionMovementActualCount - s_TrackingState.m_IntersectionMovementCount),
-                ClampToNonNegative(EnforcementTelemetry.TotalFineAmount - s_TrackingState.m_TotalFineAmount),
-                ClampToNonNegative(totals.TotalAvoidedPathCount - s_TrackingState.m_TotalAvoidedPathCount),
-                ClampToNonNegative(totals.PublicTransportLaneFineAmount - s_TrackingState.m_PublicTransportLaneFineAmount),
-                ClampToNonNegative(totals.MidBlockCrossingFineAmount - s_TrackingState.m_MidBlockCrossingFineAmount),
-                ClampToNonNegative(totals.IntersectionMovementFineAmount - s_TrackingState.m_IntersectionMovementFineAmount),
-                ClampToNonNegative(totals.PublicTransportLaneAvoidedEventCount - s_TrackingState.m_PublicTransportLaneAvoidedEventCount),
-                ClampToNonNegative(totals.MidBlockCrossingAvoidedEventCount - s_TrackingState.m_MidBlockCrossingAvoidedEventCount),
-                ClampToNonNegative(totals.IntersectionMovementAvoidedEventCount - s_TrackingState.m_IntersectionMovementAvoidedEventCount),
-                ClampToNonNegative(totals.TotalActualOrAvoidedPathCount - s_TrackingState.m_TotalActualOrAvoidedPathCount),
-                ClampToNonNegative(totals.PublicTransportLaneActualOrAvoidedPathCount - s_TrackingState.m_PublicTransportLaneActualOrAvoidedPathCount),
-                ClampToNonNegative(totals.MidBlockCrossingActualOrAvoidedPathCount - s_TrackingState.m_MidBlockCrossingActualOrAvoidedPathCount),
-                ClampToNonNegative(totals.IntersectionMovementActualOrAvoidedPathCount - s_TrackingState.m_IntersectionMovementActualOrAvoidedPathCount));
+            report = CreateDeltaReport(s_TrackingState);
             UpsertReport(report);
             s_TrackingState = CaptureCurrentState(currentMonthIndex);
             return true;

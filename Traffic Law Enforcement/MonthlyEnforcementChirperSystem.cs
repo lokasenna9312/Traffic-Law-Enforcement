@@ -64,9 +64,12 @@ namespace Traffic_Law_Enforcement
             EnsureSenderAccount();
 
             bool rebuiltLocalization = false;
+            int restoredReportCount = 0;
+
             foreach (MonthlyEnforcementReport report in MonthlyEnforcementChirperService.GetReportHistorySnapshot())
             {
                 rebuiltLocalization |= EnsureReportLocalizationEntries(report);
+                restoredReportCount += 1;
             }
 
             if (rebuiltLocalization)
@@ -74,7 +77,7 @@ namespace Traffic_Law_Enforcement
                 ReloadActiveLocale();
             }
 
-            Mod.log.Info($"Monthly chirper system initialized. restoredReports={m_ReportTriggerEntities.Count}");
+            Mod.log.Info($"Monthly chirper system initialized. restoredReportLocalizations={restoredReportCount}, activeTriggers={m_ReportTriggerEntities.Count}");
         }
 
         protected override void OnDestroy()

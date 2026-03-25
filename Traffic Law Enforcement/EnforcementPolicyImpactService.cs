@@ -363,6 +363,29 @@ namespace Traffic_Law_Enforcement
             return s_AvoidedRerouteEvents.ToArray();
         }
 
+        private static bool RemoveExpiredPrefix<T>(List<T> entries, long cutoffTimestamp, Func<T, long> getTimestamp)
+        {
+            int removeCount = 0;
+
+            for (int index = 0; index < entries.Count; index += 1)
+            {
+                if (getTimestamp(entries[index]) >= cutoffTimestamp)
+                {
+                    break;
+                }
+
+                removeCount += 1;
+            }
+
+            if (removeCount <= 0)
+            {
+                return false;
+            }
+
+            entries.RemoveRange(0, removeCount);
+            return true;
+        }
+
         public static void ResetPersistentData()
         {
             s_HasTrackingState = false;
@@ -943,9 +966,15 @@ namespace Traffic_Law_Enforcement
                 return default;
             }
 
-            HashSet<long> requestPaths = new HashSet<long>();
-            HashSet<long> totalActualPaths = new HashSet<long>();
-            HashSet<long> totalAvoidedPaths = new HashSet<long>();
+            int requestEventCount = s_PathRequestEvents.Count;
+            int actualViolationEventCount = s_ActualViolationEvents.Count;
+            int avoidedRerouteEventCount = s_AvoidedRerouteEvents.Count;
+            int combinedEventCapacity = actualViolationEventCount + avoidedRerouteEventCount;
+
+            HashSet<long> requestPaths = new HashSet<long>(requestEventCount);
+            HashSet<long> totalActualPaths = new HashSet<long>(actualViolationEventCount);
+            HashSet<long> totalAvoidedPaths = new HashSet<long>(avoidedRerouteEventCount);
+            HashSet<long> totalActualOrAvoidedPaths = new HashSet<long>(combinedEventCapacity);
 
             HashSet<long> publicTransportActualPaths = new HashSet<long>();
             HashSet<long> midBlockActualPaths = new HashSet<long>();
@@ -954,6 +983,10 @@ namespace Traffic_Law_Enforcement
             HashSet<long> publicTransportAvoidedPaths = new HashSet<long>();
             HashSet<long> midBlockAvoidedPaths = new HashSet<long>();
             HashSet<long> intersectionAvoidedPaths = new HashSet<long>();
+
+            HashSet<long> publicTransportActualOrAvoidedPaths = new HashSet<long>();
+            HashSet<long> midBlockActualOrAvoidedPaths = new HashSet<long>();
+            HashSet<long> intersectionActualOrAvoidedPaths = new HashSet<long>();
 
             int legacyRequestPathCount = 0;
             int legacyTotalActualPathCount = 0;
@@ -1013,22 +1046,27 @@ namespace Traffic_Law_Enforcement
                     continue;
                 }
 
-                totalActualPaths.Add(entry.PathContextSequence);
+                long pathContextSequence = entry.PathContextSequence;
+                totalActualPaths.Add(pathContextSequence);
+                totalActualOrAvoidedPaths.Add(pathContextSequence);
 
                 switch (entry.Kind)
                 {
                     case EnforcementKinds.PublicTransportLane:
-                        publicTransportActualPaths.Add(entry.PathContextSequence);
+                        publicTransportActualPaths.Add(pathContextSequence);
+                        publicTransportActualOrAvoidedPaths.Add(pathContextSequence);
                         publicTransportLaneFineAmount += entry.FineAmount;
                         break;
 
                     case EnforcementKinds.MidBlockCrossing:
-                        midBlockActualPaths.Add(entry.PathContextSequence);
+                        midBlockActualPaths.Add(pathContextSequence);
+                        midBlockActualOrAvoidedPaths.Add(pathContextSequence);
                         midBlockCrossingFineAmount += entry.FineAmount;
                         break;
 
                     case EnforcementKinds.IntersectionMovement:
-                        intersectionActualPaths.Add(entry.PathContextSequence);
+                        intersectionActualPaths.Add(pathContextSequence);
+                        intersectionActualOrAvoidedPaths.Add(pathContextSequence);
                         intersectionMovementFineAmount += entry.FineAmount;
                         break;
                 }
@@ -1060,38 +1098,28 @@ namespace Traffic_Law_Enforcement
                     continue;
                 }
 
-                totalAvoidedPaths.Add(entry.PathContextSequence);
+                long pathContextSequence = entry.PathContextSequence;
+                totalAvoidedPaths.Add(pathContextSequence);
+                totalActualOrAvoidedPaths.Add(pathContextSequence);
 
                 if (entry.AvoidedPublicTransportLanePenalty)
                 {
-                    publicTransportAvoidedPaths.Add(entry.PathContextSequence);
+                    publicTransportAvoidedPaths.Add(pathContextSequence);
+                    publicTransportActualOrAvoidedPaths.Add(pathContextSequence);
                 }
 
                 if (entry.AvoidedMidBlockPenalty)
                 {
-                    midBlockAvoidedPaths.Add(entry.PathContextSequence);
+                    midBlockAvoidedPaths.Add(pathContextSequence);
+                    midBlockActualOrAvoidedPaths.Add(pathContextSequence);
                 }
 
                 if (entry.AvoidedIntersectionPenalty)
                 {
-                    intersectionAvoidedPaths.Add(entry.PathContextSequence);
+                    intersectionAvoidedPaths.Add(pathContextSequence);
+                    intersectionActualOrAvoidedPaths.Add(pathContextSequence);
                 }
             }
-
-            HashSet<long> totalActualOrAvoidedPaths = new HashSet<long>(totalActualPaths);
-            totalActualOrAvoidedPaths.UnionWith(totalAvoidedPaths);
-
-            HashSet<long> publicTransportActualOrAvoidedPaths =
-                new HashSet<long>(publicTransportActualPaths);
-            publicTransportActualOrAvoidedPaths.UnionWith(publicTransportAvoidedPaths);
-
-            HashSet<long> midBlockActualOrAvoidedPaths =
-                new HashSet<long>(midBlockActualPaths);
-            midBlockActualOrAvoidedPaths.UnionWith(midBlockAvoidedPaths);
-
-            HashSet<long> intersectionActualOrAvoidedPaths =
-                new HashSet<long>(intersectionActualPaths);
-            intersectionActualOrAvoidedPaths.UnionWith(intersectionAvoidedPaths);
 
             int totalPathRequestCount = requestPaths.Count + legacyRequestPathCount;
             int totalActualPathCount = totalActualPaths.Count + legacyTotalActualPathCount;
@@ -1386,50 +1414,26 @@ namespace Traffic_Law_Enforcement
 
         private static bool PrunePathRequestEvents(long cutoffTimestamp)
         {
-            bool removedAny = false;
-
-            for (int index = s_PathRequestEvents.Count - 1; index >= 0; index -= 1)
-            {
-                if (s_PathRequestEvents[index].TimestampMonthTicks < cutoffTimestamp)
-                {
-                    s_PathRequestEvents.RemoveAt(index);
-                    removedAny = true;
-                }
-            }
-
-            return removedAny;
+            return RemoveExpiredPrefix(
+                s_PathRequestEvents,
+                cutoffTimestamp,
+                entry => entry.TimestampMonthTicks);
         }
 
         private static bool PruneActualViolationEvents(long cutoffTimestamp)
         {
-            bool removedAny = false;
-
-            for (int index = s_ActualViolationEvents.Count - 1; index >= 0; index -= 1)
-            {
-                if (s_ActualViolationEvents[index].TimestampMonthTicks < cutoffTimestamp)
-                {
-                    s_ActualViolationEvents.RemoveAt(index);
-                    removedAny = true;
-                }
-            }
-
-            return removedAny;
+            return RemoveExpiredPrefix(
+                s_ActualViolationEvents,
+                cutoffTimestamp,
+                entry => entry.TimestampMonthTicks);
         }
 
         private static bool PruneAvoidedRerouteEvents(long cutoffTimestamp)
         {
-            bool removedAny = false;
-
-            for (int index = s_AvoidedRerouteEvents.Count - 1; index >= 0; index -= 1)
-            {
-                if (s_AvoidedRerouteEvents[index].TimestampMonthTicks < cutoffTimestamp)
-                {
-                    s_AvoidedRerouteEvents.RemoveAt(index);
-                    removedAny = true;
-                }
-            }
-
-            return removedAny;
+            return RemoveExpiredPrefix(
+                s_AvoidedRerouteEvents,
+                cutoffTimestamp,
+                entry => entry.TimestampMonthTicks);
         }
     }
 }
