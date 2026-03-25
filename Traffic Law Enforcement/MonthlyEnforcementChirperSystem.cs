@@ -296,12 +296,15 @@ namespace Traffic_Law_Enforcement
                 long periodStart = MonthlyEnforcementChirperService.GetCurrentPeriodStartMonthTicks(currentTimestampMonthTicks);
                 long periodEnd = currentTimestampMonthTicks;
 
-                bool updatedLocalization = EnsurePreviewAssets(previewReport, periodStart, periodEnd, out Entity triggerEntity);
+                int previewSequence = ++m_ManualPreviewSequence;
+                bool updatedLocalization = EnsurePreviewLocalizationEntries(previewReport, periodStart, periodEnd, previewSequence);
 
                 if (updatedLocalization)
                 {
                     ReloadActiveLocale();
                 }
+
+                Entity triggerEntity = CreatePreviewTriggerEntity(periodEnd, previewSequence);
 
                 if (EnqueueChirp(triggerEntity))
                 {
@@ -346,17 +349,19 @@ namespace Traffic_Law_Enforcement
             return triggerEntity;
         }
 
-        private bool EnsurePreviewAssets(MonthlyEnforcementReport report, long periodStart, long periodEnd, out Entity triggerEntity)
+        private bool EnsurePreviewLocalizationEntries(MonthlyEnforcementReport report, long periodStart, long periodEnd, int previewSequence)
+        {
+            string localizationId = GetPreviewLocalizationId(periodEnd, previewSequence);
+            return EnsureLocalizationEntriesForLocales(localizationId, report, periodStart, periodEnd);
+        }
+
+        private Entity CreatePreviewTriggerEntity(long periodEnd, int previewSequence)
         {
             EnsureSenderAccount();
 
-            int previewSequence = ++m_ManualPreviewSequence;
             string assetKey = $"{kPrefabNamePrefix}.Preview.{periodEnd}.{previewSequence}";
             string localizationId = GetPreviewLocalizationId(periodEnd, previewSequence);
-            bool localizationChanged = EnsureLocalizationEntriesForLocales(localizationId, report, periodStart, periodEnd);
-
-            triggerEntity = CreateChirpTriggerEntity(assetKey, localizationId);
-            return localizationChanged;
+            return CreateChirpTriggerEntity(assetKey, localizationId);
         }
 
         private Entity CreateChirpTriggerEntity(string assetKey, string localizationId)
