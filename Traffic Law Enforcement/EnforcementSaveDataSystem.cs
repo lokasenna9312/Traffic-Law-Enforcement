@@ -1210,6 +1210,12 @@ namespace Traffic_Law_Enforcement
             }
         }
 
+        private static void WritePolicyImpactTrackingState<TWriter>(TWriter writer)
+            where TWriter : IWriter
+        {
+            WritePolicyImpactTrackingState(writer);
+        }
+
         private static EnforcementGameplaySettingsState ReadGameplaySettings<TReader>(TReader reader, int version) where TReader : IReader
         {
             EnforcementGameplaySettingsState state = default;
