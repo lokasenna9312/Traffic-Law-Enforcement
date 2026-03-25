@@ -414,6 +414,25 @@ namespace Traffic_Law_Enforcement
 
         private static void UpsertReport(MonthlyEnforcementReport report)
         {
+            int count = s_ReportHistory.Count;
+            if (count > 0)
+            {
+                int lastIndex = count - 1;
+                MonthlyEnforcementReport lastReport = s_ReportHistory[lastIndex];
+
+                if (lastReport.m_MonthIndex == report.m_MonthIndex)
+                {
+                    s_ReportHistory[lastIndex] = report;
+                    return;
+                }
+
+                if (lastReport.m_MonthIndex < report.m_MonthIndex)
+                {
+                    s_ReportHistory.Add(report);
+                    return;
+                }
+            }
+
             for (int index = 0; index < s_ReportHistory.Count; index += 1)
             {
                 if (s_ReportHistory[index].m_MonthIndex == report.m_MonthIndex)
@@ -426,7 +445,6 @@ namespace Traffic_Law_Enforcement
             s_ReportHistory.Add(report);
             s_ReportHistory.Sort((left, right) => left.m_MonthIndex.CompareTo(right.m_MonthIndex));
         }
-
         private static bool TrackingStatesEqual(MonthlyEnforcementTrackingState left, MonthlyEnforcementTrackingState right)
         {
             return left.m_MonthIndex == right.m_MonthIndex

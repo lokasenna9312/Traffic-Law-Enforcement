@@ -66,7 +66,7 @@ namespace Traffic_Law_Enforcement
             bool rebuiltLocalization = false;
             foreach (MonthlyEnforcementReport report in MonthlyEnforcementChirperService.GetReportHistorySnapshot())
             {
-                rebuiltLocalization |= EnsureReportAssets(report, out _);
+                rebuiltLocalization |= EnsureReportLocalizationEntries(report);
             }
 
             if (rebuiltLocalization)
@@ -280,11 +280,13 @@ namespace Traffic_Law_Enforcement
 
         private void PublishCompletedMonthReport(MonthlyEnforcementReport report)
         {
-            bool updatedLocalization = EnsureReportAssets(report, out Entity triggerEntity);
+            bool updatedLocalization = EnsureReportLocalizationEntries(report);
             if (updatedLocalization)
             {
                 ReloadActiveLocale();
             }
+
+            Entity triggerEntity = EnsureReportTriggerEntity(report.m_MonthIndex);
 
             long periodStart = MonthlyEnforcementChirperService.GetReportPeriodStartMonthTicks(report);
             long periodEnd = MonthlyEnforcementChirperService.GetReportPeriodEndMonthTicks(report);
@@ -329,25 +331,30 @@ namespace Traffic_Law_Enforcement
             }
         }
 
-        private bool EnsureReportAssets(MonthlyEnforcementReport report, out Entity triggerEntity)
+        private bool EnsureReportLocalizationEntries(MonthlyEnforcementReport report)
         {
-            EnsureSenderAccount();
-
             long periodStart = MonthlyEnforcementChirperService.GetReportPeriodStartMonthTicks(report);
             long periodEnd = MonthlyEnforcementChirperService.GetReportPeriodEndMonthTicks(report);
             string localizationId = GetReportLocalizationId(report.m_MonthIndex);
-            bool localizationChanged = EnsureLocalizationEntriesForLocales(localizationId, report, periodStart, periodEnd);
 
-            if (m_ReportTriggerEntities.TryGetValue(report.m_MonthIndex, out triggerEntity) &&
+            return EnsureLocalizationEntriesForLocales(localizationId, report, periodStart, periodEnd);
+        }
+
+        private Entity EnsureReportTriggerEntity(long monthIndex)
+        {
+            EnsureSenderAccount();
+
+            if (m_ReportTriggerEntities.TryGetValue(monthIndex, out Entity triggerEntity) &&
                 triggerEntity != Entity.Null &&
                 EntityManager.Exists(triggerEntity))
             {
-                return localizationChanged;
+                return triggerEntity;
             }
 
-            triggerEntity = CreateChirpTriggerEntity($"{kPrefabNamePrefix}.Report.{report.m_MonthIndex}", localizationId);
-            m_ReportTriggerEntities[report.m_MonthIndex] = triggerEntity;
-            return true;
+            string localizationId = GetReportLocalizationId(monthIndex);
+            triggerEntity = CreateChirpTriggerEntity($"{kPrefabNamePrefix}.Report.{monthIndex}", localizationId);
+            m_ReportTriggerEntities[monthIndex] = triggerEntity;
+            return triggerEntity;
         }
 
         private bool EnsurePreviewAssets(MonthlyEnforcementReport report, long periodStart, long periodEnd, out Entity triggerEntity)
