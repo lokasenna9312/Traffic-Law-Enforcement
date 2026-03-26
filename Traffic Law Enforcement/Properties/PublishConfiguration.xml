@@ -48,7 +48,7 @@ The following options can be configured either for the currently loaded save fil
 - Log files are saved to the following path: C:\Users\USERNAME\AppData\LocalLow\Colossal Order\Cities Skylines II\Logs\Traffic_Law_Enforcement.Mod.log
 
 ### 5. Desired Improvements and Additional Features
-- I wanted to penalize drivers who stop in intersections but I could not implement that feature because of my limited coding skills.
+- I wanted to penalize drivers who stop in intersections and jaywalkers but I could not implement that feature because of my limited coding skills.
 - I wanted to penalize non-service vehicles who enters pedestrian-only roads but I could not implement that feature because I don't know which codes to mod to implement it.
 - I would like serious habitual traffic offenders to face harsher penalties, such as having their driver's licenses suspended or revoked, or having them sent to jail, but I could not implement that either because of my limited coding skills.
 
@@ -85,7 +85,7 @@ The following options can be configured either for the currently loaded save fil
 - 로그 파일은 다음 경로에 저장됩니다. C:\Users\USERNAME\AppData\LocalLow\Colossal Order\Cities Skylines II\Logs\Traffic_Law_Enforcement.Mod.log
 
 ### 5. 추가적으로 개선하거나 구현하고 싶은 사항
-- 교차로 안에서 정차하는 운전자들도 단속하도록 만들고 싶었지만, 제 코딩 실력이 부족해서 그 기능은 구현하지 못했습니다.
+- 교차로 안에서 정차하는 운전자들과 무단횡단자들도 단속하도록 만들고 싶었지만, 제 코딩 실력이 부족해서 그 기능은 구현하지 못했습니다.
 - 서비스 차량이 아닌 차량들이 보행자 전용 도로에 진입하는 것도 단속하도록 만들고 싶었지만, 그 기능을 구현하기 위해 어떤 코드를 모드해야 할지 몰라서 구현하지 못했습니다.
 - 심각한 상습 교통법규 위반자들에게는 더욱 강한 처벌(예: 운전면허 정지 또는 취소, 교도소 수감)을 적용하고 싶었지만, 그 기능 역시 제 코딩 실력이 부족해서 구현하지 못했습니다.
 
