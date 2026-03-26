@@ -14,7 +14,7 @@ namespace Traffic_Law_Enforcement
         public static int ModifiedPrefabCount { get; private set; }
         public static string OverrideSummary { get; private set; } = "Waiting for car pathfinding prefabs.";
 
-        public static void SetState(int modifiedPrefabCount, bool enabled, float midBlockPenalty)
+        public static void SetState(int modifiedPrefabCount, bool enabled, int midBlockPenalty)
         {
             ModifiedPrefabCount = modifiedPrefabCount;
 
@@ -71,9 +71,9 @@ namespace Traffic_Law_Enforcement
 
             int prefabCount = m_PathfindCarDataQuery.CalculateEntityCount();
             bool enforcementEnabled = Mod.IsMidBlockCrossingEnforcementEnabled;
-            float midBlockPenalty = enforcementEnabled
+            int midBlockPenalty = enforcementEnabled
                 ? EnforcementPenaltyService.GetMidBlockCrossingFine()
-                : 0f;
+                : 0;
 
             bool needsApply =
                 !m_HasApplied ||
@@ -87,7 +87,7 @@ namespace Traffic_Law_Enforcement
                 return;
             }
 
-            m_LastMidBlockPenalty = (int)midBlockPenalty;
+            m_LastMidBlockPenalty = midBlockPenalty;
             m_LastPrefabCount = prefabCount;
             m_LastEnforcementEnabled = enforcementEnabled;
             m_HasApplied = true;
@@ -95,15 +95,15 @@ namespace Traffic_Law_Enforcement
             ApplyOverrides(midBlockPenalty);
 
             PathfindingPenaltyTelemetry.SetState(prefabCount, enforcementEnabled, midBlockPenalty);
-
             if (EnforcementLoggingPolicy.ShouldLogPathfindingPenaltyDiagnostics())
             {
                 Mod.log.Info(
                     $"Applied pathfinding money-axis penalties: prefabs={prefabCount}, enabled={enforcementEnabled}, {PathfindingPenaltyTelemetry.OverrideSummary}");
+                LogSharedPathfindPrefabDiagnostics();
             }
         }
 
-        private void ApplyOverrides(float midBlockPenalty)
+        private void ApplyOverrides(int midBlockPenalty)
         {
             NativeArray<Entity> prefabs = m_PathfindCarDataQuery.ToEntityArray(Allocator.Temp);
 
@@ -120,7 +120,7 @@ namespace Traffic_Law_Enforcement
             }
         }
 
-        private void ApplyOverrides(Entity prefab, float midBlockPenalty)
+        private void ApplyOverrides(Entity prefab, int midBlockPenalty)
         {
             PathfindCarData currentData = EntityManager.GetComponentData<PathfindCarData>(prefab);
             PathfindCarData originalData = GetOriginalData(prefab, currentData);
