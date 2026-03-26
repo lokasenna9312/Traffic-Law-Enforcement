@@ -9,9 +9,9 @@ using Unity.Entities;
 
 namespace Traffic_Law_Enforcement
 {
-    internal static class IntersectionMovementPathfindPatches
+    internal static class IntersectionMovementPathfindingPenaltyPatches
     {
-        private const string HarmonyId = "Traffic_Law_Enforcement.IntersectionMovementPathfindPatches";
+        private const string HarmonyId = "Traffic_Law_Enforcement.IntersectionMovementPathfindingPenaltyPatches";
 
         private static readonly Type s_PathfindExecutorType =
             AccessTools.Inner(typeof(PathfindJobs), "PathfindExecutor");
@@ -46,7 +46,7 @@ namespace Traffic_Law_Enforcement
                 }
 
                 s_Harmony = new Harmony(HarmonyId);
-                HarmonyMethod postfix = new HarmonyMethod(typeof(IntersectionMovementPathfindPatches), nameof(TransitionCostPostfix));
+                HarmonyMethod postfix = new HarmonyMethod(typeof(IntersectionMovementPathfindingPenaltyPatches), nameof(TransitionCostPostfix));
                 s_Harmony.Patch(s_TargetMethod, postfix: postfix);
 
                 Mod.log.Info(
