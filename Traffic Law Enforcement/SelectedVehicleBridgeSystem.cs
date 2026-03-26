@@ -317,20 +317,9 @@ namespace Traffic_Law_Enforcement
                 return "Unavailable";
             }
 
-            switch (resolveResult.RawTransportType)
-            {
-                case Game.Prefabs.TransportType.Tram:
-                    return "Tram";
-
-                case Game.Prefabs.TransportType.Train:
-                    return "Train";
-
-                case Game.Prefabs.TransportType.Subway:
-                    return "Subway";
-
-                default:
-                    return "None";
-            }
+            return resolveResult.RawTransportType == Game.Prefabs.TransportType.None
+                ? "None"
+                : resolveResult.RawTransportType.ToString();
         }
 
         private static string BuildRawTrackTypeText(
