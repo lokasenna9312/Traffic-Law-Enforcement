@@ -283,7 +283,17 @@ namespace Traffic_Law_Enforcement
         private static bool TryGetBindingMemberTarget(MemberInfo member, object obj, out KeybindingSettings settings)
         {
             settings = obj as KeybindingSettings;
-            if (settings == null || member == null)
+            if (!IsBindingMember(member))
+            {
+                return false;
+            }
+
+            return true;
+        }
+
+        private static bool IsBindingMember(MemberInfo member)
+        {
+            if (member == null)
             {
                 return false;
             }
