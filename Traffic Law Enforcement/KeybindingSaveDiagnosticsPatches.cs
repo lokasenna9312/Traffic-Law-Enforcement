@@ -47,6 +47,12 @@ namespace Traffic_Law_Enforcement
         private static readonly Type s_SettingAssetType =
             AccessTools.TypeByName("Colossal.IO.AssetDatabase.SettingAsset");
 
+        private static readonly MethodInfo s_SettingAssetSaveSingleArgumentMethod =
+            AccessTools.Method(
+                s_SettingAssetType,
+                "Save",
+                new[] { typeof(bool) });
+
         private static readonly MethodInfo s_SettingAssetSaveMethod =
             AccessTools.Method(
                 s_SettingAssetType,
@@ -69,7 +75,8 @@ namespace Traffic_Law_Enforcement
 
             if (s_DiffObjectMethod == null ||
                 s_TypeExtensionsGetMemberValueMethod == null ||
-                s_SettingAssetSaveMethod == null)
+                (s_SettingAssetSaveSingleArgumentMethod == null &&
+                 s_SettingAssetSaveMethod == null))
             {
                 Mod.log.Warn("[KEYBIND_DIAG] Required reflection targets were not found. Diagnostics were not applied.");
                 return;
@@ -87,9 +94,19 @@ namespace Traffic_Law_Enforcement
                     s_TypeExtensionsGetMemberValueMethod,
                     finalizer: new HarmonyMethod(typeof(KeybindingSaveDiagnosticsPatches), nameof(TypeExtensionsGetMemberValueFinalizer)));
 
-                s_Harmony.Patch(
-                    s_SettingAssetSaveMethod,
-                    prefix: new HarmonyMethod(typeof(KeybindingSaveDiagnosticsPatches), nameof(SettingAssetSavePrefix)));
+                if (s_SettingAssetSaveSingleArgumentMethod != null)
+                {
+                    s_Harmony.Patch(
+                        s_SettingAssetSaveSingleArgumentMethod,
+                        prefix: new HarmonyMethod(typeof(KeybindingSaveDiagnosticsPatches), nameof(SettingAssetSavePrefix)));
+                }
+
+                if (s_SettingAssetSaveMethod != null)
+                {
+                    s_Harmony.Patch(
+                        s_SettingAssetSaveMethod,
+                        prefix: new HarmonyMethod(typeof(KeybindingSaveDiagnosticsPatches), nameof(SettingAssetSavePrefix)));
+                }
 
                 WriteDiagnosticLine("Keybinding save diagnostics patches applied.");
             }
@@ -149,6 +166,27 @@ namespace Traffic_Law_Enforcement
         private static Exception DiffObjectFinalizer(Exception __exception)
         {
             List<string> stack = s_DiffObjectStack.Value;
+            string currentSource = stack != null && stack.Count > 0
+                ? stack[stack.Count - 1]
+                : "<unknown>";
+
+            if (__exception != null && ShouldLogDuringSettingsSave(__exception))
+            {
+                string key = $"DIFF|{BuildFailureSignature(__exception)}|{currentSource}|{s_CurrentSettingAsset.Value}";
+                if (TryRegisterFailure(key))
+                {
+                    WriteDiagnosticLine(
+                        "DiffObject failed during settings save. " +
+                        $"settingAsset={s_CurrentSettingAsset.Value ?? "<unknown>"}, " +
+                        $"source={currentSource}, " +
+                        $"diffStack={FormatCurrentDiffStack()}, " +
+                        $"saveBreadcrumbs={FormatSaveBreadcrumbs()}, " +
+                        $"exception={DescribeException(__exception)}, " +
+                        $"rootCause={DescribeException(UnwrapException(__exception))}",
+                        __exception);
+                }
+            }
+
             if (stack != null && stack.Count > 0)
             {
                 stack.RemoveAt(stack.Count - 1);
@@ -166,29 +204,28 @@ namespace Traffic_Law_Enforcement
             object obj,
             Exception __exception)
         {
+            bool keybindingSignal = HasKeybindingSignal(member, obj, __exception);
             if (__exception == null ||
-                !ShouldLogKeybindingMemberValueFailure(member, obj, __exception, out Exception rootCause))
+                (!ShouldLogDuringSettingsSave(__exception) && !keybindingSignal))
             {
                 return __exception;
             }
 
+            Exception rootCause = UnwrapException(__exception);
             string key =
-                $"{rootCause.GetType().FullName}|{member?.DeclaringType?.FullName}|{member?.Name}|{obj?.GetType().FullName}|{s_CurrentSettingAsset.Value}|{FormatCurrentDiffStack()}";
-
-            lock (s_LogGate)
+                $"GETMEMBER|{BuildFailureSignature(__exception)}|{member?.DeclaringType?.FullName}|{member?.Name}|{obj?.GetType().FullName}|{s_CurrentSettingAsset.Value}|{FormatCurrentDiffStack()}";
+            if (!TryRegisterFailure(key))
             {
-                if (!s_LoggedFailures.Add(key))
-                {
-                    return __exception;
-                }
+                return __exception;
             }
 
             string keybindingContext = DescribeKeybindingContext(obj);
             WriteDiagnosticLine(
-                "Exception while resolving a keybinding member during settings save. " +
+                "Exception while resolving a member during settings save. " +
                 $"settingAsset={s_CurrentSettingAsset.Value ?? "<unknown>"}, " +
                 $"member={DescribeMember(member)}, " +
                 $"object={DescribeObject(obj)}, " +
+                $"keybindingSignal={keybindingSignal}, " +
                 $"keybindingContext={keybindingContext}, " +
                 $"diffStack={FormatCurrentDiffStack()}, " +
                 $"saveBreadcrumbs={FormatSaveBreadcrumbs()}, " +
@@ -199,14 +236,13 @@ namespace Traffic_Law_Enforcement
             return __exception;
         }
 
-        private static bool ShouldLogKeybindingMemberValueFailure(
-            MemberInfo member,
-            object obj,
-            Exception exception,
-            out Exception rootCause)
+        private static bool ShouldLogDuringSettingsSave(Exception exception)
         {
-            rootCause = UnwrapException(exception);
+            return HasSaveContext() || HasKeybindingSignal(null, null, exception);
+        }
 
+        private static bool HasKeybindingSignal(MemberInfo member, object obj, Exception exception)
+        {
             Type objectType = obj?.GetType();
             if (IsKeybindingSettingsType(objectType) ||
                 IsKeybindingSettingsType(member?.DeclaringType))
@@ -219,10 +255,21 @@ namespace Traffic_Law_Enforcement
                 return true;
             }
 
-            string exceptionText = exception.ToString();
+            string exceptionText = exception?.ToString() ?? string.Empty;
             return
                 exceptionText.IndexOf("KeybindingSettings", StringComparison.Ordinal) >= 0 ||
                 exceptionText.IndexOf("get_bindings", StringComparison.Ordinal) >= 0;
+        }
+
+        private static bool HasSaveContext()
+        {
+            if (!string.IsNullOrWhiteSpace(s_CurrentSettingAsset.Value))
+            {
+                return true;
+            }
+
+            List<string> breadcrumbs = s_SaveBreadcrumbs.Value;
+            return breadcrumbs != null && breadcrumbs.Count > 0;
         }
 
         private static bool IsKeybindingSettingsType(Type type)
@@ -257,6 +304,12 @@ namespace Traffic_Law_Enforcement
             return
                 $"{exception.GetType().Name}: {exception.Message} " +
                 $"-> {DescribeException(exception.InnerException)}";
+        }
+
+        private static string BuildFailureSignature(Exception exception)
+        {
+            Exception rootCause = UnwrapException(exception);
+            return $"{rootCause.GetType().FullName}|{rootCause.Message}";
         }
 
         private static string DescribeKeybindingContext(object obj)
@@ -415,6 +468,14 @@ namespace Traffic_Law_Enforcement
             }
 
             return string.Join(" -> ", breadcrumbs);
+        }
+
+        private static bool TryRegisterFailure(string key)
+        {
+            lock (s_LogGate)
+            {
+                return s_LoggedFailures.Add(key);
+            }
         }
 
         private static void WriteDiagnosticLine(string message, Exception exception = null)
