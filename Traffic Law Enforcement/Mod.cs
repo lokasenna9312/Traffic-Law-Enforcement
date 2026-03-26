@@ -57,13 +57,13 @@ namespace Traffic_Law_Enforcement
             RegisterTextLocales();
             BudgetUIPatches.Apply();
             VehicleUtilsPatches.Apply();
-            IntersectionMovementPathfindPatches.Apply();
-            IntersectionMovementPathfindReflectionPatches.Apply();
+            IntersectionMovementPathfindingPenaltyPatches.Apply();
+            IntersectionMovementPathfindingPenaltyReflectionPatches.Apply();
             updateSystem.UpdateAfter<EnforcementSaveDataSystem, EnforcementGameTimeSystem>(SystemUpdatePhase.GameSimulation);
             updateSystem.UpdateBefore<EnforcementSaveDataSystem, VehicleTrafficLawProfileSystem>(SystemUpdatePhase.GameSimulation);
             updateSystem.UpdateBefore<VehicleTrafficLawProfileSystem, PublicTransportLanePermissionSystem>(SystemUpdatePhase.GameSimulation);
             updateSystem.UpdateBefore<VehicleTrafficLawProfileSystem, CarNavigationSystem>(SystemUpdatePhase.GameSimulation);
-            updateSystem.UpdateBefore<PathfindingMoneyPenaltySystem, CarNavigationSystem>(SystemUpdatePhase.GameSimulation);
+            updateSystem.UpdateBefore<MidBlockPathfindingBiasSystem, CarNavigationSystem>(SystemUpdatePhase.GameSimulation);
             updateSystem.UpdateBefore<PublicTransportLanePermissionSystem, CarNavigationSystem>(SystemUpdatePhase.GameSimulation);
             updateSystem.UpdateBefore<PublicTransportLanePermissionSystem, PublicTransportLaneViolationSystem>(SystemUpdatePhase.GameSimulation);
             updateSystem.UpdateBefore<IntersectionMovementPenaltyCacheSystem, CarNavigationSystem>(SystemUpdatePhase.GameSimulation);
@@ -96,8 +96,8 @@ namespace Traffic_Law_Enforcement
             SaveLoadTraceService.Reset();
             BudgetUIPatches.Remove();
             VehicleUtilsPatches.Remove();
-            IntersectionMovementPathfindPatches.Remove();
-            IntersectionMovementPathfindReflectionPatches.Remove();
+            IntersectionMovementPathfindingPenaltyPatches.Remove();
+            IntersectionMovementPathfindingPenaltyReflectionPatches.Remove();
             if (m_Setting != null)
             {
                 m_Setting.UnregisterInOptionsUI();

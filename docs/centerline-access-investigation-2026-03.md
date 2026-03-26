@@ -38,7 +38,7 @@ This means the core problem is not primarily “the mod misses the violation”.
 
 Relevant mod code:
 
-- [Traffic Law Enforcement/PathfindingMoneyPenaltySystem.cs](../Traffic%20Law%20Enforcement/PathfindingMoneyPenaltySystem.cs)
+- [Traffic Law Enforcement/MidBlockPathfindingBiasSystem.cs](../Traffic%20Law%20Enforcement/MidBlockPathfindingBiasSystem.cs)
 - [Traffic Law Enforcement/VehicleUtilsPatches.cs](../Traffic%20Law%20Enforcement/VehicleUtilsPatches.cs)
 
 Current pathfinding pressure is applied indirectly through shared cost axes such as lane-cross, unsafe turn, and u-turn related costs.
