@@ -175,13 +175,8 @@ namespace Traffic_Law_Enforcement
             });
             selectedVehicle.children.Add(new DebugUI.Value
             {
-                displayName = "Source selected entity",
-                getter = GetSourceSelectedEntityText
-            });
-            selectedVehicle.children.Add(new DebugUI.Value
-            {
-                displayName = "Resolved vehicle entity",
-                getter = GetResolvedVehicleEntityText
+                displayName = "TLE status",
+                getter = GetTleStatusText
             });
             selectedVehicle.children.Add(new DebugUI.Value
             {
@@ -293,8 +288,87 @@ namespace Traffic_Law_Enforcement
             tle.children.Add(enforcement);
             tle.children.Add(telemetry);
 
+            DebugUI.Foldout resolution = new DebugUI.Foldout
+            {
+                displayName = "Resolution",
+                opened = false
+            };
+            resolution.children.Add(new DebugUI.Value
+            {
+                displayName = "Source selected entity",
+                getter = GetSourceSelectedEntityText
+            });
+            resolution.children.Add(new DebugUI.Value
+            {
+                displayName = "Resolved controller/root entity",
+                getter = GetResolvedVehicleEntityText
+            });
+            resolution.children.Add(new DebugUI.Value
+            {
+                displayName = "Prefab entity",
+                getter = GetPrefabEntityText
+            });
+            resolution.children.Add(new DebugUI.Value
+            {
+                displayName = "Has prefab ref",
+                getter = GetHasPrefabRefText
+            });
+
+            DebugUI.Foldout rawClassification = new DebugUI.Foldout
+            {
+                displayName = "Raw classification",
+                opened = false
+            };
+            rawClassification.children.Add(new DebugUI.Value
+            {
+                displayName = "Runtime family",
+                getter = GetRuntimeFamilyText
+            });
+            rawClassification.children.Add(new DebugUI.Value
+            {
+                displayName = "Parked",
+                getter = GetRawParkedText
+            });
+            rawClassification.children.Add(new DebugUI.Value
+            {
+                displayName = "Has car current lane",
+                getter = GetRawHasCarCurrentLaneText
+            });
+            rawClassification.children.Add(new DebugUI.Value
+            {
+                displayName = "Has train current lane",
+                getter = GetRawHasTrainCurrentLaneText
+            });
+            rawClassification.children.Add(new DebugUI.Value
+            {
+                displayName = "Raw TransportType",
+                getter = GetRawTransportTypeText
+            });
+            rawClassification.children.Add(new DebugUI.Value
+            {
+                displayName = "Raw TrackType",
+                getter = GetRawTrackTypeText
+            });
+            rawClassification.children.Add(new DebugUI.Value
+            {
+                displayName = "Has PublicTransportVehicleData",
+                getter = GetHasPublicTransportVehicleDataText
+            });
+            rawClassification.children.Add(new DebugUI.Value
+            {
+                displayName = "Has TrainData",
+                getter = GetHasTrainDataText
+            });
+            rawClassification.children.Add(new DebugUI.Value
+            {
+                displayName = "Rail subtype source",
+                getter = GetRailSubtypeSourceText
+            });
+
             selectedVehicle.children.Add(vehicleInfo);
             selectedVehicle.children.Add(tle);
+            selectedVehicle.children.Add(resolution);
+            selectedVehicle.children.Add(rawClassification);
             return selectedVehicle;
         }
 
@@ -385,6 +459,25 @@ namespace Traffic_Law_Enforcement
                 : "Unavailable";
         }
 
+        private static string GetPrefabEntityText()
+        {
+            return TryGetSelectedVehicleSnapshot(out SelectedVehicleDebugSnapshot snapshot)
+                ? FormatEntity(snapshot.PrefabEntity)
+                : "Unavailable";
+        }
+
+        private static string GetHasPrefabRefText()
+        {
+            if (!TryGetSelectedVehicleSnapshot(out SelectedVehicleDebugSnapshot snapshot))
+            {
+                return "Unavailable";
+            }
+
+            return snapshot.ResolveState != SelectedVehicleResolveState.None
+                ? snapshot.HasPrefabRef.ToString()
+                : "Unavailable";
+        }
+
         private static string GetSelectedVehicleFlagsText()
         {
             if (!TryGetSelectedVehicleSnapshot(out SelectedVehicleDebugSnapshot snapshot))
@@ -426,6 +519,60 @@ namespace Traffic_Law_Enforcement
         {
             return GetVehicleInfoText(
                 snapshot => snapshot.IsTrailerChild.ToString());
+        }
+
+        private static string GetRuntimeFamilyText()
+        {
+            return GetRawClassificationText(
+                snapshot => snapshot.RuntimeFamilyText);
+        }
+
+        private static string GetRawParkedText()
+        {
+            return GetRawClassificationText(
+                snapshot => snapshot.IsParked.ToString());
+        }
+
+        private static string GetRawHasCarCurrentLaneText()
+        {
+            return GetRawClassificationText(
+                snapshot => snapshot.HasCarCurrentLane.ToString());
+        }
+
+        private static string GetRawHasTrainCurrentLaneText()
+        {
+            return GetRawClassificationText(
+                snapshot => snapshot.HasTrainCurrentLane.ToString());
+        }
+
+        private static string GetRawTransportTypeText()
+        {
+            return GetRawClassificationText(
+                snapshot => snapshot.RawTransportTypeText);
+        }
+
+        private static string GetRawTrackTypeText()
+        {
+            return GetRawClassificationText(
+                snapshot => snapshot.RawTrackTypeText);
+        }
+
+        private static string GetHasPublicTransportVehicleDataText()
+        {
+            return GetRawClassificationText(
+                snapshot => snapshot.HasPublicTransportVehicleData.ToString());
+        }
+
+        private static string GetHasTrainDataText()
+        {
+            return GetRawClassificationText(
+                snapshot => snapshot.HasTrainData.ToString());
+        }
+
+        private static string GetRailSubtypeSourceText()
+        {
+            return GetRawClassificationText(
+                snapshot => snapshot.RailSubtypeSourceText);
         }
 
         private static string GetCurrentLaneEntityText()
@@ -562,6 +709,22 @@ namespace Traffic_Law_Enforcement
             }
 
             if (snapshot.TleApplicability != SelectedVehicleTleApplicability.ApplicableReady)
+            {
+                return "Unavailable";
+            }
+
+            return formatter(snapshot);
+        }
+
+        private static string GetRawClassificationText(
+            System.Func<SelectedVehicleDebugSnapshot, string> formatter)
+        {
+            if (!TryGetSelectedVehicleSnapshot(out SelectedVehicleDebugSnapshot snapshot))
+            {
+                return "Unavailable";
+            }
+
+            if (!snapshot.IsVehicle)
             {
                 return "Unavailable";
             }

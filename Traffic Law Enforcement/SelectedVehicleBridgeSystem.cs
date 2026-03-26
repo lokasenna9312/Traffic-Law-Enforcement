@@ -20,6 +20,8 @@ namespace Traffic_Law_Enforcement
         public readonly SelectedVehicleTleApplicability TleApplicability;
         public readonly Entity SourceSelectedEntity;
         public readonly Entity ResolvedVehicleEntity;
+        public readonly Entity PrefabEntity;
+        public readonly bool HasPrefabRef;
         public readonly bool IsTrailerChild;
         public readonly bool IsVehicle;
         public readonly bool IsCar;
@@ -28,6 +30,12 @@ namespace Traffic_Law_Enforcement
         public readonly bool HasCarCurrentLane;
         public readonly bool HasTrainCurrentLane;
         public readonly bool HasLiveLaneData;
+        public readonly bool HasPublicTransportVehicleData;
+        public readonly bool HasTrainData;
+        public readonly string RuntimeFamilyText;
+        public readonly string RawTransportTypeText;
+        public readonly string RawTrackTypeText;
+        public readonly string RailSubtypeSourceText;
 
         public readonly int VehicleIndex;
         public readonly string RoleOrTypeText;
@@ -51,6 +59,8 @@ namespace Traffic_Law_Enforcement
             SelectedVehicleTleApplicability tleApplicability,
             Entity sourceSelectedEntity,
             Entity resolvedVehicleEntity,
+            Entity prefabEntity,
+            bool hasPrefabRef,
             bool isTrailerChild,
             bool isVehicle,
             bool isCar,
@@ -59,6 +69,12 @@ namespace Traffic_Law_Enforcement
             bool hasCarCurrentLane,
             bool hasTrainCurrentLane,
             bool hasLiveLaneData,
+            bool hasPublicTransportVehicleData,
+            bool hasTrainData,
+            string runtimeFamilyText,
+            string rawTransportTypeText,
+            string rawTrackTypeText,
+            string railSubtypeSourceText,
             int vehicleIndex,
             string roleOrTypeText,
             bool hasTrafficLawProfile,
@@ -77,6 +93,8 @@ namespace Traffic_Law_Enforcement
             TleApplicability = tleApplicability;
             SourceSelectedEntity = sourceSelectedEntity;
             ResolvedVehicleEntity = resolvedVehicleEntity;
+            PrefabEntity = prefabEntity;
+            HasPrefabRef = hasPrefabRef;
             IsTrailerChild = isTrailerChild;
             IsVehicle = isVehicle;
             IsCar = isCar;
@@ -85,6 +103,12 @@ namespace Traffic_Law_Enforcement
             HasCarCurrentLane = hasCarCurrentLane;
             HasTrainCurrentLane = hasTrainCurrentLane;
             HasLiveLaneData = hasLiveLaneData;
+            HasPublicTransportVehicleData = hasPublicTransportVehicleData;
+            HasTrainData = hasTrainData;
+            RuntimeFamilyText = runtimeFamilyText;
+            RawTransportTypeText = rawTransportTypeText;
+            RawTrackTypeText = rawTrackTypeText;
+            RailSubtypeSourceText = railSubtypeSourceText;
             VehicleIndex = vehicleIndex;
             RoleOrTypeText = roleOrTypeText;
             HasTrafficLawProfile = hasTrafficLawProfile;
@@ -231,6 +255,8 @@ namespace Traffic_Law_Enforcement
                 tleApplicability,
                 resolveResult.SourceSelectedEntity,
                 resolveResult.ResolvedVehicleEntity,
+                resolveResult.PrefabEntity,
+                resolveResult.HasPrefabRef,
                 resolveResult.IsTrailerChild,
                 resolveResult.IsVehicle,
                 resolveResult.IsCar,
@@ -239,6 +265,12 @@ namespace Traffic_Law_Enforcement
                 resolveResult.HasCarCurrentLane,
                 resolveResult.HasTrainCurrentLane,
                 resolveResult.HasLiveLaneData,
+                resolveResult.HasPublicTransportVehicleData,
+                resolveResult.HasTrainData,
+                BuildRuntimeFamilyText(resolveResult),
+                BuildRawTransportTypeText(resolveResult),
+                BuildRawTrackTypeText(resolveResult),
+                BuildRailSubtypeSourceText(resolveResult),
                 resolveResult.IsVehicle && hasVehicleEntity ? vehicle.Index : -1,
                 BuildRoleOrTypeText(resolveResult),
                 hasTrafficLawProfile,
@@ -251,6 +283,114 @@ namespace Traffic_Law_Enforcement
                 totalFines,
                 totalViolations,
                 lastReason);
+        }
+
+        private static string BuildRuntimeFamilyText(
+            SelectedVehicleResolveResult resolveResult)
+        {
+            if (!resolveResult.IsVehicle)
+            {
+                return "Unavailable";
+            }
+
+            switch (resolveResult.RuntimeFamily)
+            {
+                case SelectedVehicleRuntimeFamily.Car:
+                    return "Car";
+
+                case SelectedVehicleRuntimeFamily.Train:
+                    return "Train";
+
+                case SelectedVehicleRuntimeFamily.Other:
+                    return "Other";
+
+                default:
+                    return "Unavailable";
+            }
+        }
+
+        private static string BuildRawTransportTypeText(
+            SelectedVehicleResolveResult resolveResult)
+        {
+            if (!resolveResult.IsVehicle || !resolveResult.HasPublicTransportVehicleData)
+            {
+                return "Unavailable";
+            }
+
+            switch (resolveResult.RawTransportType)
+            {
+                case Game.Prefabs.TransportType.Tram:
+                    return "Tram";
+
+                case Game.Prefabs.TransportType.Train:
+                    return "Train";
+
+                case Game.Prefabs.TransportType.Subway:
+                    return "Subway";
+
+                default:
+                    return "None";
+            }
+        }
+
+        private static string BuildRawTrackTypeText(
+            SelectedVehicleResolveResult resolveResult)
+        {
+            if (!resolveResult.IsVehicle || !resolveResult.HasTrainData)
+            {
+                return "Unavailable";
+            }
+
+            Game.Net.TrackTypes trackType = resolveResult.RawTrackType;
+            if (trackType == Game.Net.TrackTypes.None)
+            {
+                return "None";
+            }
+
+            bool isTrainTrack = (trackType & Game.Net.TrackTypes.Train) != Game.Net.TrackTypes.None;
+            bool isTramTrack = (trackType & Game.Net.TrackTypes.Tram) != Game.Net.TrackTypes.None;
+            bool isSubwayTrack = (trackType & Game.Net.TrackTypes.Subway) != Game.Net.TrackTypes.None;
+
+            int matchedTypeCount =
+                (isTrainTrack ? 1 : 0) +
+                (isTramTrack ? 1 : 0) +
+                (isSubwayTrack ? 1 : 0);
+
+            if (matchedTypeCount != 1)
+            {
+                return "Mixed";
+            }
+
+            if (isTramTrack)
+            {
+                return "Tram";
+            }
+
+            if (isSubwayTrack)
+            {
+                return "Subway";
+            }
+
+            return "Train";
+        }
+
+        private static string BuildRailSubtypeSourceText(
+            SelectedVehicleResolveResult resolveResult)
+        {
+            switch (resolveResult.RailSubtypeSource)
+            {
+                case SelectedVehicleRailSubtypeSource.TransportType:
+                    return "TransportType";
+
+                case SelectedVehicleRailSubtypeSource.TrackType:
+                    return "TrackType";
+
+                case SelectedVehicleRailSubtypeSource.Fallback:
+                    return "Fallback";
+
+                default:
+                    return "None";
+            }
         }
 
         private string BuildRoleOrTypeText(SelectedVehicleResolveResult resolveResult)

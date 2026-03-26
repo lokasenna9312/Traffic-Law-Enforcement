@@ -32,13 +32,32 @@ namespace Traffic_Law_Enforcement
         OtherVehicle,
     }
 
+    public enum SelectedVehicleRuntimeFamily
+    {
+        None,
+        Car,
+        Train,
+        Other,
+    }
+
+    public enum SelectedVehicleRailSubtypeSource
+    {
+        None,
+        TransportType,
+        TrackType,
+        Fallback,
+    }
+
     public readonly struct SelectedVehicleResolveResult
     {
         public readonly SelectedVehicleResolveState ResolveState;
         public readonly SelectedVehicleKind VehicleKind;
+        public readonly SelectedVehicleRuntimeFamily RuntimeFamily;
         public readonly Entity SourceSelectedEntity;
         public readonly Entity ResolvedVehicleEntity;
+        public readonly Entity PrefabEntity;
         public readonly bool HasSelection;
+        public readonly bool HasPrefabRef;
         public readonly bool IsVehicle;
         public readonly bool IsCar;
         public readonly bool IsTrain;
@@ -47,13 +66,21 @@ namespace Traffic_Law_Enforcement
         public readonly bool HasCarCurrentLane;
         public readonly bool HasTrainCurrentLane;
         public readonly bool HasLiveLaneData;
+        public readonly bool HasPublicTransportVehicleData;
+        public readonly bool HasTrainData;
+        public readonly TransportType RawTransportType;
+        public readonly TrackTypes RawTrackType;
+        public readonly SelectedVehicleRailSubtypeSource RailSubtypeSource;
 
         public SelectedVehicleResolveResult(
             SelectedVehicleResolveState resolveState,
             SelectedVehicleKind vehicleKind,
+            SelectedVehicleRuntimeFamily runtimeFamily,
             Entity sourceSelectedEntity,
             Entity resolvedVehicleEntity,
+            Entity prefabEntity,
             bool hasSelection,
+            bool hasPrefabRef,
             bool isVehicle,
             bool isCar,
             bool isTrain,
@@ -61,13 +88,21 @@ namespace Traffic_Law_Enforcement
             bool isTrailerChild,
             bool hasCarCurrentLane,
             bool hasTrainCurrentLane,
-            bool hasLiveLaneData)
+            bool hasLiveLaneData,
+            bool hasPublicTransportVehicleData,
+            bool hasTrainData,
+            TransportType rawTransportType,
+            TrackTypes rawTrackType,
+            SelectedVehicleRailSubtypeSource railSubtypeSource)
         {
             ResolveState = resolveState;
             VehicleKind = vehicleKind;
+            RuntimeFamily = runtimeFamily;
             SourceSelectedEntity = sourceSelectedEntity;
             ResolvedVehicleEntity = resolvedVehicleEntity;
+            PrefabEntity = prefabEntity;
             HasSelection = hasSelection;
+            HasPrefabRef = hasPrefabRef;
             IsVehicle = isVehicle;
             IsCar = isCar;
             IsTrain = isTrain;
@@ -76,6 +111,11 @@ namespace Traffic_Law_Enforcement
             HasCarCurrentLane = hasCarCurrentLane;
             HasTrainCurrentLane = hasTrainCurrentLane;
             HasLiveLaneData = hasLiveLaneData;
+            HasPublicTransportVehicleData = hasPublicTransportVehicleData;
+            HasTrainData = hasTrainData;
+            RawTransportType = rawTransportType;
+            RawTrackType = rawTrackType;
+            RailSubtypeSource = railSubtypeSource;
         }
     }
 
@@ -153,9 +193,12 @@ namespace Traffic_Law_Enforcement
                 return new SelectedVehicleResolveResult(
                     SelectedVehicleResolveState.None,
                     SelectedVehicleKind.None,
+                    SelectedVehicleRuntimeFamily.None,
                     sourceSelectedEntity,
                     Entity.Null,
+                    Entity.Null,
                     hasSelection: false,
+                    hasPrefabRef: false,
                     isVehicle: false,
                     isCar: false,
                     isTrain: false,
@@ -163,7 +206,12 @@ namespace Traffic_Law_Enforcement
                     isTrailerChild: false,
                     hasCarCurrentLane: false,
                     hasTrainCurrentLane: false,
-                    hasLiveLaneData: false);
+                    hasLiveLaneData: false,
+                    hasPublicTransportVehicleData: false,
+                    hasTrainData: false,
+                    rawTransportType: TransportType.None,
+                    rawTrackType: TrackTypes.None,
+                    railSubtypeSource: SelectedVehicleRailSubtypeSource.None);
             }
 
             Entity resolvedVehicleEntity = ResolveControllerRoot(sourceSelectedEntity);
@@ -216,18 +264,69 @@ namespace Traffic_Law_Enforcement
 
             bool hasLiveLaneData = hasCarCurrentLane || hasTrainCurrentLane;
 
+            bool hasPrefabRef =
+                TryGetPrefabEntity(resolvedVehicleEntity, out Entity prefabEntity);
+
+            bool hasPublicTransportVehicleData = false;
+            PublicTransportVehicleData publicTransportVehicleData = default;
+            if (hasPrefabRef)
+            {
+                hasPublicTransportVehicleData =
+                    m_PublicTransportVehicleData.TryGetComponent(
+                        prefabEntity,
+                        out publicTransportVehicleData);
+            }
+
+            TransportType rawTransportType =
+                hasPublicTransportVehicleData
+                    ? publicTransportVehicleData.m_TransportType
+                    : TransportType.None;
+
+            bool hasTrainData = false;
+            TrainData trainData = default;
+            if (hasPrefabRef)
+            {
+                hasTrainData =
+                    m_TrainPrefabData.TryGetComponent(prefabEntity, out trainData);
+            }
+
+            TrackTypes rawTrackType =
+                hasTrainData
+                    ? trainData.m_TrackType
+                    : TrackTypes.None;
+
+            SelectedVehicleRuntimeFamily runtimeFamily = GetRuntimeFamily(
+                isCar,
+                isTrain,
+                hasParkedRoadCar,
+                isVehicle);
+
             SelectedVehicleKind vehicleKind;
+            SelectedVehicleRailSubtypeSource railSubtypeSource =
+                SelectedVehicleRailSubtypeSource.None;
             if (!isVehicle)
             {
                 vehicleKind = SelectedVehicleKind.None;
             }
             else if (hasParkedTrain)
             {
-                vehicleKind = ResolveRailVehicleKind(resolvedVehicleEntity, isParked: true);
+                vehicleKind = ResolveRailVehicleKind(
+                    isParked: true,
+                    hasPublicTransportVehicleData,
+                    rawTransportType,
+                    hasTrainData,
+                    rawTrackType,
+                    out railSubtypeSource);
             }
             else if (hasTrainMarker)
             {
-                vehicleKind = ResolveRailVehicleKind(resolvedVehicleEntity, isParked: false);
+                vehicleKind = ResolveRailVehicleKind(
+                    isParked: false,
+                    hasPublicTransportVehicleData,
+                    rawTransportType,
+                    hasTrainData,
+                    rawTrackType,
+                    out railSubtypeSource);
             }
             else if (hasParkedRoadCar)
             {
@@ -250,9 +349,12 @@ namespace Traffic_Law_Enforcement
             return new SelectedVehicleResolveResult(
                 resolveState,
                 vehicleKind,
+                runtimeFamily,
                 sourceSelectedEntity,
                 resolvedVehicleEntity,
+                prefabEntity,
                 hasSelection: true,
+                hasPrefabRef,
                 isVehicle,
                 isCar,
                 isTrain,
@@ -260,39 +362,55 @@ namespace Traffic_Law_Enforcement
                 isTrailerChild,
                 hasCarCurrentLane,
                 hasTrainCurrentLane,
-                hasLiveLaneData);
+                hasLiveLaneData,
+                hasPublicTransportVehicleData,
+                hasTrainData,
+                rawTransportType,
+                rawTrackType,
+                railSubtypeSource);
         }
 
-        private SelectedVehicleKind ResolveRailVehicleKind(Entity vehicle, bool isParked)
+        private static SelectedVehicleKind ResolveRailVehicleKind(
+            bool isParked,
+            bool hasPublicTransportVehicleData,
+            TransportType rawTransportType,
+            bool hasTrainData,
+            TrackTypes rawTrackType,
+            out SelectedVehicleRailSubtypeSource railSubtypeSource)
         {
-            if (TryGetRailVehicleKindFromTransportType(vehicle, out SelectedVehicleKind vehicleKind) ||
-                TryGetRailVehicleKindFromTrackType(vehicle, out vehicleKind))
+            if (hasPublicTransportVehicleData &&
+                TryMapTransportTypeToRailVehicleKind(
+                    rawTransportType,
+                    out SelectedVehicleKind vehicleKind))
             {
+                railSubtypeSource = SelectedVehicleRailSubtypeSource.TransportType;
                 return isParked
                     ? ToParkedRailVehicleKind(vehicleKind)
                     : vehicleKind;
             }
 
+            if (hasTrainData &&
+                TryMapTrackTypeToRailVehicleKind(rawTrackType, out SelectedVehicleKind trackVehicleKind))
+            {
+                railSubtypeSource = SelectedVehicleRailSubtypeSource.TrackType;
+                return isParked
+                    ? ToParkedRailVehicleKind(trackVehicleKind)
+                    : trackVehicleKind;
+            }
+
+            railSubtypeSource = SelectedVehicleRailSubtypeSource.Fallback;
             return isParked
                 ? SelectedVehicleKind.ParkedRailVehicle
                 : SelectedVehicleKind.RailVehicle;
         }
 
-        private bool TryGetRailVehicleKindFromTransportType(
-            Entity vehicle,
+        private static bool TryMapTransportTypeToRailVehicleKind(
+            TransportType transportType,
             out SelectedVehicleKind vehicleKind)
         {
             vehicleKind = SelectedVehicleKind.RailVehicle;
 
-            if (!TryGetPrefabEntity(vehicle, out Entity prefabEntity) ||
-                !m_PublicTransportVehicleData.TryGetComponent(
-                    prefabEntity,
-                    out PublicTransportVehicleData publicTransportVehicleData))
-            {
-                return false;
-            }
-
-            switch (publicTransportVehicleData.m_TransportType)
+            switch (transportType)
             {
                 case TransportType.Tram:
                     vehicleKind = SelectedVehicleKind.Tram;
@@ -309,23 +427,6 @@ namespace Traffic_Law_Enforcement
                 default:
                     return false;
             }
-        }
-
-        private bool TryGetRailVehicleKindFromTrackType(
-            Entity vehicle,
-            out SelectedVehicleKind vehicleKind)
-        {
-            vehicleKind = SelectedVehicleKind.RailVehicle;
-
-            if (!TryGetPrefabEntity(vehicle, out Entity prefabEntity) ||
-                !m_TrainPrefabData.TryGetComponent(prefabEntity, out TrainData trainData))
-            {
-                return false;
-            }
-
-            return TryMapTrackTypeToRailVehicleKind(
-                trainData.m_TrackType,
-                out vehicleKind);
         }
 
         private bool TryGetPrefabEntity(Entity vehicle, out Entity prefabEntity)
@@ -393,6 +494,27 @@ namespace Traffic_Law_Enforcement
                 default:
                     return SelectedVehicleKind.ParkedRailVehicle;
             }
+        }
+
+        private static SelectedVehicleRuntimeFamily GetRuntimeFamily(
+            bool isCar,
+            bool isTrain,
+            bool hasParkedRoadCar,
+            bool isVehicle)
+        {
+            if (isCar || hasParkedRoadCar)
+            {
+                return SelectedVehicleRuntimeFamily.Car;
+            }
+
+            if (isTrain)
+            {
+                return SelectedVehicleRuntimeFamily.Train;
+            }
+
+            return isVehicle
+                ? SelectedVehicleRuntimeFamily.Other
+                : SelectedVehicleRuntimeFamily.None;
         }
 
         private Entity ResolveControllerRoot(Entity entity)
