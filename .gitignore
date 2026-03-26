@@ -70,6 +70,7 @@ Desktop.ini
 *.log
 .dotnet/
 .tmp/
+Settings File Guard/
 
 # PDX Account
 Traffic Law Enforcement/.local/
