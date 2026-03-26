@@ -14,7 +14,11 @@ namespace Traffic_Law_Enforcement
         public static int ModifiedPrefabCount { get; private set; }
         public static string OverrideSummary { get; private set; } = "Waiting for car pathfinding prefabs.";
 
-        public static void SetState(int modifiedPrefabCount, bool enabled, int midBlockPenalty)
+        public static void SetState(
+            int modifiedPrefabCount,
+            bool enabled,
+            int midBlockPenalty,
+            float midBlockBehaviourPenalty)
         {
             ModifiedPrefabCount = modifiedPrefabCount;
 
@@ -30,7 +34,11 @@ namespace Traffic_Law_Enforcement
                 return;
             }
 
-            OverrideSummary = $"UnsafeTurn +{midBlockPenalty:0}, UTurn +{midBlockPenalty:0}, UnsafeUTurn +{midBlockPenalty:0}, LaneCross +{midBlockPenalty:0}; PT-lane money-axis penalty is handled per route rather than through shared PathfindCarData prefabs";
+            OverrideSummary =
+                $"UTurn money +{midBlockPenalty:0}, behaviour +{midBlockBehaviourPenalty:0.###}; " +
+                $"UnsafeUTurn money +{midBlockPenalty:0}, behaviour +{midBlockBehaviourPenalty:0.###}; " +
+                $"LaneCross money +{midBlockPenalty:0}, behaviour +{midBlockBehaviourPenalty:0.###}; " +
+                "PT-lane route penalties are still handled per route rather than through shared PathfindCarData prefabs";
         }
     }
 
@@ -94,11 +102,15 @@ namespace Traffic_Law_Enforcement
 
             ApplyOverrides(midBlockPenalty);
 
-            MidBlockPathfindingBiasTelemetry.SetState(prefabCount, enforcementEnabled, midBlockPenalty);
+            MidBlockPathfindingBiasTelemetry.SetState(
+                prefabCount,
+                enforcementEnabled,
+                midBlockPenalty,
+                MidBlockBehaviourPenalty);
             if (EnforcementLoggingPolicy.ShouldLogPathfindingPenaltyDiagnostics())
             {
                 Mod.log.Info(
-                    $"Applied pathfinding money-axis penalties: prefabs={prefabCount}, enabled={enforcementEnabled}, {MidBlockPathfindingBiasTelemetry.OverrideSummary}");
+                    $"Applied mid-block pathfinding bias overrides: prefabs={prefabCount}, enabled={enforcementEnabled}, {MidBlockPathfindingBiasTelemetry.OverrideSummary}");
                 LogSharedPathfindPrefabDiagnostics();
             }
         }
