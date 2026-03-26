@@ -36,6 +36,9 @@ namespace Traffic_Law_Enforcement
         public readonly string RawTransportTypeText;
         public readonly string RawTrackTypeText;
         public readonly string RailSubtypeSourceText;
+        public readonly string SummaryClassificationText;
+        public readonly string SummaryTleStatusText;
+        public readonly string CompactLastReasonText;
 
         public readonly int VehicleIndex;
         public readonly string RoleOrTypeText;
@@ -75,6 +78,9 @@ namespace Traffic_Law_Enforcement
             string rawTransportTypeText,
             string rawTrackTypeText,
             string railSubtypeSourceText,
+            string summaryClassificationText,
+            string summaryTleStatusText,
+            string compactLastReasonText,
             int vehicleIndex,
             string roleOrTypeText,
             bool hasTrafficLawProfile,
@@ -109,6 +115,9 @@ namespace Traffic_Law_Enforcement
             RawTransportTypeText = rawTransportTypeText;
             RawTrackTypeText = rawTrackTypeText;
             RailSubtypeSourceText = railSubtypeSourceText;
+            SummaryClassificationText = summaryClassificationText;
+            SummaryTleStatusText = summaryTleStatusText;
+            CompactLastReasonText = compactLastReasonText;
             VehicleIndex = vehicleIndex;
             RoleOrTypeText = roleOrTypeText;
             HasTrafficLawProfile = hasTrafficLawProfile;
@@ -271,6 +280,9 @@ namespace Traffic_Law_Enforcement
                 BuildRawTransportTypeText(resolveResult),
                 BuildRawTrackTypeText(resolveResult),
                 BuildRailSubtypeSourceText(resolveResult),
+                BuildSummaryClassificationText(resolveResult),
+                BuildSummaryTleStatusText(resolveResult, tleApplicability),
+                BuildCompactLastReasonText(tleApplicable, lastReason),
                 resolveResult.IsVehicle && hasVehicleEntity ? vehicle.Index : -1,
                 BuildRoleOrTypeText(resolveResult),
                 hasTrafficLawProfile,
@@ -380,6 +392,106 @@ namespace Traffic_Law_Enforcement
                 default:
                     return "None";
             }
+        }
+
+        private static string BuildSummaryClassificationText(
+            SelectedVehicleResolveResult resolveResult)
+        {
+            switch (resolveResult.VehicleKind)
+            {
+                case SelectedVehicleKind.RoadCar:
+                    return "Road car";
+
+                case SelectedVehicleKind.ParkedRoadCar:
+                    return "Parked road car";
+
+                case SelectedVehicleKind.RailVehicle:
+                    return "Rail vehicle";
+
+                case SelectedVehicleKind.ParkedRailVehicle:
+                    return "Parked rail vehicle";
+
+                case SelectedVehicleKind.Tram:
+                    return "Tram";
+
+                case SelectedVehicleKind.ParkedTram:
+                    return "Parked tram";
+
+                case SelectedVehicleKind.Train:
+                    return "Train";
+
+                case SelectedVehicleKind.ParkedTrain:
+                    return "Parked train";
+
+                case SelectedVehicleKind.Subway:
+                    return "Subway";
+
+                case SelectedVehicleKind.ParkedSubway:
+                    return "Parked subway";
+
+                case SelectedVehicleKind.OtherVehicle:
+                    return "Other vehicle";
+
+                default:
+                    return string.Empty;
+            }
+        }
+
+        private static string BuildSummaryTleStatusText(
+            SelectedVehicleResolveResult resolveResult,
+            SelectedVehicleTleApplicability tleApplicability)
+        {
+            if (resolveResult.ResolveState == SelectedVehicleResolveState.None)
+            {
+                return string.Empty;
+            }
+
+            if (resolveResult.ResolveState == SelectedVehicleResolveState.NotVehicle)
+            {
+                return "Selected object is not a vehicle";
+            }
+
+            switch (tleApplicability)
+            {
+                case SelectedVehicleTleApplicability.NotApplicable:
+                    return "Traffic Law Enforcement not applicable";
+
+                case SelectedVehicleTleApplicability.ApplicableNoLiveLaneData:
+                    return resolveResult.VehicleKind == SelectedVehicleKind.ParkedRoadCar
+                        ? "Live lane unavailable for parked road car"
+                        : "Live lane unavailable";
+
+                case SelectedVehicleTleApplicability.ApplicableReady:
+                    return "Tracking selected road vehicle";
+
+                default:
+                    return string.Empty;
+            }
+        }
+
+        private static string BuildCompactLastReasonText(
+            bool tleApplicable,
+            string lastReason)
+        {
+            if (!tleApplicable)
+            {
+                return string.Empty;
+            }
+
+            string normalizedReason = string.IsNullOrWhiteSpace(lastReason)
+                ? "None recorded"
+                : lastReason
+                    .Replace('\r', ' ')
+                    .Replace('\n', ' ')
+                    .Trim();
+
+            const int maxLength = 56;
+            if (normalizedReason.Length <= maxLength)
+            {
+                return normalizedReason;
+            }
+
+            return normalizedReason.Substring(0, maxLength - 3) + "...";
         }
 
         private string BuildRoleOrTypeText(SelectedVehicleResolveResult resolveResult)

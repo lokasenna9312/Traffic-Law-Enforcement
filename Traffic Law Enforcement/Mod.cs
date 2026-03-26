@@ -84,6 +84,7 @@ namespace Traffic_Law_Enforcement
             updateSystem.UpdateAfter<SelectedVehicleBridgeSystem, VehicleLaneHistorySystem>(SystemUpdatePhase.GameSimulation);
             updateSystem.UpdateAfter<SelectedVehicleBridgeSystem, PublicTransportLaneViolationApplySystem>(SystemUpdatePhase.GameSimulation);
             updateSystem.UpdateAfter<SelectedVehicleBridgeSystem, LaneTransitionViolationApplySystem>(SystemUpdatePhase.GameSimulation);
+            updateSystem.UpdateAt<SelectedVehiclePanelUISystem>(SystemUpdatePhase.UIUpdate);
         }
 
         public void OnDispose()
