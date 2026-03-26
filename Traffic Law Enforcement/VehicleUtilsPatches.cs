@@ -106,7 +106,7 @@ namespace Traffic_Law_Enforcement
 
             SyncPrivateTrafficIgnoredRules(entityManager, owner, ref item);
 
-            item.m_Parameters.m_Weights.m_Value.z = 0f;
+            // item.m_Parameters.m_Weights.m_Value.z = 0f;
         }
 
         private static void CalculateCostPostfix(ref float __result, RuleFlags rules, float2 delta, PathfindParameters ___m_Parameters)
