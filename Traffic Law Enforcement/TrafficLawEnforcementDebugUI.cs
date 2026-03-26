@@ -170,6 +170,11 @@ namespace Traffic_Law_Enforcement
             });
             selectedVehicle.children.Add(new DebugUI.Value
             {
+                displayName = "Classification",
+                getter = GetSelectedVehicleClassificationText
+            });
+            selectedVehicle.children.Add(new DebugUI.Value
+            {
                 displayName = "Source selected entity",
                 getter = GetSourceSelectedEntityText
             });
@@ -184,30 +189,41 @@ namespace Traffic_Law_Enforcement
                 getter = GetSelectedVehicleFlagsText
             });
 
-            DebugUI.Foldout identity = new DebugUI.Foldout
+            DebugUI.Foldout vehicleInfo = new DebugUI.Foldout
             {
-                displayName = "Identity",
+                displayName = "Vehicle info",
                 opened = true
             };
-            identity.children.Add(new DebugUI.Value
+            vehicleInfo.children.Add(new DebugUI.Value
             {
                 displayName = "Vehicle index",
                 getter = GetVehicleIndexText
             });
-            identity.children.Add(new DebugUI.Value
+            vehicleInfo.children.Add(new DebugUI.Value
             {
                 displayName = "Role / type",
                 getter = GetRoleOrTypeText
             });
-            identity.children.Add(new DebugUI.Value
+            vehicleInfo.children.Add(new DebugUI.Value
             {
                 displayName = "Has traffic law profile",
                 getter = GetHasTrafficLawProfileText
             });
-            identity.children.Add(new DebugUI.Value
+            vehicleInfo.children.Add(new DebugUI.Value
             {
                 displayName = "Trailer child",
                 getter = GetTrailerChildText
+            });
+
+            DebugUI.Foldout tle = new DebugUI.Foldout
+            {
+                displayName = "Traffic Law Enforcement",
+                opened = true
+            };
+            tle.children.Add(new DebugUI.Value
+            {
+                displayName = "Status",
+                getter = GetTleStatusText
             });
 
             DebugUI.Foldout lane = new DebugUI.Foldout
@@ -273,10 +289,12 @@ namespace Traffic_Law_Enforcement
                 getter = GetLastReasonText
             });
 
-            selectedVehicle.children.Add(identity);
-            selectedVehicle.children.Add(lane);
-            selectedVehicle.children.Add(enforcement);
-            selectedVehicle.children.Add(telemetry);
+            tle.children.Add(lane);
+            tle.children.Add(enforcement);
+            tle.children.Add(telemetry);
+
+            selectedVehicle.children.Add(vehicleInfo);
+            selectedVehicle.children.Add(tle);
             return selectedVehicle;
         }
 
@@ -290,25 +308,48 @@ namespace Traffic_Law_Enforcement
             switch (snapshot.ResolveState)
             {
                 case SelectedVehicleResolveState.None:
-                    return "No vehicle selected";
+                    return "No object selected";
 
                 case SelectedVehicleResolveState.NotVehicle:
                     return "Selected object is not a vehicle";
 
-                case SelectedVehicleResolveState.VehicleNotSupported:
-                    return "Selected vehicle is not a supported road car";
-
-                case SelectedVehicleResolveState.ParkedVehicle:
-                    return "Selected vehicle is parked";
-
-                case SelectedVehicleResolveState.RoadCarNoLaneData:
-                    return "Road car selected, but live lane data is unavailable";
-
-                case SelectedVehicleResolveState.Ready:
-                    return "Tracking selected road car";
+                case SelectedVehicleResolveState.Vehicle:
+                    return "Selected vehicle resolved";
 
                 default:
                     return "Selected vehicle status unavailable";
+            }
+        }
+
+        private static string GetSelectedVehicleClassificationText()
+        {
+            if (!TryGetSelectedVehicleSnapshot(out SelectedVehicleDebugSnapshot snapshot))
+            {
+                return "Unavailable";
+            }
+
+            switch (snapshot.VehicleKind)
+            {
+                case SelectedVehicleKind.None:
+                    return "Unavailable";
+
+                case SelectedVehicleKind.RoadCar:
+                    return "Selected vehicle: road car";
+
+                case SelectedVehicleKind.ParkedRoadCar:
+                    return "Selected vehicle: parked road car";
+
+                case SelectedVehicleKind.Train:
+                    return "Selected vehicle: train";
+
+                case SelectedVehicleKind.ParkedTrain:
+                    return "Selected vehicle: parked train";
+
+                case SelectedVehicleKind.OtherVehicle:
+                    return "Selected vehicle: other vehicle";
+
+                default:
+                    return "Selected vehicle: unknown";
             }
         }
 
@@ -336,8 +377,9 @@ namespace Traffic_Law_Enforcement
             return
                 $"Vehicle={snapshot.IsVehicle}, " +
                 $"Car={snapshot.IsCar}, " +
+                $"Train={snapshot.IsTrain}, " +
                 $"Parked={snapshot.IsParked}, " +
-                $"Lane={snapshot.HasCarCurrentLane}";
+                $"LiveLane={snapshot.HasLiveLaneData}";
         }
 
         private static string GetVehicleIndexText()
@@ -376,37 +418,37 @@ namespace Traffic_Law_Enforcement
 
         private static string GetCurrentLaneEntityText()
         {
-            return GetReadySelectedVehicleText(
+            return GetReadyTleText(
                 snapshot => FormatEntity(snapshot.CurrentLaneEntity));
         }
 
         private static string GetPreviousLaneEntityText()
         {
-            return GetReadySelectedVehicleText(
+            return GetReadyTleText(
                 snapshot => FormatEntity(snapshot.PreviousLaneEntity));
         }
 
         private static string GetLaneChangeCountText()
         {
-            return GetReadySelectedVehicleText(
+            return GetReadyTleText(
                 snapshot => snapshot.LaneChangeCount.ToString());
         }
 
         private static string GetPtLaneViolationActiveText()
         {
-            return GetReadySelectedVehicleText(
+            return GetReadyTleText(
                 snapshot => snapshot.PtLaneViolationActive.ToString());
         }
 
         private static string GetPendingExitActiveText()
         {
-            return GetReadySelectedVehicleText(
+            return GetReadyTleText(
                 snapshot => snapshot.PendingExitActive.ToString());
         }
 
         private static string GetPermissionStateSummaryText()
         {
-            return GetReadySelectedVehicleText(
+            return GetApplicableTleText(
                 snapshot => string.IsNullOrWhiteSpace(snapshot.PermissionStateSummary)
                     ? "Unavailable"
                     : snapshot.PermissionStateSummary);
@@ -414,25 +456,60 @@ namespace Traffic_Law_Enforcement
 
         private static string GetTotalFinesText()
         {
-            return GetReadySelectedVehicleText(
+            return GetApplicableTleText(
                 snapshot => snapshot.TotalFines.ToString());
         }
 
         private static string GetTotalViolationsText()
         {
-            return GetReadySelectedVehicleText(
+            return GetApplicableTleText(
                 snapshot => snapshot.TotalViolations.ToString());
         }
 
         private static string GetLastReasonText()
         {
-            return GetReadySelectedVehicleText(
+            return GetApplicableTleText(
                 snapshot => string.IsNullOrWhiteSpace(snapshot.LastReason)
                     ? "None recorded"
                     : snapshot.LastReason);
         }
 
-        private static string GetReadySelectedVehicleText(
+        private static string GetTleStatusText()
+        {
+            if (!TryGetSelectedVehicleSnapshot(out SelectedVehicleDebugSnapshot snapshot))
+            {
+                return "Unavailable";
+            }
+
+            if (snapshot.ResolveState == SelectedVehicleResolveState.None)
+            {
+                return "No selected vehicle";
+            }
+
+            if (snapshot.ResolveState == SelectedVehicleResolveState.NotVehicle)
+            {
+                return "Traffic Law Enforcement details are unavailable because the selected object is not a vehicle";
+            }
+
+            switch (snapshot.TleApplicability)
+            {
+                case SelectedVehicleTleApplicability.NotApplicable:
+                    return "Traffic Law Enforcement details are not applicable to this vehicle type";
+
+                case SelectedVehicleTleApplicability.ApplicableNoLiveLaneData:
+                    return snapshot.VehicleKind == SelectedVehicleKind.ParkedRoadCar
+                        ? "Live lane data unavailable for parked road vehicle"
+                        : "Live lane data unavailable for selected road vehicle";
+
+                case SelectedVehicleTleApplicability.ApplicableReady:
+                    return "Tracking selected road vehicle";
+
+                default:
+                    return "Traffic Law Enforcement status unavailable";
+            }
+        }
+
+        private static string GetApplicableTleText(
             System.Func<SelectedVehicleDebugSnapshot, string> formatter)
         {
             if (!TryGetSelectedVehicleSnapshot(out SelectedVehicleDebugSnapshot snapshot))
@@ -440,7 +517,23 @@ namespace Traffic_Law_Enforcement
                 return "Unavailable";
             }
 
-            if (snapshot.ResolveState != SelectedVehicleResolveState.Ready)
+            if (snapshot.TleApplicability == SelectedVehicleTleApplicability.NotApplicable)
+            {
+                return "Not applicable";
+            }
+
+            return formatter(snapshot);
+        }
+
+        private static string GetReadyTleText(
+            System.Func<SelectedVehicleDebugSnapshot, string> formatter)
+        {
+            if (!TryGetSelectedVehicleSnapshot(out SelectedVehicleDebugSnapshot snapshot))
+            {
+                return "Unavailable";
+            }
+
+            if (snapshot.TleApplicability != SelectedVehicleTleApplicability.ApplicableReady)
             {
                 return "Unavailable";
             }

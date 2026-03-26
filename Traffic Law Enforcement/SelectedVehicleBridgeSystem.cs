@@ -6,16 +6,28 @@ using Entity = Unity.Entities.Entity;
 
 namespace Traffic_Law_Enforcement
 {
+    public enum SelectedVehicleTleApplicability
+    {
+        NotApplicable,
+        ApplicableNoLiveLaneData,
+        ApplicableReady,
+    }
+
     public readonly struct SelectedVehicleDebugSnapshot
     {
         public readonly SelectedVehicleResolveState ResolveState;
+        public readonly SelectedVehicleKind VehicleKind;
+        public readonly SelectedVehicleTleApplicability TleApplicability;
         public readonly Entity SourceSelectedEntity;
         public readonly Entity ResolvedVehicleEntity;
         public readonly bool IsTrailerChild;
         public readonly bool IsVehicle;
         public readonly bool IsCar;
+        public readonly bool IsTrain;
         public readonly bool IsParked;
         public readonly bool HasCarCurrentLane;
+        public readonly bool HasTrainCurrentLane;
+        public readonly bool HasLiveLaneData;
 
         public readonly int VehicleIndex;
         public readonly string RoleOrTypeText;
@@ -35,13 +47,18 @@ namespace Traffic_Law_Enforcement
 
         public SelectedVehicleDebugSnapshot(
             SelectedVehicleResolveState resolveState,
+            SelectedVehicleKind vehicleKind,
+            SelectedVehicleTleApplicability tleApplicability,
             Entity sourceSelectedEntity,
             Entity resolvedVehicleEntity,
             bool isTrailerChild,
             bool isVehicle,
             bool isCar,
+            bool isTrain,
             bool isParked,
             bool hasCarCurrentLane,
+            bool hasTrainCurrentLane,
+            bool hasLiveLaneData,
             int vehicleIndex,
             string roleOrTypeText,
             bool hasTrafficLawProfile,
@@ -56,13 +73,18 @@ namespace Traffic_Law_Enforcement
             string lastReason)
         {
             ResolveState = resolveState;
+            VehicleKind = vehicleKind;
+            TleApplicability = tleApplicability;
             SourceSelectedEntity = sourceSelectedEntity;
             ResolvedVehicleEntity = resolvedVehicleEntity;
             IsTrailerChild = isTrailerChild;
             IsVehicle = isVehicle;
             IsCar = isCar;
+            IsTrain = isTrain;
             IsParked = isParked;
             HasCarCurrentLane = hasCarCurrentLane;
+            HasTrainCurrentLane = hasTrainCurrentLane;
+            HasLiveLaneData = hasLiveLaneData;
             VehicleIndex = vehicleIndex;
             RoleOrTypeText = roleOrTypeText;
             HasTrafficLawProfile = hasTrafficLawProfile;
@@ -135,13 +157,21 @@ namespace Traffic_Law_Enforcement
         {
             Entity vehicle = resolveResult.ResolvedVehicleEntity;
             bool hasVehicleEntity = vehicle != Entity.Null;
+            SelectedVehicleTleApplicability tleApplicability =
+                GetTleApplicability(resolveResult);
+            bool tleApplicable =
+                tleApplicability != SelectedVehicleTleApplicability.NotApplicable;
+            bool tleReady =
+                tleApplicability == SelectedVehicleTleApplicability.ApplicableReady;
 
             bool hasTrafficLawProfile =
+                tleApplicable &&
                 hasVehicleEntity &&
                 m_ProfileData.HasComponent(vehicle);
 
             Entity currentLaneEntity = Entity.Null;
-            if (resolveResult.HasCarCurrentLane &&
+            if (tleReady &&
+                resolveResult.HasCarCurrentLane &&
                 m_CurrentLaneData.TryGetComponent(vehicle, out CarCurrentLane currentLane))
             {
                 currentLaneEntity = currentLane.m_Lane;
@@ -149,7 +179,8 @@ namespace Traffic_Law_Enforcement
 
             Entity previousLaneEntity = Entity.Null;
             int laneChangeCount = 0;
-            if (hasVehicleEntity &&
+            if (tleReady &&
+                hasVehicleEntity &&
                 m_HistoryData.TryGetComponent(vehicle, out VehicleLaneHistory history))
             {
                 previousLaneEntity = history.m_PreviousLane;
@@ -157,18 +188,27 @@ namespace Traffic_Law_Enforcement
             }
 
             bool ptLaneViolationActive =
+                tleReady &&
                 hasVehicleEntity &&
                 m_PublicTransportLaneViolationData.HasComponent(vehicle);
 
             bool pendingExitActive =
+                tleReady &&
                 hasVehicleEntity &&
                 m_PendingExitData.HasComponent(vehicle);
+
+            string permissionStateSummary = string.Empty;
+            if (tleApplicable)
+            {
+                permissionStateSummary =
+                    BuildPermissionStateSummary(vehicle, hasTrafficLawProfile);
+            }
 
             int totalFines = 0;
             int totalViolations = 0;
             string lastReason = string.Empty;
 
-            if (resolveResult.IsVehicle)
+            if (tleApplicable && resolveResult.IsVehicle)
             {
                 int vehicleIndex = vehicle.Index;
                 totalViolations = EnforcementTelemetry.GetVehicleViolationCount(vehicleIndex);
@@ -187,13 +227,18 @@ namespace Traffic_Law_Enforcement
 
             return new SelectedVehicleDebugSnapshot(
                 resolveResult.ResolveState,
+                resolveResult.VehicleKind,
+                tleApplicability,
                 resolveResult.SourceSelectedEntity,
                 resolveResult.ResolvedVehicleEntity,
                 resolveResult.IsTrailerChild,
                 resolveResult.IsVehicle,
                 resolveResult.IsCar,
+                resolveResult.IsTrain,
                 resolveResult.IsParked,
                 resolveResult.HasCarCurrentLane,
+                resolveResult.HasTrainCurrentLane,
+                resolveResult.HasLiveLaneData,
                 hasVehicleEntity ? vehicle.Index : -1,
                 BuildRoleOrTypeText(resolveResult),
                 hasTrafficLawProfile,
@@ -202,7 +247,7 @@ namespace Traffic_Law_Enforcement
                 laneChangeCount,
                 ptLaneViolationActive,
                 pendingExitActive,
-                BuildPermissionStateSummary(vehicle, hasTrafficLawProfile),
+                permissionStateSummary,
                 totalFines,
                 totalViolations,
                 lastReason);
@@ -220,19 +265,28 @@ namespace Traffic_Law_Enforcement
                 return "Not a vehicle";
             }
 
-            if (resolveResult.IsParked)
+            switch (resolveResult.VehicleKind)
             {
-                return "Parked vehicle";
-            }
+                case SelectedVehicleKind.RoadCar:
+                    return PublicTransportLanePolicy.DescribeVehicleRole(
+                        resolveResult.ResolvedVehicleEntity,
+                        ref m_TypeLookups);
 
-            if (!resolveResult.IsCar)
-            {
-                return "Unsupported vehicle type";
-            }
+                case SelectedVehicleKind.ParkedRoadCar:
+                    return "Parked road car";
 
-            return PublicTransportLanePolicy.DescribeVehicleRole(
-                resolveResult.ResolvedVehicleEntity,
-                ref m_TypeLookups);
+                case SelectedVehicleKind.Train:
+                    return "Train";
+
+                case SelectedVehicleKind.ParkedTrain:
+                    return "Parked train";
+
+                case SelectedVehicleKind.OtherVehicle:
+                    return "Other vehicle";
+
+                default:
+                    return "Vehicle";
+            }
         }
 
         private string BuildPermissionStateSummary(
@@ -287,6 +341,24 @@ namespace Traffic_Law_Enforcement
             }
 
             return string.Empty;
+        }
+
+        private static SelectedVehicleTleApplicability GetTleApplicability(
+            SelectedVehicleResolveResult resolveResult)
+        {
+            switch (resolveResult.VehicleKind)
+            {
+                case SelectedVehicleKind.RoadCar:
+                    return resolveResult.HasCarCurrentLane
+                        ? SelectedVehicleTleApplicability.ApplicableReady
+                        : SelectedVehicleTleApplicability.ApplicableNoLiveLaneData;
+
+                case SelectedVehicleKind.ParkedRoadCar:
+                    return SelectedVehicleTleApplicability.ApplicableNoLiveLaneData;
+
+                default:
+                    return SelectedVehicleTleApplicability.NotApplicable;
+            }
         }
     }
 }

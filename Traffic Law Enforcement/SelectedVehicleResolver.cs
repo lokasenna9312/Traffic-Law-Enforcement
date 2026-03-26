@@ -10,44 +10,63 @@ namespace Traffic_Law_Enforcement
     {
         None,
         NotVehicle,
-        VehicleNotSupported,
-        ParkedVehicle,
-        RoadCarNoLaneData,
-        Ready,
+        Vehicle,
+    }
+
+    public enum SelectedVehicleKind
+    {
+        None,
+        RoadCar,
+        ParkedRoadCar,
+        Train,
+        ParkedTrain,
+        OtherVehicle,
     }
 
     public readonly struct SelectedVehicleResolveResult
     {
         public readonly SelectedVehicleResolveState ResolveState;
+        public readonly SelectedVehicleKind VehicleKind;
         public readonly Entity SourceSelectedEntity;
         public readonly Entity ResolvedVehicleEntity;
         public readonly bool HasSelection;
         public readonly bool IsVehicle;
         public readonly bool IsCar;
+        public readonly bool IsTrain;
         public readonly bool IsParked;
         public readonly bool IsTrailerChild;
         public readonly bool HasCarCurrentLane;
+        public readonly bool HasTrainCurrentLane;
+        public readonly bool HasLiveLaneData;
 
         public SelectedVehicleResolveResult(
             SelectedVehicleResolveState resolveState,
+            SelectedVehicleKind vehicleKind,
             Entity sourceSelectedEntity,
             Entity resolvedVehicleEntity,
             bool hasSelection,
             bool isVehicle,
             bool isCar,
+            bool isTrain,
             bool isParked,
             bool isTrailerChild,
-            bool hasCarCurrentLane)
+            bool hasCarCurrentLane,
+            bool hasTrainCurrentLane,
+            bool hasLiveLaneData)
         {
             ResolveState = resolveState;
+            VehicleKind = vehicleKind;
             SourceSelectedEntity = sourceSelectedEntity;
             ResolvedVehicleEntity = resolvedVehicleEntity;
             HasSelection = hasSelection;
             IsVehicle = isVehicle;
             IsCar = isCar;
+            IsTrain = isTrain;
             IsParked = isParked;
             IsTrailerChild = isTrailerChild;
             HasCarCurrentLane = hasCarCurrentLane;
+            HasTrainCurrentLane = hasTrainCurrentLane;
+            HasLiveLaneData = hasLiveLaneData;
         }
     }
 
@@ -63,8 +82,11 @@ namespace Traffic_Law_Enforcement
         private ComponentLookup<Controller> m_ControllerData;
         private ComponentLookup<Vehicle> m_VehicleData;
         private ComponentLookup<Car> m_CarData;
+        private ComponentLookup<Train> m_TrainData;
         private ComponentLookup<ParkedCar> m_ParkedCarData;
+        private ComponentLookup<ParkedTrain> m_ParkedTrainData;
         private ComponentLookup<CarCurrentLane> m_CarCurrentLaneData;
+        private ComponentLookup<TrainCurrentLane> m_TrainCurrentLaneData;
 
         public SelectedVehicleResolver(GameSystemBase system)
         {
@@ -76,8 +98,11 @@ namespace Traffic_Law_Enforcement
             m_ControllerData = system.GetComponentLookup<Controller>(true);
             m_VehicleData = system.GetComponentLookup<Vehicle>(true);
             m_CarData = system.GetComponentLookup<Car>(true);
+            m_TrainData = system.GetComponentLookup<Train>(true);
             m_ParkedCarData = system.GetComponentLookup<ParkedCar>(true);
+            m_ParkedTrainData = system.GetComponentLookup<ParkedTrain>(true);
             m_CarCurrentLaneData = system.GetComponentLookup<CarCurrentLane>(true);
+            m_TrainCurrentLaneData = system.GetComponentLookup<TrainCurrentLane>(true);
         }
 
         internal void Update(GameSystemBase system)
@@ -85,8 +110,11 @@ namespace Traffic_Law_Enforcement
             m_ControllerData.Update(system);
             m_VehicleData.Update(system);
             m_CarData.Update(system);
+            m_TrainData.Update(system);
             m_ParkedCarData.Update(system);
+            m_ParkedTrainData.Update(system);
             m_CarCurrentLaneData.Update(system);
+            m_TrainCurrentLaneData.Update(system);
         }
 
         public SelectedVehicleResolveResult ResolveCurrentSelection()
@@ -105,14 +133,18 @@ namespace Traffic_Law_Enforcement
             {
                 return new SelectedVehicleResolveResult(
                     SelectedVehicleResolveState.None,
+                    SelectedVehicleKind.None,
                     sourceSelectedEntity,
                     Entity.Null,
                     hasSelection: false,
                     isVehicle: false,
                     isCar: false,
+                    isTrain: false,
                     isParked: false,
                     isTrailerChild: false,
-                    hasCarCurrentLane: false);
+                    hasCarCurrentLane: false,
+                    hasTrainCurrentLane: false,
+                    hasLiveLaneData: false);
             }
 
             Entity resolvedVehicleEntity = ResolveControllerRoot(sourceSelectedEntity);
@@ -120,55 +152,95 @@ namespace Traffic_Law_Enforcement
                 resolvedVehicleEntity != Entity.Null &&
                 resolvedVehicleEntity != sourceSelectedEntity;
 
-            bool isVehicle =
+            bool hasVehicleMarker =
                 resolvedVehicleEntity != Entity.Null &&
                 EntityExists(resolvedVehicleEntity) &&
                 m_VehicleData.HasComponent(resolvedVehicleEntity);
 
             bool isCar =
-                isVehicle &&
+                resolvedVehicleEntity != Entity.Null &&
+                EntityExists(resolvedVehicleEntity) &&
                 m_CarData.HasComponent(resolvedVehicleEntity);
 
-            bool isParked =
-                isVehicle &&
+            bool isTrain =
+                resolvedVehicleEntity != Entity.Null &&
+                EntityExists(resolvedVehicleEntity) &&
+                m_TrainData.HasComponent(resolvedVehicleEntity);
+
+            bool hasParkedRoadCar =
+                resolvedVehicleEntity != Entity.Null &&
+                EntityExists(resolvedVehicleEntity) &&
                 m_ParkedCarData.HasComponent(resolvedVehicleEntity);
+
+            bool hasParkedTrain =
+                resolvedVehicleEntity != Entity.Null &&
+                EntityExists(resolvedVehicleEntity) &&
+                m_ParkedTrainData.HasComponent(resolvedVehicleEntity);
+
+            bool isParked = hasParkedRoadCar || hasParkedTrain;
+
+            bool isVehicle =
+                hasVehicleMarker ||
+                isCar ||
+                isTrain ||
+                hasParkedRoadCar ||
+                hasParkedTrain;
 
             bool hasCarCurrentLane =
                 isCar &&
                 m_CarCurrentLaneData.HasComponent(resolvedVehicleEntity);
 
-            SelectedVehicleResolveState resolveState;
+            bool hasTrainCurrentLane =
+                isTrain &&
+                m_TrainCurrentLaneData.HasComponent(resolvedVehicleEntity);
+
+            bool hasLiveLaneData = hasCarCurrentLane || hasTrainCurrentLane;
+
+            SelectedVehicleKind vehicleKind;
             if (!isVehicle)
             {
-                resolveState = SelectedVehicleResolveState.NotVehicle;
+                vehicleKind = SelectedVehicleKind.None;
             }
-            else if (isParked)
+            else if (hasParkedTrain)
             {
-                resolveState = SelectedVehicleResolveState.ParkedVehicle;
+                vehicleKind = SelectedVehicleKind.ParkedTrain;
             }
-            else if (!isCar)
+            else if (isTrain)
             {
-                resolveState = SelectedVehicleResolveState.VehicleNotSupported;
+                vehicleKind = SelectedVehicleKind.Train;
             }
-            else if (!hasCarCurrentLane)
+            else if (hasParkedRoadCar)
             {
-                resolveState = SelectedVehicleResolveState.RoadCarNoLaneData;
+                vehicleKind = SelectedVehicleKind.ParkedRoadCar;
+            }
+            else if (isCar)
+            {
+                vehicleKind = SelectedVehicleKind.RoadCar;
             }
             else
             {
-                resolveState = SelectedVehicleResolveState.Ready;
+                vehicleKind = SelectedVehicleKind.OtherVehicle;
             }
+
+            SelectedVehicleResolveState resolveState =
+                isVehicle
+                    ? SelectedVehicleResolveState.Vehicle
+                    : SelectedVehicleResolveState.NotVehicle;
 
             return new SelectedVehicleResolveResult(
                 resolveState,
+                vehicleKind,
                 sourceSelectedEntity,
                 resolvedVehicleEntity,
                 hasSelection: true,
                 isVehicle,
                 isCar,
+                isTrain,
                 isParked,
                 isTrailerChild,
-                hasCarCurrentLane);
+                hasCarCurrentLane,
+                hasTrainCurrentLane,
+                hasLiveLaneData);
         }
 
         private Entity ResolveControllerRoot(Entity entity)
