@@ -693,6 +693,12 @@ namespace Traffic_Law_Enforcement
                     __exception);
             }
 
+            if (HasKeybindingSignal(null, null, __exception))
+            {
+                SettingsFileProtectionService.RestoreBackupIfCurrentLooksCorrupted(
+                    $"AssetDatabase.SaveSettings worker failure in {DescribeMethod(__originalMethod)}");
+            }
+
             return __exception;
         }
 
@@ -744,6 +750,12 @@ namespace Traffic_Law_Enforcement
                     $"exception={DescribeException(__exception)}, " +
                     $"rootCause={DescribeException(UnwrapException(__exception))}",
                     __exception);
+            }
+
+            if (HasKeybindingSignal(null, null, __exception))
+            {
+                SettingsFileProtectionService.RestoreBackupIfCurrentLooksCorrupted(
+                    $"AssetDatabase async MoveNext failure in {DescribeMethod(__originalMethod)}");
             }
 
             return __exception;
