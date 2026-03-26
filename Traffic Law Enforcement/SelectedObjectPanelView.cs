@@ -435,7 +435,7 @@ namespace Traffic_Law_Enforcement
                     y,
                     contentWidth,
                     kStatusLabelHeight);
-                y += kStatusLabelHeight + 3f;
+                y += kStatusLabelHeight + kSectionGap;
 
                 SetRect(
                     m_StatusBlockRect,
@@ -492,7 +492,7 @@ namespace Traffic_Law_Enforcement
 
             if (!string.IsNullOrWhiteSpace(m_State.TleStatus))
             {
-                height += kStatusLabelHeight + 3f + kStatusBlockHeight + kSectionGap;
+                height += kStatusLabelHeight + kSectionGap + kStatusBlockHeight + kSectionGap;
             }
 
             height += CountNonEmptyRows(
