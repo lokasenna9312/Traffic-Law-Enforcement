@@ -32,6 +32,12 @@ namespace Traffic_Law_Enforcement
         private static readonly MethodInfo s_KeybindingSettingsBindingsGetter =
             AccessTools.PropertyGetter(typeof(Game.Settings.KeybindingSettings), "bindings");
 
+        private static readonly MethodInfo s_KeybindingSettingsBindingsSetter =
+            AccessTools.PropertySetter(typeof(Game.Settings.KeybindingSettings), "bindings");
+
+        private static readonly MethodInfo s_KeybindingSettingsSetDefaultsMethod =
+            AccessTools.Method(typeof(Game.Settings.KeybindingSettings), "SetDefaults");
+
         private static readonly MethodInfo s_DiffObjectMethod =
             AccessTools.Method(
                 AccessTools.TypeByName("Colossal.Json.DiffUtility"),
@@ -130,6 +136,22 @@ namespace Traffic_Law_Enforcement
                     prefix: new HarmonyMethod(typeof(KeybindingSaveDiagnosticsPatches), nameof(KeybindingBindingsGetterPrefix)),
                     finalizer: new HarmonyMethod(typeof(KeybindingSaveDiagnosticsPatches), nameof(KeybindingBindingsGetterFinalizer)));
 
+                if (s_KeybindingSettingsBindingsSetter != null)
+                {
+                    s_Harmony.Patch(
+                        s_KeybindingSettingsBindingsSetter,
+                        prefix: new HarmonyMethod(typeof(KeybindingSaveDiagnosticsPatches), nameof(KeybindingBindingsSetterPrefix)),
+                        finalizer: new HarmonyMethod(typeof(KeybindingSaveDiagnosticsPatches), nameof(KeybindingBindingsSetterFinalizer)));
+                }
+
+                if (s_KeybindingSettingsSetDefaultsMethod != null)
+                {
+                    s_Harmony.Patch(
+                        s_KeybindingSettingsSetDefaultsMethod,
+                        prefix: new HarmonyMethod(typeof(KeybindingSaveDiagnosticsPatches), nameof(KeybindingSettingsSetDefaultsPrefix)),
+                        finalizer: new HarmonyMethod(typeof(KeybindingSaveDiagnosticsPatches), nameof(KeybindingSettingsSetDefaultsFinalizer)));
+                }
+
                 s_Harmony.Patch(
                     s_TypeExtensionsGetMemberValueMethod,
                     prefix: new HarmonyMethod(typeof(KeybindingSaveDiagnosticsPatches), nameof(TypeExtensionsGetMemberValuePrefix)),
@@ -169,6 +191,8 @@ namespace Traffic_Law_Enforcement
                 WriteDiagnosticLine(
                     "Keybinding save diagnostics patches applied. " +
                     $"bindingsGetter={DescribeMethod(s_KeybindingSettingsBindingsGetter)}, " +
+                    $"bindingsSetter={DescribeMethod(s_KeybindingSettingsBindingsSetter)}, " +
+                    $"setDefaults={DescribeMethod(s_KeybindingSettingsSetDefaultsMethod)}, " +
                     $"settingAssetSaveMethods={string.Join(" | ", s_SettingAssetSaveMethods.Select(DescribeMethod))}, " +
                     $"assetDatabaseSaveSettingsMethods={string.Join(" | ", s_AssetDatabaseSaveSettingsMethods.Select(DescribeMethod))}, " +
                     $"assetDatabaseSaveSettingsWorkerMethods={string.Join(" | ", s_AssetDatabaseSaveSettingsWorkerMethods.Select(DescribeMethod))}, " +
@@ -323,6 +347,93 @@ namespace Traffic_Law_Enforcement
             {
                 AppendAuxiliaryOnlyLine(eventLine);
             }
+        }
+
+        private static void KeybindingBindingsSetterPrefix(
+            Game.Settings.KeybindingSettings __instance,
+            List<Game.Input.ProxyBinding> value)
+        {
+            string eventLine =
+                "KeybindingSettings.bindings setter entered. " +
+                $"thread={Thread.CurrentThread.ManagedThreadId}, " +
+                $"hasSaveContext={HasSaveContext()}, " +
+                $"instanceType={__instance?.GetType().FullName ?? "<null>"}, " +
+                $"isDefault={TryGetIsDefaultValue(__instance)}, " +
+                $"currentSettingAsset={s_CurrentSettingAsset.Value ?? "<unknown>"}, " +
+                $"saveBreadcrumbs={FormatSaveBreadcrumbs()}, " +
+                $"incomingBindings={DescribeBindingsSummary(value)}, " +
+                $"stack={CaptureCompactStackTrace()}";
+
+            RecordGlobalSaveEvent(eventLine);
+            AppendAuxiliaryOnlyLine(eventLine);
+        }
+
+        private static Exception KeybindingBindingsSetterFinalizer(
+            Game.Settings.KeybindingSettings __instance,
+            List<Game.Input.ProxyBinding> value,
+            Exception __exception)
+        {
+            if (__exception == null)
+            {
+                return null;
+            }
+
+            WriteDiagnosticLine(
+                "KeybindingSettings.bindings setter failed. " +
+                $"instance={DescribeObject(__instance)}, " +
+                $"keybindingContext={DescribeKeybindingContext(__instance)}, " +
+                $"incomingBindings={DescribeBindingsSummary(value)}, " +
+                $"currentSettingAsset={s_CurrentSettingAsset.Value ?? "<unknown>"}, " +
+                $"saveBreadcrumbs={FormatSaveBreadcrumbs()}, " +
+                $"globalEvents={FormatGlobalSaveEvents()}, " +
+                $"stack={CaptureCompactStackTrace()}, " +
+                $"exception={DescribeException(__exception)}, " +
+                $"rootCause={DescribeException(UnwrapException(__exception))}",
+                __exception);
+
+            return __exception;
+        }
+
+        private static void KeybindingSettingsSetDefaultsPrefix(Game.Settings.KeybindingSettings __instance)
+        {
+            string eventLine =
+                "KeybindingSettings.SetDefaults entered. " +
+                $"thread={Thread.CurrentThread.ManagedThreadId}, " +
+                $"hasSaveContext={HasSaveContext()}, " +
+                $"instanceType={__instance?.GetType().FullName ?? "<null>"}, " +
+                $"isDefault={TryGetIsDefaultValue(__instance)}, " +
+                $"currentSettingAsset={s_CurrentSettingAsset.Value ?? "<unknown>"}, " +
+                $"saveBreadcrumbs={FormatSaveBreadcrumbs()}, " +
+                $"currentBindings={DescribeBindingsSummary(SafeGetBindings(__instance))}, " +
+                $"stack={CaptureCompactStackTrace()}";
+
+            RecordGlobalSaveEvent(eventLine);
+            AppendAuxiliaryOnlyLine(eventLine);
+        }
+
+        private static Exception KeybindingSettingsSetDefaultsFinalizer(
+            Game.Settings.KeybindingSettings __instance,
+            Exception __exception)
+        {
+            if (__exception == null)
+            {
+                return null;
+            }
+
+            WriteDiagnosticLine(
+                "KeybindingSettings.SetDefaults failed. " +
+                $"instance={DescribeObject(__instance)}, " +
+                $"keybindingContext={DescribeKeybindingContext(__instance)}, " +
+                $"currentBindings={DescribeBindingsSummary(SafeGetBindings(__instance))}, " +
+                $"currentSettingAsset={s_CurrentSettingAsset.Value ?? "<unknown>"}, " +
+                $"saveBreadcrumbs={FormatSaveBreadcrumbs()}, " +
+                $"globalEvents={FormatGlobalSaveEvents()}, " +
+                $"stack={CaptureCompactStackTrace()}, " +
+                $"exception={DescribeException(__exception)}, " +
+                $"rootCause={DescribeException(UnwrapException(__exception))}",
+                __exception);
+
+            return __exception;
         }
 
         private static Exception TypeExtensionsGetMemberValueFinalizer(
@@ -956,6 +1067,45 @@ namespace Traffic_Law_Enforcement
             }
 
             return $"{arg.GetType().FullName}={arg}";
+        }
+
+        private static string DescribeBindingsSummary(List<Game.Input.ProxyBinding> bindings)
+        {
+            if (bindings == null)
+            {
+                return "<null>";
+            }
+
+            try
+            {
+                IEnumerable<string> preview = bindings
+                    .Take(5)
+                    .Select(binding => binding == null ? "<null>" : binding.ToString());
+
+                string suffix = bindings.Count > 5 ? ", ..." : string.Empty;
+                return $"count={bindings.Count}, preview=[{string.Join(" | ", preview)}{suffix}]";
+            }
+            catch (Exception ex)
+            {
+                return $"<failed:{ex.GetType().Name}:{ex.Message}>";
+            }
+        }
+
+        private static List<Game.Input.ProxyBinding> SafeGetBindings(Game.Settings.KeybindingSettings instance)
+        {
+            if (instance == null)
+            {
+                return null;
+            }
+
+            try
+            {
+                return instance.bindings;
+            }
+            catch
+            {
+                return null;
+            }
         }
 
         private static string DescribeInstanceFields(object instance)
