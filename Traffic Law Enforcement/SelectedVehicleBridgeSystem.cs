@@ -330,17 +330,16 @@ namespace Traffic_Law_Enforcement
                 return string.Empty;
             }
 
-            List<EnforcementRecord> records = new List<EnforcementRecord>(recentRecords);
-            for (int index = records.Count - 1; index >= 0; index -= 1)
+            string lastReason = string.Empty;
+            foreach (EnforcementRecord record in recentRecords)
             {
-                EnforcementRecord record = records[index];
                 if (record.VehicleId == vehicleIndex)
                 {
-                    return record.Reason ?? string.Empty;
+                    lastReason = record.Reason ?? string.Empty;
                 }
             }
 
-            return string.Empty;
+            return lastReason;
         }
 
         private static SelectedVehicleTleApplicability GetTleApplicability(
