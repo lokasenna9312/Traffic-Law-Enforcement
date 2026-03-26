@@ -195,17 +195,19 @@ namespace Traffic_Law_Enforcement
 
     public static class EnforcementPolicyImpactService
     {
-        // Active vehicle route aggregation (ECS query based)
         public static int GetActiveVehicleRouteCount()
         {
-            var world = World.DefaultGameObjectInjectionWorld;
+            World world = World.DefaultGameObjectInjectionWorld;
             if (world == null)
+            {
                 return 0;
-            var entityManager = world.EntityManager;
-            var vehicleQuery = entityManager.CreateEntityQuery(
-                ComponentType.ReadOnly<Car>(),
-                ComponentType.ReadOnly<CarCurrentLane>());
-            return vehicleQuery.CalculateEntityCount();
+            }
+
+            ActiveVehicleRouteCountSystem system =
+                world.GetExistingSystemManaged<ActiveVehicleRouteCountSystem>() ??
+                world.GetOrCreateSystemManaged<ActiveVehicleRouteCountSystem>();
+
+            return system.GetActiveVehicleRouteCount();
         }
         public const string kLoadedSaveOnlyLocaleId = "TrafficLawEnforcement.PolicyImpact.Text.LoadedSaveOnly";
         public const string kWaitingForTimeLocaleId = "TrafficLawEnforcement.PolicyImpact.Text.WaitingForTime";
@@ -276,6 +278,29 @@ namespace Traffic_Law_Enforcement
             }
         }
 
+        public readonly struct PersistentDataSnapshot
+        {
+            public readonly EnforcementPolicyImpactTrackingState? TrackingState;
+            public readonly PersistentTotalsSnapshot Totals;
+            public readonly IEnumerable<PathRequestEvent> PathRequestEvents;
+            public readonly IEnumerable<ActualViolationEvent> ActualViolationEvents;
+            public readonly IEnumerable<AvoidedRerouteEvent> AvoidedRerouteEvents;
+
+            public PersistentDataSnapshot(
+                EnforcementPolicyImpactTrackingState? trackingState,
+                PersistentTotalsSnapshot totals,
+                IEnumerable<PathRequestEvent> pathRequestEvents,
+                IEnumerable<ActualViolationEvent> actualViolationEvents,
+                IEnumerable<AvoidedRerouteEvent> avoidedRerouteEvents)
+            {
+                TrackingState = trackingState;
+                Totals = totals;
+                PathRequestEvents = pathRequestEvents;
+                ActualViolationEvents = actualViolationEvents;
+                AvoidedRerouteEvents = avoidedRerouteEvents;
+            }
+        }
+
         private static bool s_HasTrackingState;
         private static EnforcementPolicyImpactTrackingState s_TrackingState;
         private static int s_TotalPathRequestCount;
@@ -313,6 +338,9 @@ namespace Traffic_Law_Enforcement
         private static readonly Dictionary<int, long> s_PublicTransportLaneActualOrAvoidedPathContextByVehicle = new Dictionary<int, long>();
         private static readonly Dictionary<int, long> s_MidBlockCrossingActualOrAvoidedPathContextByVehicle = new Dictionary<int, long>();
         private static readonly Dictionary<int, long> s_IntersectionMovementActualOrAvoidedPathContextByVehicle = new Dictionary<int, long>();
+        private static bool s_RollingWindowSnapshotDirty = true;
+        private static long s_LastSnapshotTimestampMonthTicks = -1L;
+        private static RollingWindowSnapshot s_CachedRollingWindowSnapshot;
 
         public static bool TryGetTrackingState(out EnforcementPolicyImpactTrackingState trackingState)
         {
@@ -333,6 +361,29 @@ namespace Traffic_Law_Enforcement
         public static IReadOnlyCollection<AvoidedRerouteEvent> GetAvoidedRerouteEventSnapshot()
         {
             return s_AvoidedRerouteEvents.ToArray();
+        }
+
+        private static bool RemoveExpiredPrefix<T>(List<T> entries, long cutoffTimestamp, Func<T, long> getTimestamp)
+        {
+            int removeCount = 0;
+
+            for (int index = 0; index < entries.Count; index += 1)
+            {
+                if (getTimestamp(entries[index]) >= cutoffTimestamp)
+                {
+                    break;
+                }
+
+                removeCount += 1;
+            }
+
+            if (removeCount <= 0)
+            {
+                return false;
+            }
+
+            entries.RemoveRange(0, removeCount);
+            return true;
         }
 
         public static void ResetPersistentData()
@@ -374,60 +425,42 @@ namespace Traffic_Law_Enforcement
             s_PublicTransportLaneActualOrAvoidedPathContextByVehicle.Clear();
             s_MidBlockCrossingActualOrAvoidedPathContextByVehicle.Clear();
             s_IntersectionMovementActualOrAvoidedPathContextByVehicle.Clear();
+            s_CachedRollingWindowSnapshot = default;
+            s_LastSnapshotTimestampMonthTicks = -1L;
+            s_RollingWindowSnapshotDirty = true;
         }
 
-        public static void LoadPersistentData(
-            EnforcementPolicyImpactTrackingState? trackingState,
-            int totalPathRequestCount,
-            int totalActualPathCount,
-            int totalAvoidedPathCount,
-            int totalFineAmount,
-            int publicTransportLaneActualCount,
-            int midBlockCrossingActualCount,
-            int intersectionMovementActualCount,
-            int publicTransportLaneFineAmount,
-            int midBlockCrossingFineAmount,
-            int intersectionMovementFineAmount,
-            int publicTransportLaneAvoidedEventCount,
-            int midBlockCrossingAvoidedEventCount,
-            int intersectionMovementAvoidedEventCount,
-            int totalActualOrAvoidedPathCount,
-            int publicTransportLaneActualOrAvoidedPathCount,
-            int midBlockCrossingActualOrAvoidedPathCount,
-            int intersectionMovementActualOrAvoidedPathCount,
-            IEnumerable<PathRequestEvent> pathRequestEvents,
-            IEnumerable<ActualViolationEvent> actualViolationEvents,
-            IEnumerable<AvoidedRerouteEvent> avoidedRerouteEvents)
+        public static void LoadPersistentData(PersistentDataSnapshot data)
         {
             ResetPersistentData();
 
-            if (trackingState.HasValue)
+            if (data.TrackingState.HasValue)
             {
-                s_TrackingState = trackingState.Value;
+                s_TrackingState = data.TrackingState.Value;
                 s_HasTrackingState = true;
             }
 
-            s_TotalPathRequestCount = totalPathRequestCount;
-            s_TotalActualPathCount = totalActualPathCount;
-            s_TotalAvoidedPathCount = totalAvoidedPathCount;
-            s_TotalFineAmount = totalFineAmount;
-            s_PublicTransportLaneActualCount = publicTransportLaneActualCount;
-            s_MidBlockCrossingActualCount = midBlockCrossingActualCount;
-            s_IntersectionMovementActualCount = intersectionMovementActualCount;
-            s_PublicTransportLaneFineAmount = publicTransportLaneFineAmount;
-            s_MidBlockCrossingFineAmount = midBlockCrossingFineAmount;
-            s_IntersectionMovementFineAmount = intersectionMovementFineAmount;
-            s_PublicTransportLaneAvoidedEventCount = publicTransportLaneAvoidedEventCount;
-            s_MidBlockCrossingAvoidedEventCount = midBlockCrossingAvoidedEventCount;
-            s_IntersectionMovementAvoidedEventCount = intersectionMovementAvoidedEventCount;
-            s_TotalActualOrAvoidedPathCount = totalActualOrAvoidedPathCount;
-            s_PublicTransportLaneActualOrAvoidedPathCount = publicTransportLaneActualOrAvoidedPathCount;
-            s_MidBlockCrossingActualOrAvoidedPathCount = midBlockCrossingActualOrAvoidedPathCount;
-            s_IntersectionMovementActualOrAvoidedPathCount = intersectionMovementActualOrAvoidedPathCount;
+            s_TotalPathRequestCount = data.Totals.TotalPathRequestCount;
+            s_TotalActualPathCount = data.Totals.TotalActualPathCount;
+            s_TotalAvoidedPathCount = data.Totals.TotalAvoidedPathCount;
+            s_TotalFineAmount = data.Totals.TotalFineAmount;
+            s_PublicTransportLaneActualCount = data.Totals.PublicTransportLaneActualCount;
+            s_MidBlockCrossingActualCount = data.Totals.MidBlockCrossingActualCount;
+            s_IntersectionMovementActualCount = data.Totals.IntersectionMovementActualCount;
+            s_PublicTransportLaneFineAmount = data.Totals.PublicTransportLaneFineAmount;
+            s_MidBlockCrossingFineAmount = data.Totals.MidBlockCrossingFineAmount;
+            s_IntersectionMovementFineAmount = data.Totals.IntersectionMovementFineAmount;
+            s_PublicTransportLaneAvoidedEventCount = data.Totals.PublicTransportLaneAvoidedEventCount;
+            s_MidBlockCrossingAvoidedEventCount = data.Totals.MidBlockCrossingAvoidedEventCount;
+            s_IntersectionMovementAvoidedEventCount = data.Totals.IntersectionMovementAvoidedEventCount;
+            s_TotalActualOrAvoidedPathCount = data.Totals.TotalActualOrAvoidedPathCount;
+            s_PublicTransportLaneActualOrAvoidedPathCount = data.Totals.PublicTransportLaneActualOrAvoidedPathCount;
+            s_MidBlockCrossingActualOrAvoidedPathCount = data.Totals.MidBlockCrossingActualOrAvoidedPathCount;
+            s_IntersectionMovementActualOrAvoidedPathCount = data.Totals.IntersectionMovementActualOrAvoidedPathCount;
 
-            if (pathRequestEvents != null)
+            if (data.PathRequestEvents != null)
             {
-                foreach (PathRequestEvent entry in pathRequestEvents)
+                foreach (PathRequestEvent entry in data.PathRequestEvents)
                 {
                     if (entry.TimestampMonthTicks >= 0L)
                     {
@@ -436,9 +469,9 @@ namespace Traffic_Law_Enforcement
                 }
             }
 
-            if (actualViolationEvents != null)
+            if (data.ActualViolationEvents != null)
             {
-                foreach (ActualViolationEvent entry in actualViolationEvents)
+                foreach (ActualViolationEvent entry in data.ActualViolationEvents)
                 {
                     if (entry.TimestampMonthTicks >= 0L &&
                         !string.IsNullOrWhiteSpace(entry.Kind) &&
@@ -449,11 +482,14 @@ namespace Traffic_Law_Enforcement
                 }
             }
 
-            if (avoidedRerouteEvents != null)
+            if (data.AvoidedRerouteEvents != null)
             {
-                foreach (AvoidedRerouteEvent entry in avoidedRerouteEvents)
+                foreach (AvoidedRerouteEvent entry in data.AvoidedRerouteEvents)
                 {
-                    if (entry.TimestampMonthTicks >= 0L && (entry.AvoidedPublicTransportLanePenalty || entry.AvoidedMidBlockPenalty || entry.AvoidedIntersectionPenalty))
+                    if (entry.TimestampMonthTicks >= 0L &&
+                        (entry.AvoidedPublicTransportLanePenalty ||
+                        entry.AvoidedMidBlockPenalty ||
+                        entry.AvoidedIntersectionPenalty))
                     {
                         s_AvoidedRerouteEvents.Add(entry);
                     }
@@ -492,6 +528,9 @@ namespace Traffic_Law_Enforcement
             s_NextPathContextSequence = System.Math.Max(1L, maxLoadedPathContextSequence + 1L);
 
             UpdateRollingWindowData();
+            s_CachedRollingWindowSnapshot = default;
+            s_LastSnapshotTimestampMonthTicks = -1L;
+            s_RollingWindowSnapshotDirty = true;
         }
 
         public static PersistentTotalsSnapshot GetPersistentTotalsSnapshot()
@@ -530,13 +569,13 @@ namespace Traffic_Law_Enforcement
 
             UpdateRollingWindowData();
 
-            // Real-time route count and category logs (recent 1 month)
-            var snapshot = GetRollingWindowSnapshot();
-            int violationTotal = snapshot.TotalActualPathCount;
-            int avoidanceTotal = snapshot.TotalAvoidedPathCount;
-            int vehicleRouteDenominator = snapshot.TotalPathRequestCount; // Unified denominator for all statistics
             if (EnforcementLoggingPolicy.EnableEnforcementEventLogging)
             {
+                RollingWindowSnapshot snapshot = GetRollingWindowSnapshot();
+                int violationTotal = snapshot.TotalActualPathCount;
+                int avoidanceTotal = snapshot.TotalAvoidedPathCount;
+                int vehicleRouteDenominator = snapshot.TotalPathRequestCount;
+
                 Mod.log.Info($"[RouteCount] vehicleRouteDenominator={vehicleRouteDenominator}, violationTotal={violationTotal}, avoidanceTotal={avoidanceTotal}");
                 Mod.log.Info($"[ViolationCount] PublicTransport={snapshot.PublicTransportLaneActualCount}, MidBlock={snapshot.MidBlockCrossingActualCount}, Intersection={snapshot.IntersectionMovementActualCount}");
                 Mod.log.Info($"[AvoidanceCount] PublicTransport={snapshot.PublicTransportLaneAvoidedEventCount}, MidBlock={snapshot.MidBlockCrossingAvoidedEventCount}, Intersection={snapshot.IntersectionMovementAvoidedEventCount}");
@@ -615,6 +654,8 @@ namespace Traffic_Law_Enforcement
                         pathContextSequence,
                         kind,
                         fineAmount));
+
+                s_RollingWindowSnapshotDirty = true;
             }
 
             switch (kind)
@@ -750,6 +791,8 @@ namespace Traffic_Law_Enforcement
                         avoidedPublicTransportLanePenalty,
                         avoidedMidBlockPenalty,
                         avoidedIntersectionPenalty));
+
+                s_RollingWindowSnapshotDirty = true;
             }
 
             if (countsTowardPublicTransportLanePath)
@@ -785,70 +828,113 @@ namespace Traffic_Law_Enforcement
 
         public static string GetTotalStatisticsLine()
         {
-            if (!IsGameplayContextAvailable())
-                return LocalizeText(kLoadedSaveOnlyLocaleId, "Available only in a loaded save.");
-            if (!EnforcementGameTime.IsInitialized)
-                return LocalizeText(kWaitingForTimeLocaleId, "Waiting for in-game time initialization.");
-            var snapshot = GetRollingWindowSnapshot();
-            int violationNumeratorTotal = snapshot.TotalActualPathCount;
-            int vehicleRouteDenominatorTotal = snapshot.TotalPathRequestCount;
-            int suppressionFailureDenominatorTotal = snapshot.TotalActualOrAvoidedPathCount;
-            string violationRateTotal = FormatRatio(violationNumeratorTotal, vehicleRouteDenominatorTotal);
-            string suppressionFailureRateTotal = FormatRatio(violationNumeratorTotal, suppressionFailureDenominatorTotal);
-            string finesTotal = FormatMoney(snapshot.TotalFineAmount);
-            string lineFormat = LocalizeText(kStatisticsLineFormat, "violation rate {0}, suppression failure rate {1}, fines {2}₡.");
-            return string.Format(lineFormat, violationRateTotal, suppressionFailureRateTotal, finesTotal);
+            string unavailableText = GetStatisticsUnavailableText();
+            if (unavailableText != null)
+            {
+                return unavailableText;
+            }
+
+            RollingWindowSnapshot snapshot = GetRollingWindowSnapshot();
+
+            return BuildStatisticsLine(
+                snapshot,
+                snapshot.TotalActualPathCount,
+                snapshot.TotalActualOrAvoidedPathCount,
+                snapshot.TotalFineAmount);
         }
 
         public static string GetPublicTransportLaneStatisticsLine()
         {
-            if (!IsGameplayContextAvailable())
-                return LocalizeText(kLoadedSaveOnlyLocaleId, "Available only in a loaded save.");
-            if (!EnforcementGameTime.IsInitialized)
-                return LocalizeText(kWaitingForTimeLocaleId, "Waiting for in-game time initialization.");
-            var snapshot = GetRollingWindowSnapshot();
-            int vehicleRouteDenominatorTotal = snapshot.TotalPathRequestCount;
-            int violationNumerator1 = snapshot.PublicTransportLaneActualCount;
-            int suppressionFailureDenominator1 = snapshot.PublicTransportLaneActualOrAvoidedPathCount;
-            string violationRate1 = FormatRatio(violationNumerator1, vehicleRouteDenominatorTotal);
-            string suppressionFailureRate1 = FormatRatio(violationNumerator1, suppressionFailureDenominator1);
-            string fines1 = FormatMoney(snapshot.PublicTransportLaneFineAmount);
-            string lineFormat = LocalizeText(kStatisticsLineFormat, "violation rate {0}, suppression failure rate {1}, fines {2}₡.");
-            return string.Format(lineFormat, violationRate1, suppressionFailureRate1, fines1);
+            string unavailableText = GetStatisticsUnavailableText();
+            if (unavailableText != null)
+            {
+                return unavailableText;
+            }
+
+            RollingWindowSnapshot snapshot = GetRollingWindowSnapshot();
+
+            return BuildStatisticsLine(
+                snapshot,
+                snapshot.PublicTransportLaneActualCount,
+                snapshot.PublicTransportLaneActualOrAvoidedPathCount,
+                snapshot.PublicTransportLaneFineAmount);
         }
 
         public static string GetMidBlockCrossingStatisticsLine()
         {
-            if (!IsGameplayContextAvailable())
-                return LocalizeText(kLoadedSaveOnlyLocaleId, "Available only in a loaded save.");
-            if (!EnforcementGameTime.IsInitialized)
-                return LocalizeText(kWaitingForTimeLocaleId, "Waiting for in-game time initialization.");
-            var snapshot = GetRollingWindowSnapshot();
-            int vehicleRouteDenominatorTotal = snapshot.TotalPathRequestCount;
-            int violationNumerator2 = snapshot.MidBlockCrossingActualCount;
-            int suppressionFailureDenominator2 = snapshot.MidBlockCrossingActualOrAvoidedPathCount;
-            string violationRate2 = FormatRatio(violationNumerator2, vehicleRouteDenominatorTotal);
-            string suppressionFailureRate2 = FormatRatio(violationNumerator2, suppressionFailureDenominator2);
-            string fines2 = FormatMoney(snapshot.MidBlockCrossingFineAmount);
-            string lineFormat = LocalizeText(kStatisticsLineFormat, "violation rate {0}, suppression failure rate {1}, fines {2}₡.");
-            return string.Format(lineFormat, violationRate2, suppressionFailureRate2, fines2);
-        }
+            string unavailableText = GetStatisticsUnavailableText();
+            if (unavailableText != null)
+            {
+                return unavailableText;
+            }
 
+            RollingWindowSnapshot snapshot = GetRollingWindowSnapshot();
+
+            return BuildStatisticsLine(
+                snapshot,
+                snapshot.MidBlockCrossingActualCount,
+                snapshot.MidBlockCrossingActualOrAvoidedPathCount,
+                snapshot.MidBlockCrossingFineAmount);
+        }
         public static string GetIntersectionMovementStatisticsLine()
         {
+            string unavailableText = GetStatisticsUnavailableText();
+            if (unavailableText != null)
+            {
+                return unavailableText;
+            }
+
+            RollingWindowSnapshot snapshot = GetRollingWindowSnapshot();
+
+            return BuildStatisticsLine(
+                snapshot,
+                snapshot.IntersectionMovementActualCount,
+                snapshot.IntersectionMovementActualOrAvoidedPathCount,
+                snapshot.IntersectionMovementFineAmount);
+        }
+
+        private static string GetStatisticsUnavailableText()
+        {
             if (!IsGameplayContextAvailable())
-                return LocalizeText(kLoadedSaveOnlyLocaleId, "Available only in a loaded save.");
+            {
+                return LocalizeText(
+                    kLoadedSaveOnlyLocaleId,
+                    "Available only in a loaded save.");
+            }
+
             if (!EnforcementGameTime.IsInitialized)
-                return LocalizeText(kWaitingForTimeLocaleId, "Waiting for in-game time initialization.");
-            var snapshot = GetRollingWindowSnapshot();
-            int vehicleRouteDenominatorTotal = snapshot.TotalPathRequestCount;
-            int violationNumerator3 = snapshot.IntersectionMovementActualCount;
-            int suppressionFailureDenominator3 = snapshot.IntersectionMovementActualOrAvoidedPathCount;
-            string violationRate3 = FormatRatio(violationNumerator3, vehicleRouteDenominatorTotal);
-            string suppressionFailureRate3 = FormatRatio(violationNumerator3, suppressionFailureDenominator3);
-            string fines3 = FormatMoney(snapshot.IntersectionMovementFineAmount);
-            string lineFormat = LocalizeText(kStatisticsLineFormat, "violation rate {0}, suppression failure rate {1}, fines {2}₡.");
-            return string.Format(lineFormat, violationRate3, suppressionFailureRate3, fines3);
+            {
+                return LocalizeText(
+                    kWaitingForTimeLocaleId,
+                    "Waiting for in-game time initialization.");
+            }
+
+            return null;
+        }
+
+        private static string BuildStatisticsLine(
+            RollingWindowSnapshot snapshot,
+            int actualCount,
+            int actualOrAvoidedPathCount,
+            int fineAmount)
+        {
+            string violationRate =
+                FormatRatio(actualCount, snapshot.TotalPathRequestCount);
+
+            string suppressionFailureRate =
+                FormatRatio(actualCount, actualOrAvoidedPathCount);
+
+            string fines = FormatMoney(fineAmount);
+
+            string lineFormat = LocalizeText(
+                kStatisticsLineFormat,
+                "violation rate {0}, suppression failure rate {1}, fines {2}₡.");
+
+            return string.Format(
+                lineFormat,
+                violationRate,
+                suppressionFailureRate,
+                fines);
         }
 
         public static RollingWindowSnapshot GetRollingWindowSnapshot()
@@ -860,9 +946,35 @@ namespace Traffic_Law_Enforcement
 
             UpdateRollingWindowData();
 
-            HashSet<long> requestPaths = new HashSet<long>();
-            HashSet<long> totalActualPaths = new HashSet<long>();
-            HashSet<long> totalAvoidedPaths = new HashSet<long>();
+            long currentTimestampMonthTicks = EnforcementGameTime.CurrentTimestampMonthTicks;
+            if (!s_RollingWindowSnapshotDirty &&
+                s_LastSnapshotTimestampMonthTicks == currentTimestampMonthTicks)
+            {
+                return s_CachedRollingWindowSnapshot;
+            }
+
+            s_CachedRollingWindowSnapshot = BuildRollingWindowSnapshot();
+            s_LastSnapshotTimestampMonthTicks = currentTimestampMonthTicks;
+            s_RollingWindowSnapshotDirty = false;
+            return s_CachedRollingWindowSnapshot;
+        }
+
+        private static RollingWindowSnapshot BuildRollingWindowSnapshot()
+        {
+            if (!EnforcementGameTime.IsInitialized)
+            {
+                return default;
+            }
+
+            int requestEventCount = s_PathRequestEvents.Count;
+            int actualViolationEventCount = s_ActualViolationEvents.Count;
+            int avoidedRerouteEventCount = s_AvoidedRerouteEvents.Count;
+            int combinedEventCapacity = actualViolationEventCount + avoidedRerouteEventCount;
+
+            HashSet<long> requestPaths = new HashSet<long>(requestEventCount);
+            HashSet<long> totalActualPaths = new HashSet<long>(actualViolationEventCount);
+            HashSet<long> totalAvoidedPaths = new HashSet<long>(avoidedRerouteEventCount);
+            HashSet<long> totalActualOrAvoidedPaths = new HashSet<long>(combinedEventCapacity);
 
             HashSet<long> publicTransportActualPaths = new HashSet<long>();
             HashSet<long> midBlockActualPaths = new HashSet<long>();
@@ -871,6 +983,10 @@ namespace Traffic_Law_Enforcement
             HashSet<long> publicTransportAvoidedPaths = new HashSet<long>();
             HashSet<long> midBlockAvoidedPaths = new HashSet<long>();
             HashSet<long> intersectionAvoidedPaths = new HashSet<long>();
+
+            HashSet<long> publicTransportActualOrAvoidedPaths = new HashSet<long>();
+            HashSet<long> midBlockActualOrAvoidedPaths = new HashSet<long>();
+            HashSet<long> intersectionActualOrAvoidedPaths = new HashSet<long>();
 
             int legacyRequestPathCount = 0;
             int legacyTotalActualPathCount = 0;
@@ -930,22 +1046,27 @@ namespace Traffic_Law_Enforcement
                     continue;
                 }
 
-                totalActualPaths.Add(entry.PathContextSequence);
+                long pathContextSequence = entry.PathContextSequence;
+                totalActualPaths.Add(pathContextSequence);
+                totalActualOrAvoidedPaths.Add(pathContextSequence);
 
                 switch (entry.Kind)
                 {
                     case EnforcementKinds.PublicTransportLane:
-                        publicTransportActualPaths.Add(entry.PathContextSequence);
+                        publicTransportActualPaths.Add(pathContextSequence);
+                        publicTransportActualOrAvoidedPaths.Add(pathContextSequence);
                         publicTransportLaneFineAmount += entry.FineAmount;
                         break;
 
                     case EnforcementKinds.MidBlockCrossing:
-                        midBlockActualPaths.Add(entry.PathContextSequence);
+                        midBlockActualPaths.Add(pathContextSequence);
+                        midBlockActualOrAvoidedPaths.Add(pathContextSequence);
                         midBlockCrossingFineAmount += entry.FineAmount;
                         break;
 
                     case EnforcementKinds.IntersectionMovement:
-                        intersectionActualPaths.Add(entry.PathContextSequence);
+                        intersectionActualPaths.Add(pathContextSequence);
+                        intersectionActualOrAvoidedPaths.Add(pathContextSequence);
                         intersectionMovementFineAmount += entry.FineAmount;
                         break;
                 }
@@ -977,38 +1098,28 @@ namespace Traffic_Law_Enforcement
                     continue;
                 }
 
-                totalAvoidedPaths.Add(entry.PathContextSequence);
+                long pathContextSequence = entry.PathContextSequence;
+                totalAvoidedPaths.Add(pathContextSequence);
+                totalActualOrAvoidedPaths.Add(pathContextSequence);
 
                 if (entry.AvoidedPublicTransportLanePenalty)
                 {
-                    publicTransportAvoidedPaths.Add(entry.PathContextSequence);
+                    publicTransportAvoidedPaths.Add(pathContextSequence);
+                    publicTransportActualOrAvoidedPaths.Add(pathContextSequence);
                 }
 
                 if (entry.AvoidedMidBlockPenalty)
                 {
-                    midBlockAvoidedPaths.Add(entry.PathContextSequence);
+                    midBlockAvoidedPaths.Add(pathContextSequence);
+                    midBlockActualOrAvoidedPaths.Add(pathContextSequence);
                 }
 
                 if (entry.AvoidedIntersectionPenalty)
                 {
-                    intersectionAvoidedPaths.Add(entry.PathContextSequence);
+                    intersectionAvoidedPaths.Add(pathContextSequence);
+                    intersectionActualOrAvoidedPaths.Add(pathContextSequence);
                 }
             }
-
-            HashSet<long> totalActualOrAvoidedPaths = new HashSet<long>(totalActualPaths);
-            totalActualOrAvoidedPaths.UnionWith(totalAvoidedPaths);
-
-            HashSet<long> publicTransportActualOrAvoidedPaths =
-                new HashSet<long>(publicTransportActualPaths);
-            publicTransportActualOrAvoidedPaths.UnionWith(publicTransportAvoidedPaths);
-
-            HashSet<long> midBlockActualOrAvoidedPaths =
-                new HashSet<long>(midBlockActualPaths);
-            midBlockActualOrAvoidedPaths.UnionWith(midBlockAvoidedPaths);
-
-            HashSet<long> intersectionActualOrAvoidedPaths =
-                new HashSet<long>(intersectionActualPaths);
-            intersectionActualOrAvoidedPaths.UnionWith(intersectionAvoidedPaths);
 
             int totalPathRequestCount = requestPaths.Count + legacyRequestPathCount;
             int totalActualPathCount = totalActualPaths.Count + legacyTotalActualPathCount;
@@ -1118,9 +1229,16 @@ namespace Traffic_Law_Enforcement
 
             long currentTimestampMonthTicks = EnforcementGameTime.CurrentTimestampMonthTicks;
             long cutoffTimestamp = System.Math.Max(0L, currentTimestampMonthTicks - EnforcementGameTime.CurrentMonthTicksPerMonth);
-            PrunePathRequestEvents(cutoffTimestamp);
-            PruneActualViolationEvents(cutoffTimestamp);
-            PruneAvoidedRerouteEvents(cutoffTimestamp);
+
+            bool removedAny = false;
+            removedAny |= PrunePathRequestEvents(cutoffTimestamp);
+            removedAny |= PruneActualViolationEvents(cutoffTimestamp);
+            removedAny |= PruneAvoidedRerouteEvents(cutoffTimestamp);
+
+            if (removedAny)
+            {
+                s_RollingWindowSnapshotDirty = true;
+            }
         }
 
 
@@ -1134,6 +1252,7 @@ namespace Traffic_Law_Enforcement
             }
 
             long timestampMonthTicks = EnforcementGameTime.CurrentTimestampMonthTicks;
+            bool addedAny = false;
 
             for (int index = 0; index < s_PendingPathRequestSequencesUntilTimeInitialization.Count; index += 1)
             {
@@ -1146,10 +1265,16 @@ namespace Traffic_Law_Enforcement
                         new PathRequestEvent(
                             timestampMonthTicks,
                             pathContextSequence));
+                    addedAny = true;
                 }
             }
 
             s_PendingPathRequestSequencesUntilTimeInitialization.Clear();
+
+            if (addedAny)
+            {
+                s_RollingWindowSnapshotDirty = true;
+            }
         }
 
         private static long RecordPathRequestInternal(int vehicleId)
@@ -1181,6 +1306,8 @@ namespace Traffic_Law_Enforcement
                     new PathRequestEvent(
                         EnforcementGameTime.CurrentTimestampMonthTicks,
                         pathContextSequence));
+
+                s_RollingWindowSnapshotDirty = true;
             }
 
             return pathContextSequence;
@@ -1285,37 +1412,28 @@ namespace Traffic_Law_Enforcement
             return amount.ToString("N0", CultureInfo.InvariantCulture);
         }
 
-        private static void PrunePathRequestEvents(long cutoffTimestamp)
+        private static bool PrunePathRequestEvents(long cutoffTimestamp)
         {
-            for (int index = s_PathRequestEvents.Count - 1; index >= 0; index -= 1)
-            {
-                if (s_PathRequestEvents[index].TimestampMonthTicks < cutoffTimestamp)
-                {
-                    s_PathRequestEvents.RemoveAt(index);
-                }
-            }
+            return RemoveExpiredPrefix(
+                s_PathRequestEvents,
+                cutoffTimestamp,
+                entry => entry.TimestampMonthTicks);
         }
 
-        private static void PruneActualViolationEvents(long cutoffTimestamp)
+        private static bool PruneActualViolationEvents(long cutoffTimestamp)
         {
-            for (int index = s_ActualViolationEvents.Count - 1; index >= 0; index -= 1)
-            {
-                if (s_ActualViolationEvents[index].TimestampMonthTicks < cutoffTimestamp)
-                {
-                    s_ActualViolationEvents.RemoveAt(index);
-                }
-            }
+            return RemoveExpiredPrefix(
+                s_ActualViolationEvents,
+                cutoffTimestamp,
+                entry => entry.TimestampMonthTicks);
         }
 
-        private static void PruneAvoidedRerouteEvents(long cutoffTimestamp)
+        private static bool PruneAvoidedRerouteEvents(long cutoffTimestamp)
         {
-            for (int index = s_AvoidedRerouteEvents.Count - 1; index >= 0; index -= 1)
-            {
-                if (s_AvoidedRerouteEvents[index].TimestampMonthTicks < cutoffTimestamp)
-                {
-                    s_AvoidedRerouteEvents.RemoveAt(index);
-                }
-            }
+            return RemoveExpiredPrefix(
+                s_AvoidedRerouteEvents,
+                cutoffTimestamp,
+                entry => entry.TimestampMonthTicks);
         }
     }
 }

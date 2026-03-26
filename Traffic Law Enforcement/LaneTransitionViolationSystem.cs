@@ -237,122 +237,15 @@ namespace Traffic_Law_Enforcement
             }
         }
 
-        private bool TryDetectMidBlockCrossing(VehicleLaneHistory history, out LaneTransitionViolationReasonCode reasonCode)
+        private bool TryDetectMidBlockCrossing(
+            VehicleLaneHistory history,
+            out LaneTransitionViolationReasonCode reasonCode)
         {
-            reasonCode = LaneTransitionViolationReasonCode.None;
-
-            if (m_EdgeLaneData.HasComponent(history.m_PreviousLane) &&
-                m_EdgeLaneData.HasComponent(history.m_CurrentLane))
-            {
-                if (!m_CarLaneData.TryGetComponent(history.m_PreviousLane, out CarLane previousCarLane) ||
-                    !m_CarLaneData.TryGetComponent(history.m_CurrentLane, out CarLane currentCarLane))
-                {
-                    return false;
-                }
-
-                EdgeLane previousEdgeLane = m_EdgeLaneData[history.m_PreviousLane];
-                EdgeLane currentEdgeLane = m_EdgeLaneData[history.m_CurrentLane];
-                bool sameOwner =
-                    history.m_PreviousLaneOwner == history.m_CurrentLaneOwner &&
-                    history.m_CurrentLaneOwner != Entity.Null;
-                bool oppositeDirections = IsOppositeDirection(previousEdgeLane, currentEdgeLane);
-                bool sameCarriageway =
-                    previousCarLane.m_CarriagewayGroup == currentCarLane.m_CarriagewayGroup;
-
-                if (sameOwner && oppositeDirections && sameCarriageway)
-                {
-                    reasonCode = LaneTransitionViolationReasonCode.OppositeFlowSameRoadSegment;
-                    return true;
-                }
-            }
-
-            if (!m_EdgeLaneData.HasComponent(history.m_PreviousLane) ||
-                !m_CarLaneData.TryGetComponent(history.m_PreviousLane, out CarLane sourceLane))
-            {
-                return TryDetectOutboundAccessCrossing(history, out reasonCode);
-            }
-
-            if (!LaneAllowsSideAccess(sourceLane))
-            {
-                if (m_GarageLaneData.HasComponent(history.m_CurrentLane))
-                {
-                    reasonCode = LaneTransitionViolationReasonCode.EnteredGarageAccessWithoutSideAccess;
-                    return true;
-                }
-
-                if (m_ParkingLaneData.HasComponent(history.m_CurrentLane))
-                {
-                    reasonCode = LaneTransitionViolationReasonCode.EnteredParkingAccessWithoutSideAccess;
-                    return true;
-                }
-
-                if (m_ConnectionLaneData.TryGetComponent(history.m_CurrentLane, out ConnectionLane connectionLane))
-                {
-                    if ((connectionLane.m_Flags & ConnectionLaneFlags.Parking) != 0)
-                    {
-                        reasonCode = LaneTransitionViolationReasonCode.EnteredParkingConnectionWithoutSideAccess;
-                        return true;
-                    }
-
-                    if ((connectionLane.m_Flags & ConnectionLaneFlags.Road) == 0)
-                    {
-                        reasonCode = LaneTransitionViolationReasonCode.EnteredBuildingAccessConnectionWithoutSideAccess;
-                        return true;
-                    }
-                }
-            }
-
-            return TryDetectOutboundAccessCrossing(history, out reasonCode);
-        }
-
-        private bool TryDetectOutboundAccessCrossing(VehicleLaneHistory history, out LaneTransitionViolationReasonCode reasonCode)
-        {
-            reasonCode = LaneTransitionViolationReasonCode.None;
-
-            if (!IsAccessOrigin(history.m_PreviousLane))
-            {
-                return false;
-            }
-
-            if (!m_EdgeLaneData.HasComponent(history.m_CurrentLane) ||
-                !m_CarLaneData.TryGetComponent(history.m_CurrentLane, out CarLane targetLane))
-            {
-                return false;
-            }
-
-            if (LaneAllowsSideAccess(targetLane))
-            {
-                return false;
-            }
-
-            if (m_ParkingLaneData.HasComponent(history.m_PreviousLane))
-            {
-                reasonCode = LaneTransitionViolationReasonCode.ExitedParkingAccessWithoutSideAccess;
-                return true;
-            }
-
-            if (m_GarageLaneData.HasComponent(history.m_PreviousLane))
-            {
-                reasonCode = LaneTransitionViolationReasonCode.ExitedGarageAccessWithoutSideAccess;
-                return true;
-            }
-
-            if (m_ConnectionLaneData.TryGetComponent(history.m_PreviousLane, out ConnectionLane connectionLane))
-            {
-                if ((connectionLane.m_Flags & ConnectionLaneFlags.Parking) != 0)
-                {
-                    reasonCode = LaneTransitionViolationReasonCode.ExitedParkingConnectionWithoutSideAccess;
-                    return true;
-                }
-
-                if ((connectionLane.m_Flags & ConnectionLaneFlags.Road) == 0)
-                {
-                    reasonCode = LaneTransitionViolationReasonCode.ExitedBuildingAccessConnectionWithoutSideAccess;
-                    return true;
-                }
-            }
-
-            return false;
+            return MidBlockCrossingPolicy.TryGetIllegalTransition(
+                EntityManager,
+                history.m_PreviousLane,
+                history.m_CurrentLane,
+                out reasonCode);
         }
 
         private bool TryDetectIntersectionMovementViolation(VehicleLaneHistory history, CarCurrentLane currentLane, out LaneMovement actualMovement, out LaneMovement allowedMovement)

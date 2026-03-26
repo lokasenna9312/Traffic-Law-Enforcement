@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
-using System.Reflection;
 using Colossal.Localization;
 using Game;
 using Game.Common;
@@ -60,13 +59,15 @@ namespace Traffic_Law_Enforcement
             m_InfoviewPrefabQuery = GetEntityQuery(ComponentType.ReadOnly<InfoviewData>(), ComponentType.ReadOnly<PrefabData>());
 
             CacheStaticChirperTemplates();
-            RegisterLocalizationSources();
             EnsureSenderAccount();
 
             bool rebuiltLocalization = false;
+            int restoredReportCount = 0;
+
             foreach (MonthlyEnforcementReport report in MonthlyEnforcementChirperService.GetReportHistorySnapshot())
             {
-                rebuiltLocalization |= EnsureReportAssets(report, out _);
+                rebuiltLocalization |= EnsureReportLocalizationEntries(report);
+                restoredReportCount += 1;
             }
 
             if (rebuiltLocalization)
@@ -74,7 +75,7 @@ namespace Traffic_Law_Enforcement
                 ReloadActiveLocale();
             }
 
-            Mod.log.Info($"Monthly chirper system initialized. restoredReports={m_ReportTriggerEntities.Count}");
+            Mod.log.Info($"Monthly chirper system initialized. restoredReportLocalizations={restoredReportCount}, activeTriggers={m_ReportTriggerEntities.Count}");
         }
 
         protected override void OnDestroy()
@@ -156,18 +157,6 @@ namespace Traffic_Law_Enforcement
             MonthlyEnforcementChirperService.EnsureTrackingInitialized(currentMonthIndex);
 
             return TryPublishCurrentPeriodPreview(currentTimestampMonthTicks, openPanel: true, out failureReason);
-        }
-
-        private void RegisterLocalizationSources()
-        {
-            LocalizationManager localizationManager = GameManager.instance?.localizationManager;
-            if (localizationManager == null)
-            {
-                Mod.log.Info("Monthly chirper localization manager unavailable during initialization.");
-                return;
-            }
-
-            ReloadActiveLocale();
         }
 
         private void CacheStaticChirperTemplates()
@@ -280,11 +269,13 @@ namespace Traffic_Law_Enforcement
 
         private void PublishCompletedMonthReport(MonthlyEnforcementReport report)
         {
-            bool updatedLocalization = EnsureReportAssets(report, out Entity triggerEntity);
+            bool updatedLocalization = EnsureReportLocalizationEntries(report);
             if (updatedLocalization)
             {
                 ReloadActiveLocale();
             }
+
+            Entity triggerEntity = EnsureReportTriggerEntity(report.m_MonthIndex);
 
             long periodStart = MonthlyEnforcementChirperService.GetReportPeriodStartMonthTicks(report);
             long periodEnd = MonthlyEnforcementChirperService.GetReportPeriodEndMonthTicks(report);
@@ -305,12 +296,15 @@ namespace Traffic_Law_Enforcement
                 long periodStart = MonthlyEnforcementChirperService.GetCurrentPeriodStartMonthTicks(currentTimestampMonthTicks);
                 long periodEnd = currentTimestampMonthTicks;
 
-                bool updatedLocalization = EnsurePreviewAssets(previewReport, periodStart, periodEnd, out Entity triggerEntity);
+                int previewSequence = ++m_ManualPreviewSequence;
+                bool updatedLocalization = EnsurePreviewLocalizationEntries(previewReport, periodStart, periodEnd, previewSequence);
 
                 if (updatedLocalization)
                 {
                     ReloadActiveLocale();
                 }
+
+                Entity triggerEntity = CreatePreviewTriggerEntity(periodEnd, previewSequence);
 
                 if (EnqueueChirp(triggerEntity))
                 {
@@ -329,51 +323,48 @@ namespace Traffic_Law_Enforcement
             }
         }
 
-        private bool EnsureReportAssets(MonthlyEnforcementReport report, out Entity triggerEntity)
+        private bool EnsureReportLocalizationEntries(MonthlyEnforcementReport report)
         {
-            EnsureSenderAccount();
-
             long periodStart = MonthlyEnforcementChirperService.GetReportPeriodStartMonthTicks(report);
             long periodEnd = MonthlyEnforcementChirperService.GetReportPeriodEndMonthTicks(report);
             string localizationId = GetReportLocalizationId(report.m_MonthIndex);
-            bool localizationChanged = EnsureLocalizationEntriesForLocales(localizationId, report, periodStart, periodEnd);
 
-            if (localizationChanged)
-            {
-                ReloadActiveLocale();
-            }
-
-            if (m_ReportTriggerEntities.TryGetValue(report.m_MonthIndex, out triggerEntity) &&
-                triggerEntity != Entity.Null &&
-                EntityManager.Exists(triggerEntity))
-            {
-                return localizationChanged;
-            }
-
-            triggerEntity = CreateChirpTriggerEntity($"{kPrefabNamePrefix}.Report.{report.m_MonthIndex}", localizationId);
-            m_ReportTriggerEntities[report.m_MonthIndex] = triggerEntity;
-            return true;
+            return EnsureLocalizationEntriesForLocales(localizationId, report, periodStart, periodEnd);
         }
 
-        private bool EnsurePreviewAssets(MonthlyEnforcementReport report, long periodStart, long periodEnd, out Entity triggerEntity)
+        private Entity EnsureReportTriggerEntity(long monthIndex)
         {
             EnsureSenderAccount();
 
-            int previewSequence = ++m_ManualPreviewSequence;
-            string assetKey = $"{kPrefabNamePrefix}.Preview.{periodEnd}.{previewSequence}";
-            string localizationId = GetPreviewLocalizationId(periodEnd, previewSequence);
-            bool localizationChanged = EnsureLocalizationEntriesForLocales(localizationId, report, periodStart, periodEnd);
-
-            if (localizationChanged)
+            if (m_ReportTriggerEntities.TryGetValue(monthIndex, out Entity triggerEntity) &&
+                triggerEntity != Entity.Null &&
+                EntityManager.Exists(triggerEntity))
             {
-                ReloadActiveLocale();
+                return triggerEntity;
             }
 
-            triggerEntity = CreateChirpTriggerEntity(assetKey, localizationId);
-            return localizationChanged;
+            string localizationId = GetReportLocalizationId(monthIndex);
+            triggerEntity = CreateTriggerEntityForLocalizedChirp($"{kPrefabNamePrefix}.Report.{monthIndex}", localizationId);
+            m_ReportTriggerEntities[monthIndex] = triggerEntity;
+            return triggerEntity;
         }
 
-        private Entity CreateChirpTriggerEntity(string assetKey, string localizationId)
+        private bool EnsurePreviewLocalizationEntries(MonthlyEnforcementReport report, long periodStart, long periodEnd, int previewSequence)
+        {
+            string localizationId = GetPreviewLocalizationId(periodEnd, previewSequence);
+            return EnsureLocalizationEntriesForLocales(localizationId, report, periodStart, periodEnd);
+        }
+
+        private Entity CreatePreviewTriggerEntity(long periodEnd, int previewSequence)
+        {
+            EnsureSenderAccount();
+
+            string assetKey = $"{kPrefabNamePrefix}.Preview.{periodEnd}.{previewSequence}";
+            string localizationId = GetPreviewLocalizationId(periodEnd, previewSequence);
+            return CreateTriggerEntityForLocalizedChirp(assetKey, localizationId);
+        }
+
+        private Entity CreateTriggerEntityForLocalizedChirp(string assetKey, string localizationId)
         {
             ServiceChirpPrefab chirpPrefab = ScriptableObject.CreateInstance<ServiceChirpPrefab>();
             chirpPrefab.name = $"{assetKey}.Chirp";
@@ -634,39 +625,60 @@ namespace Traffic_Law_Enforcement
             return $"{monthName} {year} {hour:00}:{minute:00}";
         }
 
+        private string BuildLocalizedStatisticsLine(
+            string localeId,
+            string lineFormatLocaleId,
+            int finedViolationCount,
+            int totalPathRequestCount,
+            int actualOrAvoidedPathCount,
+            int fineAmount)
+        {
+            return FormatLocalizedTextForLocale(
+                localeId,
+                lineFormatLocaleId,
+                FormatViolationRate(localeId, finedViolationCount, totalPathRequestCount),
+                FormatSuppressionFailureRate(localeId, finedViolationCount, actualOrAvoidedPathCount),
+                FormatMoney(localeId, fineAmount));
+        }
+
         private string BuildLocalizedMessage(string localeId, MonthlyEnforcementReport report, long periodStartMonthTicks, long periodEndMonthTicks)
         {
-            return
+            return string.Join(
+                "\n",
                 FormatLocalizedTextForLocale(
                     localeId,
                     kReportHeaderFormatLocaleId,
                     FormatPeriodPoint(localeId, periodStartMonthTicks),
                     FormatPeriodPoint(localeId, periodEndMonthTicks),
-                    report.TotalViolationCount) + "\n" +
-                FormatLocalizedTextForLocale(
+                    report.TotalViolationCount),
+                BuildLocalizedStatisticsLine(
                     localeId,
                     kTotalLineFormatLocaleId,
-                    FormatViolationRate(localeId, report.m_TotalActualPathCount, report.m_TotalPathRequestCount),
-                    FormatSuppressionFailureRate(localeId, report.m_TotalActualPathCount, report.m_TotalActualOrAvoidedPathCount),
-                    FormatMoney(localeId, report.m_TotalFineAmount)) + "\n" +
-                FormatLocalizedTextForLocale(
+                    report.m_TotalActualPathCount,
+                    report.m_TotalPathRequestCount,
+                    report.m_TotalActualOrAvoidedPathCount,
+                    report.m_TotalFineAmount),
+                BuildLocalizedStatisticsLine(
                     localeId,
                     kPublicTransportLaneLineFormatLocaleId,
-                    FormatViolationRate(localeId, report.m_PublicTransportLaneCount, report.m_TotalPathRequestCount),
-                    FormatSuppressionFailureRate(localeId, report.m_PublicTransportLaneCount, report.m_PublicTransportLaneActualOrAvoidedPathCount),
-                    FormatMoney(localeId, report.m_PublicTransportLaneFineAmount)) + "\n" +
-                FormatLocalizedTextForLocale(
+                    report.m_PublicTransportLaneCount,
+                    report.m_TotalPathRequestCount,
+                    report.m_PublicTransportLaneActualOrAvoidedPathCount,
+                    report.m_PublicTransportLaneFineAmount),
+                BuildLocalizedStatisticsLine(
                     localeId,
                     kMidBlockLineFormatLocaleId,
-                    FormatViolationRate(localeId, report.m_MidBlockCrossingCount, report.m_TotalPathRequestCount),
-                    FormatSuppressionFailureRate(localeId, report.m_MidBlockCrossingCount, report.m_MidBlockCrossingActualOrAvoidedPathCount),
-                    FormatMoney(localeId, report.m_MidBlockCrossingFineAmount)) + "\n" +
-                FormatLocalizedTextForLocale(
+                    report.m_MidBlockCrossingCount,
+                    report.m_TotalPathRequestCount,
+                    report.m_MidBlockCrossingActualOrAvoidedPathCount,
+                    report.m_MidBlockCrossingFineAmount),
+                BuildLocalizedStatisticsLine(
                     localeId,
                     kIntersectionLineFormatLocaleId,
-                    FormatViolationRate(localeId, report.m_IntersectionMovementCount, report.m_TotalPathRequestCount),
-                    FormatSuppressionFailureRate(localeId, report.m_IntersectionMovementCount, report.m_IntersectionMovementActualOrAvoidedPathCount),
-                    FormatMoney(localeId, report.m_IntersectionMovementFineAmount));
+                    report.m_IntersectionMovementCount,
+                    report.m_TotalPathRequestCount,
+                    report.m_IntersectionMovementActualOrAvoidedPathCount,
+                    report.m_IntersectionMovementFineAmount));
         }
 
         private string FormatPeriodPoint(string localeId, long monthTicks)

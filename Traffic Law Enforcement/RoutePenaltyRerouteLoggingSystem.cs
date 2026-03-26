@@ -400,51 +400,63 @@ namespace Traffic_Law_Enforcement
             m_PublicTransportLaneDecisionDiagnosticLogsThisUpdate += 1;
         }
 
-        private bool TryGetMidBlockPenaltyTag(Entity sourceLane, Entity sourceOwner, Entity targetLane, Entity targetOwner, out string tag)
+        private bool TryGetMidBlockPenaltyTag(
+            Entity sourceLane,
+            Entity sourceOwner,
+            Entity targetLane,
+            Entity targetOwner,
+            out string tag)
         {
             tag = null;
 
-            if (m_EdgeLaneData.HasComponent(sourceLane) && m_EdgeLaneData.HasComponent(targetLane))
+            if (!MidBlockCrossingPolicy.TryGetIllegalTransition(
+                    EntityManager,
+                    sourceLane,
+                    targetLane,
+                    out LaneTransitionViolationReasonCode reasonCode))
             {
-                if (!m_CarLaneData.TryGetComponent(sourceLane, out CarLane sourceCarLane) ||
-                    !m_CarLaneData.TryGetComponent(targetLane, out CarLane targetCarLane))
-                {
-                    return false;
-                }
-
-                EdgeLane sourceEdgeLane = m_EdgeLaneData[sourceLane];
-                EdgeLane targetEdgeLane = m_EdgeLaneData[targetLane];
-                bool sameOwner = sourceOwner == targetOwner && targetOwner != Entity.Null;
-                bool oppositeDirections = IsOppositeDirection(sourceEdgeLane, targetEdgeLane);
-                bool sameCarriageway = sourceCarLane.m_CarriagewayGroup == targetCarLane.m_CarriagewayGroup;
-                if (sameOwner && oppositeDirections && sameCarriageway)
-                {
-                    tag = "mid-block(opposite-flow)";
-                    return true;
-                }
+                return false;
             }
 
-            if (!m_EdgeLaneData.HasComponent(sourceLane) || !m_CarLaneData.TryGetComponent(sourceLane, out CarLane originLane))
+            tag = $"mid-block({FormatMidBlockReasonTag(reasonCode)})";
+            return true;
+        }
+
+        private static string FormatMidBlockReasonTag(
+            LaneTransitionViolationReasonCode reasonCode)
+        {
+            switch (reasonCode)
             {
-                return TryGetOutboundAccessPenaltyTag(sourceLane, targetLane, out tag);
+                case LaneTransitionViolationReasonCode.OppositeFlowSameRoadSegment:
+                    return "opposite-flow";
+
+                case LaneTransitionViolationReasonCode.EnteredGarageAccessWithoutSideAccess:
+                    return "garage-access-ingress";
+
+                case LaneTransitionViolationReasonCode.EnteredParkingAccessWithoutSideAccess:
+                    return "parking-access-ingress";
+
+                case LaneTransitionViolationReasonCode.EnteredParkingConnectionWithoutSideAccess:
+                    return "parking-connection-ingress";
+
+                case LaneTransitionViolationReasonCode.EnteredBuildingAccessConnectionWithoutSideAccess:
+                    return "building-service-access-ingress";
+
+                case LaneTransitionViolationReasonCode.ExitedParkingAccessWithoutSideAccess:
+                    return "parking-access-egress";
+
+                case LaneTransitionViolationReasonCode.ExitedGarageAccessWithoutSideAccess:
+                    return "garage-access-egress";
+
+                case LaneTransitionViolationReasonCode.ExitedParkingConnectionWithoutSideAccess:
+                    return "parking-connection-egress";
+
+                case LaneTransitionViolationReasonCode.ExitedBuildingAccessConnectionWithoutSideAccess:
+                    return "building-service-access-egress";
+
+                default:
+                    return "illegal-transition";
             }
-
-            if (!LaneAllowsSideAccess(originLane))
-            {
-                if (m_ParkingLaneData.HasComponent(targetLane) || m_GarageLaneData.HasComponent(targetLane))
-                {
-                    tag = m_GarageLaneData.HasComponent(targetLane) ? "mid-block(garage-access)" : "mid-block(parking-access)";
-                    return true;
-                }
-
-                if (IsAccessConnection(targetLane))
-                {
-                    tag = $"mid-block({DescribeAccessConnectionTag(targetLane)})";
-                    return true;
-                }
-            }
-
-            return TryGetOutboundAccessPenaltyTag(sourceLane, targetLane, out tag);
         }
 
         private bool TryResolveAllowedOnPublicTransportLaneForLogging(

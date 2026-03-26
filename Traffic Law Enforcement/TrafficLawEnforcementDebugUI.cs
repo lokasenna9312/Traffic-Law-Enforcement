@@ -59,12 +59,12 @@ namespace Traffic_Law_Enforcement
             overview.children.Add(new DebugUI.Value
             {
                 displayName = "Pathfinding penalty prefabs",
-                getter = () => PathfindingPenaltyTelemetry.ModifiedPrefabCount
+                getter = () => MidBlockPathfindingBiasTelemetry.ModifiedPrefabCount
             });
             overview.children.Add(new DebugUI.Value
             {
                 displayName = "Pathfinding money overrides",
-                getter = () => PathfindingPenaltyTelemetry.OverrideSummary
+                getter = () => MidBlockPathfindingBiasTelemetry.OverrideSummary
             });
             overview.children.Add(new DebugUI.Value
             {

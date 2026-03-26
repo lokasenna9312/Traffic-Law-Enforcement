@@ -103,6 +103,8 @@ namespace Traffic_Law_Enforcement
 
         protected override void OnUpdate()
         {
+            return;
+
             if (!Mod.IsMidBlockCrossingEnforcementEnabled)
             {
                 return;

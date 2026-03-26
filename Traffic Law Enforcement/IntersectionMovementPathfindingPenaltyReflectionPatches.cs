@@ -10,13 +10,13 @@ using Entity = Unity.Entities.Entity;
 namespace Traffic_Law_Enforcement
 {
     [HarmonyPatch]
-    internal static class IntersectionMovementPathfindReflectionPatches
+    internal static class IntersectionMovementPathfindingPenaltyReflectionPatches
     {
         private const int MaxDiagnosticLogs = 32;
         private static readonly Type s_PathfindExecutorType = AccessTools.Inner(typeof(PathfindJobs), "PathfindExecutor");
         private static int s_DiagnosticLogCount;
         private static readonly HashSet<string> s_ActivatedMethods = new HashSet<string>();
-        private const string HarmonyId = "Traffic_Law_Enforcement.IntersectionMovementPathfindReflectionPatches";
+        private const string HarmonyId = "Traffic_Law_Enforcement.IntersectionMovementPathfindingPenaltyReflectionPatches";
         private static Harmony s_Harmony;
 
         private readonly struct NamedEntity
@@ -63,7 +63,7 @@ namespace Traffic_Law_Enforcement
             try
             {
                 s_Harmony = new Harmony(HarmonyId);
-                s_Harmony.PatchAll(typeof(IntersectionMovementPathfindReflectionPatches).Assembly);
+                s_Harmony.PatchAll(typeof(IntersectionMovementPathfindingPenaltyReflectionPatches).Assembly);
                 Mod.log.Info("Intersection movement reflection fallback patches applied.");
             }
             catch (Exception ex)
@@ -84,6 +84,7 @@ namespace Traffic_Law_Enforcement
             s_Harmony = null;
         }
 
+        [HarmonyPostfix]
         private static void Postfix(object[] __args, ref float __result, PathfindParameters ___m_Parameters, MethodBase __originalMethod)
         {
             string methodKey = __originalMethod?.ToString() ?? "(null)";

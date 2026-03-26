@@ -9,12 +9,16 @@ using Entity = Unity.Entities.Entity;
 
 namespace Traffic_Law_Enforcement
 {
-    public static class PathfindingPenaltyTelemetry
+    public static class MidBlockPathfindingBiasTelemetry
     {
         public static int ModifiedPrefabCount { get; private set; }
         public static string OverrideSummary { get; private set; } = "Waiting for car pathfinding prefabs.";
 
-        public static void SetState(int modifiedPrefabCount, bool enabled, float midBlockPenalty)
+        public static void SetState(
+            int modifiedPrefabCount,
+            bool enabled,
+            int midBlockMoneyPenalty,
+            float midBlockBehaviourPenalty)
         {
             ModifiedPrefabCount = modifiedPrefabCount;
 
@@ -30,11 +34,15 @@ namespace Traffic_Law_Enforcement
                 return;
             }
 
-            OverrideSummary = $"UTurn +{midBlockPenalty:0}, UnsafeUTurn +{midBlockPenalty:0}, LaneCross +{midBlockPenalty:0}; PT-lane money-axis penalty is handled per route rather than through shared PathfindCarData prefabs";
+            OverrideSummary =
+                $"UTurn money +{midBlockMoneyPenalty:0}, behaviour +{midBlockBehaviourPenalty:0.###}; " +
+                $"UnsafeUTurn money +{midBlockMoneyPenalty:0}, behaviour +{midBlockBehaviourPenalty:0.###}; " +
+                $"LaneCross money +{midBlockMoneyPenalty:0}, behaviour +{midBlockBehaviourPenalty:0.###}; " +
+                "PT-lane route penalties are still handled per route rather than through shared PathfindCarData prefabs";
         }
     }
 
-    public partial class PathfindingMoneyPenaltySystem : GameSystemBase
+    public partial class MidBlockPathfindingBiasSystem : GameSystemBase
     {
         private EntityQuery m_PathfindCarDataQuery;
         private EntityQuery m_UncachedPathfindCarDataQuery;
@@ -44,6 +52,17 @@ namespace Traffic_Law_Enforcement
         private int m_LastPrefabCount = -1;
         private bool m_LastEnforcementEnabled;
         private bool m_HasApplied;
+        private const float MidBlockBehaviourBaseline = 2f;
+        private const float MidBlockBehaviourFineDivisor = 15f;
+        private static float CalculateMidBlockBehaviourPenalty(int midBlockMoneyPenalty, bool enforcementEnabled)
+        {
+            if (!enforcementEnabled || midBlockMoneyPenalty <= 0)
+            {
+                return 0f;
+            }
+
+            return MidBlockBehaviourBaseline + math.sqrt(midBlockMoneyPenalty) / MidBlockBehaviourFineDivisor;
+        }
 
         protected override void OnCreate()
         {
@@ -70,8 +89,11 @@ namespace Traffic_Law_Enforcement
             m_OriginalPathfindCarDataLookup.Update(this);
 
             int prefabCount = m_PathfindCarDataQuery.CalculateEntityCount();
-            bool enforcementEnabled = Mod.IsMidBlockCrossingEnforcementEnabled || Mod.IsIntersectionMovementEnforcementEnabled;
-            int midBlockPenalty = Mod.IsMidBlockCrossingEnforcementEnabled ? EnforcementPenaltyService.GetMidBlockCrossingFine() : 0;
+            bool enforcementEnabled = Mod.IsMidBlockCrossingEnforcementEnabled;
+            int midBlockPenalty = enforcementEnabled
+                ? EnforcementPenaltyService.GetMidBlockCrossingFine()
+                : 0;
+            float midBlockBehaviourPenalty = CalculateMidBlockBehaviourPenalty(midBlockPenalty, enforcementEnabled);
 
             bool needsApply =
                 !m_HasApplied ||
@@ -90,15 +112,22 @@ namespace Traffic_Law_Enforcement
             m_LastEnforcementEnabled = enforcementEnabled;
             m_HasApplied = true;
 
-            PathfindingPenaltyTelemetry.SetState(prefabCount, enforcementEnabled, midBlockPenalty);
+            ApplyOverrides(midBlockPenalty, midBlockBehaviourPenalty);
+
+            MidBlockPathfindingBiasTelemetry.SetState(
+                prefabCount,
+                enforcementEnabled,
+                midBlockPenalty,
+                midBlockBehaviourPenalty);
             if (EnforcementLoggingPolicy.ShouldLogPathfindingPenaltyDiagnostics())
             {
-                Mod.log.Info($"Applied pathfinding money-axis penalties: prefabs={prefabCount}, enabled={enforcementEnabled}, {PathfindingPenaltyTelemetry.OverrideSummary}");
+                Mod.log.Info(
+                    $"Applied mid-block pathfinding bias overrides: prefabs={prefabCount}, enabled={enforcementEnabled}, {MidBlockPathfindingBiasTelemetry.OverrideSummary}");
                 LogSharedPathfindPrefabDiagnostics();
             }
         }
 
-        private void ApplyOverrides(float midBlockPenalty, float intersectionPenalty)
+        private void ApplyOverrides(int midBlockPenalty, float midBlockBehaviourPenalty)
         {
             NativeArray<Entity> prefabs = m_PathfindCarDataQuery.ToEntityArray(Allocator.Temp);
 
@@ -106,7 +135,7 @@ namespace Traffic_Law_Enforcement
             {
                 for (int index = 0; index < prefabs.Length; index++)
                 {
-                    ApplyOverrides(prefabs[index], midBlockPenalty, intersectionPenalty);
+                    ApplyOverrides(prefabs[index], midBlockPenalty, midBlockBehaviourPenalty);
                 }
             }
             finally
@@ -115,20 +144,29 @@ namespace Traffic_Law_Enforcement
             }
         }
 
-        private void ApplyOverrides(Entity prefab, float midBlockPenalty, float intersectionPenalty)
+        private void ApplyOverrides(Entity prefab, int midBlockMoneyPenalty, float midBlockBehaviourPenalty)
         {
             PathfindCarData currentData = EntityManager.GetComponentData<PathfindCarData>(prefab);
             PathfindCarData originalData = GetOriginalData(prefab, currentData);
             PathfindCarData updatedData = originalData;
 
-            AddMoneyPenalty(ref updatedData.m_UTurnCost, midBlockPenalty);
-            AddMoneyPenalty(ref updatedData.m_UnsafeUTurnCost, midBlockPenalty);
-            AddMoneyPenalty(ref updatedData.m_LaneCrossCost, midBlockPenalty);
+            AddMoneyPenalty(ref updatedData.m_UTurnCost, midBlockMoneyPenalty);
+            AddMoneyPenalty(ref updatedData.m_UnsafeUTurnCost, midBlockMoneyPenalty);
+            AddMoneyPenalty(ref updatedData.m_LaneCrossCost, midBlockMoneyPenalty);
+
+            AddBehaviourPenalty(ref updatedData.m_UTurnCost, midBlockBehaviourPenalty);
+            AddBehaviourPenalty(ref updatedData.m_UnsafeUTurnCost, midBlockBehaviourPenalty);
+            AddBehaviourPenalty(ref updatedData.m_LaneCrossCost, midBlockBehaviourPenalty);
 
             if (!PathfindCarDataEquals(currentData, updatedData))
             {
                 EntityManager.SetComponentData(prefab, updatedData);
             }
+        }
+
+        private static void AddBehaviourPenalty(ref PathfindCosts cost, float penalty)
+        {
+            cost.m_Value.y += penalty;
         }
 
         private PathfindCarData GetOriginalData(Entity prefab, PathfindCarData currentData)

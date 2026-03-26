@@ -69,6 +69,16 @@ namespace Traffic_Law_Enforcement
             Mod.log.Info(message);
         }
 
+        public static void RecordSaveLoadInfo(string message)
+        {
+            if (!ShouldLogSaveIdentification() || string.IsNullOrWhiteSpace(message))
+            {
+                return;
+            }
+
+            Mod.log.Info(message);
+        }
+
         public static void RecordEnforcementEvent(string message)
         {
             if (!ShouldLogEnforcementEvents() || string.IsNullOrWhiteSpace(message))
