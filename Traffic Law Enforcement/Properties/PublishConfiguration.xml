@@ -129,7 +129,7 @@ The following options can be configured either for the currently loaded save fil
 	<!--Change log for new version. Single line or multi line. Supports minimal markdown subset-->
 	<ChangeLog>
 - Reworked mid-block enforcement logic. Service vehicles should no longer freeze or repeatedly recalculate meaningless routes when mid-block enforcement is enabled.
-- Adding backup logics for Settings.coc in progress. (not complete, but works now.) At least my client frequently suffered the issue that keybindings reset when game shut down.
+- Split Settings.coc protection into the standalone Settings File Guard utility mod.
 	</ChangeLog>
 	<!--External link, can be set multiple times. supported types are "discord", "github", "youtube", "twitch", "x", "paypal", "patreon", "buymeacoffee", "kofi", "crowdin", "gitlab", "gofundme"-->
 	<ExternalLink Type="github" Url="https://github.com/lokasenna9312/Traffic-Law-Enforcement/" />
