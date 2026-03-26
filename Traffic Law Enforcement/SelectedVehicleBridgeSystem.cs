@@ -239,7 +239,7 @@ namespace Traffic_Law_Enforcement
                 resolveResult.HasCarCurrentLane,
                 resolveResult.HasTrainCurrentLane,
                 resolveResult.HasLiveLaneData,
-                hasVehicleEntity ? vehicle.Index : -1,
+                resolveResult.IsVehicle && hasVehicleEntity ? vehicle.Index : -1,
                 BuildRoleOrTypeText(resolveResult),
                 hasTrafficLawProfile,
                 currentLaneEntity,
@@ -262,7 +262,7 @@ namespace Traffic_Law_Enforcement
 
             if (!resolveResult.IsVehicle)
             {
-                return "Not a vehicle";
+                return string.Empty;
             }
 
             switch (resolveResult.VehicleKind)
@@ -275,11 +275,29 @@ namespace Traffic_Law_Enforcement
                 case SelectedVehicleKind.ParkedRoadCar:
                     return "Parked road car";
 
+                case SelectedVehicleKind.RailVehicle:
+                    return "Rail vehicle";
+
+                case SelectedVehicleKind.ParkedRailVehicle:
+                    return "Parked rail vehicle";
+
+                case SelectedVehicleKind.Tram:
+                    return "Tram";
+
+                case SelectedVehicleKind.ParkedTram:
+                    return "Parked tram";
+
                 case SelectedVehicleKind.Train:
                     return "Train";
 
                 case SelectedVehicleKind.ParkedTrain:
                     return "Parked train";
+
+                case SelectedVehicleKind.Subway:
+                    return "Subway";
+
+                case SelectedVehicleKind.ParkedSubway:
+                    return "Parked subway";
 
                 case SelectedVehicleKind.OtherVehicle:
                     return "Other vehicle";

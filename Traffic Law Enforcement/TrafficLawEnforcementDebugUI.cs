@@ -339,11 +339,29 @@ namespace Traffic_Law_Enforcement
                 case SelectedVehicleKind.ParkedRoadCar:
                     return "Selected vehicle: parked road car";
 
+                case SelectedVehicleKind.RailVehicle:
+                    return "Selected vehicle: rail vehicle";
+
+                case SelectedVehicleKind.ParkedRailVehicle:
+                    return "Selected vehicle: parked rail vehicle";
+
+                case SelectedVehicleKind.Tram:
+                    return "Selected vehicle: tram";
+
+                case SelectedVehicleKind.ParkedTram:
+                    return "Selected vehicle: parked tram";
+
                 case SelectedVehicleKind.Train:
                     return "Selected vehicle: train";
 
                 case SelectedVehicleKind.ParkedTrain:
                     return "Selected vehicle: parked train";
+
+                case SelectedVehicleKind.Subway:
+                    return "Selected vehicle: subway";
+
+                case SelectedVehicleKind.ParkedSubway:
+                    return "Selected vehicle: parked subway";
 
                 case SelectedVehicleKind.OtherVehicle:
                     return "Selected vehicle: other vehicle";
@@ -384,36 +402,30 @@ namespace Traffic_Law_Enforcement
 
         private static string GetVehicleIndexText()
         {
-            return TryGetSelectedVehicleSnapshot(out SelectedVehicleDebugSnapshot snapshot) &&
-                snapshot.VehicleIndex >= 0
-                ? snapshot.VehicleIndex.ToString()
-                : "Unavailable";
+            return GetVehicleInfoText(
+                snapshot => snapshot.VehicleIndex >= 0
+                    ? snapshot.VehicleIndex.ToString()
+                    : "Unavailable");
         }
 
         private static string GetRoleOrTypeText()
         {
-            if (!TryGetSelectedVehicleSnapshot(out SelectedVehicleDebugSnapshot snapshot))
-            {
-                return "Unavailable";
-            }
-
-            return string.IsNullOrWhiteSpace(snapshot.RoleOrTypeText)
-                ? "Unavailable"
-                : snapshot.RoleOrTypeText;
+            return GetVehicleInfoText(
+                snapshot => string.IsNullOrWhiteSpace(snapshot.RoleOrTypeText)
+                    ? "Unavailable"
+                    : snapshot.RoleOrTypeText);
         }
 
         private static string GetHasTrafficLawProfileText()
         {
-            return TryGetSelectedVehicleSnapshot(out SelectedVehicleDebugSnapshot snapshot)
-                ? snapshot.HasTrafficLawProfile.ToString()
-                : "Unavailable";
+            return GetVehicleInfoText(
+                snapshot => snapshot.HasTrafficLawProfile.ToString());
         }
 
         private static string GetTrailerChildText()
         {
-            return TryGetSelectedVehicleSnapshot(out SelectedVehicleDebugSnapshot snapshot)
-                ? snapshot.IsTrailerChild.ToString()
-                : "Unavailable";
+            return GetVehicleInfoText(
+                snapshot => snapshot.IsTrailerChild.ToString());
         }
 
         private static string GetCurrentLaneEntityText()
@@ -520,6 +532,22 @@ namespace Traffic_Law_Enforcement
             if (snapshot.TleApplicability == SelectedVehicleTleApplicability.NotApplicable)
             {
                 return "Not applicable";
+            }
+
+            return formatter(snapshot);
+        }
+
+        private static string GetVehicleInfoText(
+            System.Func<SelectedVehicleDebugSnapshot, string> formatter)
+        {
+            if (!TryGetSelectedVehicleSnapshot(out SelectedVehicleDebugSnapshot snapshot))
+            {
+                return "Unavailable";
+            }
+
+            if (!snapshot.IsVehicle)
+            {
+                return "Unavailable";
             }
 
             return formatter(snapshot);
