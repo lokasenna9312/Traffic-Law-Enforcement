@@ -14,8 +14,6 @@ namespace Traffic_Law_Enforcement
         private SelectedObjectBridgeSystem m_SelectedObjectBridgeSystem;
         private GameObject m_PanelObject;
         private SelectedObjectPanelView m_PanelView;
-        private SelectedObjectPanelView.State m_LastVisibleState;
-        private bool m_HasLastVisibleState;
 
         public override GameMode gameMode => GameMode.Game;
 
@@ -51,29 +49,11 @@ namespace Traffic_Law_Enforcement
 
             if (m_SelectedObjectBridgeSystem == null || !m_SelectedObjectBridgeSystem.HasSnapshot)
             {
-                m_HasLastVisibleState = false;
                 m_PanelView.UpdateState(default);
                 return;
             }
 
-            SelectedObjectPanelView.State nextState =
-                BuildState(m_SelectedObjectBridgeSystem.CurrentSnapshot);
-
-            if (nextState.Visible)
-            {
-                m_LastVisibleState = nextState;
-                m_HasLastVisibleState = true;
-                m_PanelView.UpdateState(nextState);
-                return;
-            }
-
-            if (m_HasLastVisibleState)
-            {
-                m_PanelView.UpdateState(m_LastVisibleState);
-                return;
-            }
-
-            m_PanelView.UpdateState(default);
+            m_PanelView.UpdateState(BuildState(m_SelectedObjectBridgeSystem.CurrentSnapshot));
         }
 
         private SelectedObjectPanelView.State BuildState(
@@ -200,4 +180,3 @@ namespace Traffic_Law_Enforcement
         }
     }
 }
-

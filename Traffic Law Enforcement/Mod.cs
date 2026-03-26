@@ -56,6 +56,7 @@ namespace Traffic_Law_Enforcement
             VehicleUtilsPatches.Apply();
             IntersectionMovementPathfindingPenaltyPatches.Apply();
             IntersectionMovementPathfindingPenaltyReflectionPatches.Apply();
+            SelectedObjectSelectionBlockPatches.Apply();
             updateSystem.UpdateAfter<EnforcementSaveDataSystem, EnforcementGameTimeSystem>(SystemUpdatePhase.GameSimulation);
             updateSystem.UpdateBefore<EnforcementSaveDataSystem, VehicleTrafficLawProfileSystem>(SystemUpdatePhase.GameSimulation);
             updateSystem.UpdateBefore<VehicleTrafficLawProfileSystem, PublicTransportLanePermissionSystem>(SystemUpdatePhase.GameSimulation);
@@ -96,6 +97,7 @@ namespace Traffic_Law_Enforcement
             VehicleUtilsPatches.Remove();
             IntersectionMovementPathfindingPenaltyPatches.Remove();
             IntersectionMovementPathfindingPenaltyReflectionPatches.Remove();
+            SelectedObjectSelectionBlockPatches.Remove();
             if (m_Setting != null)
             {
                 m_Setting.UnregisterInOptionsUI();

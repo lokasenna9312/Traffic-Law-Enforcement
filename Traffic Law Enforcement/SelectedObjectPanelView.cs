@@ -20,7 +20,9 @@ namespace Traffic_Law_Enforcement
         private const float kRowLabelWidth = 162f;
         private const float kSectionGap = 12f;
         private const float kStatusLabelHeight = 18f;
+        private const float kStatusLabelGap = 8f;
         private const float kStatusBlockHeight = 46f;
+        private const float kSelectionBlockGraceSeconds = 0.12f;
         private const int kSortingOrder = 240;
 
         private static readonly Color kPanelColor = new Color(0.08f, 0.12f, 0.17f, 0.92f);
@@ -31,6 +33,7 @@ namespace Traffic_Law_Enforcement
         private static readonly Color kClassificationColor = new Color(0.69f, 0.87f, 1f, 1f);
         private static readonly Color kLabelColor = new Color(0.76f, 0.81f, 0.88f, 1f);
         private static readonly Color kFooterColor = new Color(0.82f, 0.86f, 0.90f, 0.95f);
+        internal static SelectedObjectPanelView Instance { get; private set; }
 
         private sealed class RowView
         {
@@ -61,9 +64,11 @@ namespace Traffic_Law_Enforcement
         private bool m_Collapsed;
         private bool m_HasCustomPosition;
         private bool m_IsDragging;
+        private bool m_IsPointerOverPanel;
         private Vector2 m_WindowPosition;
         private Vector2 m_DragOffset;
         private Vector2 m_LastScreenSize;
+        private float m_BlockSelectionUntilUnscaledTime;
 
         private Font m_Font;
         private Canvas m_Canvas;
@@ -98,11 +103,33 @@ namespace Traffic_Law_Enforcement
             ApplyState();
         }
 
+        internal bool ShouldBlockWorldSelection()
+        {
+            if (m_PanelRect == null || !m_PanelRect.gameObject.activeInHierarchy)
+            {
+                return false;
+            }
+
+            if (m_IsDragging)
+            {
+                return true;
+            }
+
+            if (Time.unscaledTime <= m_BlockSelectionUntilUnscaledTime)
+            {
+                return true;
+            }
+
+            return m_IsPointerOverPanel &&
+                (Input.GetMouseButtonDown(0) || Input.GetMouseButton(0) || Input.GetMouseButtonUp(0));
+        }
+
         internal void BeginDrag(Vector2 pointerTopLeft)
         {
             m_IsDragging = true;
             m_HasCustomPosition = true;
             m_DragOffset = pointerTopLeft - m_WindowPosition;
+            m_BlockSelectionUntilUnscaledTime = Time.unscaledTime + kSelectionBlockGraceSeconds;
         }
 
         internal void DragTo(Vector2 pointerTopLeft)
@@ -115,42 +142,53 @@ namespace Traffic_Law_Enforcement
             m_WindowPosition = pointerTopLeft - m_DragOffset;
             ClampWindowPosition(CalculateHeight());
             ApplyWindowPosition();
+            m_BlockSelectionUntilUnscaledTime = Time.unscaledTime + kSelectionBlockGraceSeconds;
         }
 
         internal void EndDrag()
         {
             m_IsDragging = false;
+            m_BlockSelectionUntilUnscaledTime = Time.unscaledTime + kSelectionBlockGraceSeconds;
         }
 
         private void Awake()
         {
             hideFlags = HideFlags.HideAndDontSave;
+            Instance = this;
             ResetWindowPosition();
             EnsureUi();
             ApplyState();
         }
 
+        private void OnDestroy()
+        {
+            if (ReferenceEquals(Instance, this))
+            {
+                Instance = null;
+            }
+        }
+
         private void LateUpdate()
         {
-            if (m_PanelRect == null || !m_PanelRect.gameObject.activeSelf)
+            if (m_PanelRect == null || !m_PanelRect.gameObject.activeInHierarchy)
             {
                 return;
             }
 
             Vector2 screenSize = new Vector2(Screen.width, Screen.height);
-            if (m_LastScreenSize == screenSize)
+            if (m_LastScreenSize != screenSize)
             {
-                return;
+                if (!m_HasCustomPosition)
+                {
+                    ResetWindowPosition();
+                }
+
+                ClampWindowPosition(CalculateHeight());
+                ApplyWindowPosition();
+                m_LastScreenSize = screenSize;
             }
 
-            if (!m_HasCustomPosition)
-            {
-                ResetWindowPosition();
-            }
-
-            ClampWindowPosition(CalculateHeight());
-            ApplyWindowPosition();
-            m_LastScreenSize = screenSize;
+            RefreshPointerOverState();
         }
 
         private void EnsureUi()
@@ -435,21 +473,21 @@ namespace Traffic_Law_Enforcement
                     y,
                     contentWidth,
                     kStatusLabelHeight);
-                y += kStatusLabelHeight + kSectionGap;
+                y += kStatusLabelHeight + kStatusLabelGap;
 
                 SetRect(
                     m_StatusBlockRect,
                     kPadding,
                     y,
                     contentWidth,
-                    kStatusBlockHeight);
+                    kStatusBlockHeight);    
                 SetRect(
                     m_StatusValueText.rectTransform,
                     12f,
                     11f,
                     contentWidth - 24f,
                     kStatusBlockHeight - 22f);
-                y += kStatusBlockHeight + kSectionGap;
+                y += kStatusLabelHeight + kSectionGap;
             }
 
             for (int index = 0; index < m_Rows.Length; index += 1)
@@ -492,7 +530,7 @@ namespace Traffic_Law_Enforcement
 
             if (!string.IsNullOrWhiteSpace(m_State.TleStatus))
             {
-                height += kStatusLabelHeight + kSectionGap + kStatusBlockHeight + kSectionGap;
+                height += kStatusLabelHeight + kStatusLabelGap + kStatusBlockHeight + kSectionGap;
             }
 
             height += CountNonEmptyRows(
@@ -544,6 +582,27 @@ namespace Traffic_Law_Enforcement
         {
             return !string.IsNullOrWhiteSpace(m_State.SelectionToken) &&
                 string.Equals(m_DismissedSelectionToken, m_State.SelectionToken);
+        }
+
+        private void RefreshPointerOverState()
+        {
+            if (m_PanelRect == null || !m_PanelRect.gameObject.activeInHierarchy)
+            {
+                m_IsPointerOverPanel = false;
+                return;
+            }
+
+            Camera eventCamera = m_Canvas != null ? m_Canvas.worldCamera : null;
+            m_IsPointerOverPanel = RectTransformUtility.RectangleContainsScreenPoint(
+                m_PanelRect,
+                Input.mousePosition,
+                eventCamera);
+
+            if (m_IsPointerOverPanel &&
+                (Input.GetMouseButtonDown(0) || Input.GetMouseButton(0) || Input.GetMouseButtonUp(0)))
+            {
+                m_BlockSelectionUntilUnscaledTime = Time.unscaledTime + kSelectionBlockGraceSeconds;
+            }
         }
 
         private Font ResolveFont()
