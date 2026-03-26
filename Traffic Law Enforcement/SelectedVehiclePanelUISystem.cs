@@ -70,6 +70,7 @@ namespace Traffic_Law_Enforcement
                 {
                     Visible = true,
                     Compact = true,
+                    SelectionToken = BuildSelectionToken(snapshot),
                     Message = "Selected object is not a vehicle"
                 };
             }
@@ -83,8 +84,9 @@ namespace Traffic_Law_Enforcement
             {
                 Visible = true,
                 Compact = false,
+                SelectionToken = BuildSelectionToken(snapshot),
                 Classification = snapshot.SummaryClassificationText,
-                TleStatus = snapshot.SummaryTleStatusText,
+                TleStatus = BuildCompactTleStatus(snapshot),
                 RoleOrType = NormalizeText(snapshot.RoleOrTypeText),
                 VehicleIndex = snapshot.VehicleIndex >= 0
                     ? snapshot.VehicleIndex.ToString()
@@ -149,6 +151,32 @@ namespace Traffic_Law_Enforcement
             return entity == Entity.Null
                 ? "None"
                 : entity.ToString();
+        }
+
+        private static string BuildCompactTleStatus(SelectedVehicleDebugSnapshot snapshot)
+        {
+            switch (snapshot.TleApplicability)
+            {
+                case SelectedVehicleTleApplicability.NotApplicable:
+                    return snapshot.ResolveState == SelectedVehicleResolveState.NotVehicle
+                        ? string.Empty
+                        : "Not applicable";
+
+                case SelectedVehicleTleApplicability.ApplicableNoLiveLaneData:
+                    return "No live lane";
+
+                case SelectedVehicleTleApplicability.ApplicableReady:
+                    return "Tracking";
+
+                default:
+                    return NormalizeText(snapshot.SummaryTleStatusText);
+            }
+        }
+
+        private static string BuildSelectionToken(SelectedVehicleDebugSnapshot snapshot)
+        {
+            return
+                $"{snapshot.ResolveState}|{snapshot.SourceSelectedEntity}|{snapshot.ResolvedVehicleEntity}";
         }
     }
 }
