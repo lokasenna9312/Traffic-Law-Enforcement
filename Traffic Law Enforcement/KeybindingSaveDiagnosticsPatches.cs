@@ -245,6 +245,13 @@ namespace Traffic_Law_Enforcement
                 return null;
             }
 
+            AppendAuxiliaryOnlyLine(
+                "KeybindingSettings.bindings getter finalizer entered. " +
+                $"instanceType={__instance?.GetType().FullName ?? "<null>"}, " +
+                $"isDefault={TryGetIsDefaultValue(__instance)}, " +
+                $"exceptionType={__exception.GetType().FullName}, " +
+                $"exceptionMessage={__exception.Message}");
+
             string key =
                 $"BINDINGSGETTER|{BuildFailureSignature(__exception)}|{DescribeObject(__instance)}|{DescribeKeybindingContext(__instance)}";
             if (TryRegisterFailure(key))
@@ -864,6 +871,46 @@ namespace Traffic_Law_Enforcement
             catch (Exception ex)
             {
                 return $"<failed:{ex.GetType().Name}:{ex.Message}>";
+            }
+        }
+
+        private static string TryGetIsDefaultValue(Game.Settings.KeybindingSettings instance)
+        {
+            if (instance == null || s_KeybindingSettingsIsDefaultField == null)
+            {
+                return "unknown";
+            }
+
+            try
+            {
+                object rawValue = s_KeybindingSettingsIsDefaultField.GetValue(instance);
+                return rawValue?.ToString() ?? "<null>";
+            }
+            catch (Exception ex)
+            {
+                return $"<failed:{ex.GetType().Name}:{ex.Message}>";
+            }
+        }
+
+        private static void AppendAuxiliaryOnlyLine(string message)
+        {
+            try
+            {
+                string logPath = ResolveAuxiliaryLogPath();
+                string directory = Path.GetDirectoryName(logPath);
+                if (!string.IsNullOrWhiteSpace(directory))
+                {
+                    Directory.CreateDirectory(directory);
+                }
+
+                string timestampedLine = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss,fff}] [KEYBIND_DIAG] {message}";
+                lock (s_LogGate)
+                {
+                    File.AppendAllText(logPath, timestampedLine + Environment.NewLine);
+                }
+            }
+            catch
+            {
             }
         }
     }
