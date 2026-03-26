@@ -584,10 +584,12 @@ namespace Traffic_Law_Enforcement
 
         private static void AssetDatabaseAsyncMoveNextPrefix(MethodBase __originalMethod, object __instance)
         {
+            string inferredSettingAsset = InferAndTrackSettingAssetContext(__instance);
             string message =
                 "AssetDatabase async MoveNext entered. " +
                 $"method={DescribeMethod(__originalMethod)}, " +
                 $"thread={Thread.CurrentThread.ManagedThreadId}, " +
+                $"inferredSettingAsset={FirstNonBlank(inferredSettingAsset, "<unknown>")}, " +
                 $"instanceFields={DescribeInstanceFields(__instance)}, " +
                 $"stack={CaptureCompactStackTrace()}";
 
@@ -602,6 +604,7 @@ namespace Traffic_Law_Enforcement
                 return null;
             }
 
+            string inferredSettingAsset = InferAndTrackSettingAssetContext(__instance);
             string key = $"ASYNCMOVENEXT|{BuildFailureSignature(__exception)}|{DescribeMethod(__originalMethod)}";
             if (TryRegisterFailure(key))
             {
@@ -609,6 +612,7 @@ namespace Traffic_Law_Enforcement
                     "AssetDatabase async MoveNext failed. " +
                     $"method={DescribeMethod(__originalMethod)}, " +
                     $"thread={Thread.CurrentThread.ManagedThreadId}, " +
+                    $"inferredSettingAsset={FirstNonBlank(inferredSettingAsset, "<unknown>")}, " +
                     $"instanceFields={DescribeInstanceFields(__instance)}, " +
                     $"stack={CaptureCompactStackTrace()}, " +
                     $"diffStack={FormatCurrentDiffStack()}, " +
@@ -960,12 +964,40 @@ namespace Traffic_Law_Enforcement
 
                 return string.Join(
                     "; ",
-                    fields.Select(field => $"{field.Name}={SafeDescribeValue(field.GetValue(instance))}"));
+                    fields.Select(field => $"{field.Name}={DescribeFieldValue(field.Name, field.GetValue(instance))}"));
             }
             catch (Exception ex)
             {
                 return $"<failed:{ex.GetType().Name}:{ex.Message}>";
             }
+        }
+
+        private static string DescribeFieldValue(string fieldName, object value)
+        {
+            if (value == null)
+            {
+                return "<null>";
+            }
+
+            string enumeratorState = DescribeEnumeratorState(fieldName, value);
+            if (!string.IsNullOrWhiteSpace(enumeratorState))
+            {
+                return enumeratorState;
+            }
+
+            string keyValuePairState = DescribeKeyValuePair(value);
+            if (!string.IsNullOrWhiteSpace(keyValuePairState))
+            {
+                return keyValuePairState;
+            }
+
+            string fragmentState = DescribeSettingAssetFragment(value);
+            if (!string.IsNullOrWhiteSpace(fragmentState))
+            {
+                return fragmentState;
+            }
+
+            return SafeDescribeValue(value);
         }
 
         private static string SafeDescribeValue(object value)
@@ -1018,6 +1050,257 @@ namespace Traffic_Law_Enforcement
             return string.IsNullOrWhiteSpace(describedObject)
                 ? valueType.FullName
                 : describedObject;
+        }
+
+        private static string DescribeEnumeratorState(string fieldName, object value)
+        {
+            if (value == null)
+            {
+                return null;
+            }
+
+            Type valueType = value.GetType();
+            bool enumeratorHint =
+                string.Equals(fieldName, "<>7__wrap1", StringComparison.Ordinal) ||
+                valueType.Name.IndexOf("Enumerator", StringComparison.Ordinal) >= 0;
+            if (!enumeratorHint)
+            {
+                return null;
+            }
+
+            PropertyInfo currentProperty = valueType.GetProperty(
+                "Current",
+                BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+            if (currentProperty == null)
+            {
+                return SafeDescribeValue(value);
+            }
+
+            string currentText;
+            try
+            {
+                object current = currentProperty.GetValue(value);
+                currentText = DescribeFieldValue($"{fieldName}.Current", current);
+            }
+            catch (Exception ex)
+            {
+                currentText = $"<failed:{ex.GetType().Name}:{ex.Message}>";
+            }
+
+            return $"{valueType.FullName}(Current={currentText})";
+        }
+
+        private static string DescribeKeyValuePair(object value)
+        {
+            if (value == null)
+            {
+                return null;
+            }
+
+            Type valueType = value.GetType();
+            if (!valueType.IsValueType ||
+                !valueType.IsGenericType ||
+                !string.Equals(valueType.GetGenericTypeDefinition().FullName, "System.Collections.Generic.KeyValuePair`2", StringComparison.Ordinal))
+            {
+                return null;
+            }
+
+            try
+            {
+                PropertyInfo keyProperty = valueType.GetProperty("Key");
+                PropertyInfo valueProperty = valueType.GetProperty("Value");
+                object key = keyProperty?.GetValue(value);
+                object pairValue = valueProperty?.GetValue(value);
+                return $"KeyValuePair(Key={DescribeFieldValue("Key", key)}, Value={DescribeFieldValue("Value", pairValue)})";
+            }
+            catch (Exception ex)
+            {
+                return $"<failed:{ex.GetType().Name}:{ex.Message}>";
+            }
+        }
+
+        private static string DescribeSettingAssetFragment(object fragment)
+        {
+            if (fragment == null)
+            {
+                return null;
+            }
+
+            Type fragmentType = fragment.GetType();
+            if (fragmentType.FullName?.IndexOf("SettingAsset+Fragment", StringComparison.Ordinal) < 0)
+            {
+                return null;
+            }
+
+            object owner =
+                TryReadNamedMemberObject(fragment, fragmentType, "settingAsset") ??
+                TryReadNamedMemberObject(fragment, fragmentType, "asset") ??
+                TryReadNamedMemberObject(fragment, fragmentType, "m_SettingAsset") ??
+                TryReadNamedMemberObject(fragment, fragmentType, "m_Asset");
+
+            string ownerDescription = owner != null
+                ? DescribeSettingAsset(owner)
+                : "<unknown>";
+
+            string name = FirstNonBlank(
+                TryReadNamedMemberString(fragment, fragmentType, "name"),
+                TryReadNamedMemberString(fragment, fragmentType, "m_Name"));
+
+            string identifier = FirstNonBlank(
+                TryReadNamedMemberString(fragment, fragmentType, "identifier"),
+                TryReadNamedMemberString(fragment, fragmentType, "m_Identifier"));
+
+            string path = FirstNonBlank(
+                TryReadNamedMemberString(fragment, fragmentType, "path"),
+                TryReadNamedMemberString(fragment, fragmentType, "m_Path"));
+
+            return
+                $"{fragmentType.FullName}(" +
+                $"owner={ownerDescription}, " +
+                $"name={FirstNonBlank(name, "unknown")}, " +
+                $"identifier={FirstNonBlank(identifier, "unknown")}, " +
+                $"path={FirstNonBlank(path, "unknown")})";
+        }
+
+        private static string InferAndTrackSettingAssetContext(object instance)
+        {
+            string inferred = TryInferSettingAssetContext(instance);
+            if (!string.IsNullOrWhiteSpace(inferred))
+            {
+                s_CurrentSettingAsset.Value = inferred;
+            }
+
+            return inferred;
+        }
+
+        private static string TryInferSettingAssetContext(object instance)
+        {
+            if (instance == null)
+            {
+                return null;
+            }
+
+            Type instanceType = instance.GetType();
+            if (s_SettingAssetType != null && s_SettingAssetType.IsAssignableFrom(instanceType))
+            {
+                return DescribeSettingAsset(instance);
+            }
+
+            foreach (FieldInfo field in instanceType.GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic))
+            {
+                object value;
+                try
+                {
+                    value = field.GetValue(instance);
+                }
+                catch
+                {
+                    continue;
+                }
+
+                string inferred = TryInferSettingAssetContextFromValue(field.Name, value);
+                if (!string.IsNullOrWhiteSpace(inferred))
+                {
+                    return inferred;
+                }
+            }
+
+            return null;
+        }
+
+        private static string TryInferSettingAssetContextFromValue(string fieldName, object value)
+        {
+            if (value == null)
+            {
+                return null;
+            }
+
+            Type valueType = value.GetType();
+            if (s_SettingAssetType != null && s_SettingAssetType.IsAssignableFrom(valueType))
+            {
+                return DescribeSettingAsset(value);
+            }
+
+            string fragmentDescription = DescribeSettingAssetFragment(value);
+            if (!string.IsNullOrWhiteSpace(fragmentDescription))
+            {
+                return fragmentDescription;
+            }
+
+            if (valueType.IsValueType &&
+                valueType.IsGenericType &&
+                string.Equals(valueType.GetGenericTypeDefinition().FullName, "System.Collections.Generic.KeyValuePair`2", StringComparison.Ordinal))
+            {
+                try
+                {
+                    object key = valueType.GetProperty("Key")?.GetValue(value);
+                    string keyContext = TryInferSettingAssetContextFromValue("Key", key);
+                    if (!string.IsNullOrWhiteSpace(keyContext))
+                    {
+                        return keyContext;
+                    }
+                }
+                catch
+                {
+                }
+            }
+
+            bool enumeratorHint =
+                string.Equals(fieldName, "<>7__wrap1", StringComparison.Ordinal) ||
+                valueType.Name.IndexOf("Enumerator", StringComparison.Ordinal) >= 0;
+            if (enumeratorHint)
+            {
+                try
+                {
+                    object current = valueType.GetProperty(
+                        "Current",
+                        BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)?.GetValue(value);
+                    string currentContext = TryInferSettingAssetContextFromValue($"{fieldName}.Current", current);
+                    if (!string.IsNullOrWhiteSpace(currentContext))
+                    {
+                        return currentContext;
+                    }
+                }
+                catch
+                {
+                }
+            }
+
+            return null;
+        }
+
+        private static object TryReadNamedMemberObject(object instance, Type objectType, string memberName)
+        {
+            if (instance == null || objectType == null || string.IsNullOrWhiteSpace(memberName))
+            {
+                return null;
+            }
+
+            try
+            {
+                PropertyInfo property = objectType.GetProperty(
+                    memberName,
+                    BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                if (property != null && property.GetIndexParameters().Length == 0)
+                {
+                    return property.GetValue(instance);
+                }
+
+                FieldInfo field = objectType.GetField(
+                    memberName,
+                    BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                return field?.GetValue(instance);
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private static string TryReadNamedMemberString(object instance, Type objectType, string memberName)
+        {
+            object value = TryReadNamedMemberObject(instance, objectType, memberName);
+            return value?.ToString();
         }
 
         private static string DescribeObjectMembers(object instance)
