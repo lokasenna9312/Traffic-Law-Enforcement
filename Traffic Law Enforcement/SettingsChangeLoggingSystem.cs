@@ -23,21 +23,23 @@ namespace Traffic_Law_Enforcement
         protected override void OnUpdate()
         {
             LoggedSettingsSnapshot snapshot = LoggedSettingsSnapshot.Capture();
-            string inGameTimeLabel = GetInGameTimeLabel();
 
             if (!m_HasSnapshot)
             {
+                string inGameTimeLabel = GetInGameTimeLabel();
                 Mod.log.Info($"[Settings] Initial snapshot at {inGameTimeLabel}: {snapshot.ToLogString()}");
                 m_LastSnapshot = snapshot;
                 m_HasSnapshot = true;
                 return;
             }
 
-            LogChanges(inGameTimeLabel, m_LastSnapshot, snapshot);
+            LogChanges(m_LastSnapshot, snapshot);
             m_LastSnapshot = snapshot;
         }
-        private void LogChanges(string inGameTimeLabel, LoggedSettingsSnapshot previous, LoggedSettingsSnapshot current)
+
+        private void LogChanges(LoggedSettingsSnapshot previous, LoggedSettingsSnapshot current)
         {
+            string inGameTimeLabel = null;
             bool invalidateVehicleUtilsPenaltyCache =
                 previous.Gameplay.EnablePublicTransportLaneEnforcement != current.Gameplay.EnablePublicTransportLaneEnforcement ||
                 previous.Gameplay.PublicTransportLaneFineAmount != current.Gameplay.PublicTransportLaneFineAmount;
@@ -47,91 +49,91 @@ namespace Traffic_Law_Enforcement
                 VehicleUtilsPatches.InvalidateCachedPenaltyValues();
             }
             
-            LogChange(inGameTimeLabel, nameof(Setting.EnablePublicTransportLaneEnforcement), previous.Gameplay.EnablePublicTransportLaneEnforcement, current.Gameplay.EnablePublicTransportLaneEnforcement);
-            LogChange(inGameTimeLabel, nameof(Setting.EnableMidBlockCrossingEnforcement), previous.Gameplay.EnableMidBlockCrossingEnforcement, current.Gameplay.EnableMidBlockCrossingEnforcement);
-            LogChange(inGameTimeLabel, nameof(Setting.EnableIntersectionMovementEnforcement), previous.Gameplay.EnableIntersectionMovementEnforcement, current.Gameplay.EnableIntersectionMovementEnforcement);
-            LogChange(inGameTimeLabel, nameof(Setting.EnableEstimatedRerouteLogging), previous.EnableEstimatedRerouteLogging, current.EnableEstimatedRerouteLogging);
-            LogChange(inGameTimeLabel, nameof(Setting.EnableEnforcementEventLogging), previous.EnableEnforcementEventLogging, current.EnableEnforcementEventLogging);
-            LogChange(inGameTimeLabel, nameof(Setting.EnableType2PublicTransportLaneUsageLogging), previous.EnableType2PublicTransportLaneUsageLogging, current.EnableType2PublicTransportLaneUsageLogging);
-            LogChange(inGameTimeLabel, nameof(Setting.EnableType3PublicTransportLaneUsageLogging), previous.EnableType3PublicTransportLaneUsageLogging, current.EnableType3PublicTransportLaneUsageLogging);
-            LogChange(inGameTimeLabel, nameof(Setting.EnableType4PublicTransportLaneUsageLogging), previous.EnableType4PublicTransportLaneUsageLogging, current.EnableType4PublicTransportLaneUsageLogging);
-            LogChange(inGameTimeLabel, nameof(Setting.EnablePathfindingPenaltyDiagnosticLogging), previous.EnablePathfindingPenaltyDiagnosticLogging, current.EnablePathfindingPenaltyDiagnosticLogging);
-            LogChange(inGameTimeLabel, nameof(Setting.EnablePathObsoleteSourceLogging), previous.EnablePathObsoleteSourceLogging, current.EnablePathObsoleteSourceLogging);
-            LogChange(inGameTimeLabel, nameof(Setting.AllowRoadPublicTransportVehicles), previous.Gameplay.AllowRoadPublicTransportVehicles, current.Gameplay.AllowRoadPublicTransportVehicles);
-            LogChange(inGameTimeLabel, nameof(Setting.AllowTaxis), previous.Gameplay.AllowTaxis, current.Gameplay.AllowTaxis);
-            LogChange(inGameTimeLabel, nameof(Setting.AllowPoliceCars), previous.Gameplay.AllowPoliceCars, current.Gameplay.AllowPoliceCars);
-            LogChange(inGameTimeLabel, nameof(Setting.AllowFireEngines), previous.Gameplay.AllowFireEngines, current.Gameplay.AllowFireEngines);
-            LogChange(inGameTimeLabel, nameof(Setting.AllowAmbulances), previous.Gameplay.AllowAmbulances, current.Gameplay.AllowAmbulances);
-            LogChange(inGameTimeLabel, nameof(Setting.AllowGarbageTrucks), previous.Gameplay.AllowGarbageTrucks, current.Gameplay.AllowGarbageTrucks);
-            LogChange(inGameTimeLabel, nameof(Setting.AllowPostVans), previous.Gameplay.AllowPostVans, current.Gameplay.AllowPostVans);
-            LogChange(inGameTimeLabel, nameof(Setting.AllowRoadMaintenanceVehicles), previous.Gameplay.AllowRoadMaintenanceVehicles, current.Gameplay.AllowRoadMaintenanceVehicles);
-            LogChange(inGameTimeLabel, nameof(Setting.AllowSnowplows), previous.Gameplay.AllowSnowplows, current.Gameplay.AllowSnowplows);
-            LogChange(inGameTimeLabel, nameof(Setting.AllowVehicleMaintenanceVehicles), previous.Gameplay.AllowVehicleMaintenanceVehicles, current.Gameplay.AllowVehicleMaintenanceVehicles);
-            LogChange(inGameTimeLabel, nameof(Setting.AllowPersonalCars), previous.Gameplay.AllowPersonalCars, current.Gameplay.AllowPersonalCars);
-            LogChange(inGameTimeLabel, nameof(Setting.AllowDeliveryTrucks), previous.Gameplay.AllowDeliveryTrucks, current.Gameplay.AllowDeliveryTrucks);
-            LogChange(inGameTimeLabel, nameof(Setting.AllowCargoTransportVehicles), previous.Gameplay.AllowCargoTransportVehicles, current.Gameplay.AllowCargoTransportVehicles);
-            LogChange(inGameTimeLabel, nameof(Setting.AllowHearses), previous.Gameplay.AllowHearses, current.Gameplay.AllowHearses);
-            LogChange(inGameTimeLabel, nameof(Setting.AllowPrisonerTransports), previous.Gameplay.AllowPrisonerTransports, current.Gameplay.AllowPrisonerTransports);
-            LogChange(inGameTimeLabel, nameof(Setting.AllowParkMaintenanceVehicles), previous.Gameplay.AllowParkMaintenanceVehicles, current.Gameplay.AllowParkMaintenanceVehicles);
+            LogChange(ref inGameTimeLabel, nameof(Setting.EnablePublicTransportLaneEnforcement), previous.Gameplay.EnablePublicTransportLaneEnforcement, current.Gameplay.EnablePublicTransportLaneEnforcement);
+            LogChange(ref inGameTimeLabel, nameof(Setting.EnableMidBlockCrossingEnforcement), previous.Gameplay.EnableMidBlockCrossingEnforcement, current.Gameplay.EnableMidBlockCrossingEnforcement);
+            LogChange(ref inGameTimeLabel, nameof(Setting.EnableIntersectionMovementEnforcement), previous.Gameplay.EnableIntersectionMovementEnforcement, current.Gameplay.EnableIntersectionMovementEnforcement);
+            LogChange(ref inGameTimeLabel, nameof(Setting.EnableEstimatedRerouteLogging), previous.EnableEstimatedRerouteLogging, current.EnableEstimatedRerouteLogging);
+            LogChange(ref inGameTimeLabel, nameof(Setting.EnableEnforcementEventLogging), previous.EnableEnforcementEventLogging, current.EnableEnforcementEventLogging);
+            LogChange(ref inGameTimeLabel, nameof(Setting.EnableType2PublicTransportLaneUsageLogging), previous.EnableType2PublicTransportLaneUsageLogging, current.EnableType2PublicTransportLaneUsageLogging);
+            LogChange(ref inGameTimeLabel, nameof(Setting.EnableType3PublicTransportLaneUsageLogging), previous.EnableType3PublicTransportLaneUsageLogging, current.EnableType3PublicTransportLaneUsageLogging);
+            LogChange(ref inGameTimeLabel, nameof(Setting.EnableType4PublicTransportLaneUsageLogging), previous.EnableType4PublicTransportLaneUsageLogging, current.EnableType4PublicTransportLaneUsageLogging);
+            LogChange(ref inGameTimeLabel, nameof(Setting.EnablePathfindingPenaltyDiagnosticLogging), previous.EnablePathfindingPenaltyDiagnosticLogging, current.EnablePathfindingPenaltyDiagnosticLogging);
+            LogChange(ref inGameTimeLabel, nameof(Setting.EnablePathObsoleteSourceLogging), previous.EnablePathObsoleteSourceLogging, current.EnablePathObsoleteSourceLogging);
+            LogChange(ref inGameTimeLabel, nameof(Setting.AllowRoadPublicTransportVehicles), previous.Gameplay.AllowRoadPublicTransportVehicles, current.Gameplay.AllowRoadPublicTransportVehicles);
+            LogChange(ref inGameTimeLabel, nameof(Setting.AllowTaxis), previous.Gameplay.AllowTaxis, current.Gameplay.AllowTaxis);
+            LogChange(ref inGameTimeLabel, nameof(Setting.AllowPoliceCars), previous.Gameplay.AllowPoliceCars, current.Gameplay.AllowPoliceCars);
+            LogChange(ref inGameTimeLabel, nameof(Setting.AllowFireEngines), previous.Gameplay.AllowFireEngines, current.Gameplay.AllowFireEngines);
+            LogChange(ref inGameTimeLabel, nameof(Setting.AllowAmbulances), previous.Gameplay.AllowAmbulances, current.Gameplay.AllowAmbulances);
+            LogChange(ref inGameTimeLabel, nameof(Setting.AllowGarbageTrucks), previous.Gameplay.AllowGarbageTrucks, current.Gameplay.AllowGarbageTrucks);
+            LogChange(ref inGameTimeLabel, nameof(Setting.AllowPostVans), previous.Gameplay.AllowPostVans, current.Gameplay.AllowPostVans);
+            LogChange(ref inGameTimeLabel, nameof(Setting.AllowRoadMaintenanceVehicles), previous.Gameplay.AllowRoadMaintenanceVehicles, current.Gameplay.AllowRoadMaintenanceVehicles);
+            LogChange(ref inGameTimeLabel, nameof(Setting.AllowSnowplows), previous.Gameplay.AllowSnowplows, current.Gameplay.AllowSnowplows);
+            LogChange(ref inGameTimeLabel, nameof(Setting.AllowVehicleMaintenanceVehicles), previous.Gameplay.AllowVehicleMaintenanceVehicles, current.Gameplay.AllowVehicleMaintenanceVehicles);
+            LogChange(ref inGameTimeLabel, nameof(Setting.AllowPersonalCars), previous.Gameplay.AllowPersonalCars, current.Gameplay.AllowPersonalCars);
+            LogChange(ref inGameTimeLabel, nameof(Setting.AllowDeliveryTrucks), previous.Gameplay.AllowDeliveryTrucks, current.Gameplay.AllowDeliveryTrucks);
+            LogChange(ref inGameTimeLabel, nameof(Setting.AllowCargoTransportVehicles), previous.Gameplay.AllowCargoTransportVehicles, current.Gameplay.AllowCargoTransportVehicles);
+            LogChange(ref inGameTimeLabel, nameof(Setting.AllowHearses), previous.Gameplay.AllowHearses, current.Gameplay.AllowHearses);
+            LogChange(ref inGameTimeLabel, nameof(Setting.AllowPrisonerTransports), previous.Gameplay.AllowPrisonerTransports, current.Gameplay.AllowPrisonerTransports);
+            LogChange(ref inGameTimeLabel, nameof(Setting.AllowParkMaintenanceVehicles), previous.Gameplay.AllowParkMaintenanceVehicles, current.Gameplay.AllowParkMaintenanceVehicles);
 
-            LogChange(inGameTimeLabel, nameof(Setting.PublicTransportLaneExitPressureThresholdDays), previous.Gameplay.PublicTransportLaneExitPressureThresholdDays, current.Gameplay.PublicTransportLaneExitPressureThresholdDays);
-            LogChange(inGameTimeLabel, nameof(Setting.PublicTransportLaneFineAmount), previous.Gameplay.PublicTransportLaneFineAmount, current.Gameplay.PublicTransportLaneFineAmount);
-            LogChange(inGameTimeLabel, nameof(Setting.MidBlockCrossingFineAmount), previous.Gameplay.MidBlockCrossingFineAmount, current.Gameplay.MidBlockCrossingFineAmount);
-            LogChange(inGameTimeLabel, nameof(Setting.IntersectionMovementFineAmount), previous.Gameplay.IntersectionMovementFineAmount, current.Gameplay.IntersectionMovementFineAmount);
+            LogChange(ref inGameTimeLabel, nameof(Setting.PublicTransportLaneExitPressureThresholdDays), previous.Gameplay.PublicTransportLaneExitPressureThresholdDays, current.Gameplay.PublicTransportLaneExitPressureThresholdDays);
+            LogChange(ref inGameTimeLabel, nameof(Setting.PublicTransportLaneFineAmount), previous.Gameplay.PublicTransportLaneFineAmount, current.Gameplay.PublicTransportLaneFineAmount);
+            LogChange(ref inGameTimeLabel, nameof(Setting.MidBlockCrossingFineAmount), previous.Gameplay.MidBlockCrossingFineAmount, current.Gameplay.MidBlockCrossingFineAmount);
+            LogChange(ref inGameTimeLabel, nameof(Setting.IntersectionMovementFineAmount), previous.Gameplay.IntersectionMovementFineAmount, current.Gameplay.IntersectionMovementFineAmount);
 
-            LogChange(inGameTimeLabel, nameof(Setting.EnablePublicTransportLaneRepeatPenalty), previous.Gameplay.EnablePublicTransportLaneRepeatPenalty, current.Gameplay.EnablePublicTransportLaneRepeatPenalty);
-            LogChange(inGameTimeLabel, nameof(Setting.PublicTransportLaneRepeatWindowMonths), previous.Gameplay.PublicTransportLaneRepeatWindowMonths, current.Gameplay.PublicTransportLaneRepeatWindowMonths);
-            LogChange(inGameTimeLabel, nameof(Setting.PublicTransportLaneRepeatThreshold), previous.Gameplay.PublicTransportLaneRepeatThreshold, current.Gameplay.PublicTransportLaneRepeatThreshold);
-            LogChange(inGameTimeLabel, nameof(Setting.PublicTransportLaneRepeatMultiplierPercent), previous.Gameplay.PublicTransportLaneRepeatMultiplierPercent, current.Gameplay.PublicTransportLaneRepeatMultiplierPercent);
+            LogChange(ref inGameTimeLabel, nameof(Setting.EnablePublicTransportLaneRepeatPenalty), previous.Gameplay.EnablePublicTransportLaneRepeatPenalty, current.Gameplay.EnablePublicTransportLaneRepeatPenalty);
+            LogChange(ref inGameTimeLabel, nameof(Setting.PublicTransportLaneRepeatWindowMonths), previous.Gameplay.PublicTransportLaneRepeatWindowMonths, current.Gameplay.PublicTransportLaneRepeatWindowMonths);
+            LogChange(ref inGameTimeLabel, nameof(Setting.PublicTransportLaneRepeatThreshold), previous.Gameplay.PublicTransportLaneRepeatThreshold, current.Gameplay.PublicTransportLaneRepeatThreshold);
+            LogChange(ref inGameTimeLabel, nameof(Setting.PublicTransportLaneRepeatMultiplierPercent), previous.Gameplay.PublicTransportLaneRepeatMultiplierPercent, current.Gameplay.PublicTransportLaneRepeatMultiplierPercent);
 
-            LogChange(inGameTimeLabel, nameof(Setting.EnableMidBlockCrossingRepeatPenalty), previous.Gameplay.EnableMidBlockCrossingRepeatPenalty, current.Gameplay.EnableMidBlockCrossingRepeatPenalty);
-            LogChange(inGameTimeLabel, nameof(Setting.MidBlockCrossingRepeatWindowMonths), previous.Gameplay.MidBlockCrossingRepeatWindowMonths, current.Gameplay.MidBlockCrossingRepeatWindowMonths);
-            LogChange(inGameTimeLabel, nameof(Setting.MidBlockCrossingRepeatThreshold), previous.Gameplay.MidBlockCrossingRepeatThreshold, current.Gameplay.MidBlockCrossingRepeatThreshold);
-            LogChange(inGameTimeLabel, nameof(Setting.MidBlockCrossingRepeatMultiplierPercent), previous.Gameplay.MidBlockCrossingRepeatMultiplierPercent, current.Gameplay.MidBlockCrossingRepeatMultiplierPercent);
+            LogChange(ref inGameTimeLabel, nameof(Setting.EnableMidBlockCrossingRepeatPenalty), previous.Gameplay.EnableMidBlockCrossingRepeatPenalty, current.Gameplay.EnableMidBlockCrossingRepeatPenalty);
+            LogChange(ref inGameTimeLabel, nameof(Setting.MidBlockCrossingRepeatWindowMonths), previous.Gameplay.MidBlockCrossingRepeatWindowMonths, current.Gameplay.MidBlockCrossingRepeatWindowMonths);
+            LogChange(ref inGameTimeLabel, nameof(Setting.MidBlockCrossingRepeatThreshold), previous.Gameplay.MidBlockCrossingRepeatThreshold, current.Gameplay.MidBlockCrossingRepeatThreshold);
+            LogChange(ref inGameTimeLabel, nameof(Setting.MidBlockCrossingRepeatMultiplierPercent), previous.Gameplay.MidBlockCrossingRepeatMultiplierPercent, current.Gameplay.MidBlockCrossingRepeatMultiplierPercent);
 
-            LogChange(inGameTimeLabel, nameof(Setting.EnableIntersectionMovementRepeatPenalty), previous.Gameplay.EnableIntersectionMovementRepeatPenalty, current.Gameplay.EnableIntersectionMovementRepeatPenalty);
-            LogChange(inGameTimeLabel, nameof(Setting.IntersectionMovementRepeatWindowMonths), previous.Gameplay.IntersectionMovementRepeatWindowMonths, current.Gameplay.IntersectionMovementRepeatWindowMonths);
-            LogChange(inGameTimeLabel, nameof(Setting.IntersectionMovementRepeatThreshold), previous.Gameplay.IntersectionMovementRepeatThreshold, current.Gameplay.IntersectionMovementRepeatThreshold);
-            LogChange(inGameTimeLabel, nameof(Setting.IntersectionMovementRepeatMultiplierPercent), previous.Gameplay.IntersectionMovementRepeatMultiplierPercent, current.Gameplay.IntersectionMovementRepeatMultiplierPercent);
+            LogChange(ref inGameTimeLabel, nameof(Setting.EnableIntersectionMovementRepeatPenalty), previous.Gameplay.EnableIntersectionMovementRepeatPenalty, current.Gameplay.EnableIntersectionMovementRepeatPenalty);
+            LogChange(ref inGameTimeLabel, nameof(Setting.IntersectionMovementRepeatWindowMonths), previous.Gameplay.IntersectionMovementRepeatWindowMonths, current.Gameplay.IntersectionMovementRepeatWindowMonths);
+            LogChange(ref inGameTimeLabel, nameof(Setting.IntersectionMovementRepeatThreshold), previous.Gameplay.IntersectionMovementRepeatThreshold, current.Gameplay.IntersectionMovementRepeatThreshold);
+            LogChange(ref inGameTimeLabel, nameof(Setting.IntersectionMovementRepeatMultiplierPercent), previous.Gameplay.IntersectionMovementRepeatMultiplierPercent, current.Gameplay.IntersectionMovementRepeatMultiplierPercent);
         }
 
-        private static void LogChange(string inGameTimeLabel, string settingName, bool previous, bool current)
+        private void LogChange(ref string inGameTimeLabel, string settingName, bool previous, bool current)
         {
             if (previous != current)
             {
+                inGameTimeLabel ??= GetInGameTimeLabel();
                 Mod.log.Info($"[Settings] {settingName} changed: {previous} -> {current} at {inGameTimeLabel}");
             }
         }
 
-        private static void LogChange(string inGameTimeLabel, string settingName, int previous, int current)
+        private void LogChange(ref string inGameTimeLabel, string settingName, int previous, int current)
         {
             if (previous != current)
             {
+                inGameTimeLabel ??= GetInGameTimeLabel();
                 Mod.log.Info($"[Settings] {settingName} changed: {previous} -> {current} at {inGameTimeLabel}");
             }
         }
 
-        private static void LogChange(string inGameTimeLabel, string settingName, float previous, float current)
+        private void LogChange(ref string inGameTimeLabel, string settingName, float previous, float current)
         {
             if (!Mathf.Approximately(previous, current))
             {
+                inGameTimeLabel ??= GetInGameTimeLabel();
                 Mod.log.Info($"[Settings] {settingName} changed: {previous} -> {current} at {inGameTimeLabel}");
             }
         }
 
         private string GetInGameTimeLabel()
         {
-            if (!EnforcementGameTime.IsInitialized || m_TimeSystem == null)
+            if (m_TimeSystem == null)
             {
                 return "unavailable";
             }
 
-            int daysPerYear = Mathf.Max(1, m_TimeSystem.daysPerYear);
-            int day = Mathf.Clamp(Mathf.FloorToInt(m_TimeSystem.normalizedDate * daysPerYear), 0, daysPerYear - 1) + 1;
-            float totalHours = Mathf.Clamp01(m_TimeSystem.normalizedTime) * 24f;
-            int hour = Mathf.Clamp(Mathf.FloorToInt(totalHours), 0, 23);
-            int minute = Mathf.Clamp(Mathf.FloorToInt((totalHours - hour) * 60f), 0, 59);
-            return FormattableString.Invariant($"Y{m_TimeSystem.year} day={day} time={hour:00}:{minute:00}");
+            DateTime now = m_TimeSystem.GetCurrentDateTime();
+            return FormattableString.Invariant(
+                $"Y{now.Year} day={now.DayOfYear} time={now.Hour:00}:{now.Minute:00}");
         }
 
         private static string FormatFloat(float value)
