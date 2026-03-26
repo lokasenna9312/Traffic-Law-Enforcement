@@ -26,6 +26,9 @@ namespace Traffic_Law_Enforcement
         private static readonly FieldInfo s_KeybindingSettingsIsDefaultField =
             AccessTools.Field(typeof(Game.Settings.KeybindingSettings), "m_IsDefault");
 
+        private static readonly MethodInfo s_KeybindingSettingsBindingsGetter =
+            AccessTools.PropertyGetter(typeof(Game.Settings.KeybindingSettings), "bindings");
+
         private static readonly MethodInfo s_DiffObjectMethod =
             AccessTools.Method(
                 AccessTools.TypeByName("Colossal.Json.DiffUtility"),
@@ -88,6 +91,7 @@ namespace Traffic_Law_Enforcement
             }
 
             if (s_DiffObjectMethod == null ||
+                s_KeybindingSettingsBindingsGetter == null ||
                 s_TypeExtensionsGetMemberValueMethod == null ||
                 s_SettingAssetSaveMethods.Length == 0)
             {
@@ -102,6 +106,10 @@ namespace Traffic_Law_Enforcement
                     s_DiffObjectMethod,
                     prefix: new HarmonyMethod(typeof(KeybindingSaveDiagnosticsPatches), nameof(DiffObjectPrefix)),
                     finalizer: new HarmonyMethod(typeof(KeybindingSaveDiagnosticsPatches), nameof(DiffObjectFinalizer)));
+
+                s_Harmony.Patch(
+                    s_KeybindingSettingsBindingsGetter,
+                    finalizer: new HarmonyMethod(typeof(KeybindingSaveDiagnosticsPatches), nameof(KeybindingBindingsGetterFinalizer)));
 
                 s_Harmony.Patch(
                     s_TypeExtensionsGetMemberValueMethod,
@@ -132,6 +140,7 @@ namespace Traffic_Law_Enforcement
 
                 WriteDiagnosticLine(
                     "Keybinding save diagnostics patches applied. " +
+                    $"bindingsGetter={DescribeMethod(s_KeybindingSettingsBindingsGetter)}, " +
                     $"settingAssetSaveMethods={string.Join(" | ", s_SettingAssetSaveMethods.Select(DescribeMethod))}, " +
                     $"assetDatabaseSaveSettingsMethods={string.Join(" | ", s_AssetDatabaseSaveSettingsMethods.Select(DescribeMethod))}, " +
                     $"assetDatabaseSaveSettingsWorkerMethods={string.Join(" | ", s_AssetDatabaseSaveSettingsWorkerMethods.Select(DescribeMethod))}");
@@ -222,6 +231,35 @@ namespace Traffic_Law_Enforcement
                 {
                     s_DiffObjectStack.Value = null;
                 }
+            }
+
+            return __exception;
+        }
+
+        private static Exception KeybindingBindingsGetterFinalizer(
+            Game.Settings.KeybindingSettings __instance,
+            Exception __exception)
+        {
+            if (__exception == null)
+            {
+                return null;
+            }
+
+            string key =
+                $"BINDINGSGETTER|{BuildFailureSignature(__exception)}|{DescribeObject(__instance)}|{DescribeKeybindingContext(__instance)}";
+            if (TryRegisterFailure(key))
+            {
+                WriteDiagnosticLine(
+                    "KeybindingSettings.bindings getter failed. " +
+                    $"instance={DescribeObject(__instance)}, " +
+                    $"keybindingContext={DescribeKeybindingContext(__instance)}, " +
+                    $"members={DescribeObjectMembers(__instance)}, " +
+                    $"diffStack={FormatCurrentDiffStack()}, " +
+                    $"saveBreadcrumbs={FormatSaveBreadcrumbs()}, " +
+                    $"globalEvents={FormatGlobalSaveEvents()}, " +
+                    $"exception={DescribeException(__exception)}, " +
+                    $"rootCause={DescribeException(UnwrapException(__exception))}",
+                    __exception);
             }
 
             return __exception;
@@ -776,6 +814,57 @@ namespace Traffic_Law_Enforcement
             return string.IsNullOrWhiteSpace(describedObject)
                 ? valueType.FullName
                 : describedObject;
+        }
+
+        private static string DescribeObjectMembers(object instance)
+        {
+            if (instance == null)
+            {
+                return "<null>";
+            }
+
+            List<string> parts = new List<string>();
+            Type objectType = instance.GetType();
+
+            foreach (FieldInfo field in objectType.GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic))
+            {
+                parts.Add($"{field.Name}={SafeReadMember(() => field.GetValue(instance))}");
+                if (parts.Count >= 20)
+                {
+                    return string.Join("; ", parts);
+                }
+            }
+
+            foreach (PropertyInfo property in objectType.GetProperties(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic))
+            {
+                if (property.GetIndexParameters().Length != 0 ||
+                    string.Equals(property.Name, "bindings", StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                parts.Add($"{property.Name}={SafeReadMember(() => property.GetValue(instance))}");
+                if (parts.Count >= 20)
+                {
+                    return string.Join("; ", parts);
+                }
+            }
+
+            return parts.Count == 0
+                ? objectType.FullName
+                : string.Join("; ", parts);
+        }
+
+        private static string SafeReadMember(Func<object> reader)
+        {
+            try
+            {
+                return SafeDescribeValue(reader());
+            }
+            catch (Exception ex)
+            {
+                return $"<failed:{ex.GetType().Name}:{ex.Message}>";
+            }
         }
     }
 }
