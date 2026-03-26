@@ -84,6 +84,18 @@ namespace Traffic_Law_Enforcement
                 .ToArray() ??
             Array.Empty<MethodInfo>();
 
+        private static readonly MethodInfo[] s_AssetDatabaseAsyncMoveNextMethods =
+            s_AssetDatabaseType?.Assembly
+                .GetTypes()
+                .Where(type =>
+                    (type.FullName?.IndexOf("Colossal.IO.AssetDatabase", StringComparison.Ordinal) >= 0) &&
+                    (type.FullName?.IndexOf("<SaveSettings>", StringComparison.Ordinal) >= 0 ||
+                     type.FullName?.IndexOf("<DisposeAsync>", StringComparison.Ordinal) >= 0))
+                .SelectMany(type => type.GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic))
+                .Where(method => string.Equals(method.Name, "MoveNext", StringComparison.Ordinal))
+                .ToArray() ??
+            Array.Empty<MethodInfo>();
+
         private static Harmony s_Harmony;
 
         public static void Apply()
@@ -143,12 +155,21 @@ namespace Traffic_Law_Enforcement
                         finalizer: new HarmonyMethod(typeof(KeybindingSaveDiagnosticsPatches), nameof(AssetDatabaseSaveSettingsWorkerFinalizer)));
                 }
 
+                foreach (MethodInfo method in s_AssetDatabaseAsyncMoveNextMethods)
+                {
+                    s_Harmony.Patch(
+                        method,
+                        prefix: new HarmonyMethod(typeof(KeybindingSaveDiagnosticsPatches), nameof(AssetDatabaseAsyncMoveNextPrefix)),
+                        finalizer: new HarmonyMethod(typeof(KeybindingSaveDiagnosticsPatches), nameof(AssetDatabaseAsyncMoveNextFinalizer)));
+                }
+
                 WriteDiagnosticLine(
                     "Keybinding save diagnostics patches applied. " +
                     $"bindingsGetter={DescribeMethod(s_KeybindingSettingsBindingsGetter)}, " +
                     $"settingAssetSaveMethods={string.Join(" | ", s_SettingAssetSaveMethods.Select(DescribeMethod))}, " +
                     $"assetDatabaseSaveSettingsMethods={string.Join(" | ", s_AssetDatabaseSaveSettingsMethods.Select(DescribeMethod))}, " +
-                    $"assetDatabaseSaveSettingsWorkerMethods={string.Join(" | ", s_AssetDatabaseSaveSettingsWorkerMethods.Select(DescribeMethod))}");
+                    $"assetDatabaseSaveSettingsWorkerMethods={string.Join(" | ", s_AssetDatabaseSaveSettingsWorkerMethods.Select(DescribeMethod))}, " +
+                    $"assetDatabaseAsyncMoveNextMethods={string.Join(" | ", s_AssetDatabaseAsyncMoveNextMethods.Select(DescribeMethod))}");
             }
             catch (Exception ex)
             {
@@ -561,6 +582,47 @@ namespace Traffic_Law_Enforcement
             return __exception;
         }
 
+        private static void AssetDatabaseAsyncMoveNextPrefix(MethodBase __originalMethod, object __instance)
+        {
+            string message =
+                "AssetDatabase async MoveNext entered. " +
+                $"method={DescribeMethod(__originalMethod)}, " +
+                $"thread={Thread.CurrentThread.ManagedThreadId}, " +
+                $"instanceFields={DescribeInstanceFields(__instance)}, " +
+                $"stack={CaptureCompactStackTrace()}";
+
+            RecordGlobalSaveEvent(message);
+            AppendAuxiliaryOnlyLine(message);
+        }
+
+        private static Exception AssetDatabaseAsyncMoveNextFinalizer(MethodBase __originalMethod, object __instance, Exception __exception)
+        {
+            if (__exception == null)
+            {
+                return null;
+            }
+
+            string key = $"ASYNCMOVENEXT|{BuildFailureSignature(__exception)}|{DescribeMethod(__originalMethod)}";
+            if (TryRegisterFailure(key))
+            {
+                WriteDiagnosticLine(
+                    "AssetDatabase async MoveNext failed. " +
+                    $"method={DescribeMethod(__originalMethod)}, " +
+                    $"thread={Thread.CurrentThread.ManagedThreadId}, " +
+                    $"instanceFields={DescribeInstanceFields(__instance)}, " +
+                    $"stack={CaptureCompactStackTrace()}, " +
+                    $"diffStack={FormatCurrentDiffStack()}, " +
+                    $"saveBreadcrumbs={FormatSaveBreadcrumbs()}, " +
+                    $"globalEvents={FormatGlobalSaveEvents()}, " +
+                    $"recentGetterEvents={FormatRecentGetterEvents()}, " +
+                    $"exception={DescribeException(__exception)}, " +
+                    $"rootCause={DescribeException(UnwrapException(__exception))}",
+                    __exception);
+            }
+
+            return __exception;
+        }
+
         private static void SettingAssetSavePrefix(MethodBase __originalMethod, object __instance, object[] __args)
         {
             string settingAsset = DescribeSettingAsset(__instance);
@@ -820,6 +882,31 @@ namespace Traffic_Law_Enforcement
             }
 
             return Path.Combine(AppContext.BaseDirectory, "Traffic_Law_Enforcement.KeybindDiag.recent_getters.log");
+        }
+
+        private static string CaptureCompactStackTrace()
+        {
+            try
+            {
+                System.Diagnostics.StackTrace stackTrace = new System.Diagnostics.StackTrace(2, false);
+                System.Diagnostics.StackFrame[] frames = stackTrace.GetFrames();
+                if (frames == null || frames.Length == 0)
+                {
+                    return "<empty>";
+                }
+
+                return string.Join(
+                    " <= ",
+                    frames
+                        .Select(frame => frame.GetMethod())
+                        .Where(method => method != null)
+                        .Take(12)
+                        .Select(DescribeMethod));
+            }
+            catch (Exception ex)
+            {
+                return $"<failed:{ex.GetType().Name}:{ex.Message}>";
+            }
         }
 
         private static string DescribeMethod(MethodBase method)
