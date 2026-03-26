@@ -30,6 +30,8 @@ namespace Traffic_Law_Enforcement
         private static bool s_LoggedEffectiveBindingFallback;
         private static bool s_LoggedOriginalBindingFallback;
         private static bool s_LoggedMemberValueSuppression;
+        private static bool s_LoggedGuardInternalFailure;
+        private static bool s_LoggedBindingCloneFailure;
 
         public static void Apply()
         {
@@ -142,7 +144,7 @@ namespace Traffic_Law_Enforcement
                 return null;
             }
 
-            __result = ResolveBindings(__instance, __exception);
+            __result = SafeResolveBindings(__instance, __exception);
             return null;
         }
 
@@ -150,7 +152,7 @@ namespace Traffic_Law_Enforcement
             KeybindingSettings __instance,
             ref List<ProxyBinding> __result)
         {
-            __result = ResolveBindings(__instance, null);
+            __result = SafeResolveBindings(__instance, null);
             return false;
         }
 
@@ -164,7 +166,7 @@ namespace Traffic_Law_Enforcement
                 return true;
             }
 
-            __result = ResolveBindings(settings, null);
+            __result = SafeResolveBindings(settings, null);
             return false;
         }
 
@@ -184,7 +186,7 @@ namespace Traffic_Law_Enforcement
                 return __exception;
             }
 
-            __result = ResolveBindings(settings, __exception);
+            __result = SafeResolveBindings(settings, __exception);
             LogMemberValueSuppression(member, obj, __exception);
             return null;
         }
@@ -204,12 +206,19 @@ namespace Traffic_Law_Enforcement
                 return;
             }
 
-            InputManager.PathType pathType = IsDefaultSettings(settings)
-                ? InputManager.PathType.Original
-                : InputManager.PathType.Effective;
+            try
+            {
+                InputManager.PathType pathType = IsDefaultSettings(settings)
+                    ? InputManager.PathType.Original
+                    : InputManager.PathType.Effective;
 
-            SetCachedBindings(pathType, CloneBindings(bindings));
-            ResetFallbackLog(pathType);
+                SetCachedBindings(pathType, CloneBindings(bindings));
+                ResetFallbackLog(pathType);
+            }
+            catch (Exception ex)
+            {
+                LogGuardInternalFailure("CaptureResolvedBindings", ex);
+            }
         }
 
         private static bool TryReadBindings(InputManager.PathType pathType, out List<ProxyBinding> bindings, out Exception failure)
@@ -270,6 +279,27 @@ namespace Traffic_Law_Enforcement
 
             LogFallback(pathType, failure, 0, usedCachedBindings: true);
             return new List<ProxyBinding>();
+        }
+
+        private static List<ProxyBinding> SafeResolveBindings(KeybindingSettings settings, Exception failure)
+        {
+            try
+            {
+                return ResolveBindings(settings, failure);
+            }
+            catch (Exception ex)
+            {
+                LogGuardInternalFailure("SafeResolveBindings", ex);
+
+                InputManager.PathType pathType = IsDefaultSettings(settings)
+                    ? InputManager.PathType.Original
+                    : InputManager.PathType.Effective;
+
+                List<ProxyBinding> cachedBindings = GetCachedBindings(pathType);
+                return cachedBindings != null
+                    ? CloneBindings(cachedBindings)
+                    : new List<ProxyBinding>();
+            }
         }
 
         private static bool IsDefaultSettings(KeybindingSettings settings)
@@ -394,7 +424,54 @@ namespace Traffic_Law_Enforcement
 
         private static List<ProxyBinding> CloneBindings(IEnumerable<ProxyBinding> bindings)
         {
-            return bindings?.Select(static binding => binding.Copy()).ToList() ?? new List<ProxyBinding>();
+            List<ProxyBinding> clonedBindings = new List<ProxyBinding>();
+            if (bindings == null)
+            {
+                return clonedBindings;
+            }
+
+            foreach (ProxyBinding binding in bindings)
+            {
+                if (binding == null)
+                {
+                    continue;
+                }
+
+                try
+                {
+                    clonedBindings.Add(binding.Copy());
+                }
+                catch (Exception ex)
+                {
+                    LogBindingCloneFailure(ex);
+                    clonedBindings.Add(binding);
+                }
+            }
+
+            return clonedBindings;
+        }
+
+        private static void LogGuardInternalFailure(string phase, Exception ex)
+        {
+            if (s_LoggedGuardInternalFailure)
+            {
+                return;
+            }
+
+            s_LoggedGuardInternalFailure = true;
+            Mod.log.Error(ex, $"[KEYBIND_GUARD] Internal guard failure during {phase}.");
+        }
+
+        private static void LogBindingCloneFailure(Exception ex)
+        {
+            if (s_LoggedBindingCloneFailure)
+            {
+                return;
+            }
+
+            s_LoggedBindingCloneFailure = true;
+            Mod.log.Warn(
+                $"[KEYBIND_GUARD] Failed to clone one or more bindings. Falling back to original binding instances. reason={ex.GetType().Name}: {ex.Message}");
         }
     }
 }
