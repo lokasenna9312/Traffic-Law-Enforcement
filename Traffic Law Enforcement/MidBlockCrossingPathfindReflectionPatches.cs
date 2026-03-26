@@ -60,7 +60,7 @@ namespace Traffic_Law_Enforcement
 
         public static void Apply()
         {
-            Mod.log.Info("[MIDBLOCK_TEST] Mod.OnLoad reached after MidBlock reflection Apply call.");
+            Mod.log.Info("[MIDBLOCK_TEST] Reflection Apply invoked.");
             if (s_Harmony != null)
             {
                 return;
