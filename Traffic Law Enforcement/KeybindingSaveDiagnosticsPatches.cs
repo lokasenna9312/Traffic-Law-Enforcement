@@ -56,6 +56,9 @@ namespace Traffic_Law_Enforcement
         private static readonly Type s_SettingAssetType =
             AccessTools.TypeByName("Colossal.IO.AssetDatabase.SettingAsset");
 
+        private static readonly Type s_SettingAssetFragmentType =
+            AccessTools.TypeByName("Colossal.IO.AssetDatabase.SettingAsset+Fragment");
+
         private static readonly Type s_AssetDatabaseType =
             AccessTools.TypeByName("Colossal.IO.AssetDatabase.AssetDatabase");
 
@@ -585,10 +588,14 @@ namespace Traffic_Law_Enforcement
         private static void AssetDatabaseAsyncMoveNextPrefix(MethodBase __originalMethod, object __instance)
         {
             string inferredSettingAsset = InferAndTrackSettingAssetContext(__instance);
+            string currentFragment = DescribeCurrentSettingAssetFragment(__instance);
+            string currentFragmentOwner = DescribeCurrentSettingAssetOwner(__instance);
             string message =
                 "AssetDatabase async MoveNext entered. " +
                 $"method={DescribeMethod(__originalMethod)}, " +
                 $"thread={Thread.CurrentThread.ManagedThreadId}, " +
+                $"currentFragmentOwner={FirstNonBlank(currentFragmentOwner, "<unknown>")}, " +
+                $"currentFragment={FirstNonBlank(currentFragment, "<unknown>")}, " +
                 $"inferredSettingAsset={FirstNonBlank(inferredSettingAsset, "<unknown>")}, " +
                 $"instanceFields={DescribeInstanceFields(__instance)}, " +
                 $"stack={CaptureCompactStackTrace()}";
@@ -605,6 +612,8 @@ namespace Traffic_Law_Enforcement
             }
 
             string inferredSettingAsset = InferAndTrackSettingAssetContext(__instance);
+            string currentFragment = DescribeCurrentSettingAssetFragment(__instance);
+            string currentFragmentOwner = DescribeCurrentSettingAssetOwner(__instance);
             string key = $"ASYNCMOVENEXT|{BuildFailureSignature(__exception)}|{DescribeMethod(__originalMethod)}";
             if (TryRegisterFailure(key))
             {
@@ -612,6 +621,8 @@ namespace Traffic_Law_Enforcement
                     "AssetDatabase async MoveNext failed. " +
                     $"method={DescribeMethod(__originalMethod)}, " +
                     $"thread={Thread.CurrentThread.ManagedThreadId}, " +
+                    $"currentFragmentOwner={FirstNonBlank(currentFragmentOwner, "<unknown>")}, " +
+                    $"currentFragment={FirstNonBlank(currentFragment, "<unknown>")}, " +
                     $"inferredSettingAsset={FirstNonBlank(inferredSettingAsset, "<unknown>")}, " +
                     $"instanceFields={DescribeInstanceFields(__instance)}, " +
                     $"stack={CaptureCompactStackTrace()}, " +
@@ -1127,7 +1138,8 @@ namespace Traffic_Law_Enforcement
             }
 
             Type fragmentType = fragment.GetType();
-            if (fragmentType.FullName?.IndexOf("SettingAsset+Fragment", StringComparison.Ordinal) < 0)
+            if (s_SettingAssetFragmentType == null ||
+                !s_SettingAssetFragmentType.IsAssignableFrom(fragmentType))
             {
                 return null;
             }
@@ -1160,6 +1172,34 @@ namespace Traffic_Law_Enforcement
                 $"name={FirstNonBlank(name, "unknown")}, " +
                 $"identifier={FirstNonBlank(identifier, "unknown")}, " +
                 $"path={FirstNonBlank(path, "unknown")})";
+        }
+
+        private static string DescribeCurrentSettingAssetFragment(object instance)
+        {
+            object fragment = TryGetCurrentSettingAssetFragment(instance);
+            return fragment != null
+                ? DescribeSettingAssetFragment(fragment)
+                : null;
+        }
+
+        private static string DescribeCurrentSettingAssetOwner(object instance)
+        {
+            object fragment = TryGetCurrentSettingAssetFragment(instance);
+            if (fragment == null)
+            {
+                return null;
+            }
+
+            Type fragmentType = fragment.GetType();
+            object owner =
+                TryReadNamedMemberObject(fragment, fragmentType, "settingAsset") ??
+                TryReadNamedMemberObject(fragment, fragmentType, "asset") ??
+                TryReadNamedMemberObject(fragment, fragmentType, "m_SettingAsset") ??
+                TryReadNamedMemberObject(fragment, fragmentType, "m_Asset");
+
+            return owner != null
+                ? DescribeSettingAsset(owner)
+                : "<unknown>";
         }
 
         private static string InferAndTrackSettingAssetContext(object instance)
@@ -1221,10 +1261,58 @@ namespace Traffic_Law_Enforcement
                 return DescribeSettingAsset(value);
             }
 
-            string fragmentDescription = DescribeSettingAssetFragment(value);
+            object fragment = TryGetSettingAssetFragmentFromValue(fieldName, value);
+            string fragmentDescription = DescribeSettingAssetFragment(fragment);
             if (!string.IsNullOrWhiteSpace(fragmentDescription))
             {
                 return fragmentDescription;
+            }
+
+            return null;
+        }
+
+        private static object TryGetCurrentSettingAssetFragment(object instance)
+        {
+            if (instance == null)
+            {
+                return null;
+            }
+
+            Type instanceType = instance.GetType();
+            foreach (FieldInfo field in instanceType.GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic))
+            {
+                object value;
+                try
+                {
+                    value = field.GetValue(instance);
+                }
+                catch
+                {
+                    continue;
+                }
+
+                object fragment = TryGetSettingAssetFragmentFromValue(field.Name, value);
+                if (fragment != null)
+                {
+                    return fragment;
+                }
+            }
+
+            return null;
+        }
+
+        private static object TryGetSettingAssetFragmentFromValue(string fieldName, object value)
+        {
+            if (value == null)
+            {
+                return null;
+            }
+
+            Type valueType = value.GetType();
+            if (s_SettingAssetFragmentType != null &&
+                s_SettingAssetFragmentType.IsAssignableFrom(valueType))
+            {
+                return value;
             }
 
             if (valueType.IsValueType &&
@@ -1234,10 +1322,10 @@ namespace Traffic_Law_Enforcement
                 try
                 {
                     object key = valueType.GetProperty("Key")?.GetValue(value);
-                    string keyContext = TryInferSettingAssetContextFromValue("Key", key);
-                    if (!string.IsNullOrWhiteSpace(keyContext))
+                    object keyFragment = TryGetSettingAssetFragmentFromValue("Key", key);
+                    if (keyFragment != null)
                     {
-                        return keyContext;
+                        return keyFragment;
                     }
                 }
                 catch
@@ -1255,10 +1343,10 @@ namespace Traffic_Law_Enforcement
                     object current = valueType.GetProperty(
                         "Current",
                         BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)?.GetValue(value);
-                    string currentContext = TryInferSettingAssetContextFromValue($"{fieldName}.Current", current);
-                    if (!string.IsNullOrWhiteSpace(currentContext))
+                    object currentFragment = TryGetSettingAssetFragmentFromValue($"{fieldName}.Current", current);
+                    if (currentFragment != null)
                     {
-                        return currentContext;
+                        return currentFragment;
                     }
                 }
                 catch
