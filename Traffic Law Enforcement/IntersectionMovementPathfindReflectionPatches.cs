@@ -84,6 +84,7 @@ namespace Traffic_Law_Enforcement
             s_Harmony = null;
         }
 
+        [HarmonyPostfix]
         private static void Postfix(object[] __args, ref float __result, PathfindParameters ___m_Parameters, MethodBase __originalMethod)
         {
             string methodKey = __originalMethod?.ToString() ?? "(null)";

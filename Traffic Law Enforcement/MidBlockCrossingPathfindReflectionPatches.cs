@@ -60,6 +60,7 @@ namespace Traffic_Law_Enforcement
 
         public static void Apply()
         {
+            Mod.log.Info("[MIDBLOCK_TEST] Mod.OnLoad reached after MidBlock reflection Apply call.");
             if (s_Harmony != null)
             {
                 return;
@@ -67,8 +68,10 @@ namespace Traffic_Law_Enforcement
 
             try
             {
+                Mod.log.Info("[MIDBLOCK_TEST] Reflection Apply entered.");
                 s_Harmony = new Harmony(HarmonyId);
                 s_Harmony.PatchAll(typeof(MidBlockCrossingPathfindReflectionPatches).Assembly);
+                Mod.log.Info("[MIDBLOCK_TEST] Reflection PatchAll finished.");
                 if (EnforcementLoggingPolicy.ShouldLogPathfindingPenaltyDiagnostics())
                 {
                     Mod.log.Info("Mid-block reflection fallback patches applied.");
@@ -92,6 +95,7 @@ namespace Traffic_Law_Enforcement
             s_Harmony = null;
         }
 
+        [HarmonyPostfix]
         private static void Postfix(
             object[] __args,
             ref float __result,
