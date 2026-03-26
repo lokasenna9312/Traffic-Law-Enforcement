@@ -117,6 +117,7 @@ namespace Traffic_Law_Enforcement
 
                 s_Harmony.Patch(
                     s_TypeExtensionsGetMemberValueMethod,
+                    prefix: new HarmonyMethod(typeof(KeybindingSaveDiagnosticsPatches), nameof(TypeExtensionsGetMemberValuePrefix)),
                     finalizer: new HarmonyMethod(typeof(KeybindingSaveDiagnosticsPatches), nameof(TypeExtensionsGetMemberValueFinalizer)));
 
                 foreach (MethodInfo method in s_SettingAssetSaveMethods)
@@ -337,6 +338,31 @@ namespace Traffic_Law_Enforcement
                 __exception);
 
             return __exception;
+        }
+
+        private static void TypeExtensionsGetMemberValuePrefix(MemberInfo member, object obj)
+        {
+            bool keybindingSignal =
+                string.Equals(member?.Name, "bindings", StringComparison.Ordinal) ||
+                IsKeybindingSettingsType(member?.DeclaringType) ||
+                IsKeybindingSettingsType(obj?.GetType());
+
+            if (!keybindingSignal)
+            {
+                return;
+            }
+
+            string eventLine =
+                "TypeExtensions.GetMemberValue entered. " +
+                $"thread={Thread.CurrentThread.ManagedThreadId}, " +
+                $"member={DescribeMember(member)}, " +
+                $"object={DescribeObject(obj)}, " +
+                $"hasSaveContext={HasSaveContext()}, " +
+                $"currentSettingAsset={s_CurrentSettingAsset.Value ?? "<unknown>"}, " +
+                $"saveBreadcrumbs={FormatSaveBreadcrumbs()}";
+
+            RecordRecentGetterEvent(eventLine);
+            AppendAuxiliaryOnlyLine(eventLine);
         }
 
         private static bool ShouldLogDuringSettingsSave(Exception exception)
