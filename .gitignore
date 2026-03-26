@@ -69,6 +69,7 @@ Desktop.ini
 *.cache
 *.log
 .dotnet/
+.tmp/
 
 # PDX Account
 Traffic Law Enforcement/.local/

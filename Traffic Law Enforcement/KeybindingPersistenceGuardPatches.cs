@@ -44,6 +44,13 @@ namespace Traffic_Law_Enforcement
 
                 if (s_KeybindingSettingsBindingsGetter != null)
                 {
+                    HarmonyMethod getterPrefix = new HarmonyMethod(
+                        typeof(KeybindingPersistenceGuardPatches),
+                        nameof(KeybindingSettingsBindingsPrefix))
+                    {
+                        priority = 200,
+                    };
+
                     HarmonyMethod getterFinalizer = new HarmonyMethod(
                         typeof(KeybindingPersistenceGuardPatches),
                         nameof(KeybindingSettingsBindingsFinalizer))
@@ -51,11 +58,21 @@ namespace Traffic_Law_Enforcement
                         priority = 0,
                     };
 
-                    s_Harmony.Patch(s_KeybindingSettingsBindingsGetter, finalizer: getterFinalizer);
+                    s_Harmony.Patch(
+                        s_KeybindingSettingsBindingsGetter,
+                        prefix: getterPrefix,
+                        finalizer: getterFinalizer);
                 }
 
                 if (s_TypeExtensionsGetMemberValueMethod != null)
                 {
+                    HarmonyMethod memberValuePrefix = new HarmonyMethod(
+                        typeof(KeybindingPersistenceGuardPatches),
+                        nameof(TypeExtensionsGetMemberValuePrefix))
+                    {
+                        priority = 200,
+                    };
+
                     HarmonyMethod memberValueFinalizer = new HarmonyMethod(
                         typeof(KeybindingPersistenceGuardPatches),
                         nameof(TypeExtensionsGetMemberValueFinalizer))
@@ -63,7 +80,10 @@ namespace Traffic_Law_Enforcement
                         priority = 0,
                     };
 
-                    s_Harmony.Patch(s_TypeExtensionsGetMemberValueMethod, finalizer: memberValueFinalizer);
+                    s_Harmony.Patch(
+                        s_TypeExtensionsGetMemberValueMethod,
+                        prefix: memberValuePrefix,
+                        finalizer: memberValueFinalizer);
                 }
 
                 Mod.log.Info("[KEYBIND_GUARD] Keybinding persistence guard patches applied.");
@@ -124,6 +144,28 @@ namespace Traffic_Law_Enforcement
 
             __result = ResolveBindings(__instance, __exception);
             return null;
+        }
+
+        private static bool KeybindingSettingsBindingsPrefix(
+            KeybindingSettings __instance,
+            ref List<ProxyBinding> __result)
+        {
+            __result = ResolveBindings(__instance, null);
+            return false;
+        }
+
+        private static bool TypeExtensionsGetMemberValuePrefix(
+            MemberInfo member,
+            object obj,
+            ref object __result)
+        {
+            if (!TryGetBindingMemberTarget(member, obj, out KeybindingSettings settings))
+            {
+                return true;
+            }
+
+            __result = ResolveBindings(settings, null);
+            return false;
         }
 
         private static Exception TypeExtensionsGetMemberValueFinalizer(
