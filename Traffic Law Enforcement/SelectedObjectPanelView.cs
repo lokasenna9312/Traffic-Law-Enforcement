@@ -487,7 +487,7 @@ namespace Traffic_Law_Enforcement
                     11f,
                     contentWidth - 24f,
                     kStatusBlockHeight - 22f);
-                y += kStatusLabelHeight + kSectionGap;
+                y += kStatusBlockHeight + kSectionGap;
             }
 
             for (int index = 0; index < m_Rows.Length; index += 1)
