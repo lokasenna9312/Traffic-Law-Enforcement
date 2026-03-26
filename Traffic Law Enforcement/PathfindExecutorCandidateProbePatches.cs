@@ -23,6 +23,7 @@ namespace Traffic_Law_Enforcement
             new HashSet<string>(StringComparer.Ordinal);
 
         private static Harmony s_Harmony;
+        private static bool s_FirstPrefixSeen;
 
         private static IEnumerable<MethodBase> TargetMethods()
         {
@@ -57,26 +58,39 @@ namespace Traffic_Law_Enforcement
 
         public static void Apply()
         {
-            Mod.log.Info("[PATHFIND_PROBE_V2] Apply reached.");
+            Mod.log.Info("[PATHFIND_PROBE_V3] Apply reached.");
+
             if (s_Harmony != null)
             {
+                Mod.log.Info("[PATHFIND_PROBE_V3] Already applied.");
                 return;
             }
 
             try
             {
+                if (s_PathfindExecutorType == null)
+                {
+                    Mod.log.Info("[PATHFIND_PROBE_V3] PathfindExecutor type not found.");
+                    return;
+                }
+
+                List<MethodBase> targets = TargetMethods().ToList();
+                Mod.log.Info($"[PATHFIND_PROBE_V3] TargetMethods count={targets.Count}");
+
+                for (int i = 0; i < targets.Count && i < 20; i += 1)
+                {
+                    Mod.log.Info($"[PATHFIND_PROBE_V3] Target[{i}]={targets[i]}");
+                }
+
                 s_Harmony = new Harmony(HarmonyId);
                 s_Harmony.PatchAll(typeof(PathfindExecutorCandidateProbePatches).Assembly);
 
-                if (EnforcementLoggingPolicy.ShouldLogPathfindingPenaltyDiagnostics())
-                {
-                    Mod.log.Info("[PATHFIND_PROBE] Candidate probe patches applied.");
-                }
+                Mod.log.Info("[PATHFIND_PROBE_V3] PatchAll finished.");
             }
             catch (Exception ex)
             {
                 s_Harmony = null;
-                Mod.log.Error(ex, "[PATHFIND_PROBE] Failed to apply candidate probe patches.");
+                Mod.log.Error(ex, "[PATHFIND_PROBE_V3] Failed to apply candidate probe patches.");
             }
         }
 
@@ -90,14 +104,16 @@ namespace Traffic_Law_Enforcement
             s_Harmony.UnpatchAll(HarmonyId);
             s_Harmony = null;
             s_SeenMethods.Clear();
+            s_FirstPrefixSeen = false;
         }
 
         [HarmonyPrefix]
         private static void Prefix(object[] __args, MethodBase __originalMethod)
         {
-            if (!EnforcementLoggingPolicy.ShouldLogPathfindingPenaltyDiagnostics())
+            if (!s_FirstPrefixSeen)
             {
-                return;
+                s_FirstPrefixSeen = true;
+                Mod.log.Info($"[PATHFIND_PROBE_V3] First prefix entered: {__originalMethod}");
             }
 
             string key = __originalMethod?.ToString() ?? "(null)";
@@ -107,7 +123,7 @@ namespace Traffic_Law_Enforcement
             }
 
             Mod.log.Info(
-                "[PATHFIND_PROBE] Entered method: " +
+                "[PATHFIND_PROBE_V3] Entered method: " +
                 $"{DescribeMethod(__originalMethod as MethodInfo)}, " +
                 $"argSummary={SummarizeArgs(__args)}");
         }
