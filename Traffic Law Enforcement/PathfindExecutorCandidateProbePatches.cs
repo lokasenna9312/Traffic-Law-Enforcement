@@ -57,6 +57,7 @@ namespace Traffic_Law_Enforcement
 
         public static void Apply()
         {
+            Mod.log.Info("[PATHFIND_PROBE_V2] Apply reached.");
             if (s_Harmony != null)
             {
                 return;
