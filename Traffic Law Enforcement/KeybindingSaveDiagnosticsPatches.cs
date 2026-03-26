@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Reflection;
 using System.Threading;
 using HarmonyLib;
@@ -13,12 +14,14 @@ namespace Traffic_Law_Enforcement
         private const string HarmonyId = "Traffic_Law_Enforcement.KeybindingSaveDiagnosticsPatches";
         private const int kMaxTrackedDepth = 12;
         private const int kMaxSaveBreadcrumbs = 20;
+        private const int kMaxGlobalEvents = 40;
 
         private static readonly AsyncLocal<List<string>> s_DiffObjectStack = new AsyncLocal<List<string>>();
         private static readonly AsyncLocal<string> s_CurrentSettingAsset = new AsyncLocal<string>();
         private static readonly AsyncLocal<List<string>> s_SaveBreadcrumbs = new AsyncLocal<List<string>>();
         private static readonly HashSet<string> s_LoggedFailures = new HashSet<string>(StringComparer.Ordinal);
         private static readonly object s_LogGate = new object();
+        private static readonly List<string> s_GlobalSaveEvents = new List<string>();
 
         private static readonly FieldInfo s_KeybindingSettingsIsDefaultField =
             AccessTools.Field(typeof(Game.Settings.KeybindingSettings), "m_IsDefault");
@@ -47,22 +50,22 @@ namespace Traffic_Law_Enforcement
         private static readonly Type s_SettingAssetType =
             AccessTools.TypeByName("Colossal.IO.AssetDatabase.SettingAsset");
 
-        private static readonly MethodInfo s_SettingAssetSaveSingleArgumentMethod =
-            AccessTools.Method(
-                s_SettingAssetType,
-                "Save",
-                new[] { typeof(bool) });
+        private static readonly Type s_AssetDatabaseType =
+            AccessTools.TypeByName("Colossal.IO.AssetDatabase.AssetDatabase");
 
-        private static readonly MethodInfo s_SettingAssetSaveMethod =
-            AccessTools.Method(
-                s_SettingAssetType,
-                "Save",
-                new[]
-                {
-                    typeof(bool),
-                    typeof(bool),
-                    s_SaveSettingsHelperType,
-                });
+        private static readonly MethodInfo[] s_SettingAssetSaveMethods =
+            s_SettingAssetType?
+                .GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
+                .Where(method => string.Equals(method.Name, "Save", StringComparison.Ordinal))
+                .ToArray() ??
+            Array.Empty<MethodInfo>();
+
+        private static readonly MethodInfo[] s_AssetDatabaseSaveSettingsMethods =
+            s_AssetDatabaseType?
+                .GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
+                .Where(method => string.Equals(method.Name, "SaveSettings", StringComparison.Ordinal))
+                .ToArray() ??
+            Array.Empty<MethodInfo>();
 
         private static Harmony s_Harmony;
 
@@ -75,8 +78,7 @@ namespace Traffic_Law_Enforcement
 
             if (s_DiffObjectMethod == null ||
                 s_TypeExtensionsGetMemberValueMethod == null ||
-                (s_SettingAssetSaveSingleArgumentMethod == null &&
-                 s_SettingAssetSaveMethod == null))
+                s_SettingAssetSaveMethods.Length == 0)
             {
                 Mod.log.Warn("[KEYBIND_DIAG] Required reflection targets were not found. Diagnostics were not applied.");
                 return;
@@ -94,21 +96,25 @@ namespace Traffic_Law_Enforcement
                     s_TypeExtensionsGetMemberValueMethod,
                     finalizer: new HarmonyMethod(typeof(KeybindingSaveDiagnosticsPatches), nameof(TypeExtensionsGetMemberValueFinalizer)));
 
-                if (s_SettingAssetSaveSingleArgumentMethod != null)
+                foreach (MethodInfo method in s_SettingAssetSaveMethods)
                 {
                     s_Harmony.Patch(
-                        s_SettingAssetSaveSingleArgumentMethod,
-                        prefix: new HarmonyMethod(typeof(KeybindingSaveDiagnosticsPatches), nameof(SettingAssetSavePrefix)));
+                        method,
+                        prefix: new HarmonyMethod(typeof(KeybindingSaveDiagnosticsPatches), nameof(SettingAssetSavePrefix)),
+                        finalizer: new HarmonyMethod(typeof(KeybindingSaveDiagnosticsPatches), nameof(SettingAssetSaveFinalizer)));
                 }
 
-                if (s_SettingAssetSaveMethod != null)
+                foreach (MethodInfo method in s_AssetDatabaseSaveSettingsMethods)
                 {
                     s_Harmony.Patch(
-                        s_SettingAssetSaveMethod,
-                        prefix: new HarmonyMethod(typeof(KeybindingSaveDiagnosticsPatches), nameof(SettingAssetSavePrefix)));
+                        method,
+                        prefix: new HarmonyMethod(typeof(KeybindingSaveDiagnosticsPatches), nameof(AssetDatabaseSaveSettingsPrefix)));
                 }
 
-                WriteDiagnosticLine("Keybinding save diagnostics patches applied.");
+                WriteDiagnosticLine(
+                    "Keybinding save diagnostics patches applied. " +
+                    $"settingAssetSaveMethods={string.Join(" | ", s_SettingAssetSaveMethods.Select(DescribeMethod))}, " +
+                    $"assetDatabaseSaveSettingsMethods={string.Join(" | ", s_AssetDatabaseSaveSettingsMethods.Select(DescribeMethod))}");
             }
             catch (Exception ex)
             {
@@ -142,6 +148,7 @@ namespace Traffic_Law_Enforcement
                 lock (s_LogGate)
                 {
                     s_LoggedFailures.Clear();
+                    s_GlobalSaveEvents.Clear();
                 }
             }
         }
@@ -181,6 +188,7 @@ namespace Traffic_Law_Enforcement
                         $"source={currentSource}, " +
                         $"diffStack={FormatCurrentDiffStack()}, " +
                         $"saveBreadcrumbs={FormatSaveBreadcrumbs()}, " +
+                        $"globalEvents={FormatGlobalSaveEvents()}, " +
                         $"exception={DescribeException(__exception)}, " +
                         $"rootCause={DescribeException(UnwrapException(__exception))}",
                         __exception);
@@ -229,6 +237,7 @@ namespace Traffic_Law_Enforcement
                 $"keybindingContext={keybindingContext}, " +
                 $"diffStack={FormatCurrentDiffStack()}, " +
                 $"saveBreadcrumbs={FormatSaveBreadcrumbs()}, " +
+                $"globalEvents={FormatGlobalSaveEvents()}, " +
                 $"exception={DescribeException(__exception)}, " +
                 $"rootCause={DescribeException(rootCause)}",
                 __exception);
@@ -389,7 +398,15 @@ namespace Traffic_Law_Enforcement
                 : $"{objectType.FullName}({identity})";
         }
 
-        private static void SettingAssetSavePrefix(object __instance)
+        private static void AssetDatabaseSaveSettingsPrefix(MethodBase __originalMethod, object[] __args)
+        {
+            string message =
+                $"AssetDatabase.SaveSettings started. method={DescribeMethod(__originalMethod)}, args={DescribeArguments(__args)}";
+            RecordGlobalSaveEvent(message);
+            WriteDiagnosticLine(message);
+        }
+
+        private static void SettingAssetSavePrefix(MethodBase __originalMethod, object __instance, object[] __args)
         {
             string settingAsset = DescribeSettingAsset(__instance);
             s_CurrentSettingAsset.Value = settingAsset;
@@ -407,7 +424,37 @@ namespace Traffic_Law_Enforcement
                 breadcrumbs.RemoveAt(0);
             }
 
-            WriteDiagnosticLine($"SettingAsset.Save started. settingAsset={settingAsset}");
+            string message =
+                $"SettingAsset.Save started. method={DescribeMethod(__originalMethod)}, " +
+                $"settingAsset={settingAsset}, args={DescribeArguments(__args)}";
+            RecordGlobalSaveEvent(message);
+            WriteDiagnosticLine(message);
+        }
+
+        private static Exception SettingAssetSaveFinalizer(MethodBase __originalMethod, object __instance, Exception __exception)
+        {
+            if (__exception == null)
+            {
+                return null;
+            }
+
+            string settingAsset = DescribeSettingAsset(__instance);
+            string key = $"SAVE|{BuildFailureSignature(__exception)}|{DescribeMethod(__originalMethod)}|{settingAsset}";
+            if (TryRegisterFailure(key))
+            {
+                WriteDiagnosticLine(
+                    "SettingAsset.Save failed. " +
+                    $"method={DescribeMethod(__originalMethod)}, " +
+                    $"settingAsset={settingAsset}, " +
+                    $"diffStack={FormatCurrentDiffStack()}, " +
+                    $"saveBreadcrumbs={FormatSaveBreadcrumbs()}, " +
+                    $"globalEvents={FormatGlobalSaveEvents()}, " +
+                    $"exception={DescribeException(__exception)}, " +
+                    $"rootCause={DescribeException(UnwrapException(__exception))}",
+                    __exception);
+            }
+
+            return __exception;
         }
 
         private static string DescribeSettingAsset(object settingAsset)
@@ -468,6 +515,31 @@ namespace Traffic_Law_Enforcement
             }
 
             return string.Join(" -> ", breadcrumbs);
+        }
+
+        private static void RecordGlobalSaveEvent(string message)
+        {
+            lock (s_LogGate)
+            {
+                s_GlobalSaveEvents.Add(message);
+                if (s_GlobalSaveEvents.Count > kMaxGlobalEvents)
+                {
+                    s_GlobalSaveEvents.RemoveAt(0);
+                }
+            }
+        }
+
+        private static string FormatGlobalSaveEvents()
+        {
+            lock (s_LogGate)
+            {
+                if (s_GlobalSaveEvents.Count == 0)
+                {
+                    return "<empty>";
+                }
+
+                return string.Join(" || ", s_GlobalSaveEvents);
+            }
         }
 
         private static bool TryRegisterFailure(string key)
@@ -539,6 +611,40 @@ namespace Traffic_Law_Enforcement
             }
 
             return Path.Combine(AppContext.BaseDirectory, "Traffic_Law_Enforcement.KeybindDiag.log");
+        }
+
+        private static string DescribeMethod(MethodBase method)
+        {
+            if (method == null)
+            {
+                return "<null>";
+            }
+
+            ParameterInfo[] parameters = method.GetParameters();
+            return
+                $"{method.DeclaringType?.FullName}.{method.Name}(" +
+                string.Join(", ", parameters.Select(parameter => parameter.ParameterType.Name)) +
+                ")";
+        }
+
+        private static string DescribeArguments(object[] args)
+        {
+            if (args == null || args.Length == 0)
+            {
+                return "<none>";
+            }
+
+            return string.Join(", ", args.Select(DescribeArgument));
+        }
+
+        private static string DescribeArgument(object arg)
+        {
+            if (arg == null)
+            {
+                return "<null>";
+            }
+
+            return $"{arg.GetType().FullName}={arg}";
         }
     }
 }
