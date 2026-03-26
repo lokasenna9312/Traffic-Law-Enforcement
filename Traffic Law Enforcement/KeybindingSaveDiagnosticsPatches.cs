@@ -67,6 +67,17 @@ namespace Traffic_Law_Enforcement
                 .ToArray() ??
             Array.Empty<MethodInfo>();
 
+        private static readonly MethodInfo[] s_AssetDatabaseSaveSettingsWorkerMethods =
+            s_AssetDatabaseType?.Assembly
+                .GetTypes()
+                .Where(type =>
+                    string.Equals(type.Namespace, "Colossal.IO.AssetDatabase", StringComparison.Ordinal) &&
+                    (type.FullName?.IndexOf("AssetDatabase", StringComparison.Ordinal) >= 0))
+                .SelectMany(type => type.GetMethods(BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic))
+                .Where(method => method.Name.IndexOf("<SaveSettings>", StringComparison.Ordinal) >= 0)
+                .ToArray() ??
+            Array.Empty<MethodInfo>();
+
         private static Harmony s_Harmony;
 
         public static void Apply()
@@ -111,10 +122,19 @@ namespace Traffic_Law_Enforcement
                         prefix: new HarmonyMethod(typeof(KeybindingSaveDiagnosticsPatches), nameof(AssetDatabaseSaveSettingsPrefix)));
                 }
 
+                foreach (MethodInfo method in s_AssetDatabaseSaveSettingsWorkerMethods)
+                {
+                    s_Harmony.Patch(
+                        method,
+                        prefix: new HarmonyMethod(typeof(KeybindingSaveDiagnosticsPatches), nameof(AssetDatabaseSaveSettingsWorkerPrefix)),
+                        finalizer: new HarmonyMethod(typeof(KeybindingSaveDiagnosticsPatches), nameof(AssetDatabaseSaveSettingsWorkerFinalizer)));
+                }
+
                 WriteDiagnosticLine(
                     "Keybinding save diagnostics patches applied. " +
                     $"settingAssetSaveMethods={string.Join(" | ", s_SettingAssetSaveMethods.Select(DescribeMethod))}, " +
-                    $"assetDatabaseSaveSettingsMethods={string.Join(" | ", s_AssetDatabaseSaveSettingsMethods.Select(DescribeMethod))}");
+                    $"assetDatabaseSaveSettingsMethods={string.Join(" | ", s_AssetDatabaseSaveSettingsMethods.Select(DescribeMethod))}, " +
+                    $"assetDatabaseSaveSettingsWorkerMethods={string.Join(" | ", s_AssetDatabaseSaveSettingsWorkerMethods.Select(DescribeMethod))}");
             }
             catch (Exception ex)
             {
@@ -406,6 +426,40 @@ namespace Traffic_Law_Enforcement
             WriteDiagnosticLine(message);
         }
 
+        private static void AssetDatabaseSaveSettingsWorkerPrefix(MethodBase __originalMethod, object __instance, object[] __args)
+        {
+            string message =
+                $"AssetDatabase.SaveSettings worker started. method={DescribeMethod(__originalMethod)}, " +
+                $"instanceFields={DescribeInstanceFields(__instance)}, args={DescribeArguments(__args)}";
+            RecordGlobalSaveEvent(message);
+            WriteDiagnosticLine(message);
+        }
+
+        private static Exception AssetDatabaseSaveSettingsWorkerFinalizer(MethodBase __originalMethod, object __instance, Exception __exception)
+        {
+            if (__exception == null)
+            {
+                return null;
+            }
+
+            string key = $"SAVEWORKER|{BuildFailureSignature(__exception)}|{DescribeMethod(__originalMethod)}";
+            if (TryRegisterFailure(key))
+            {
+                WriteDiagnosticLine(
+                    "AssetDatabase.SaveSettings worker failed. " +
+                    $"method={DescribeMethod(__originalMethod)}, " +
+                    $"instanceFields={DescribeInstanceFields(__instance)}, " +
+                    $"diffStack={FormatCurrentDiffStack()}, " +
+                    $"saveBreadcrumbs={FormatSaveBreadcrumbs()}, " +
+                    $"globalEvents={FormatGlobalSaveEvents()}, " +
+                    $"exception={DescribeException(__exception)}, " +
+                    $"rootCause={DescribeException(UnwrapException(__exception))}",
+                    __exception);
+            }
+
+            return __exception;
+        }
+
         private static void SettingAssetSavePrefix(MethodBase __originalMethod, object __instance, object[] __args)
         {
             string settingAsset = DescribeSettingAsset(__instance);
@@ -645,6 +699,83 @@ namespace Traffic_Law_Enforcement
             }
 
             return $"{arg.GetType().FullName}={arg}";
+        }
+
+        private static string DescribeInstanceFields(object instance)
+        {
+            if (instance == null)
+            {
+                return "<null>";
+            }
+
+            try
+            {
+                FieldInfo[] fields = instance.GetType().GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                if (fields.Length == 0)
+                {
+                    return instance.GetType().FullName;
+                }
+
+                return string.Join(
+                    "; ",
+                    fields.Select(field => $"{field.Name}={SafeDescribeValue(field.GetValue(instance))}"));
+            }
+            catch (Exception ex)
+            {
+                return $"<failed:{ex.GetType().Name}:{ex.Message}>";
+            }
+        }
+
+        private static string SafeDescribeValue(object value)
+        {
+            if (value == null)
+            {
+                return "<null>";
+            }
+
+            if (value is string text)
+            {
+                return text;
+            }
+
+            if (value is System.Collections.IEnumerable enumerable && !(value is string))
+            {
+                List<string> items = new List<string>();
+                int count = 0;
+                foreach (object item in enumerable)
+                {
+                    items.Add(SafeDescribeScalar(item));
+                    count += 1;
+                    if (count >= 5)
+                    {
+                        break;
+                    }
+                }
+
+                string suffix = count >= 5 ? ", ..." : string.Empty;
+                return $"[{string.Join(", ", items)}{suffix}]";
+            }
+
+            return SafeDescribeScalar(value);
+        }
+
+        private static string SafeDescribeScalar(object value)
+        {
+            if (value == null)
+            {
+                return "<null>";
+            }
+
+            Type valueType = value.GetType();
+            if (valueType.IsPrimitive || value is decimal || value is Guid)
+            {
+                return value.ToString();
+            }
+
+            string describedObject = DescribeObject(value);
+            return string.IsNullOrWhiteSpace(describedObject)
+                ? valueType.FullName
+                : describedObject;
         }
     }
 }
