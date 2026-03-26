@@ -15,6 +15,7 @@ namespace Traffic_Law_Enforcement
         private const int kMaxTrackedDepth = 12;
         private const int kMaxSaveBreadcrumbs = 20;
         private const int kMaxGlobalEvents = 40;
+        private const int kMaxRecentGetterEvents = 60;
 
         private static readonly AsyncLocal<List<string>> s_DiffObjectStack = new AsyncLocal<List<string>>();
         private static readonly AsyncLocal<string> s_CurrentSettingAsset = new AsyncLocal<string>();
@@ -22,6 +23,7 @@ namespace Traffic_Law_Enforcement
         private static readonly HashSet<string> s_LoggedFailures = new HashSet<string>(StringComparer.Ordinal);
         private static readonly object s_LogGate = new object();
         private static readonly List<string> s_GlobalSaveEvents = new List<string>();
+        private static readonly List<string> s_RecentGetterEvents = new List<string>();
         private static int s_KeybindingBindingsGetterCallCount;
 
         private static readonly FieldInfo s_KeybindingSettingsIsDefaultField =
@@ -180,6 +182,7 @@ namespace Traffic_Law_Enforcement
                 {
                     s_LoggedFailures.Clear();
                     s_GlobalSaveEvents.Clear();
+                    s_RecentGetterEvents.Clear();
                 }
             }
         }
@@ -213,16 +216,17 @@ namespace Traffic_Law_Enforcement
                 string key = $"DIFF|{BuildFailureSignature(__exception)}|{currentSource}|{s_CurrentSettingAsset.Value}";
                 if (TryRegisterFailure(key))
                 {
-                    WriteDiagnosticLine(
-                        "DiffObject failed during settings save. " +
-                        $"settingAsset={s_CurrentSettingAsset.Value ?? "<unknown>"}, " +
-                        $"source={currentSource}, " +
-                        $"diffStack={FormatCurrentDiffStack()}, " +
-                        $"saveBreadcrumbs={FormatSaveBreadcrumbs()}, " +
-                        $"globalEvents={FormatGlobalSaveEvents()}, " +
-                        $"exception={DescribeException(__exception)}, " +
-                        $"rootCause={DescribeException(UnwrapException(__exception))}",
-                        __exception);
+                WriteDiagnosticLine(
+                    "DiffObject failed during settings save. " +
+                    $"settingAsset={s_CurrentSettingAsset.Value ?? "<unknown>"}, " +
+                    $"source={currentSource}, " +
+                    $"diffStack={FormatCurrentDiffStack()}, " +
+                    $"saveBreadcrumbs={FormatSaveBreadcrumbs()}, " +
+                    $"globalEvents={FormatGlobalSaveEvents()}, " +
+                    $"recentGetterEvents={FormatRecentGetterEvents()}, " +
+                    $"exception={DescribeException(__exception)}, " +
+                    $"rootCause={DescribeException(UnwrapException(__exception))}",
+                    __exception);
                 }
             }
 
@@ -266,6 +270,7 @@ namespace Traffic_Law_Enforcement
                     $"diffStack={FormatCurrentDiffStack()}, " +
                     $"saveBreadcrumbs={FormatSaveBreadcrumbs()}, " +
                     $"globalEvents={FormatGlobalSaveEvents()}, " +
+                    $"recentGetterEvents={FormatRecentGetterEvents()}, " +
                     $"exception={DescribeException(__exception)}, " +
                     $"rootCause={DescribeException(UnwrapException(__exception))}",
                     __exception);
@@ -278,18 +283,21 @@ namespace Traffic_Law_Enforcement
         {
             int callCount = Interlocked.Increment(ref s_KeybindingBindingsGetterCallCount);
             bool hasSaveContext = HasSaveContext();
-            if (!hasSaveContext && callCount > 20)
-            {
-                return;
-            }
-
-            AppendAuxiliaryOnlyLine(
+            string eventLine =
                 "KeybindingSettings.bindings getter entered. " +
                 $"call={callCount}, " +
                 $"thread={Thread.CurrentThread.ManagedThreadId}, " +
                 $"hasSaveContext={hasSaveContext}, " +
                 $"instanceType={__instance?.GetType().FullName ?? "<null>"}, " +
-                $"isDefault={TryGetIsDefaultValue(__instance)}");
+                $"isDefault={TryGetIsDefaultValue(__instance)}, " +
+                $"currentSettingAsset={s_CurrentSettingAsset.Value ?? "<unknown>"}, " +
+                $"saveBreadcrumbs={FormatSaveBreadcrumbs()}";
+
+            RecordRecentGetterEvent(eventLine);
+            if (hasSaveContext || callCount <= 5)
+            {
+                AppendAuxiliaryOnlyLine(eventLine);
+            }
         }
 
         private static Exception TypeExtensionsGetMemberValueFinalizer(
@@ -323,6 +331,7 @@ namespace Traffic_Law_Enforcement
                 $"diffStack={FormatCurrentDiffStack()}, " +
                 $"saveBreadcrumbs={FormatSaveBreadcrumbs()}, " +
                 $"globalEvents={FormatGlobalSaveEvents()}, " +
+                $"recentGetterEvents={FormatRecentGetterEvents()}, " +
                 $"exception={DescribeException(__exception)}, " +
                 $"rootCause={DescribeException(rootCause)}",
                 __exception);
@@ -517,6 +526,7 @@ namespace Traffic_Law_Enforcement
                     $"diffStack={FormatCurrentDiffStack()}, " +
                     $"saveBreadcrumbs={FormatSaveBreadcrumbs()}, " +
                     $"globalEvents={FormatGlobalSaveEvents()}, " +
+                    $"recentGetterEvents={FormatRecentGetterEvents()}, " +
                     $"exception={DescribeException(__exception)}, " +
                     $"rootCause={DescribeException(UnwrapException(__exception))}",
                     __exception);
@@ -568,6 +578,7 @@ namespace Traffic_Law_Enforcement
                     $"diffStack={FormatCurrentDiffStack()}, " +
                     $"saveBreadcrumbs={FormatSaveBreadcrumbs()}, " +
                     $"globalEvents={FormatGlobalSaveEvents()}, " +
+                    $"recentGetterEvents={FormatRecentGetterEvents()}, " +
                     $"exception={DescribeException(__exception)}, " +
                     $"rootCause={DescribeException(UnwrapException(__exception))}",
                     __exception);
@@ -661,6 +672,48 @@ namespace Traffic_Law_Enforcement
             }
         }
 
+        private static void RecordRecentGetterEvent(string message)
+        {
+            string timestampedLine = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss,fff}] [KEYBIND_DIAG] {message}";
+
+            try
+            {
+                lock (s_LogGate)
+                {
+                    s_RecentGetterEvents.Add(timestampedLine);
+                    if (s_RecentGetterEvents.Count > kMaxRecentGetterEvents)
+                    {
+                        s_RecentGetterEvents.RemoveAt(0);
+                    }
+
+                    string logPath = ResolveRecentGetterLogPath();
+                    string directory = Path.GetDirectoryName(logPath);
+                    if (!string.IsNullOrWhiteSpace(directory))
+                    {
+                        Directory.CreateDirectory(directory);
+                    }
+
+                    File.WriteAllLines(logPath, s_RecentGetterEvents);
+                }
+            }
+            catch
+            {
+            }
+        }
+
+        private static string FormatRecentGetterEvents()
+        {
+            lock (s_LogGate)
+            {
+                if (s_RecentGetterEvents.Count == 0)
+                {
+                    return "<empty>";
+                }
+
+                return string.Join(" || ", s_RecentGetterEvents);
+            }
+        }
+
         private static bool TryRegisterFailure(string key)
         {
             lock (s_LogGate)
@@ -730,6 +783,17 @@ namespace Traffic_Law_Enforcement
             }
 
             return Path.Combine(AppContext.BaseDirectory, "Traffic_Law_Enforcement.KeybindDiag.log");
+        }
+
+        private static string ResolveRecentGetterLogPath()
+        {
+            string directory = Path.GetDirectoryName(ResolveAuxiliaryLogPath());
+            if (!string.IsNullOrWhiteSpace(directory))
+            {
+                return Path.Combine(directory, "Traffic_Law_Enforcement.KeybindDiag.recent_getters.log");
+            }
+
+            return Path.Combine(AppContext.BaseDirectory, "Traffic_Law_Enforcement.KeybindDiag.recent_getters.log");
         }
 
         private static string DescribeMethod(MethodBase method)
