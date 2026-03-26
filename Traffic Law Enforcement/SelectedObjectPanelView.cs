@@ -4,7 +4,7 @@ using UnityEngine.UI;
 
 namespace Traffic_Law_Enforcement
 {
-    internal sealed class SelectedVehiclePanelView : MonoBehaviour
+    internal sealed class SelectedObjectPanelView : MonoBehaviour
     {
         private const float kWidth = 516f;
         private const float kTopInset = 78f;
@@ -67,7 +67,7 @@ namespace Traffic_Law_Enforcement
 
         private Font m_Font;
         private Canvas m_Canvas;
-        private RectTransform m_CanvasRect;
+        private RectTransform m_UiRootRect;
         private RectTransform m_PanelRect;
         private Image m_PanelBackground;
         private RectTransform m_TitleBarRect;
@@ -187,18 +187,15 @@ namespace Traffic_Law_Enforcement
                 gameObject.AddComponent<GraphicRaycaster>();
             }
 
-            m_CanvasRect = gameObject.GetComponent<RectTransform>();
-            if (m_CanvasRect == null)
-            {
-                m_CanvasRect = gameObject.AddComponent<RectTransform>();
-            }
+            GameObject uiRootObject = new GameObject("UiRoot", typeof(RectTransform));
+            uiRootObject.transform.SetParent(gameObject.transform, false);
+            m_UiRootRect = (RectTransform)uiRootObject.transform;
+            m_UiRootRect.anchorMin = Vector2.zero;
+            m_UiRootRect.anchorMax = Vector2.one;
+            m_UiRootRect.offsetMin = Vector2.zero;
+            m_UiRootRect.offsetMax = Vector2.zero;
 
-            m_CanvasRect.anchorMin = Vector2.zero;
-            m_CanvasRect.anchorMax = Vector2.one;
-            m_CanvasRect.offsetMin = Vector2.zero;
-            m_CanvasRect.offsetMax = Vector2.zero;
-
-            m_PanelRect = CreateRect("Panel", m_CanvasRect);
+            m_PanelRect = CreateRect("Panel", m_UiRootRect);
             m_PanelBackground = m_PanelRect.gameObject.AddComponent<Image>();
             m_PanelBackground.color = kPanelColor;
             m_PanelBackground.raycastTarget = true;
@@ -212,8 +209,8 @@ namespace Traffic_Law_Enforcement
             Image dragHandleImage = dragHandleRect.gameObject.AddComponent<Image>();
             dragHandleImage.color = new Color(0f, 0f, 0f, 0.001f);
             dragHandleImage.raycastTarget = true;
-            SelectedVehiclePanelDragHandle dragHandle =
-                dragHandleRect.gameObject.AddComponent<SelectedVehiclePanelDragHandle>();
+            SelectedObjectPanelDragHandle dragHandle =
+                dragHandleRect.gameObject.AddComponent<SelectedObjectPanelDragHandle>();
             dragHandle.Initialize(this);
 
             m_TitleText = CreateText(
@@ -327,7 +324,7 @@ namespace Traffic_Law_Enforcement
                 return;
             }
 
-            m_TitleText.text = "Selected Vehicle";
+            m_TitleText.text = "Selected Object";
             m_CollapseButtonText.text = m_Collapsed ? "+" : "-";
             m_CloseButtonText.text = "X";
             m_ClassificationText.text = m_State.Classification ?? string.Empty;
@@ -670,15 +667,15 @@ namespace Traffic_Law_Enforcement
         }
     }
 
-    internal sealed class SelectedVehiclePanelDragHandle :
+    internal sealed class SelectedObjectPanelDragHandle :
         MonoBehaviour,
         IPointerDownHandler,
         IDragHandler,
         IEndDragHandler
     {
-        private SelectedVehiclePanelView m_Owner;
+        private SelectedObjectPanelView m_Owner;
 
-        internal void Initialize(SelectedVehiclePanelView owner)
+        internal void Initialize(SelectedObjectPanelView owner)
         {
             m_Owner = owner;
         }
@@ -704,3 +701,4 @@ namespace Traffic_Law_Enforcement
         }
     }
 }
+

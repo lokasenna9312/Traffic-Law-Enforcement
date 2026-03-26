@@ -81,10 +81,10 @@ namespace Traffic_Law_Enforcement
             updateSystem.UpdateAfter<LaneTransitionViolationApplySystem, LaneTransitionViolationSystem>(SystemUpdatePhase.GameSimulation);
             updateSystem.UpdateAfter<EnforcementFineMoneySystem, PublicTransportLaneViolationApplySystem>(SystemUpdatePhase.GameSimulation);
             updateSystem.UpdateAfter<EnforcementFineMoneySystem, LaneTransitionViolationApplySystem>(SystemUpdatePhase.GameSimulation);
-            updateSystem.UpdateAfter<SelectedVehicleBridgeSystem, VehicleLaneHistorySystem>(SystemUpdatePhase.GameSimulation);
-            updateSystem.UpdateAfter<SelectedVehicleBridgeSystem, PublicTransportLaneViolationApplySystem>(SystemUpdatePhase.GameSimulation);
-            updateSystem.UpdateAfter<SelectedVehicleBridgeSystem, LaneTransitionViolationApplySystem>(SystemUpdatePhase.GameSimulation);
-            updateSystem.UpdateAt<SelectedVehiclePanelUISystem>(SystemUpdatePhase.UIUpdate);
+            updateSystem.UpdateAfter<SelectedObjectBridgeSystem, VehicleLaneHistorySystem>(SystemUpdatePhase.GameSimulation);
+            updateSystem.UpdateAfter<SelectedObjectBridgeSystem, PublicTransportLaneViolationApplySystem>(SystemUpdatePhase.GameSimulation);
+            updateSystem.UpdateAfter<SelectedObjectBridgeSystem, LaneTransitionViolationApplySystem>(SystemUpdatePhase.GameSimulation);
+            updateSystem.UpdateAt<SelectedObjectPanelUISystem>(SystemUpdatePhase.UIUpdate);
         }
 
         public void OnDispose()
@@ -410,3 +410,4 @@ namespace Traffic_Law_Enforcement
         }
     }
 }
+

@@ -6,18 +6,18 @@ using Entity = Unity.Entities.Entity;
 
 namespace Traffic_Law_Enforcement
 {
-    public enum SelectedVehicleTleApplicability
+    public enum SelectedObjectTleApplicability
     {
         NotApplicable,
         ApplicableNoLiveLaneData,
         ApplicableReady,
     }
 
-    public readonly struct SelectedVehicleDebugSnapshot
+    public readonly struct SelectedObjectDebugSnapshot
     {
-        public readonly SelectedVehicleResolveState ResolveState;
-        public readonly SelectedVehicleKind VehicleKind;
-        public readonly SelectedVehicleTleApplicability TleApplicability;
+        public readonly SelectedObjectResolveState ResolveState;
+        public readonly SelectedObjectKind VehicleKind;
+        public readonly SelectedObjectTleApplicability TleApplicability;
         public readonly Entity SourceSelectedEntity;
         public readonly Entity ResolvedVehicleEntity;
         public readonly Entity PrefabEntity;
@@ -56,10 +56,10 @@ namespace Traffic_Law_Enforcement
         public readonly int TotalViolations;
         public readonly string LastReason;
 
-        public SelectedVehicleDebugSnapshot(
-            SelectedVehicleResolveState resolveState,
-            SelectedVehicleKind vehicleKind,
-            SelectedVehicleTleApplicability tleApplicability,
+        public SelectedObjectDebugSnapshot(
+            SelectedObjectResolveState resolveState,
+            SelectedObjectKind vehicleKind,
+            SelectedObjectTleApplicability tleApplicability,
             Entity sourceSelectedEntity,
             Entity resolvedVehicleEntity,
             Entity prefabEntity,
@@ -133,9 +133,9 @@ namespace Traffic_Law_Enforcement
         }
     }
 
-    public partial class SelectedVehicleBridgeSystem : GameSystemBase
+    public partial class SelectedObjectBridgeSystem : GameSystemBase
     {
-        private SelectedVehicleResolver m_SelectedVehicleResolver;
+        private SelectedObjectResolver m_SelectedObjectResolver;
         private PublicTransportLaneVehicleTypeLookups m_TypeLookups;
 
         private ComponentLookup<CarCurrentLane> m_CurrentLaneData;
@@ -145,17 +145,17 @@ namespace Traffic_Law_Enforcement
         private ComponentLookup<PublicTransportLanePendingExit> m_PendingExitData;
         private ComponentLookup<PublicTransportLanePermissionState> m_PermissionStateData;
 
-        private SelectedVehicleDebugSnapshot m_CurrentSnapshot;
+        private SelectedObjectDebugSnapshot m_CurrentSnapshot;
         private bool m_HasSnapshot;
 
-        public SelectedVehicleDebugSnapshot CurrentSnapshot => m_CurrentSnapshot;
+        public SelectedObjectDebugSnapshot CurrentSnapshot => m_CurrentSnapshot;
         public bool HasSnapshot => m_HasSnapshot;
 
         protected override void OnCreate()
         {
             base.OnCreate();
 
-            m_SelectedVehicleResolver = new SelectedVehicleResolver(this);
+            m_SelectedObjectResolver = new SelectedObjectResolver(this);
             m_TypeLookups = PublicTransportLaneVehicleTypeLookups.Create(this);
             m_CurrentLaneData = GetComponentLookup<CarCurrentLane>(true);
             m_HistoryData = GetComponentLookup<VehicleLaneHistory>(true);
@@ -169,7 +169,7 @@ namespace Traffic_Law_Enforcement
 
         protected override void OnUpdate()
         {
-            m_SelectedVehicleResolver.Update(this);
+            m_SelectedObjectResolver.Update(this);
             m_TypeLookups.Update(this);
             m_CurrentLaneData.Update(this);
             m_HistoryData.Update(this);
@@ -178,24 +178,24 @@ namespace Traffic_Law_Enforcement
             m_PendingExitData.Update(this);
             m_PermissionStateData.Update(this);
 
-            SelectedVehicleResolveResult resolveResult =
-                m_SelectedVehicleResolver.ResolveCurrentSelection();
+            SelectedObjectResolveResult resolveResult =
+                m_SelectedObjectResolver.ResolveCurrentSelection();
 
             m_CurrentSnapshot = BuildSnapshot(resolveResult);
             m_HasSnapshot = true;
         }
 
-        private SelectedVehicleDebugSnapshot BuildSnapshot(
-            SelectedVehicleResolveResult resolveResult)
+        private SelectedObjectDebugSnapshot BuildSnapshot(
+            SelectedObjectResolveResult resolveResult)
         {
             Entity vehicle = resolveResult.ResolvedVehicleEntity;
             bool hasVehicleEntity = vehicle != Entity.Null;
-            SelectedVehicleTleApplicability tleApplicability =
+            SelectedObjectTleApplicability tleApplicability =
                 GetTleApplicability(resolveResult);
             bool tleApplicable =
-                tleApplicability != SelectedVehicleTleApplicability.NotApplicable;
+                tleApplicability != SelectedObjectTleApplicability.NotApplicable;
             bool tleReady =
-                tleApplicability == SelectedVehicleTleApplicability.ApplicableReady;
+                tleApplicability == SelectedObjectTleApplicability.ApplicableReady;
 
             bool hasTrafficLawProfile =
                 tleApplicable &&
@@ -258,7 +258,7 @@ namespace Traffic_Law_Enforcement
                 lastReason = FindLastReason(vehicleIndex);
             }
 
-            return new SelectedVehicleDebugSnapshot(
+            return new SelectedObjectDebugSnapshot(
                 resolveResult.ResolveState,
                 resolveResult.VehicleKind,
                 tleApplicability,
@@ -298,7 +298,7 @@ namespace Traffic_Law_Enforcement
         }
 
         private static string BuildRuntimeFamilyText(
-            SelectedVehicleResolveResult resolveResult)
+            SelectedObjectResolveResult resolveResult)
         {
             if (!resolveResult.IsVehicle)
             {
@@ -307,13 +307,13 @@ namespace Traffic_Law_Enforcement
 
             switch (resolveResult.RuntimeFamily)
             {
-                case SelectedVehicleRuntimeFamily.Car:
+                case SelectedObjectRuntimeFamily.Car:
                     return "Car";
 
-                case SelectedVehicleRuntimeFamily.Train:
+                case SelectedObjectRuntimeFamily.Train:
                     return "Train";
 
-                case SelectedVehicleRuntimeFamily.Other:
+                case SelectedObjectRuntimeFamily.Other:
                     return "Other";
 
                 default:
@@ -322,7 +322,7 @@ namespace Traffic_Law_Enforcement
         }
 
         private static string BuildRawTransportTypeText(
-            SelectedVehicleResolveResult resolveResult)
+            SelectedObjectResolveResult resolveResult)
         {
             if (!resolveResult.IsVehicle || !resolveResult.HasPublicTransportVehicleData)
             {
@@ -335,7 +335,7 @@ namespace Traffic_Law_Enforcement
         }
 
         private static string BuildRawTrackTypeText(
-            SelectedVehicleResolveResult resolveResult)
+            SelectedObjectResolveResult resolveResult)
         {
             if (!resolveResult.IsVehicle || !resolveResult.HasTrainData)
             {
@@ -376,17 +376,17 @@ namespace Traffic_Law_Enforcement
         }
 
         private static string BuildRailSubtypeSourceText(
-            SelectedVehicleResolveResult resolveResult)
+            SelectedObjectResolveResult resolveResult)
         {
             switch (resolveResult.RailSubtypeSource)
             {
-                case SelectedVehicleRailSubtypeSource.TransportType:
+                case SelectedObjectRailSubtypeSource.TransportType:
                     return "TransportType";
 
-                case SelectedVehicleRailSubtypeSource.TrackType:
+                case SelectedObjectRailSubtypeSource.TrackType:
                     return "TrackType";
 
-                case SelectedVehicleRailSubtypeSource.Fallback:
+                case SelectedObjectRailSubtypeSource.Fallback:
                     return "Fallback";
 
                 default:
@@ -395,41 +395,41 @@ namespace Traffic_Law_Enforcement
         }
 
         private static string BuildSummaryClassificationText(
-            SelectedVehicleResolveResult resolveResult)
+            SelectedObjectResolveResult resolveResult)
         {
             switch (resolveResult.VehicleKind)
             {
-                case SelectedVehicleKind.RoadCar:
+                case SelectedObjectKind.RoadCar:
                     return "Road car";
 
-                case SelectedVehicleKind.ParkedRoadCar:
+                case SelectedObjectKind.ParkedRoadCar:
                     return "Parked road car";
 
-                case SelectedVehicleKind.RailVehicle:
+                case SelectedObjectKind.RailVehicle:
                     return "Rail vehicle";
 
-                case SelectedVehicleKind.ParkedRailVehicle:
+                case SelectedObjectKind.ParkedRailVehicle:
                     return "Parked rail vehicle";
 
-                case SelectedVehicleKind.Tram:
+                case SelectedObjectKind.Tram:
                     return "Tram";
 
-                case SelectedVehicleKind.ParkedTram:
+                case SelectedObjectKind.ParkedTram:
                     return "Parked tram";
 
-                case SelectedVehicleKind.Train:
+                case SelectedObjectKind.Train:
                     return "Train";
 
-                case SelectedVehicleKind.ParkedTrain:
+                case SelectedObjectKind.ParkedTrain:
                     return "Parked train";
 
-                case SelectedVehicleKind.Subway:
+                case SelectedObjectKind.Subway:
                     return "Subway";
 
-                case SelectedVehicleKind.ParkedSubway:
+                case SelectedObjectKind.ParkedSubway:
                     return "Parked subway";
 
-                case SelectedVehicleKind.OtherVehicle:
+                case SelectedObjectKind.OtherVehicle:
                     return "Other vehicle";
 
                 default:
@@ -438,30 +438,30 @@ namespace Traffic_Law_Enforcement
         }
 
         private static string BuildSummaryTleStatusText(
-            SelectedVehicleResolveResult resolveResult,
-            SelectedVehicleTleApplicability tleApplicability)
+            SelectedObjectResolveResult resolveResult,
+            SelectedObjectTleApplicability tleApplicability)
         {
-            if (resolveResult.ResolveState == SelectedVehicleResolveState.None)
+            if (resolveResult.ResolveState == SelectedObjectResolveState.None)
             {
                 return string.Empty;
             }
 
-            if (resolveResult.ResolveState == SelectedVehicleResolveState.NotVehicle)
+            if (resolveResult.ResolveState == SelectedObjectResolveState.NotVehicle)
             {
                 return "Selected object is not a vehicle";
             }
 
             switch (tleApplicability)
             {
-                case SelectedVehicleTleApplicability.NotApplicable:
+                case SelectedObjectTleApplicability.NotApplicable:
                     return "Traffic Law Enforcement not applicable";
 
-                case SelectedVehicleTleApplicability.ApplicableNoLiveLaneData:
-                    return resolveResult.VehicleKind == SelectedVehicleKind.ParkedRoadCar
+                case SelectedObjectTleApplicability.ApplicableNoLiveLaneData:
+                    return resolveResult.VehicleKind == SelectedObjectKind.ParkedRoadCar
                         ? "Live lane unavailable for parked road car"
                         : "Live lane unavailable";
 
-                case SelectedVehicleTleApplicability.ApplicableReady:
+                case SelectedObjectTleApplicability.ApplicableReady:
                     return "Tracking selected road vehicle";
 
                 default:
@@ -494,7 +494,7 @@ namespace Traffic_Law_Enforcement
             return normalizedReason.Substring(0, maxLength - 3) + "...";
         }
 
-        private string BuildRoleOrTypeText(SelectedVehicleResolveResult resolveResult)
+        private string BuildRoleOrTypeText(SelectedObjectResolveResult resolveResult)
         {
             if (!resolveResult.HasSelection)
             {
@@ -508,39 +508,39 @@ namespace Traffic_Law_Enforcement
 
             switch (resolveResult.VehicleKind)
             {
-                case SelectedVehicleKind.RoadCar:
+                case SelectedObjectKind.RoadCar:
                     return PublicTransportLanePolicy.DescribeVehicleRole(
                         resolveResult.ResolvedVehicleEntity,
                         ref m_TypeLookups);
 
-                case SelectedVehicleKind.ParkedRoadCar:
+                case SelectedObjectKind.ParkedRoadCar:
                     return "Parked road car";
 
-                case SelectedVehicleKind.RailVehicle:
+                case SelectedObjectKind.RailVehicle:
                     return "Rail vehicle";
 
-                case SelectedVehicleKind.ParkedRailVehicle:
+                case SelectedObjectKind.ParkedRailVehicle:
                     return "Parked rail vehicle";
 
-                case SelectedVehicleKind.Tram:
+                case SelectedObjectKind.Tram:
                     return "Tram";
 
-                case SelectedVehicleKind.ParkedTram:
+                case SelectedObjectKind.ParkedTram:
                     return "Parked tram";
 
-                case SelectedVehicleKind.Train:
+                case SelectedObjectKind.Train:
                     return "Train";
 
-                case SelectedVehicleKind.ParkedTrain:
+                case SelectedObjectKind.ParkedTrain:
                     return "Parked train";
 
-                case SelectedVehicleKind.Subway:
+                case SelectedObjectKind.Subway:
                     return "Subway";
 
-                case SelectedVehicleKind.ParkedSubway:
+                case SelectedObjectKind.ParkedSubway:
                     return "Parked subway";
 
-                case SelectedVehicleKind.OtherVehicle:
+                case SelectedObjectKind.OtherVehicle:
                     return "Other vehicle";
 
                 default:
@@ -601,22 +601,23 @@ namespace Traffic_Law_Enforcement
             return lastReason;
         }
 
-        private static SelectedVehicleTleApplicability GetTleApplicability(
-            SelectedVehicleResolveResult resolveResult)
+        private static SelectedObjectTleApplicability GetTleApplicability(
+            SelectedObjectResolveResult resolveResult)
         {
             switch (resolveResult.VehicleKind)
             {
-                case SelectedVehicleKind.RoadCar:
+                case SelectedObjectKind.RoadCar:
                     return resolveResult.HasCarCurrentLane
-                        ? SelectedVehicleTleApplicability.ApplicableReady
-                        : SelectedVehicleTleApplicability.ApplicableNoLiveLaneData;
+                        ? SelectedObjectTleApplicability.ApplicableReady
+                        : SelectedObjectTleApplicability.ApplicableNoLiveLaneData;
 
-                case SelectedVehicleKind.ParkedRoadCar:
-                    return SelectedVehicleTleApplicability.ApplicableNoLiveLaneData;
+                case SelectedObjectKind.ParkedRoadCar:
+                    return SelectedObjectTleApplicability.ApplicableNoLiveLaneData;
 
                 default:
-                    return SelectedVehicleTleApplicability.NotApplicable;
+                    return SelectedObjectTleApplicability.NotApplicable;
             }
         }
     }
 }
+

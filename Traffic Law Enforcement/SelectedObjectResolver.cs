@@ -9,14 +9,14 @@ using PrefabRef = Game.Prefabs.PrefabRef;
 
 namespace Traffic_Law_Enforcement
 {
-    public enum SelectedVehicleResolveState
+    public enum SelectedObjectResolveState
     {
         None,
         NotVehicle,
         Vehicle,
     }
 
-    public enum SelectedVehicleKind
+    public enum SelectedObjectKind
     {
         None,
         RoadCar,
@@ -32,7 +32,7 @@ namespace Traffic_Law_Enforcement
         OtherVehicle,
     }
 
-    public enum SelectedVehicleRuntimeFamily
+    public enum SelectedObjectRuntimeFamily
     {
         None,
         Car,
@@ -40,7 +40,7 @@ namespace Traffic_Law_Enforcement
         Other,
     }
 
-    public enum SelectedVehicleRailSubtypeSource
+    public enum SelectedObjectRailSubtypeSource
     {
         None,
         TransportType,
@@ -48,11 +48,11 @@ namespace Traffic_Law_Enforcement
         Fallback,
     }
 
-    public readonly struct SelectedVehicleResolveResult
+    public readonly struct SelectedObjectResolveResult
     {
-        public readonly SelectedVehicleResolveState ResolveState;
-        public readonly SelectedVehicleKind VehicleKind;
-        public readonly SelectedVehicleRuntimeFamily RuntimeFamily;
+        public readonly SelectedObjectResolveState ResolveState;
+        public readonly SelectedObjectKind VehicleKind;
+        public readonly SelectedObjectRuntimeFamily RuntimeFamily;
         public readonly Entity SourceSelectedEntity;
         public readonly Entity ResolvedVehicleEntity;
         public readonly Entity PrefabEntity;
@@ -70,12 +70,12 @@ namespace Traffic_Law_Enforcement
         public readonly bool HasTrainData;
         public readonly TransportType RawTransportType;
         public readonly TrackTypes RawTrackType;
-        public readonly SelectedVehicleRailSubtypeSource RailSubtypeSource;
+        public readonly SelectedObjectRailSubtypeSource RailSubtypeSource;
 
-        public SelectedVehicleResolveResult(
-            SelectedVehicleResolveState resolveState,
-            SelectedVehicleKind vehicleKind,
-            SelectedVehicleRuntimeFamily runtimeFamily,
+        public SelectedObjectResolveResult(
+            SelectedObjectResolveState resolveState,
+            SelectedObjectKind vehicleKind,
+            SelectedObjectRuntimeFamily runtimeFamily,
             Entity sourceSelectedEntity,
             Entity resolvedVehicleEntity,
             Entity prefabEntity,
@@ -93,7 +93,7 @@ namespace Traffic_Law_Enforcement
             bool hasTrainData,
             TransportType rawTransportType,
             TrackTypes rawTrackType,
-            SelectedVehicleRailSubtypeSource railSubtypeSource)
+            SelectedObjectRailSubtypeSource railSubtypeSource)
         {
             ResolveState = resolveState;
             VehicleKind = vehicleKind;
@@ -119,7 +119,7 @@ namespace Traffic_Law_Enforcement
         }
     }
 
-    internal sealed class SelectedVehicleResolver
+    internal sealed class SelectedObjectResolver
     {
         private const int kMaxControllerDepth = 16;
 
@@ -140,7 +140,7 @@ namespace Traffic_Law_Enforcement
         private ComponentLookup<PublicTransportVehicleData> m_PublicTransportVehicleData;
         private ComponentLookup<TrainData> m_TrainPrefabData;
 
-        public SelectedVehicleResolver(GameSystemBase system)
+        public SelectedObjectResolver(GameSystemBase system)
         {
             m_EntityManager = system.EntityManager;
             m_World = system.World;
@@ -176,7 +176,7 @@ namespace Traffic_Law_Enforcement
             m_TrainPrefabData.Update(system);
         }
 
-        public SelectedVehicleResolveResult ResolveCurrentSelection()
+        public SelectedObjectResolveResult ResolveCurrentSelection()
         {
             if (m_SelectedInfoSystem == null)
             {
@@ -190,10 +190,10 @@ namespace Traffic_Law_Enforcement
 
             if (sourceSelectedEntity == Entity.Null)
             {
-                return new SelectedVehicleResolveResult(
-                    SelectedVehicleResolveState.None,
-                    SelectedVehicleKind.None,
-                    SelectedVehicleRuntimeFamily.None,
+                return new SelectedObjectResolveResult(
+                    SelectedObjectResolveState.None,
+                    SelectedObjectKind.None,
+                    SelectedObjectRuntimeFamily.None,
                     sourceSelectedEntity,
                     Entity.Null,
                     Entity.Null,
@@ -211,7 +211,7 @@ namespace Traffic_Law_Enforcement
                     hasTrainData: false,
                     rawTransportType: TransportType.None,
                     rawTrackType: TrackTypes.None,
-                    railSubtypeSource: SelectedVehicleRailSubtypeSource.None);
+                    railSubtypeSource: SelectedObjectRailSubtypeSource.None);
             }
 
             Entity resolvedVehicleEntity = ResolveControllerRoot(sourceSelectedEntity);
@@ -295,18 +295,18 @@ namespace Traffic_Law_Enforcement
                     ? trainData.m_TrackType
                     : TrackTypes.None;
 
-            SelectedVehicleRuntimeFamily runtimeFamily = GetRuntimeFamily(
+            SelectedObjectRuntimeFamily runtimeFamily = GetRuntimeFamily(
                 isCar,
                 isTrain,
                 hasParkedRoadCar,
                 isVehicle);
 
-            SelectedVehicleKind vehicleKind;
-            SelectedVehicleRailSubtypeSource railSubtypeSource =
-                SelectedVehicleRailSubtypeSource.None;
+            SelectedObjectKind vehicleKind;
+            SelectedObjectRailSubtypeSource railSubtypeSource =
+                SelectedObjectRailSubtypeSource.None;
             if (!isVehicle)
             {
-                vehicleKind = SelectedVehicleKind.None;
+                vehicleKind = SelectedObjectKind.None;
             }
             else if (hasParkedTrain)
             {
@@ -330,23 +330,23 @@ namespace Traffic_Law_Enforcement
             }
             else if (hasParkedRoadCar)
             {
-                vehicleKind = SelectedVehicleKind.ParkedRoadCar;
+                vehicleKind = SelectedObjectKind.ParkedRoadCar;
             }
             else if (isCar)
             {
-                vehicleKind = SelectedVehicleKind.RoadCar;
+                vehicleKind = SelectedObjectKind.RoadCar;
             }
             else
             {
-                vehicleKind = SelectedVehicleKind.OtherVehicle;
+                vehicleKind = SelectedObjectKind.OtherVehicle;
             }
 
-            SelectedVehicleResolveState resolveState =
+            SelectedObjectResolveState resolveState =
                 isVehicle
-                    ? SelectedVehicleResolveState.Vehicle
-                    : SelectedVehicleResolveState.NotVehicle;
+                    ? SelectedObjectResolveState.Vehicle
+                    : SelectedObjectResolveState.NotVehicle;
 
-            return new SelectedVehicleResolveResult(
+            return new SelectedObjectResolveResult(
                 resolveState,
                 vehicleKind,
                 runtimeFamily,
@@ -370,58 +370,58 @@ namespace Traffic_Law_Enforcement
                 railSubtypeSource);
         }
 
-        private static SelectedVehicleKind ResolveRailVehicleKind(
+        private static SelectedObjectKind ResolveRailVehicleKind(
             bool isParked,
             bool hasPublicTransportVehicleData,
             TransportType rawTransportType,
             bool hasTrainData,
             TrackTypes rawTrackType,
-            out SelectedVehicleRailSubtypeSource railSubtypeSource)
+            out SelectedObjectRailSubtypeSource railSubtypeSource)
         {
             if (hasPublicTransportVehicleData &&
                 TryMapTransportTypeToRailVehicleKind(
                     rawTransportType,
-                    out SelectedVehicleKind vehicleKind))
+                    out SelectedObjectKind vehicleKind))
             {
-                railSubtypeSource = SelectedVehicleRailSubtypeSource.TransportType;
+                railSubtypeSource = SelectedObjectRailSubtypeSource.TransportType;
                 return isParked
                     ? ToParkedRailVehicleKind(vehicleKind)
                     : vehicleKind;
             }
 
             if (hasTrainData &&
-                TryMapTrackTypeToRailVehicleKind(rawTrackType, out SelectedVehicleKind trackVehicleKind))
+                TryMapTrackTypeToRailVehicleKind(rawTrackType, out SelectedObjectKind trackVehicleKind))
             {
-                railSubtypeSource = SelectedVehicleRailSubtypeSource.TrackType;
+                railSubtypeSource = SelectedObjectRailSubtypeSource.TrackType;
                 return isParked
                     ? ToParkedRailVehicleKind(trackVehicleKind)
                     : trackVehicleKind;
             }
 
-            railSubtypeSource = SelectedVehicleRailSubtypeSource.Fallback;
+            railSubtypeSource = SelectedObjectRailSubtypeSource.Fallback;
             return isParked
-                ? SelectedVehicleKind.ParkedRailVehicle
-                : SelectedVehicleKind.RailVehicle;
+                ? SelectedObjectKind.ParkedRailVehicle
+                : SelectedObjectKind.RailVehicle;
         }
 
         private static bool TryMapTransportTypeToRailVehicleKind(
             TransportType transportType,
-            out SelectedVehicleKind vehicleKind)
+            out SelectedObjectKind vehicleKind)
         {
-            vehicleKind = SelectedVehicleKind.RailVehicle;
+            vehicleKind = SelectedObjectKind.RailVehicle;
 
             switch (transportType)
             {
                 case TransportType.Tram:
-                    vehicleKind = SelectedVehicleKind.Tram;
+                    vehicleKind = SelectedObjectKind.Tram;
                     return true;
 
                 case TransportType.Train:
-                    vehicleKind = SelectedVehicleKind.Train;
+                    vehicleKind = SelectedObjectKind.Train;
                     return true;
 
                 case TransportType.Subway:
-                    vehicleKind = SelectedVehicleKind.Subway;
+                    vehicleKind = SelectedObjectKind.Subway;
                     return true;
 
                 default:
@@ -443,9 +443,9 @@ namespace Traffic_Law_Enforcement
 
         private static bool TryMapTrackTypeToRailVehicleKind(
             TrackTypes trackType,
-            out SelectedVehicleKind vehicleKind)
+            out SelectedObjectKind vehicleKind)
         {
-            vehicleKind = SelectedVehicleKind.RailVehicle;
+            vehicleKind = SelectedObjectKind.RailVehicle;
 
             bool isTrainTrack = (trackType & TrackTypes.Train) != TrackTypes.None;
             bool isTramTrack = (trackType & TrackTypes.Tram) != TrackTypes.None;
@@ -463,40 +463,40 @@ namespace Traffic_Law_Enforcement
 
             if (isTramTrack)
             {
-                vehicleKind = SelectedVehicleKind.Tram;
+                vehicleKind = SelectedObjectKind.Tram;
                 return true;
             }
 
             if (isSubwayTrack)
             {
-                vehicleKind = SelectedVehicleKind.Subway;
+                vehicleKind = SelectedObjectKind.Subway;
                 return true;
             }
 
-            vehicleKind = SelectedVehicleKind.Train;
+            vehicleKind = SelectedObjectKind.Train;
             return true;
         }
 
-        private static SelectedVehicleKind ToParkedRailVehicleKind(
-            SelectedVehicleKind vehicleKind)
+        private static SelectedObjectKind ToParkedRailVehicleKind(
+            SelectedObjectKind vehicleKind)
         {
             switch (vehicleKind)
             {
-                case SelectedVehicleKind.Tram:
-                    return SelectedVehicleKind.ParkedTram;
+                case SelectedObjectKind.Tram:
+                    return SelectedObjectKind.ParkedTram;
 
-                case SelectedVehicleKind.Train:
-                    return SelectedVehicleKind.ParkedTrain;
+                case SelectedObjectKind.Train:
+                    return SelectedObjectKind.ParkedTrain;
 
-                case SelectedVehicleKind.Subway:
-                    return SelectedVehicleKind.ParkedSubway;
+                case SelectedObjectKind.Subway:
+                    return SelectedObjectKind.ParkedSubway;
 
                 default:
-                    return SelectedVehicleKind.ParkedRailVehicle;
+                    return SelectedObjectKind.ParkedRailVehicle;
             }
         }
 
-        private static SelectedVehicleRuntimeFamily GetRuntimeFamily(
+        private static SelectedObjectRuntimeFamily GetRuntimeFamily(
             bool isCar,
             bool isTrain,
             bool hasParkedRoadCar,
@@ -504,17 +504,17 @@ namespace Traffic_Law_Enforcement
         {
             if (isCar || hasParkedRoadCar)
             {
-                return SelectedVehicleRuntimeFamily.Car;
+                return SelectedObjectRuntimeFamily.Car;
             }
 
             if (isTrain)
             {
-                return SelectedVehicleRuntimeFamily.Train;
+                return SelectedObjectRuntimeFamily.Train;
             }
 
             return isVehicle
-                ? SelectedVehicleRuntimeFamily.Other
-                : SelectedVehicleRuntimeFamily.None;
+                ? SelectedObjectRuntimeFamily.Other
+                : SelectedObjectRuntimeFamily.None;
         }
 
         private Entity ResolveControllerRoot(Entity entity)
@@ -548,3 +548,4 @@ namespace Traffic_Law_Enforcement
         }
     }
 }
+

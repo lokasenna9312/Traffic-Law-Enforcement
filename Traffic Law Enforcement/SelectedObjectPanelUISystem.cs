@@ -7,13 +7,13 @@ using Entity = Unity.Entities.Entity;
 
 namespace Traffic_Law_Enforcement
 {
-    public partial class SelectedVehiclePanelUISystem : UISystemBase
+    public partial class SelectedObjectPanelUISystem : UISystemBase
     {
-        private const string kPanelObjectName = "TrafficLawEnforcement.SelectedVehiclePanel";
+        private const string kPanelObjectName = "TrafficLawEnforcement.SelectedObjectPanel";
 
-        private SelectedVehicleBridgeSystem m_SelectedVehicleBridgeSystem;
+        private SelectedObjectBridgeSystem m_SelectedObjectBridgeSystem;
         private GameObject m_PanelObject;
-        private SelectedVehiclePanelView m_PanelView;
+        private SelectedObjectPanelView m_PanelView;
 
         public override GameMode gameMode => GameMode.Game;
 
@@ -21,8 +21,8 @@ namespace Traffic_Law_Enforcement
         {
             base.OnCreate();
 
-            m_SelectedVehicleBridgeSystem =
-                World.GetOrCreateSystemManaged<SelectedVehicleBridgeSystem>();
+            m_SelectedObjectBridgeSystem =
+                World.GetOrCreateSystemManaged<SelectedObjectBridgeSystem>();
             EnsurePanelView();
         }
 
@@ -36,10 +36,10 @@ namespace Traffic_Law_Enforcement
         {
             base.OnUpdate();
 
-            if (m_SelectedVehicleBridgeSystem == null)
+            if (m_SelectedObjectBridgeSystem == null)
             {
-                m_SelectedVehicleBridgeSystem =
-                    World.GetExistingSystemManaged<SelectedVehicleBridgeSystem>();
+                m_SelectedObjectBridgeSystem =
+                    World.GetExistingSystemManaged<SelectedObjectBridgeSystem>();
             }
 
             if (!EnsurePanelView())
@@ -47,26 +47,26 @@ namespace Traffic_Law_Enforcement
                 return;
             }
 
-            if (m_SelectedVehicleBridgeSystem == null || !m_SelectedVehicleBridgeSystem.HasSnapshot)
+            if (m_SelectedObjectBridgeSystem == null || !m_SelectedObjectBridgeSystem.HasSnapshot)
             {
                 m_PanelView.UpdateState(default);
                 return;
             }
 
-            m_PanelView.UpdateState(BuildState(m_SelectedVehicleBridgeSystem.CurrentSnapshot));
+            m_PanelView.UpdateState(BuildState(m_SelectedObjectBridgeSystem.CurrentSnapshot));
         }
 
-        private SelectedVehiclePanelView.State BuildState(
-            SelectedVehicleDebugSnapshot snapshot)
+        private SelectedObjectPanelView.State BuildState(
+            SelectedObjectDebugSnapshot snapshot)
         {
-            if (snapshot.ResolveState == SelectedVehicleResolveState.None)
+            if (snapshot.ResolveState == SelectedObjectResolveState.None)
             {
                 return default;
             }
 
-            if (snapshot.ResolveState == SelectedVehicleResolveState.NotVehicle)
+            if (snapshot.ResolveState == SelectedObjectResolveState.NotVehicle)
             {
-                return new SelectedVehiclePanelView.State
+                return new SelectedObjectPanelView.State
                 {
                     Visible = true,
                     Compact = true,
@@ -76,11 +76,11 @@ namespace Traffic_Law_Enforcement
             }
 
             bool tleApplicable =
-                snapshot.TleApplicability != SelectedVehicleTleApplicability.NotApplicable;
+                snapshot.TleApplicability != SelectedObjectTleApplicability.NotApplicable;
             bool tleReady =
-                snapshot.TleApplicability == SelectedVehicleTleApplicability.ApplicableReady;
+                snapshot.TleApplicability == SelectedObjectTleApplicability.ApplicableReady;
 
-            return new SelectedVehiclePanelView.State
+            return new SelectedObjectPanelView.State
             {
                 Visible = true,
                 Compact = false,
@@ -120,10 +120,10 @@ namespace Traffic_Law_Enforcement
                 Object.DontDestroyOnLoad(m_PanelObject);
             }
 
-            m_PanelView = m_PanelObject.GetComponent<SelectedVehiclePanelView>();
+            m_PanelView = m_PanelObject.GetComponent<SelectedObjectPanelView>();
             if (m_PanelView == null)
             {
-                m_PanelView = m_PanelObject.AddComponent<SelectedVehiclePanelView>();
+                m_PanelView = m_PanelObject.AddComponent<SelectedObjectPanelView>();
             }
 
             return m_PanelView != null;
@@ -153,19 +153,19 @@ namespace Traffic_Law_Enforcement
                 : entity.ToString();
         }
 
-        private static string BuildCompactTleStatus(SelectedVehicleDebugSnapshot snapshot)
+        private static string BuildCompactTleStatus(SelectedObjectDebugSnapshot snapshot)
         {
             switch (snapshot.TleApplicability)
             {
-                case SelectedVehicleTleApplicability.NotApplicable:
-                    return snapshot.ResolveState == SelectedVehicleResolveState.NotVehicle
+                case SelectedObjectTleApplicability.NotApplicable:
+                    return snapshot.ResolveState == SelectedObjectResolveState.NotVehicle
                         ? string.Empty
                         : "Not applicable";
 
-                case SelectedVehicleTleApplicability.ApplicableNoLiveLaneData:
+                case SelectedObjectTleApplicability.ApplicableNoLiveLaneData:
                     return "No live lane";
 
-                case SelectedVehicleTleApplicability.ApplicableReady:
+                case SelectedObjectTleApplicability.ApplicableReady:
                     return "Tracking";
 
                 default:
@@ -173,10 +173,11 @@ namespace Traffic_Law_Enforcement
             }
         }
 
-        private static string BuildSelectionToken(SelectedVehicleDebugSnapshot snapshot)
+        private static string BuildSelectionToken(SelectedObjectDebugSnapshot snapshot)
         {
             return
                 $"{snapshot.ResolveState}|{snapshot.SourceSelectedEntity}|{snapshot.ResolvedVehicleEntity}";
         }
     }
 }
+
