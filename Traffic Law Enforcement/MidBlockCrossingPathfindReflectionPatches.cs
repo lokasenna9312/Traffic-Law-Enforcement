@@ -95,6 +95,8 @@ namespace Traffic_Law_Enforcement
             s_Harmony = null;
         }
 
+        private static bool s_TestPostfixSeen;
+
         [HarmonyPostfix]
         private static void Postfix(
             object[] __args,
@@ -102,6 +104,11 @@ namespace Traffic_Law_Enforcement
             PathfindParameters ___m_Parameters,
             MethodBase __originalMethod)
         {
+            if (!s_TestPostfixSeen)
+            {
+                s_TestPostfixSeen = true;
+                Mod.log.Info("[MIDBLOCK_TEST] Reflection Postfix entered.");
+            }
             string methodKey = __originalMethod?.ToString() ?? "(null)";
             if (s_ActivatedMethods.Add(methodKey) && EnforcementLoggingPolicy.ShouldLogPathfindingPenaltyDiagnostics())
             {
