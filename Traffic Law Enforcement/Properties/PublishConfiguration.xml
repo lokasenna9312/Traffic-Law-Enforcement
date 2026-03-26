@@ -53,7 +53,7 @@ The following options can be configured either for the currently loaded save fil
 - I would like serious habitual traffic offenders to face harsher penalties, such as having their driver's licenses suspended or revoked, or having them sent to jail, but I could not implement that either because of my limited coding skills.
 
 ### 6. Known Issues : Investigation and Fixing in Progress
-- Mid-block enforcement sometimes makes vehicles take weird routes.
+- Mid-block enforcement sometimes makes vehicles take weird routes or be freezed making meaningless routes rapdily.
 
 ## 한국어 설명
 
@@ -90,7 +90,7 @@ The following options can be configured either for the currently loaded save fil
 - 심각한 상습 교통법규 위반자들에게는 더욱 강한 처벌(예: 운전면허 정지 또는 취소, 교도소 수감)을 적용하고 싶었지만, 그 기능 역시 제 코딩 실력이 부족해서 구현하지 못했습니다.
 
 ### 6. 알려진 문제점 : 조사 및 수정 진행 중
-- 중앙선 침범 단속을 활성화하면 차량들이 이상한 경로를 택하는 경우가 있습니다.
+- 중앙선 침범 단속을 활성화하면 차량들이 이상한 경로를 택하거나 제자리에서 의미없는 경로를 계속 만들면서 얼어붙는 경우가 있습니다.
 	</LongDescription>
 	<!--Thumbnail-->
 	<Thumbnail Value="Properties/Thumbnail.jpg" />
@@ -109,7 +109,7 @@ The following options can be configured either for the currently loaded save fil
 	<!--Link to the forum post where the mod can be discussed-->
 	<ForumLink Value="https://forum.paradoxplaza.com/forum/threads/traffic-law-enforcement.1909882/" />
 	<!--Version of the mod-->
-	<ModVersion Value="0.2.8" />
+	<ModVersion Value="0.2.9" />
 	<!--Recommended version of the base game to use the mod-->
 	<GameVersion Value="1.5.6f1" />
 	<!--Dependency for the mod, can be set multiple times-->
@@ -118,12 +118,8 @@ The following options can be configured either for the currently loaded save fil
 	<RequiredDLC Value="" />
 	<!--Change log for new version. Single line or multi line. Supports minimal markdown subset-->
 	<ChangeLog>
-- Improved save/load reliability for enforcement-related data.
-- Fixed issues that could cause monthly enforcement reports, policy-impact statistics, and tracking state to restore incorrectly after loading a save.
-- Improved persistence of public transport lane tracking data.
-- Refactored internal save-data handling for better stability.
-- Refactored codes related to Chirper message creation for better maintainability and performance.
-- Game's mod version and savefile's mod version will be logged in the log files, even if all logging options are turned off.
+- Rebuilt mid-block enforcement logic. It'll not make services vehicles have weird routes or be freezed making meaningless routes rapdily anymore. (hopefully)
+- Added backup logics for Settings.coc. At least my client frequently suffered the issue that keybindings reset when game shut down.
 	</ChangeLog>
 	<!--External link, can be set multiple times. supported types are "discord", "github", "youtube", "twitch", "x", "paypal", "patreon", "buymeacoffee", "kofi", "crowdin", "gitlab", "gofundme"-->
 	<ExternalLink Type="github" Url="https://github.com/lokasenna9312/Traffic-Law-Enforcement/" />
