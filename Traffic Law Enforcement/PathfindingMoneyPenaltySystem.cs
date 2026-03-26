@@ -30,7 +30,7 @@ namespace Traffic_Law_Enforcement
                 return;
             }
 
-            OverrideSummary = $"UTurn +{midBlockPenalty:0}, UnsafeUTurn +{midBlockPenalty:0}, LaneCross +{midBlockPenalty:0}; PT-lane money-axis penalty is handled per route rather than through shared PathfindCarData prefabs";
+            OverrideSummary = $"UnsafeTurn +{midBlockPenalty:0}, UTurn +{midBlockPenalty:0}, UnsafeUTurn +{midBlockPenalty:0}, LaneCross +{midBlockPenalty:0}; PT-lane money-axis penalty is handled per route rather than through shared PathfindCarData prefabs";
         }
     }
 
@@ -126,6 +126,7 @@ namespace Traffic_Law_Enforcement
             PathfindCarData originalData = GetOriginalData(prefab, currentData);
             PathfindCarData updatedData = originalData;
 
+            AddMoneyPenalty(ref updatedData.m_UnsafeTurningCost, midBlockPenalty);
             AddMoneyPenalty(ref updatedData.m_UTurnCost, midBlockPenalty);
             AddMoneyPenalty(ref updatedData.m_UnsafeUTurnCost, midBlockPenalty);
             AddMoneyPenalty(ref updatedData.m_LaneCrossCost, midBlockPenalty);
