@@ -1,23 +1,43 @@
 using UnityEngine;
+using UnityEngine.EventSystems;
+using UnityEngine.UI;
 
 namespace Traffic_Law_Enforcement
 {
     internal sealed class SelectedVehiclePanelView : MonoBehaviour
     {
-        private const float kWidth = 456f;
+        private const float kWidth = 516f;
         private const float kTopInset = 78f;
         private const float kRightInset = 88f;
-        private const float kPadding = 16f;
-        private const float kTitleBarHeight = 36f;
-        private const float kTitleLineHeight = 22f;
-        private const float kClassificationLineHeight = 24f;
-        private const float kBodyLineHeight = 23f;
-        private const float kCompactMinHeight = 118f;
+        private const float kPadding = 18f;
+        private const float kTitleBarHeight = 44f;
+        private const float kTitleLineHeight = 24f;
+        private const float kClassificationLineHeight = 30f;
+        private const float kBodyLineHeight = 30f;
+        private const float kCompactMessageHeight = 40f;
         private const float kButtonSize = 20f;
-        private const float kRowLabelWidth = 144f;
-        private const float kSectionGap = 10f;
-        private const float kStatusLabelHeight = 17f;
-        private const float kStatusBlockPadding = 10f;
+        private const float kButtonGap = 8f;
+        private const float kRowLabelWidth = 162f;
+        private const float kSectionGap = 12f;
+        private const float kStatusLabelHeight = 18f;
+        private const float kStatusBlockHeight = 46f;
+        private const int kSortingOrder = 240;
+
+        private static readonly Color kPanelColor = new Color(0.08f, 0.12f, 0.17f, 0.92f);
+        private static readonly Color kTitleBarColor = new Color(0.16f, 0.20f, 0.27f, 0.98f);
+        private static readonly Color kStatusBlockColor = new Color(0.15f, 0.19f, 0.25f, 1f);
+        private static readonly Color kButtonColor = new Color(0.27f, 0.32f, 0.40f, 1f);
+        private static readonly Color kTitleColor = new Color(0.97f, 0.98f, 1f, 1f);
+        private static readonly Color kClassificationColor = new Color(0.69f, 0.87f, 1f, 1f);
+        private static readonly Color kLabelColor = new Color(0.76f, 0.81f, 0.88f, 1f);
+        private static readonly Color kFooterColor = new Color(0.82f, 0.86f, 0.90f, 0.95f);
+
+        private sealed class RowView
+        {
+            public RectTransform Root;
+            public Text Label;
+            public Text Value;
+        }
 
         internal struct State
         {
@@ -45,22 +65,25 @@ namespace Traffic_Law_Enforcement
         private Vector2 m_DragOffset;
         private Vector2 m_LastScreenSize;
 
-        private Texture2D m_BodyTexture;
-        private Texture2D m_TitleBarTexture;
-        private Texture2D m_ButtonTexture;
-        private Texture2D m_StatusTexture;
-        private GUIStyle m_WindowStyle;
-        private GUIStyle m_TitleBarStyle;
-        private GUIStyle m_TitleStyle;
-        private GUIStyle m_ButtonStyle;
-        private GUIStyle m_ClassificationStyle;
-        private GUIStyle m_StatusBlockStyle;
-        private GUIStyle m_StatusLabelStyle;
-        private GUIStyle m_StatusValueStyle;
-        private GUIStyle m_LabelStyle;
-        private GUIStyle m_ValueStyle;
-        private GUIStyle m_MessageStyle;
-        private GUIStyle m_FooterStyle;
+        private Font m_Font;
+        private Canvas m_Canvas;
+        private RectTransform m_CanvasRect;
+        private RectTransform m_PanelRect;
+        private Image m_PanelBackground;
+        private RectTransform m_TitleBarRect;
+        private Image m_TitleBarBackground;
+        private Text m_TitleText;
+        private Button m_CollapseButton;
+        private Text m_CollapseButtonText;
+        private Button m_CloseButton;
+        private Text m_CloseButtonText;
+        private Text m_ClassificationText;
+        private Text m_MessageText;
+        private Text m_StatusLabelText;
+        private RectTransform m_StatusBlockRect;
+        private Image m_StatusBlockBackground;
+        private Text m_StatusValueText;
+        private readonly RowView[] m_Rows = new RowView[6];
 
         internal void UpdateState(State state)
         {
@@ -72,154 +95,394 @@ namespace Traffic_Law_Enforcement
             }
 
             m_State = state;
-            enabled = state.Visible && !IsDismissed();
+            ApplyState();
+        }
+
+        internal void BeginDrag(Vector2 pointerTopLeft)
+        {
+            m_IsDragging = true;
+            m_HasCustomPosition = true;
+            m_DragOffset = pointerTopLeft - m_WindowPosition;
+        }
+
+        internal void DragTo(Vector2 pointerTopLeft)
+        {
+            if (!m_IsDragging)
+            {
+                return;
+            }
+
+            m_WindowPosition = pointerTopLeft - m_DragOffset;
+            ClampWindowPosition(CalculateHeight());
+            ApplyWindowPosition();
+        }
+
+        internal void EndDrag()
+        {
+            m_IsDragging = false;
         }
 
         private void Awake()
         {
             hideFlags = HideFlags.HideAndDontSave;
             ResetWindowPosition();
-            enabled = false;
+            EnsureUi();
+            ApplyState();
         }
 
-        private void OnDestroy()
+        private void LateUpdate()
         {
-            if (m_BodyTexture != null)
-            {
-                Destroy(m_BodyTexture);
-                m_BodyTexture = null;
-            }
-
-            if (m_TitleBarTexture != null)
-            {
-                Destroy(m_TitleBarTexture);
-                m_TitleBarTexture = null;
-            }
-
-            if (m_ButtonTexture != null)
-            {
-                Destroy(m_ButtonTexture);
-                m_ButtonTexture = null;
-            }
-
-            if (m_StatusTexture != null)
-            {
-                Destroy(m_StatusTexture);
-                m_StatusTexture = null;
-            }
-        }
-
-        private void OnGUI()
-        {
-            if (!m_State.Visible || IsDismissed())
+            if (m_PanelRect == null || !m_PanelRect.gameObject.activeSelf)
             {
                 return;
             }
 
-            EnsureStyles();
+            Vector2 screenSize = new Vector2(Screen.width, Screen.height);
+            if (m_LastScreenSize == screenSize)
+            {
+                return;
+            }
 
+            if (!m_HasCustomPosition)
+            {
+                ResetWindowPosition();
+            }
+
+            ClampWindowPosition(CalculateHeight());
+            ApplyWindowPosition();
+            m_LastScreenSize = screenSize;
+        }
+
+        private void EnsureUi()
+        {
+            if (m_Canvas != null)
+            {
+                return;
+            }
+
+            m_Font = ResolveFont();
+
+            m_Canvas = gameObject.GetComponent<Canvas>();
+            if (m_Canvas == null)
+            {
+                m_Canvas = gameObject.AddComponent<Canvas>();
+            }
+
+            m_Canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            m_Canvas.sortingOrder = kSortingOrder;
+            m_Canvas.pixelPerfect = false;
+
+            CanvasScaler scaler = gameObject.GetComponent<CanvasScaler>();
+            if (scaler == null)
+            {
+                scaler = gameObject.AddComponent<CanvasScaler>();
+            }
+
+            scaler.uiScaleMode = CanvasScaler.ScaleMode.ConstantPixelSize;
+            scaler.scaleFactor = 1f;
+            scaler.referencePixelsPerUnit = 100f;
+
+            if (gameObject.GetComponent<GraphicRaycaster>() == null)
+            {
+                gameObject.AddComponent<GraphicRaycaster>();
+            }
+
+            m_CanvasRect = gameObject.GetComponent<RectTransform>();
+            if (m_CanvasRect == null)
+            {
+                m_CanvasRect = gameObject.AddComponent<RectTransform>();
+            }
+
+            m_CanvasRect.anchorMin = Vector2.zero;
+            m_CanvasRect.anchorMax = Vector2.one;
+            m_CanvasRect.offsetMin = Vector2.zero;
+            m_CanvasRect.offsetMax = Vector2.zero;
+
+            m_PanelRect = CreateRect("Panel", m_CanvasRect);
+            m_PanelBackground = m_PanelRect.gameObject.AddComponent<Image>();
+            m_PanelBackground.color = kPanelColor;
+            m_PanelBackground.raycastTarget = true;
+
+            m_TitleBarRect = CreateRect("TitleBar", m_PanelRect);
+            m_TitleBarBackground = m_TitleBarRect.gameObject.AddComponent<Image>();
+            m_TitleBarBackground.color = kTitleBarColor;
+            m_TitleBarBackground.raycastTarget = true;
+
+            RectTransform dragHandleRect = CreateRect("DragHandle", m_TitleBarRect);
+            Image dragHandleImage = dragHandleRect.gameObject.AddComponent<Image>();
+            dragHandleImage.color = new Color(0f, 0f, 0f, 0.001f);
+            dragHandleImage.raycastTarget = true;
+            SelectedVehiclePanelDragHandle dragHandle =
+                dragHandleRect.gameObject.AddComponent<SelectedVehiclePanelDragHandle>();
+            dragHandle.Initialize(this);
+
+            m_TitleText = CreateText(
+                "TitleText",
+                m_TitleBarRect,
+                20,
+                FontStyle.Bold,
+                TextAnchor.MiddleLeft,
+                kTitleColor);
+
+            m_CollapseButton = CreateButton(m_TitleBarRect, "-", out m_CollapseButtonText);
+            m_CollapseButton.onClick.AddListener(ToggleCollapsed);
+
+            m_CloseButton = CreateButton(m_TitleBarRect, "X", out m_CloseButtonText);
+            m_CloseButton.onClick.AddListener(CloseCurrentSelection);
+
+            m_ClassificationText = CreateText(
+                "ClassificationText",
+                m_PanelRect,
+                18,
+                FontStyle.Bold,
+                TextAnchor.MiddleLeft,
+                kClassificationColor);
+
+            m_MessageText = CreateText(
+                "MessageText",
+                m_PanelRect,
+                16,
+                FontStyle.Bold,
+                TextAnchor.UpperLeft,
+                Color.white);
+            m_MessageText.horizontalOverflow = HorizontalWrapMode.Wrap;
+            m_MessageText.verticalOverflow = VerticalWrapMode.Truncate;
+
+            m_StatusLabelText = CreateText(
+                "StatusLabelText",
+                m_PanelRect,
+                13,
+                FontStyle.Bold,
+                TextAnchor.MiddleLeft,
+                kLabelColor);
+
+            m_StatusBlockRect = CreateRect("StatusBlock", m_PanelRect);
+            m_StatusBlockBackground = m_StatusBlockRect.gameObject.AddComponent<Image>();
+            m_StatusBlockBackground.color = kStatusBlockColor;
+            m_StatusBlockBackground.raycastTarget = true;
+
+            m_StatusValueText = CreateText(
+                "StatusValueText",
+                m_StatusBlockRect,
+                16,
+                FontStyle.Bold,
+                TextAnchor.MiddleLeft,
+                Color.white);
+
+            CreateRows();
+        }
+
+        private void CreateRows()
+        {
+            string[] labels =
+            {
+                "Role / type",
+                "Vehicle index",
+                "Violation / pending",
+                "Violations / fines",
+                "Last reason",
+                "Resolved entity",
+            };
+
+            for (int index = 0; index < m_Rows.Length; index += 1)
+            {
+                RowView row = new RowView();
+                row.Root = CreateRect($"Row{index}", m_PanelRect);
+
+                Color valueColor = index == m_Rows.Length - 1
+                    ? kFooterColor
+                    : Color.white;
+
+                row.Label = CreateText(
+                    $"Row{index}Label",
+                    row.Root,
+                    14,
+                    FontStyle.Normal,
+                    TextAnchor.MiddleLeft,
+                    kLabelColor);
+                row.Label.text = labels[index];
+
+                row.Value = CreateText(
+                    $"Row{index}Value",
+                    row.Root,
+                    14,
+                    FontStyle.Normal,
+                    TextAnchor.MiddleLeft,
+                    valueColor);
+                row.Value.horizontalOverflow = HorizontalWrapMode.Wrap;
+                row.Value.verticalOverflow = VerticalWrapMode.Truncate;
+
+                m_Rows[index] = row;
+            }
+        }
+
+        private void ApplyState()
+        {
+            EnsureUi();
+
+            bool visible = m_State.Visible && !IsDismissed();
+            m_PanelRect.gameObject.SetActive(visible);
+            if (!visible)
+            {
+                return;
+            }
+
+            m_TitleText.text = "Selected Vehicle";
+            m_CollapseButtonText.text = m_Collapsed ? "+" : "-";
+            m_CloseButtonText.text = "X";
+            m_ClassificationText.text = m_State.Classification ?? string.Empty;
+            m_MessageText.text = m_State.Message ?? string.Empty;
+            m_StatusLabelText.text = "TLE status";
+            m_StatusValueText.text = m_State.TleStatus ?? string.Empty;
+
+            string[] rowValues =
+            {
+                m_State.RoleOrType,
+                m_State.VehicleIndex,
+                m_State.ViolationPending,
+                m_State.Totals,
+                m_State.LastReason,
+                m_State.ResolvedEntity,
+            };
+
+            for (int index = 0; index < m_Rows.Length; index += 1)
+            {
+                bool rowVisible = !string.IsNullOrWhiteSpace(rowValues[index]);
+                m_Rows[index].Root.gameObject.SetActive(rowVisible);
+                m_Rows[index].Value.text = rowValues[index] ?? string.Empty;
+            }
+
+            RefreshLayout();
+        }
+
+        private void RefreshLayout()
+        {
             float height = CalculateHeight();
-            Rect rect = GetWindowRect(height);
+            m_PanelRect.sizeDelta = new Vector2(kWidth, height);
+            ApplyWindowPosition();
 
-            GUI.Box(rect, GUIContent.none, m_WindowStyle);
+            float contentWidth = kWidth - (kPadding * 2f);
+            float y = 0f;
 
-            Rect titleBarRect = new Rect(rect.x, rect.y, rect.width, kTitleBarHeight);
-            GUI.Box(titleBarRect, GUIContent.none, m_TitleBarStyle);
-
-            Rect closeButtonRect = new Rect(
-                titleBarRect.xMax - kPadding - kButtonSize,
-                titleBarRect.y + 8f,
+            SetRect(m_TitleBarRect, 0f, y, kWidth, kTitleBarHeight);
+            SetRect(
+                (RectTransform)m_CloseButton.transform,
+                kWidth - kPadding - kButtonSize,
+                12f,
                 kButtonSize,
                 kButtonSize);
-            Rect collapseButtonRect = new Rect(
-                closeButtonRect.x - 6f - kButtonSize,
-                closeButtonRect.y,
+            SetRect(
+                (RectTransform)m_CollapseButton.transform,
+                kWidth - kPadding - (kButtonSize * 2f) - kButtonGap,
+                12f,
                 kButtonSize,
                 kButtonSize);
-            Rect dragHandleRect = new Rect(
-                titleBarRect.x + 4f,
-                titleBarRect.y + 4f,
-                Mathf.Max(0f, collapseButtonRect.x - titleBarRect.x - 12f),
-                titleBarRect.height - 8f);
+            SetRect(
+                m_TitleText.rectTransform,
+                kPadding,
+                9f,
+                contentWidth - (kButtonSize * 2f) - kButtonGap - 12f,
+                kTitleLineHeight);
+            SetRect(
+                m_TitleBarRect.Find("DragHandle") as RectTransform,
+                6f,
+                5f,
+                Mathf.Max(0f, kWidth - (kPadding * 2f) - (kButtonSize * 2f) - kButtonGap - 14f),
+                kTitleBarHeight - 10f);
 
-            HandleDrag(dragHandleRect, height);
-
-            if (GUI.Button(closeButtonRect, "X", m_ButtonStyle))
-            {
-                m_DismissedSelectionToken = m_State.SelectionToken;
-                enabled = false;
-                return;
-            }
-
-            if (GUI.Button(collapseButtonRect, m_Collapsed ? "+" : "-", m_ButtonStyle))
-            {
-                m_Collapsed = !m_Collapsed;
-                return;
-            }
-
-            float x = rect.x + kPadding;
-            float y = titleBarRect.y + 7f;
-            float contentWidth = rect.width - (kPadding * 2f);
-            float titleWidth = contentWidth - ((kButtonSize * 2f) + 14f);
-
-            GUI.Label(
-                new Rect(x, y, titleWidth, kTitleLineHeight),
-                "Selected Vehicle",
-                m_TitleStyle);
-            y = titleBarRect.yMax + kPadding;
-
+            y += kTitleBarHeight;
             if (m_Collapsed)
             {
                 return;
             }
 
-            if (!string.IsNullOrWhiteSpace(m_State.Classification))
+            y += kPadding;
+
+            bool hasClassification = !string.IsNullOrWhiteSpace(m_State.Classification);
+            m_ClassificationText.gameObject.SetActive(hasClassification);
+            if (hasClassification)
             {
-                GUI.Label(
-                    new Rect(x, y, contentWidth, kClassificationLineHeight),
-                    m_State.Classification,
-                    m_ClassificationStyle);
+                SetRect(
+                    m_ClassificationText.rectTransform,
+                    kPadding,
+                    y,
+                    contentWidth,
+                    kClassificationLineHeight);
                 y += kClassificationLineHeight;
             }
 
             if (m_State.Compact)
             {
-                if (!string.IsNullOrWhiteSpace(m_State.Message))
-                {
-                    float messageHeight = m_MessageStyle.CalcHeight(
-                        new GUIContent(m_State.Message),
-                        contentWidth);
-                    GUI.Label(
-                        new Rect(x, y + 2f, contentWidth, messageHeight),
-                        m_State.Message,
-                        m_MessageStyle);
-                }
-
+                SetRect(
+                    m_MessageText.rectTransform,
+                    kPadding,
+                    y + 2f,
+                    contentWidth,
+                    kCompactMessageHeight);
+                m_MessageText.gameObject.SetActive(true);
+                m_StatusLabelText.gameObject.SetActive(false);
+                m_StatusBlockRect.gameObject.SetActive(false);
                 return;
             }
 
-            DrawStatusBlock(ref y, x, contentWidth, m_State.TleStatus);
-            y += kSectionGap;
+            m_MessageText.gameObject.SetActive(false);
 
-            DrawRow(ref y, x, contentWidth, "Role / type", m_State.RoleOrType);
-            DrawRow(ref y, x, contentWidth, "Vehicle index", m_State.VehicleIndex);
-            DrawRow(ref y, x, contentWidth, "Violation / pending", m_State.ViolationPending);
-            DrawRow(ref y, x, contentWidth, "Violations / fines", m_State.Totals);
-            DrawRow(ref y, x, contentWidth, "Last reason", m_State.LastReason);
-            DrawRow(ref y, x, contentWidth, "Resolved entity", m_State.ResolvedEntity, m_FooterStyle);
+            bool hasStatus = !string.IsNullOrWhiteSpace(m_State.TleStatus);
+            m_StatusLabelText.gameObject.SetActive(hasStatus);
+            m_StatusBlockRect.gameObject.SetActive(hasStatus);
+            if (hasStatus)
+            {
+                SetRect(
+                    m_StatusLabelText.rectTransform,
+                    kPadding,
+                    y,
+                    contentWidth,
+                    kStatusLabelHeight);
+                y += kStatusLabelHeight + 3f;
+
+                SetRect(
+                    m_StatusBlockRect,
+                    kPadding,
+                    y,
+                    contentWidth,
+                    kStatusBlockHeight);
+                SetRect(
+                    m_StatusValueText.rectTransform,
+                    12f,
+                    11f,
+                    contentWidth - 24f,
+                    kStatusBlockHeight - 22f);
+                y += kStatusBlockHeight + kSectionGap;
+            }
+
+            for (int index = 0; index < m_Rows.Length; index += 1)
+            {
+                if (!m_Rows[index].Root.gameObject.activeSelf)
+                {
+                    continue;
+                }
+
+                SetRect(m_Rows[index].Root, kPadding, y, contentWidth, kBodyLineHeight);
+                SetRect(m_Rows[index].Label.rectTransform, 0f, 0f, kRowLabelWidth, kBodyLineHeight);
+                SetRect(
+                    m_Rows[index].Value.rectTransform,
+                    kRowLabelWidth,
+                    0f,
+                    contentWidth - kRowLabelWidth,
+                    kBodyLineHeight);
+                y += kBodyLineHeight;
+            }
         }
 
         private float CalculateHeight()
         {
             float height = kTitleBarHeight;
-
             if (m_Collapsed)
             {
                 return height;
             }
 
             height += kPadding;
-
             if (!string.IsNullOrWhiteSpace(m_State.Classification))
             {
                 height += kClassificationLineHeight;
@@ -227,17 +490,14 @@ namespace Traffic_Law_Enforcement
 
             if (m_State.Compact)
             {
-                float messageHeight = m_MessageStyle.CalcHeight(
-                    new GUIContent(m_State.Message ?? string.Empty),
-                    kWidth - (kPadding * 2f));
-
-                return Mathf.Max(
-                    kCompactMinHeight,
-                    height + messageHeight + kPadding);
+                return height + kCompactMessageHeight + kPadding;
             }
 
-            height += GetStatusBlockHeight(kWidth - (kPadding * 2f), m_State.TleStatus);
-            height += kSectionGap;
+            if (!string.IsNullOrWhiteSpace(m_State.TleStatus))
+            {
+                height += kStatusLabelHeight + 3f + kStatusBlockHeight + kSectionGap;
+            }
+
             height += CountNonEmptyRows(
                 m_State.RoleOrType,
                 m_State.VehicleIndex,
@@ -249,314 +509,16 @@ namespace Traffic_Law_Enforcement
             return height + kPadding;
         }
 
-        private void DrawRow(
-            ref float y,
-            float x,
-            float width,
-            string label,
-            string value,
-            GUIStyle valueStyle = null)
+        private void CloseCurrentSelection()
         {
-            if (string.IsNullOrWhiteSpace(value))
-            {
-                return;
-            }
-
-            float labelWidth = kRowLabelWidth;
-            GUI.Label(
-                new Rect(x, y, labelWidth, kBodyLineHeight),
-                label,
-                m_LabelStyle);
-            GUI.Label(
-                new Rect(x + labelWidth, y, width - labelWidth, kBodyLineHeight),
-                value,
-                valueStyle ?? m_ValueStyle);
-            y += kBodyLineHeight;
+            m_DismissedSelectionToken = m_State.SelectionToken;
+            ApplyState();
         }
 
-        private void DrawStatusBlock(
-            ref float y,
-            float x,
-            float width,
-            string value)
+        private void ToggleCollapsed()
         {
-            if (string.IsNullOrWhiteSpace(value))
-            {
-                return;
-            }
-
-            GUI.Label(
-                new Rect(x, y, width, kStatusLabelHeight),
-                "TLE status",
-                m_StatusLabelStyle);
-            y += kStatusLabelHeight;
-
-            float blockY = y + 2f;
-            float innerWidth = width - (kStatusBlockPadding * 2f);
-            float valueHeight = m_StatusValueStyle.CalcHeight(
-                new GUIContent(value),
-                innerWidth);
-            float blockHeight = valueHeight + (kStatusBlockPadding * 2f);
-
-            GUI.Box(
-                new Rect(x, blockY, width, blockHeight),
-                GUIContent.none,
-                m_StatusBlockStyle);
-            GUI.Label(
-                new Rect(
-                    x + kStatusBlockPadding,
-                    blockY + kStatusBlockPadding,
-                    innerWidth,
-                    valueHeight),
-                value,
-                m_StatusValueStyle);
-            y = blockY + blockHeight;
-        }
-
-        private float GetStatusBlockHeight(float width, string value)
-        {
-            if (string.IsNullOrWhiteSpace(value))
-            {
-                return 0f;
-            }
-
-            float innerWidth = width - (kStatusBlockPadding * 2f);
-            float valueHeight = m_StatusValueStyle.CalcHeight(
-                new GUIContent(value),
-                innerWidth);
-            return kStatusLabelHeight + 2f + valueHeight + (kStatusBlockPadding * 2f);
-        }
-
-        private Rect GetWindowRect(float height)
-        {
-            Vector2 screenSize = new Vector2(Screen.width, Screen.height);
-            if (m_LastScreenSize != screenSize)
-            {
-                if (!m_HasCustomPosition)
-                {
-                    ResetWindowPosition();
-                }
-
-                m_LastScreenSize = screenSize;
-            }
-
-            ClampWindowPosition(height);
-            return new Rect(m_WindowPosition.x, m_WindowPosition.y, kWidth, height);
-        }
-
-        private void HandleDrag(Rect dragHandleRect, float height)
-        {
-            Event currentEvent = Event.current;
-            if (currentEvent == null)
-            {
-                return;
-            }
-
-            Vector2 mousePosition = currentEvent.mousePosition;
-            switch (currentEvent.type)
-            {
-                case EventType.MouseDown:
-                    if (currentEvent.button == 0 && dragHandleRect.Contains(mousePosition))
-                    {
-                        m_IsDragging = true;
-                        m_HasCustomPosition = true;
-                        m_DragOffset = mousePosition - m_WindowPosition;
-                        currentEvent.Use();
-                    }
-                    break;
-
-                case EventType.MouseDrag:
-                    if (m_IsDragging)
-                    {
-                        m_WindowPosition = mousePosition - m_DragOffset;
-                        ClampWindowPosition(height);
-                        currentEvent.Use();
-                    }
-                    break;
-
-                case EventType.MouseUp:
-                    if (currentEvent.button == 0 && m_IsDragging)
-                    {
-                        m_IsDragging = false;
-                        currentEvent.Use();
-                    }
-                    break;
-            }
-        }
-
-        private void EnsureStyles()
-        {
-            if (m_WindowStyle == null)
-            {
-                CreateStyles();
-            }
-        }
-
-        private void CreateStyles()
-        {
-            if (m_BodyTexture == null)
-            {
-                m_BodyTexture = CreateSolidTexture(new Color(0.09f, 0.13f, 0.18f, 0.9f));
-            }
-
-            if (m_TitleBarTexture == null)
-            {
-                m_TitleBarTexture = CreateSolidTexture(new Color(0.15f, 0.19f, 0.25f, 0.98f));
-            }
-
-            if (m_ButtonTexture == null)
-            {
-                m_ButtonTexture = CreateSolidTexture(new Color(0.23f, 0.28f, 0.36f, 1f));
-            }
-
-            if (m_StatusTexture == null)
-            {
-                m_StatusTexture = CreateSolidTexture(new Color(0.14f, 0.18f, 0.24f, 0.96f));
-            }
-
-            m_WindowStyle = new GUIStyle(GUI.skin.box)
-            {
-                padding = new RectOffset(0, 0, 0, 0),
-                margin = new RectOffset(0, 0, 0, 0),
-                border = new RectOffset(1, 1, 1, 1),
-                normal =
-                {
-                    background = m_BodyTexture,
-                    textColor = Color.white
-                }
-            };
-
-            m_TitleBarStyle = new GUIStyle(GUI.skin.box)
-            {
-                padding = new RectOffset(0, 0, 0, 0),
-                margin = new RectOffset(0, 0, 0, 0),
-                border = new RectOffset(0, 0, 0, 0),
-                normal =
-                {
-                    background = m_TitleBarTexture,
-                    textColor = Color.white
-                }
-            };
-
-            m_TitleStyle = new GUIStyle(GUI.skin.label)
-            {
-                fontSize = 16,
-                fontStyle = FontStyle.Bold,
-                alignment = TextAnchor.MiddleLeft,
-                clipping = TextClipping.Clip,
-                normal =
-                {
-                    textColor = new Color(0.97f, 0.98f, 1f, 1f)
-                }
-            };
-
-            m_ButtonStyle = new GUIStyle(GUI.skin.button)
-            {
-                fontSize = 12,
-                fontStyle = FontStyle.Bold,
-                alignment = TextAnchor.MiddleCenter,
-                margin = new RectOffset(0, 0, 0, 0),
-                padding = new RectOffset(0, 0, 0, 0),
-                border = new RectOffset(1, 1, 1, 1),
-                normal =
-                {
-                    background = m_ButtonTexture,
-                    textColor = new Color(0.95f, 0.97f, 1f, 1f)
-                }
-            };
-
-            m_ClassificationStyle = new GUIStyle(GUI.skin.label)
-            {
-                fontSize = 15,
-                fontStyle = FontStyle.Bold,
-                alignment = TextAnchor.MiddleLeft,
-                clipping = TextClipping.Clip,
-                normal =
-                {
-                    textColor = new Color(0.69f, 0.87f, 1f, 1f)
-                }
-            };
-
-            m_StatusBlockStyle = new GUIStyle(GUI.skin.box)
-            {
-                padding = new RectOffset(0, 0, 0, 0),
-                margin = new RectOffset(0, 0, 0, 0),
-                border = new RectOffset(1, 1, 1, 1),
-                normal =
-                {
-                    background = m_StatusTexture,
-                    textColor = Color.white
-                }
-            };
-
-            m_StatusLabelStyle = new GUIStyle(GUI.skin.label)
-            {
-                fontSize = 12,
-                fontStyle = FontStyle.Bold,
-                alignment = TextAnchor.MiddleLeft,
-                clipping = TextClipping.Clip,
-                normal =
-                {
-                    textColor = new Color(0.75f, 0.81f, 0.89f, 1f)
-                }
-            };
-
-            m_StatusValueStyle = new GUIStyle(GUI.skin.label)
-            {
-                fontSize = 14,
-                fontStyle = FontStyle.Bold,
-                alignment = TextAnchor.UpperLeft,
-                wordWrap = true,
-                clipping = TextClipping.Clip,
-                normal =
-                {
-                    textColor = Color.white
-                }
-            };
-
-            m_LabelStyle = new GUIStyle(GUI.skin.label)
-            {
-                fontSize = 13,
-                alignment = TextAnchor.MiddleLeft,
-                clipping = TextClipping.Clip,
-                normal =
-                {
-                    textColor = new Color(0.74f, 0.8f, 0.86f, 1f)
-                }
-            };
-
-            m_ValueStyle = new GUIStyle(GUI.skin.label)
-            {
-                fontSize = 13,
-                alignment = TextAnchor.MiddleLeft,
-                clipping = TextClipping.Clip,
-                normal =
-                {
-                    textColor = Color.white
-                }
-            };
-
-            m_MessageStyle = new GUIStyle(m_ValueStyle)
-            {
-                fontSize = 14,
-                fontStyle = FontStyle.Bold,
-                wordWrap = true
-            };
-
-            m_FooterStyle = new GUIStyle(m_ValueStyle)
-            {
-                fontSize = 12,
-                normal =
-                {
-                    textColor = new Color(0.82f, 0.86f, 0.9f, 0.95f)
-                }
-            };
-        }
-
-        private bool IsDismissed()
-        {
-            return !string.IsNullOrWhiteSpace(m_State.SelectionToken) &&
-                string.Equals(m_DismissedSelectionToken, m_State.SelectionToken);
+            m_Collapsed = !m_Collapsed;
+            ApplyState();
         }
 
         private void ResetWindowPosition()
@@ -565,6 +527,11 @@ namespace Traffic_Law_Enforcement
                 Screen.width - kWidth - kRightInset,
                 kTopInset);
             m_LastScreenSize = new Vector2(Screen.width, Screen.height);
+        }
+
+        private void ApplyWindowPosition()
+        {
+            m_PanelRect.anchoredPosition = new Vector2(m_WindowPosition.x, -m_WindowPosition.y);
         }
 
         private void ClampWindowPosition(float height)
@@ -576,12 +543,116 @@ namespace Traffic_Law_Enforcement
                 Mathf.Clamp(m_WindowPosition.y, 0f, maxY));
         }
 
-        private static Texture2D CreateSolidTexture(Color color)
+        private bool IsDismissed()
         {
-            Texture2D texture = new Texture2D(1, 1, TextureFormat.RGBA32, mipChain: false);
-            texture.SetPixel(0, 0, color);
-            texture.Apply();
-            return texture;
+            return !string.IsNullOrWhiteSpace(m_State.SelectionToken) &&
+                string.Equals(m_DismissedSelectionToken, m_State.SelectionToken);
+        }
+
+        private Font ResolveFont()
+        {
+            Font builtinFont = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            if (builtinFont != null)
+            {
+                return builtinFont;
+            }
+
+            return Font.CreateDynamicFontFromOSFont(
+                new[] { "Segoe UI", "Malgun Gothic", "Arial" },
+                16);
+        }
+
+        private Button CreateButton(
+            RectTransform parent,
+            string text,
+            out Text buttonLabel)
+        {
+            RectTransform rect = CreateRect(text + "Button", parent);
+            Image image = rect.gameObject.AddComponent<Image>();
+            image.color = kButtonColor;
+            image.raycastTarget = true;
+
+            Button button = rect.gameObject.AddComponent<Button>();
+            button.targetGraphic = image;
+            button.transition = Selectable.Transition.ColorTint;
+            button.colors = new ColorBlock
+            {
+                normalColor = kButtonColor,
+                highlightedColor = new Color(0.34f, 0.40f, 0.48f, 1f),
+                pressedColor = new Color(0.20f, 0.24f, 0.31f, 1f),
+                selectedColor = kButtonColor,
+                disabledColor = new Color(0.20f, 0.24f, 0.31f, 0.65f),
+                colorMultiplier = 1f,
+                fadeDuration = 0.08f
+            };
+
+            buttonLabel = CreateText(
+                text + "ButtonLabel",
+                rect,
+                11,
+                FontStyle.Bold,
+                TextAnchor.MiddleCenter,
+                kTitleColor);
+            buttonLabel.raycastTarget = false;
+
+            SetRect(buttonLabel.rectTransform, 0f, 0f, 0f, 0f, stretch: true);
+            return button;
+        }
+
+        private Text CreateText(
+            string name,
+            RectTransform parent,
+            int fontSize,
+            FontStyle fontStyle,
+            TextAnchor alignment,
+            Color color)
+        {
+            RectTransform rect = CreateRect(name, parent);
+            Text text = rect.gameObject.AddComponent<Text>();
+            text.font = m_Font;
+            text.fontSize = fontSize;
+            text.fontStyle = fontStyle;
+            text.alignment = alignment;
+            text.color = color;
+            text.raycastTarget = false;
+            text.horizontalOverflow = HorizontalWrapMode.Wrap;
+            text.verticalOverflow = VerticalWrapMode.Truncate;
+            return text;
+        }
+
+        private static RectTransform CreateRect(string name, Transform parent)
+        {
+            GameObject gameObject = new GameObject(name, typeof(RectTransform));
+            gameObject.transform.SetParent(parent, false);
+            RectTransform rect = (RectTransform)gameObject.transform;
+            rect.anchorMin = new Vector2(0f, 1f);
+            rect.anchorMax = new Vector2(0f, 1f);
+            rect.pivot = new Vector2(0f, 1f);
+            return rect;
+        }
+
+        private static void SetRect(
+            RectTransform rect,
+            float x,
+            float y,
+            float width,
+            float height,
+            bool stretch = false)
+        {
+            if (stretch)
+            {
+                rect.anchorMin = new Vector2(0f, 0f);
+                rect.anchorMax = new Vector2(1f, 1f);
+                rect.offsetMin = Vector2.zero;
+                rect.offsetMax = Vector2.zero;
+                return;
+            }
+
+            rect.anchorMin = new Vector2(0f, 1f);
+            rect.anchorMax = new Vector2(0f, 1f);
+            rect.pivot = new Vector2(0f, 1f);
+            rect.anchoredPosition = new Vector2(x, -y);
+            rect.sizeDelta = new Vector2(width, height);
         }
 
         private static int CountNonEmptyRows(params string[] values)
@@ -596,6 +667,40 @@ namespace Traffic_Law_Enforcement
             }
 
             return count;
+        }
+    }
+
+    internal sealed class SelectedVehiclePanelDragHandle :
+        MonoBehaviour,
+        IPointerDownHandler,
+        IDragHandler,
+        IEndDragHandler
+    {
+        private SelectedVehiclePanelView m_Owner;
+
+        internal void Initialize(SelectedVehiclePanelView owner)
+        {
+            m_Owner = owner;
+        }
+
+        public void OnPointerDown(PointerEventData eventData)
+        {
+            m_Owner?.BeginDrag(ToTopLeft(eventData.position));
+        }
+
+        public void OnDrag(PointerEventData eventData)
+        {
+            m_Owner?.DragTo(ToTopLeft(eventData.position));
+        }
+
+        public void OnEndDrag(PointerEventData eventData)
+        {
+            m_Owner?.EndDrag();
+        }
+
+        private static Vector2 ToTopLeft(Vector2 screenPosition)
+        {
+            return new Vector2(screenPosition.x, Screen.height - screenPosition.y);
         }
     }
 }
