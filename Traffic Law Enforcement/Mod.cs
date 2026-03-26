@@ -43,10 +43,12 @@ namespace Traffic_Law_Enforcement
             EnforcementGameTime.Reset();
             SaveLoadTraceService.Reset();
             SaveLoadTracePatches.Apply();
+            KeybindingPersistenceGuardPatches.Apply();
             KeybindingSaveDiagnosticsPatches.Apply();
             m_Setting = new Setting(this);
             Settings = m_Setting;
             AssetDatabase.global.LoadSettings(nameof(Traffic_Law_Enforcement), m_Setting, new Setting(this));
+            KeybindingPersistenceGuardPatches.CaptureCurrentBindings();
 
             ResolveAndCacheModMetadata(modAssetPath);
             LogModVersionInfo(modAssetPath);
@@ -87,7 +89,9 @@ namespace Traffic_Law_Enforcement
         public void OnDispose()
         {
             log.Info(nameof(OnDispose));
+            KeybindingPersistenceGuardPatches.CaptureCurrentBindings();
             SaveLoadTracePatches.Remove();
+            log.Info("[KEYBIND_GUARD] Leaving guard patches applied until process exit to protect async settings-save after OnDispose.");
             log.Info("[KEYBIND_DIAG] Leaving diagnostics patches applied until process exit to observe async settings-save failures after OnDispose.");
             SaveLoadTraceService.Reset();
             BudgetUIPatches.Remove();
