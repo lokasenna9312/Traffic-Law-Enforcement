@@ -22,6 +22,7 @@ namespace Traffic_Law_Enforcement
         private static readonly HashSet<string> s_LoggedFailures = new HashSet<string>(StringComparer.Ordinal);
         private static readonly object s_LogGate = new object();
         private static readonly List<string> s_GlobalSaveEvents = new List<string>();
+        private static int s_KeybindingBindingsGetterCallCount;
 
         private static readonly FieldInfo s_KeybindingSettingsIsDefaultField =
             AccessTools.Field(typeof(Game.Settings.KeybindingSettings), "m_IsDefault");
@@ -109,6 +110,7 @@ namespace Traffic_Law_Enforcement
 
                 s_Harmony.Patch(
                     s_KeybindingSettingsBindingsGetter,
+                    prefix: new HarmonyMethod(typeof(KeybindingSaveDiagnosticsPatches), nameof(KeybindingBindingsGetterPrefix)),
                     finalizer: new HarmonyMethod(typeof(KeybindingSaveDiagnosticsPatches), nameof(KeybindingBindingsGetterFinalizer)));
 
                 s_Harmony.Patch(
@@ -270,6 +272,24 @@ namespace Traffic_Law_Enforcement
             }
 
             return __exception;
+        }
+
+        private static void KeybindingBindingsGetterPrefix(Game.Settings.KeybindingSettings __instance)
+        {
+            int callCount = Interlocked.Increment(ref s_KeybindingBindingsGetterCallCount);
+            bool hasSaveContext = HasSaveContext();
+            if (!hasSaveContext && callCount > 20)
+            {
+                return;
+            }
+
+            AppendAuxiliaryOnlyLine(
+                "KeybindingSettings.bindings getter entered. " +
+                $"call={callCount}, " +
+                $"thread={Thread.CurrentThread.ManagedThreadId}, " +
+                $"hasSaveContext={hasSaveContext}, " +
+                $"instanceType={__instance?.GetType().FullName ?? "<null>"}, " +
+                $"isDefault={TryGetIsDefaultValue(__instance)}");
         }
 
         private static Exception TypeExtensionsGetMemberValueFinalizer(
