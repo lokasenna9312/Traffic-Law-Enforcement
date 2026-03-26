@@ -47,13 +47,18 @@ The following options can be configured either for the currently loaded save fil
 - I coded the mod so that the budget of the household or company that owns a fined vehicle is actually reduced. However, due to my limited development experience, I have not been able to thoroughly verify whether this is actually reflected in practice. (is it possible to view the budget balance details of individual households or companies with the developer tools?)
 - Log files are saved to the following path: C:\Users\USERNAME\AppData\LocalLow\Colossal Order\Cities Skylines II\Logs\Traffic_Law_Enforcement.Mod.log
 
-### 5. Desired Improvements and Additional Features
+### 5. The things that are being developed
+- DEBUG PANEL which shows selected vehicle's entity ID and information.
+- Considering that the enforcement and amount of fine affects more axes of path cost than money axis. There are 4 axes of path cost: time, behaviour, money, comfort.
+
+### 6. Desired Improvements and Additional Features
 - I wanted to penalize drivers who stop in intersections and jaywalkers but I could not implement that feature because of my limited coding skills.
 - I wanted to penalize non-service vehicles who enters pedestrian-only roads but I could not implement that feature because I don't know which codes to mod to implement it.
 - I would like serious habitual traffic offenders to face harsher penalties, such as having their driver's licenses suspended or revoked, or having them sent to jail, but I could not implement that either because of my limited coding skills.
 
-### 6. Known Issues : Investigation and Fixing in Progress
-- Mid-block enforcement sometimes makes vehicles take weird routes or be freezed making meaningless routes rapdily.
+### 7. Known Issues : Investigation and Fixing in Progress
+- There are no known issues at the moment.
+- If you find bugs or issues, please be free to report them here or at GitHub.
 
 ## 한국어 설명
 
@@ -84,13 +89,18 @@ The following options can be configured either for the currently loaded save fil
 - 벌금이 부과된 차량을 소유한 가구 또는 업체의 예산이 실제로 줄어들도록 코딩했지만, 실제로 그 예산 감소가 충분히 반영되는지는 아직 철저하게 검증하지 못했습니다.
 - 로그 파일은 다음 경로에 저장됩니다. C:\Users\USERNAME\AppData\LocalLow\Colossal Order\Cities Skylines II\Logs\Traffic_Law_Enforcement.Mod.log
 
-### 5. 추가적으로 개선하거나 구현하고 싶은 사항
+### 5. 개발중인 것들
+- 선택된 차량의 엔티티 ID와 정보를 보여주는 DEBUG PANEL.
+- 교통법규 단속과 벌금 액수가 경로 비용 계산식에서 금전 축뿐만 아니라 다른 축에도 보정을 넣게 하는 것을 고려중입니다. 경로 비용 계산식에는 시간, 행동, 금전, 쾌적성의 4가지 축이 있습니다.
+
+### 6. 추가적으로 개선하거나 구현하고 싶은 사항
 - 교차로 안에서 정차하는 운전자들과 무단횡단자들도 단속하도록 만들고 싶었지만, 제 코딩 실력이 부족해서 그 기능은 구현하지 못했습니다.
 - 서비스 차량이 아닌 차량들이 보행자 전용 도로에 진입하는 것도 단속하도록 만들고 싶었지만, 그 기능을 구현하기 위해 어떤 코드를 모드해야 할지 몰라서 구현하지 못했습니다.
 - 심각한 상습 교통법규 위반자들에게는 더욱 강한 처벌(예: 운전면허 정지 또는 취소, 교도소 수감)을 적용하고 싶었지만, 그 기능 역시 제 코딩 실력이 부족해서 구현하지 못했습니다.
 
-### 6. 알려진 문제점 : 조사 및 수정 진행 중
-- 중앙선 침범 단속을 활성화하면 차량들이 이상한 경로를 택하거나 제자리에서 의미없는 경로를 계속 만들면서 얼어붙는 경우가 있습니다.
+### 7. 알려진 문제점 : 조사 및 수정 진행 중
+- 현재 개발자가 파악하고 있는 문제점은 없습니다.
+- 버그나 문제점을 발견하시면, 이 글이나 GitHub에 자유롭게 제보해주세요.
 	</LongDescription>
 	<!--Thumbnail-->
 	<Thumbnail Value="Properties/Thumbnail.jpg" />
