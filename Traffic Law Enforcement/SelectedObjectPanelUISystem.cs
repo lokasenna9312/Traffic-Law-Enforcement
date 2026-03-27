@@ -22,6 +22,8 @@ namespace Traffic_Law_Enforcement
         private ValueBinding<string> m_MessageBinding;
         private ValueBinding<string> m_TleStatusBinding;
         private ValueBinding<string> m_RoleOrTypeBinding;
+        private ValueBinding<string> m_RoleBinding;
+        private ValueBinding<string> m_PublicTransportLaneAllowanceBinding;
         private ValueBinding<string> m_VehicleIndexBinding;
         private ValueBinding<string> m_ViolationPendingBinding;
         private ValueBinding<string> m_TotalsBinding;
@@ -41,6 +43,8 @@ namespace Traffic_Law_Enforcement
             public string Message;
             public string TleStatus;
             public string RoleOrType;
+            public string Role;
+            public string PublicTransportLaneAllowance;
             public string VehicleIndex;
             public string ViolationPending;
             public string Totals;
@@ -62,6 +66,8 @@ namespace Traffic_Law_Enforcement
             AddBinding(m_MessageBinding = new ValueBinding<string>(kGroup, "message", string.Empty));
             AddBinding(m_TleStatusBinding = new ValueBinding<string>(kGroup, "tleStatus", string.Empty));
             AddBinding(m_RoleOrTypeBinding = new ValueBinding<string>(kGroup, "roleOrType", string.Empty));
+            AddBinding(m_RoleBinding = new ValueBinding<string>(kGroup, "role", string.Empty));
+            AddBinding(m_PublicTransportLaneAllowanceBinding = new ValueBinding<string>(kGroup, "publicTransportLaneAllowance", string.Empty));
             AddBinding(m_VehicleIndexBinding = new ValueBinding<string>(kGroup, "vehicleIndex", string.Empty));
             AddBinding(m_ViolationPendingBinding = new ValueBinding<string>(kGroup, "violationPending", string.Empty));
             AddBinding(m_TotalsBinding = new ValueBinding<string>(kGroup, "totals", string.Empty));
@@ -123,7 +129,7 @@ namespace Traffic_Law_Enforcement
                 {
                     Visible = true,
                     Compact = true,
-                    Message = "Selected object is not a vehicle"
+                    Message = "Not a vehicle"
                 };
             }
 
@@ -131,6 +137,8 @@ namespace Traffic_Law_Enforcement
                 snapshot.TleApplicability != SelectedObjectTleApplicability.NotApplicable;
             bool tleReady =
                 snapshot.TleApplicability == SelectedObjectTleApplicability.ApplicableReady;
+            (string role, string publicTransportLaneAllowance) =
+                SplitRoleAndPublicTransportLaneAllowance(snapshot.RoleOrTypeText);
 
             return new PanelState
             {
@@ -139,6 +147,8 @@ namespace Traffic_Law_Enforcement
                 Classification = snapshot.SummaryClassificationText,
                 TleStatus = BuildCompactTleStatus(snapshot),
                 RoleOrType = NormalizeText(snapshot.RoleOrTypeText),
+                Role = role,
+                PublicTransportLaneAllowance = publicTransportLaneAllowance,
                 VehicleIndex = snapshot.VehicleIndex >= 0
                     ? snapshot.VehicleIndex.ToString()
                     : string.Empty,
@@ -164,6 +174,8 @@ namespace Traffic_Law_Enforcement
             m_MessageBinding.Update(state.Message ?? string.Empty);
             m_TleStatusBinding.Update(state.TleStatus ?? string.Empty);
             m_RoleOrTypeBinding.Update(state.RoleOrType ?? string.Empty);
+            m_RoleBinding.Update(state.Role ?? string.Empty);
+            m_PublicTransportLaneAllowanceBinding.Update(state.PublicTransportLaneAllowance ?? string.Empty);
             m_VehicleIndexBinding.Update(state.VehicleIndex ?? string.Empty);
             m_ViolationPendingBinding.Update(state.ViolationPending ?? string.Empty);
             m_TotalsBinding.Update(state.Totals ?? string.Empty);
@@ -252,8 +264,60 @@ namespace Traffic_Law_Enforcement
             {
                 Visible = true,
                 Compact = true,
-                Message = "No object selected"
+                Message = "No selection"
             };
+        }
+
+        private static (string role, string publicTransportLaneAllowance)
+            SplitRoleAndPublicTransportLaneAllowance(string roleOrType)
+        {
+            string normalized = NormalizeText(roleOrType);
+            if (string.IsNullOrEmpty(normalized))
+            {
+                return (string.Empty, string.Empty);
+            }
+
+            string[] segments = normalized.Split('|');
+            string role = string.Empty;
+            List<string> publicTransportLaneAllowanceParts = null;
+
+            foreach (string rawSegment in segments)
+            {
+                string segment = NormalizeText(rawSegment);
+                if (string.IsNullOrEmpty(segment))
+                {
+                    continue;
+                }
+
+                if (string.IsNullOrEmpty(role))
+                {
+                    role = segment;
+                    continue;
+                }
+
+                const string publicTransportLaneAllowancePrefix = "PT type:";
+                if (segment.StartsWith(
+                        publicTransportLaneAllowancePrefix,
+                        System.StringComparison.OrdinalIgnoreCase))
+                {
+                    string publicTransportLaneAllowance = NormalizeText(
+                        segment.Substring(publicTransportLaneAllowancePrefix.Length));
+                    if (!string.IsNullOrEmpty(publicTransportLaneAllowance))
+                    {
+                        (publicTransportLaneAllowanceParts ??= new List<string>())
+                            .Add(publicTransportLaneAllowance);
+                    }
+
+                    continue;
+                }
+
+                (publicTransportLaneAllowanceParts ??= new List<string>()).Add(segment);
+            }
+
+            return (role, publicTransportLaneAllowanceParts == null ||
+                publicTransportLaneAllowanceParts.Count == 0
+                ? string.Empty
+                : string.Join(" | ", publicTransportLaneAllowanceParts));
         }
     }
 }

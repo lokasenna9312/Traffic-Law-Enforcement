@@ -20,7 +20,8 @@ const collapsedBinding = api.bindValue(group, "collapsed", false);
 const classificationBinding = api.bindValue(group, "classification", "");
 const messageBinding = api.bindValue(group, "message", "");
 const tleStatusBinding = api.bindValue(group, "tleStatus", "");
-const roleOrTypeBinding = api.bindValue(group, "roleOrType", "");
+const roleBinding = api.bindValue(group, "role", "");
+const publicTransportLaneAllowanceBinding = api.bindValue(group, "publicTransportLaneAllowance", "");
 const vehicleIndexBinding = api.bindValue(group, "vehicleIndex", "");
 const violationPendingBinding = api.bindValue(group, "violationPending", "");
 const totalsBinding = api.bindValue(group, "totals", "");
@@ -28,7 +29,7 @@ const lastReasonBinding = api.bindValue(group, "lastReason", "");
 const resolvedEntityBinding = api.bindValue(group, "resolvedEntity", "");
 
 const initialPosition = { x: 0.76, y: 0.1 };
-const compactPanelWidth = "420px";
+const compactPanelWidth = "320px";
 const fullPanelWidth = "560px";
 
 const styles = {
@@ -56,16 +57,32 @@ const styles = {
         width: "100%",
         boxSizing: "border-box",
     },
-    classification: {
+    compactBody: {
+        padding: "14px 16px",
+        width: "100%",
+        boxSizing: "border-box",
+    },
+    classificationRow: {
+        display: "flex",
+        alignItems: "baseline",
+        gap: "8px",
+        marginBottom: "10px",
+        flexWrap: "wrap",
+    },
+    classificationText: {
         color: "#b0defc",
         fontWeight: 700,
         fontSize: "18px",
-        marginBottom: "10px",
+    },
+    classificationIndex: {
+        color: "#d6e1f2",
+        fontWeight: 600,
+        fontSize: "14px",
     },
     compactMessage: {
-        fontSize: "16px",
+        fontSize: "15px",
         lineHeight: 1.45,
-        fontWeight: 700,
+        fontWeight: 600,
         color: "#f7f9ff",
     },
     statusLabel: {
@@ -97,7 +114,7 @@ const styles = {
         alignItems: "center",
     },
     label: {
-        width: "162px",
+        width: "138px",
         color: "#c2cfdf",
         fontSize: "14px",
         lineHeight: 1.35,
@@ -165,7 +182,8 @@ function SelectedObjectPanel() {
     const classification = api.useValue(classificationBinding);
     const message = api.useValue(messageBinding);
     const tleStatus = api.useValue(tleStatusBinding);
-    const roleOrType = api.useValue(roleOrTypeBinding);
+    const role = api.useValue(roleBinding);
+    const publicTransportLaneAllowance = api.useValue(publicTransportLaneAllowanceBinding);
     const vehicleIndex = api.useValue(vehicleIndexBinding);
     const violationPending = api.useValue(violationPendingBinding);
     const totals = api.useValue(totalsBinding);
@@ -195,7 +213,7 @@ function SelectedObjectPanel() {
     const body = compact
         ? h(
               "div",
-              { style: Object.assign({}, styles.body, { width: compactPanelWidth }) },
+              { style: Object.assign({}, styles.compactBody, { width: compactPanelWidth }) },
               h("div", { style: styles.compactMessage }, message)
           )
         : collapsed
@@ -203,14 +221,21 @@ function SelectedObjectPanel() {
             : h(
                   "div",
                   { style: styles.body },
-                  h("div", { style: styles.classification }, classification),
+                  h(
+                      "div",
+                      { style: styles.classificationRow },
+                      h("div", { style: styles.classificationText }, classification),
+                      vehicleIndex
+                          ? h("div", { style: styles.classificationIndex }, "#" + vehicleIndex)
+                          : null
+                  ),
                   h("div", { style: styles.statusLabel }, "TLE status"),
                   h("div", { style: styles.statusBlock }, tleStatus),
                   h(
                       "div",
                       { style: styles.rows },
-                      h(Row, { label: "Role / PT type", value: roleOrType }),
-                      h(Row, { label: "Vehicle index", value: vehicleIndex }),
+                      h(Row, { label: "Role", value: role }),
+                      h(Row, { label: "PT type", value: publicTransportLaneAllowance }),
                       h(Row, { label: "Violation / pending", value: violationPending }),
                       h(Row, { label: "Violations / fines", value: totals }),
                       h(Row, { label: "Last reason", value: lastReason }),
