@@ -1,4 +1,5 @@
 using Game;
+using Game.Input;
 using Game.SceneFlow;
 using Game.UI;
 using Unity.Entities;
@@ -12,10 +13,10 @@ namespace Traffic_Law_Enforcement
         private const string kPanelObjectName = "TrafficLawEnforcement.SelectedObjectPanel";
 
         private SelectedObjectBridgeSystem m_SelectedObjectBridgeSystem;
+        private ProxyAction m_PanelToggleAction;
         private GameObject m_PanelObject;
         private SelectedObjectPanelView m_PanelView;
         private bool m_IsPanelEnabled = true;
-        private bool m_WasTogglePressed;
 
         public override GameMode gameMode => GameMode.Game;
 
@@ -116,28 +117,22 @@ namespace Traffic_Law_Enforcement
 
         private void UpdatePanelToggle()
         {
-            bool isTogglePressed = IsPanelTogglePressed();
-
-            if (isTogglePressed && !m_WasTogglePressed)
+            ProxyAction toggleAction = GetPanelToggleAction();
+            if (toggleAction != null && toggleAction.WasPressedThisFrame())
             {
                 m_IsPanelEnabled = !m_IsPanelEnabled;
             }
-
-            m_WasTogglePressed = isTogglePressed;
         }
 
-        private static bool IsPanelTogglePressed()
+        private ProxyAction GetPanelToggleAction()
         {
-            bool ctrlPressed =
-                Input.GetKey(KeyCode.LeftControl);
+            if (m_PanelToggleAction == null && Mod.Settings != null)
+            {
+                m_PanelToggleAction =
+                    Mod.Settings.GetAction(KeybindingIds.SelectedObjectPanelToggleActionName);
+            }
 
-            bool shiftPressed =
-                Input.GetKey(KeyCode.LeftShift);
-
-            bool iPressed =
-                Input.GetKey(KeyCode.I);
-
-            return ctrlPressed && shiftPressed && iPressed;
+            return m_PanelToggleAction;
         }
 
         private bool EnsurePanelView()

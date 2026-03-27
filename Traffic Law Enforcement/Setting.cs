@@ -6,6 +6,7 @@ using Colossal.IO.AssetDatabase;
 using Colossal.Json;
 using Colossal.Localization;
 using Game;
+using Game.Input;
 using Game.Modding;
 using Game.SceneFlow;
 using Game.Settings;
@@ -13,10 +14,19 @@ using Game.UI;
 
 namespace Traffic_Law_Enforcement
 {
+    internal static class KeybindingIds
+    {
+        public const string SelectedObjectPanelToggleActionName =
+            "SelectedObjectPanelToggle";
+    }
+
     [FileLocation(nameof(Traffic_Law_Enforcement))]
     [SettingsUITabOrder(kCurrentSaveTab, kNewSaveDefaultsTab, kPolicyImpactTab, kDebugTab)]
     [SettingsUIGroupOrder(kGeneralGroup, kPublicTransportLaneAuthorizedGroup, kPublicTransportLaneAdditionalGroup, kPublicTransportLanePressureGroup, kFineGroup, kRepeatOffenderGroup, kTemplateActionsGroup, kPolicyImpactGroup, kDebugGroup, kLogPathGroup)]
     [SettingsUIShowGroupName(kGeneralGroup, kPublicTransportLaneAuthorizedGroup, kPublicTransportLaneAdditionalGroup, kPublicTransportLanePressureGroup, kFineGroup, kRepeatOffenderGroup, kTemplateActionsGroup, kPolicyImpactGroup, kDebugGroup, kLogPathGroup)]
+    [SettingsUIKeyboardAction(
+        KeybindingIds.SelectedObjectPanelToggleActionName,
+        canBeEmpty: false)]
     public class Setting : ModSetting
     {
         // --- Debug logging toggles for save/load ---
@@ -597,6 +607,14 @@ namespace Traffic_Law_Enforcement
         [SettingsUISection(kDebugTab, kDebugGroup)]
         public bool EnableSaveIdentificationLogging { get; set; }
 
+        [SettingsUISection(kDebugTab, kDebugGroup)]
+        [SettingsUIKeyboardBinding(
+            BindingKeyboard.I,
+            KeybindingIds.SelectedObjectPanelToggleActionName,
+            ctrl: true,
+            shift: true)]
+        public ProxyBinding SelectedObjectPanelToggleBinding { get; set; }
+
         [Exclude]
         [SettingsUISection(kDebugTab, kLogPathGroup)]
         public string ModLogPath => GetModLogPath();
@@ -628,6 +646,7 @@ namespace Traffic_Law_Enforcement
             EnablePathfindingPenaltyDiagnosticLogging = false;
             EnablePathObsoleteSourceLogging = false;
             EnableSaveIdentificationLogging = false;
+            ResetKeyBindings();
         }
 
         public EnforcementGameplaySettingsState GetNewSaveDefaultSettings()
