@@ -26,6 +26,15 @@ namespace Traffic_Law_Enforcement
         internal const string kFooterHintLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Text.FooterHint";
         internal const string kExpandSectionLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Text.ExpandSection";
         internal const string kCollapseSectionLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Text.CollapseSection";
+        internal const string kLaneDetailsTitleLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Text.LaneDetailsTitle";
+        internal const string kCurrentLaneLabelLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Label.CurrentLane";
+        internal const string kPreviousLaneLabelLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Label.PreviousLane";
+        internal const string kLaneChangesLabelLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Label.LaneChanges";
+        internal const string kLiveLaneStateLabelLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Label.LiveLaneState";
+        internal const string kLiveLaneStateReadyLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Text.LiveLaneStateReady";
+        internal const string kLiveLaneStateNoLiveLaneLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Text.LiveLaneStateNoLiveLane";
+        internal const string kLiveLaneStateNotApplicableLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Text.LiveLaneStateNotApplicable";
+        internal const string kLiveLaneStateParkedRoadCarLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Text.LiveLaneStateParkedRoadCar";
 
         private SelectedObjectBridgeSystem m_SelectedObjectBridgeSystem;
         private ProxyAction m_PanelToggleAction;
@@ -53,6 +62,15 @@ namespace Traffic_Law_Enforcement
         private ValueBinding<string> m_FooterTextBinding;
         private ValueBinding<string> m_ExpandSectionTooltipBinding;
         private ValueBinding<string> m_CollapseSectionTooltipBinding;
+        private ValueBinding<string> m_LaneDetailsTitleBinding;
+        private ValueBinding<string> m_CurrentLaneLabelBinding;
+        private ValueBinding<string> m_PreviousLaneLabelBinding;
+        private ValueBinding<string> m_LaneChangesLabelBinding;
+        private ValueBinding<string> m_LiveLaneStateLabelBinding;
+        private ValueBinding<string> m_CurrentLaneBinding;
+        private ValueBinding<string> m_PreviousLaneBinding;
+        private ValueBinding<string> m_LaneChangesBinding;
+        private ValueBinding<string> m_LiveLaneStateBinding;
 
         private bool m_IsPanelEnabled;
         private bool m_IsCollapsed;
@@ -72,6 +90,10 @@ namespace Traffic_Law_Enforcement
             public string ViolationPending;
             public string Totals;
             public string LastReason;
+            public string CurrentLane;
+            public string PreviousLane;
+            public string LaneChanges;
+            public string LiveLaneState;
         }
 
         protected override void OnCreate()
@@ -104,6 +126,15 @@ namespace Traffic_Law_Enforcement
             AddBinding(m_FooterTextBinding = new ValueBinding<string>(kGroup, "footerText", string.Empty));
             AddBinding(m_ExpandSectionTooltipBinding = new ValueBinding<string>(kGroup, "expandSectionTooltipText", string.Empty));
             AddBinding(m_CollapseSectionTooltipBinding = new ValueBinding<string>(kGroup, "collapseSectionTooltipText", string.Empty));
+            AddBinding(m_LaneDetailsTitleBinding = new ValueBinding<string>(kGroup, "laneDetailsTitleText", string.Empty));
+            AddBinding(m_CurrentLaneLabelBinding = new ValueBinding<string>(kGroup, "currentLaneLabelText", string.Empty));
+            AddBinding(m_PreviousLaneLabelBinding = new ValueBinding<string>(kGroup, "previousLaneLabelText", string.Empty));
+            AddBinding(m_LaneChangesLabelBinding = new ValueBinding<string>(kGroup, "laneChangesLabelText", string.Empty));
+            AddBinding(m_LiveLaneStateLabelBinding = new ValueBinding<string>(kGroup, "liveLaneStateLabelText", string.Empty));
+            AddBinding(m_CurrentLaneBinding = new ValueBinding<string>(kGroup, "currentLane", string.Empty));
+            AddBinding(m_PreviousLaneBinding = new ValueBinding<string>(kGroup, "previousLane", string.Empty));
+            AddBinding(m_LaneChangesBinding = new ValueBinding<string>(kGroup, "laneChanges", string.Empty));
+            AddBinding(m_LiveLaneStateBinding = new ValueBinding<string>(kGroup, "liveLaneState", string.Empty));
 
             AddBinding(new TriggerBinding(kGroup, "close", HandleCloseRequested));
             AddBinding(new TriggerBinding(kGroup, "toggleCollapsed", ToggleCollapsed));
@@ -195,7 +226,11 @@ namespace Traffic_Law_Enforcement
                     $"Violation {snapshot.PtLaneViolationActive}, Pending {snapshot.PendingExitActive}",
                 Totals =
                     $"Violations {snapshot.TotalViolations}, Fines {snapshot.TotalFines}",
-                LastReason = NormalizeText(snapshot.CompactLastReasonText)
+                LastReason = NormalizeText(snapshot.CompactLastReasonText),
+                CurrentLane = FormatEntity(snapshot.CurrentLaneEntity),
+                PreviousLane = FormatEntity(snapshot.PreviousLaneEntity),
+                LaneChanges = snapshot.LaneChangeCount.ToString(),
+                LiveLaneState = BuildLiveLaneStateText(snapshot)
             };
         }
 
@@ -213,6 +248,10 @@ namespace Traffic_Law_Enforcement
             m_ViolationPendingBinding.Update(state.ViolationPending ?? string.Empty);
             m_TotalsBinding.Update(state.Totals ?? string.Empty);
             m_LastReasonBinding.Update(state.LastReason ?? string.Empty);
+            m_CurrentLaneBinding.Update(state.CurrentLane ?? string.Empty);
+            m_PreviousLaneBinding.Update(state.PreviousLane ?? string.Empty);
+            m_LaneChangesBinding.Update(state.LaneChanges ?? string.Empty);
+            m_LiveLaneStateBinding.Update(state.LiveLaneState ?? string.Empty);
         }
 
         private void UpdateLocalizedTextBindings()
@@ -228,6 +267,11 @@ namespace Traffic_Law_Enforcement
             m_FooterTextBinding.Update(LocalizeText(kFooterHintLocaleId, "If Developer Mode is enabled, press Tab for more details."));
             m_ExpandSectionTooltipBinding.Update(LocalizeText(kExpandSectionLocaleId, "Expand section"));
             m_CollapseSectionTooltipBinding.Update(LocalizeText(kCollapseSectionLocaleId, "Collapse section"));
+            m_LaneDetailsTitleBinding.Update(LocalizeText(kLaneDetailsTitleLocaleId, "Lane details"));
+            m_CurrentLaneLabelBinding.Update(LocalizeText(kCurrentLaneLabelLocaleId, "Current lane"));
+            m_PreviousLaneLabelBinding.Update(LocalizeText(kPreviousLaneLabelLocaleId, "Previous lane"));
+            m_LaneChangesLabelBinding.Update(LocalizeText(kLaneChangesLabelLocaleId, "Lane changes"));
+            m_LiveLaneStateLabelBinding.Update(LocalizeText(kLiveLaneStateLabelLocaleId, "Live lane state"));
         }
 
         private void UpdatePanelToggle()
@@ -306,6 +350,30 @@ namespace Traffic_Law_Enforcement
                 Compact = true,
                 Message = LocalizeText(kNoSelectionLocaleId, "No selection")
             };
+        }
+
+        private string BuildLiveLaneStateText(SelectedObjectDebugSnapshot snapshot)
+        {
+            switch (snapshot.TleApplicability)
+            {
+                case SelectedObjectTleApplicability.ApplicableReady:
+                    return LocalizeText(kLiveLaneStateReadyLocaleId, "Ready");
+
+                case SelectedObjectTleApplicability.ApplicableNoLiveLaneData:
+                    return snapshot.VehicleKind == SelectedObjectKind.ParkedRoadCar
+                        ? LocalizeText(kLiveLaneStateParkedRoadCarLocaleId, "Parked road car")
+                        : LocalizeText(kLiveLaneStateNoLiveLaneLocaleId, "No live lane");
+
+                default:
+                    return LocalizeText(kLiveLaneStateNotApplicableLocaleId, "Not applicable");
+            }
+        }
+
+        private static string FormatEntity(Entity entity)
+        {
+            return entity == Entity.Null
+                ? "None"
+                : $"Entity({entity.Index}:{entity.Version})";
         }
 
         private static string LocalizeText(string localeId, string fallback)

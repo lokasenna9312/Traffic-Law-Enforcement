@@ -152,6 +152,15 @@ namespace Traffic_Law_Enforcement
             map["SelectedObjectPanel.FooterHint"] = SelectedObjectPanelUISystem.kFooterHintLocaleId;
             map["SelectedObjectPanel.ExpandSection"] = SelectedObjectPanelUISystem.kExpandSectionLocaleId;
             map["SelectedObjectPanel.CollapseSection"] = SelectedObjectPanelUISystem.kCollapseSectionLocaleId;
+            map["SelectedObjectPanel.LaneDetailsTitle"] = SelectedObjectPanelUISystem.kLaneDetailsTitleLocaleId;
+            map["SelectedObjectPanel.CurrentLaneLabel"] = SelectedObjectPanelUISystem.kCurrentLaneLabelLocaleId;
+            map["SelectedObjectPanel.PreviousLaneLabel"] = SelectedObjectPanelUISystem.kPreviousLaneLabelLocaleId;
+            map["SelectedObjectPanel.LaneChangesLabel"] = SelectedObjectPanelUISystem.kLaneChangesLabelLocaleId;
+            map["SelectedObjectPanel.LiveLaneStateLabel"] = SelectedObjectPanelUISystem.kLiveLaneStateLabelLocaleId;
+            map["SelectedObjectPanel.LiveLaneStateReady"] = SelectedObjectPanelUISystem.kLiveLaneStateReadyLocaleId;
+            map["SelectedObjectPanel.LiveLaneStateNoLiveLane"] = SelectedObjectPanelUISystem.kLiveLaneStateNoLiveLaneLocaleId;
+            map["SelectedObjectPanel.LiveLaneStateNotApplicable"] = SelectedObjectPanelUISystem.kLiveLaneStateNotApplicableLocaleId;
+            map["SelectedObjectPanel.LiveLaneStateParkedRoadCar"] = SelectedObjectPanelUISystem.kLiveLaneStateParkedRoadCarLocaleId;
             map["SelectedObjectPanel.PublicTransportLanePolicyMeaningFormat"] =
                 SelectedObjectBridgeSystem.kPublicTransportLanePolicyMeaningFormatLocaleId;
             map["SelectedObjectPanel.PublicTransportLanePolicyVanillaAllow"] =

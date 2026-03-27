@@ -37,6 +37,15 @@ const publicTransportLanePolicyLabelTextBinding = api.bindValue(group, "publicTr
 const footerTextBinding = api.bindValue(group, "footerText", "");
 const expandSectionTooltipTextBinding = api.bindValue(group, "expandSectionTooltipText", "");
 const collapseSectionTooltipTextBinding = api.bindValue(group, "collapseSectionTooltipText", "");
+const laneDetailsTitleTextBinding = api.bindValue(group, "laneDetailsTitleText", "");
+const currentLaneLabelTextBinding = api.bindValue(group, "currentLaneLabelText", "");
+const previousLaneLabelTextBinding = api.bindValue(group, "previousLaneLabelText", "");
+const laneChangesLabelTextBinding = api.bindValue(group, "laneChangesLabelText", "");
+const liveLaneStateLabelTextBinding = api.bindValue(group, "liveLaneStateLabelText", "");
+const currentLaneBinding = api.bindValue(group, "currentLane", "");
+const previousLaneBinding = api.bindValue(group, "previousLane", "");
+const laneChangesBinding = api.bindValue(group, "laneChanges", "");
+const liveLaneStateBinding = api.bindValue(group, "liveLaneState", "");
 
 const initialPosition = { x: 0.76, y: 0.1 };
 const ultraCompactPanelWidth = "240px";
@@ -132,6 +141,18 @@ const styles = {
         fontStyle: "italic",
         lineHeight: 1.35,
     },
+    subsectionFoldout: {
+        marginTop: "14px",
+        marginBottom: "8px",
+        borderRadius: "4px",
+        background: "rgba(28, 40, 58, 0.72)",
+    },
+    subsectionBody: {
+        display: "flex",
+        flexDirection: "column",
+        gap: "0px",
+        paddingLeft: "6px",
+    },
 };
 
 function stopEvent(event) {
@@ -171,7 +192,7 @@ function FoldoutRow(props) {
     return h(
         "div",
         {
-            style: styles.foldout,
+            style: Object.assign({}, styles.foldout, props.style || null),
             onMouseDown: stopEvent,
             onClick: function (event) {
                 stopEvent(event);
@@ -208,6 +229,16 @@ function SelectedObjectPanel() {
     const footerText = api.useValue(footerTextBinding);
     const expandSectionTooltipText = api.useValue(expandSectionTooltipTextBinding);
     const collapseSectionTooltipText = api.useValue(collapseSectionTooltipTextBinding);
+    const laneDetailsTitleText = api.useValue(laneDetailsTitleTextBinding);
+    const currentLaneLabelText = api.useValue(currentLaneLabelTextBinding);
+    const previousLaneLabelText = api.useValue(previousLaneLabelTextBinding);
+    const laneChangesLabelText = api.useValue(laneChangesLabelTextBinding);
+    const liveLaneStateLabelText = api.useValue(liveLaneStateLabelTextBinding);
+    const currentLane = api.useValue(currentLaneBinding);
+    const previousLane = api.useValue(previousLaneBinding);
+    const laneChanges = api.useValue(laneChangesBinding);
+    const liveLaneState = api.useValue(liveLaneStateBinding);
+    const [laneDetailsCollapsed, setLaneDetailsCollapsed] = React.useState(true);
 
     const onClose = React.useCallback(function () {
         api.trigger(group, "close");
@@ -215,6 +246,12 @@ function SelectedObjectPanel() {
 
     const onToggleCollapsed = React.useCallback(function () {
         api.trigger(group, "toggleCollapsed");
+    }, []);
+
+    const onToggleLaneDetails = React.useCallback(function () {
+        setLaneDetailsCollapsed(function (value) {
+            return !value;
+        });
     }, []);
 
     if (!visible) {
@@ -276,6 +313,24 @@ function SelectedObjectPanel() {
                       h(Row, { label: lastReasonLabelText, value: lastReason }),
                       h(Row, { label: publicTransportLanePolicyLabelText, value: publicTransportLanePolicy })
                   ),
+                  h(FoldoutRow, {
+                      title: laneDetailsTitleText,
+                      collapsed: laneDetailsCollapsed,
+                      onToggleCollapsed: onToggleLaneDetails,
+                      expandTooltip: expandSectionTooltipText,
+                      collapseTooltip: collapseSectionTooltipText,
+                      style: styles.subsectionFoldout,
+                  }),
+                  laneDetailsCollapsed
+                      ? null
+                      : h(
+                            "div",
+                            { style: styles.subsectionBody },
+                            h(Row, { label: currentLaneLabelText, value: currentLane }),
+                            h(Row, { label: previousLaneLabelText, value: previousLane }),
+                            h(Row, { label: laneChangesLabelText, value: laneChanges }),
+                            h(Row, { label: liveLaneStateLabelText, value: liveLaneState })
+                        ),
                   h(
                       "div",
                       { style: styles.footer },
