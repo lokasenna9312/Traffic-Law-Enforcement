@@ -32,25 +32,6 @@ const compactPanelWidth = "420px";
 const fullPanelWidth = "560px";
 
 const styles = {
-    wrapper: {
-        display: "inline-block",
-        width: "auto",
-    },
-    header: {
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        width: "100%",
-        gap: "10px",
-        color: "#f7f9ff",
-        fontWeight: 700,
-        fontSize: "20px",
-    },
-    headerActions: {
-        display: "flex",
-        alignItems: "center",
-        gap: "8px",
-    },
     foldout: {
         display: "flex",
         alignItems: "center",
@@ -160,15 +141,6 @@ function Row(props) {
     );
 }
 
-function Header(props) {
-    return h(
-        "div",
-        { style: styles.header },
-        h("span", null, "Selected Object"),
-        h("div", { style: styles.headerActions })
-    );
-}
-
 function FoldoutRow(props) {
     return h(
         "div",
@@ -208,11 +180,9 @@ function SelectedObjectPanel() {
         api.trigger(group, "toggleCollapsed");
     }, []);
 
-    const header = h(Header, {
-        compact,
-        collapsed,
-        onToggleCollapsed,
-    });
+    if (!visible) {
+        return null;
+    }
 
     const foldout = compact
         ? null
@@ -257,24 +227,20 @@ function SelectedObjectPanel() {
         ui.Portal,
         null,
         h(
-            "div",
-            { style: Object.assign({}, styles.wrapper, { display: visible ? "inline-block" : "none" }) },
-            h(
-                ui.Panel,
-                {
-                    draggable: true,
-                    onClose,
-                    initialPosition,
-                    style: {
-                        width: compact ? compactPanelWidth : fullPanelWidth,
-                        maxWidth: compact ? compactPanelWidth : fullPanelWidth,
-                        overflow: "hidden",
-                    },
+            ui.Panel,
+            {
+                draggable: true,
+                header: "Selected Object",
+                onClose,
+                initialPosition,
+                style: {
+                    width: compact ? compactPanelWidth : fullPanelWidth,
+                    maxWidth: compact ? compactPanelWidth : fullPanelWidth,
+                    overflow: "hidden",
                 },
-                header,
-                foldout,
-                body
-            )
+            },
+            foldout,
+            body
         )
     );
 }
