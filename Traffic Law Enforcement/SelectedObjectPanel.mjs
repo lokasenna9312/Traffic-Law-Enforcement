@@ -29,7 +29,8 @@ const lastReasonBinding = api.bindValue(group, "lastReason", "");
 const resolvedEntityBinding = api.bindValue(group, "resolvedEntity", "");
 
 const initialPosition = { x: 0.76, y: 0.1 };
-const compactPanelWidth = "320px";
+const ultraCompactPanelWidth = "240px";
+const compactPanelWidth = "340px";
 const fullPanelWidth = "560px";
 
 const styles = {
@@ -62,6 +63,13 @@ const styles = {
         width: "100%",
         boxSizing: "border-box",
     },
+    compactClassificationRow: {
+        display: "flex",
+        alignItems: "baseline",
+        gap: "8px",
+        marginBottom: "8px",
+        flexWrap: "wrap",
+    },
     classificationRow: {
         display: "flex",
         alignItems: "baseline",
@@ -80,8 +88,8 @@ const styles = {
         fontSize: "14px",
     },
     compactMessage: {
-        fontSize: "15px",
-        lineHeight: 1.45,
+        fontSize: "14px",
+        lineHeight: 1.35,
         fontWeight: 600,
         color: "#f7f9ff",
     },
@@ -202,6 +210,13 @@ function SelectedObjectPanel() {
         return null;
     }
 
+    const isUltraCompact = compact && !classification;
+    const panelWidth = isUltraCompact
+        ? ultraCompactPanelWidth
+        : compact
+            ? compactPanelWidth
+            : fullPanelWidth;
+
     const foldout = compact
         ? null
         : h(FoldoutRow, {
@@ -213,8 +228,21 @@ function SelectedObjectPanel() {
     const body = compact
         ? h(
               "div",
-              { style: Object.assign({}, styles.compactBody, { width: compactPanelWidth }) },
-              h("div", { style: styles.compactMessage }, message)
+              { style: Object.assign({}, styles.compactBody, { width: panelWidth }) },
+              isUltraCompact
+                  ? h("div", { style: styles.compactMessage }, message)
+                  : [
+                        h(
+                            "div",
+                            { style: styles.compactClassificationRow, key: "classification" },
+                            h("div", { style: styles.classificationText }, classification),
+                            vehicleIndex
+                                ? h("div", { style: styles.classificationIndex }, "#" + vehicleIndex)
+                                : null
+                        ),
+                        h("div", { style: styles.statusLabel, key: "label" }, "TLE status"),
+                        h("div", { style: styles.statusBlock, key: "status" }, tleStatus),
+                    ]
           )
         : collapsed
             ? null
@@ -234,12 +262,11 @@ function SelectedObjectPanel() {
                   h(
                       "div",
                       { style: styles.rows },
-                      h(Row, { label: "Role", value: role }),
-                      h(Row, { label: "PT type", value: publicTransportLaneAllowance }),
-                      h(Row, { label: "Violation / pending", value: violationPending }),
+                      h(Row, { label: "Role / type", value: role }),
+                      h(Row, { label: "Active flags", value: violationPending }),
                       h(Row, { label: "Violations / fines", value: totals }),
                       h(Row, { label: "Last reason", value: lastReason }),
-                      h(Row, { label: "Resolved entity", value: resolvedEntity })
+                      h(Row, { label: "PT lane policy", value: publicTransportLaneAllowance })
                   ),
                   h(
                       "div",
@@ -259,8 +286,8 @@ function SelectedObjectPanel() {
                 onClose,
                 initialPosition,
                 style: {
-                    width: compact ? compactPanelWidth : fullPanelWidth,
-                    maxWidth: compact ? compactPanelWidth : fullPanelWidth,
+                    width: panelWidth,
+                    maxWidth: panelWidth,
                     overflow: "hidden",
                 },
             },

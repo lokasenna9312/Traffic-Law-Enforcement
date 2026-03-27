@@ -133,12 +133,23 @@ namespace Traffic_Law_Enforcement
                 };
             }
 
-            bool tleApplicable =
-                snapshot.TleApplicability != SelectedObjectTleApplicability.NotApplicable;
-            bool tleReady =
-                snapshot.TleApplicability == SelectedObjectTleApplicability.ApplicableReady;
-            (string role, string publicTransportLaneAllowance) =
-                SplitRoleAndPublicTransportLaneAllowance(snapshot.RoleOrTypeText);
+            if (snapshot.TleApplicability != SelectedObjectTleApplicability.ApplicableReady)
+            {
+                return new PanelState
+                {
+                    Visible = true,
+                    Compact = true,
+                    Classification = snapshot.SummaryClassificationText,
+                    TleStatus = BuildCompactTleStatus(snapshot),
+                    VehicleIndex = snapshot.VehicleIndex >= 0
+                        ? snapshot.VehicleIndex.ToString()
+                        : string.Empty,
+                };
+            }
+
+            bool tleApplicable = true;
+            bool tleReady = true;
+            string role = ExtractRoleText(snapshot.RoleOrTypeText);
 
             return new PanelState
             {
@@ -148,7 +159,8 @@ namespace Traffic_Law_Enforcement
                 TleStatus = BuildCompactTleStatus(snapshot),
                 RoleOrType = NormalizeText(snapshot.RoleOrTypeText),
                 Role = role,
-                PublicTransportLaneAllowance = publicTransportLaneAllowance,
+                PublicTransportLaneAllowance =
+                    NormalizeText(snapshot.PublicTransportLaneAllowanceText),
                 VehicleIndex = snapshot.VehicleIndex >= 0
                     ? snapshot.VehicleIndex.ToString()
                     : string.Empty,
@@ -268,56 +280,25 @@ namespace Traffic_Law_Enforcement
             };
         }
 
-        private static (string role, string publicTransportLaneAllowance)
-            SplitRoleAndPublicTransportLaneAllowance(string roleOrType)
+        private static string ExtractRoleText(string roleOrType)
         {
             string normalized = NormalizeText(roleOrType);
             if (string.IsNullOrEmpty(normalized))
             {
-                return (string.Empty, string.Empty);
+                return string.Empty;
             }
 
             string[] segments = normalized.Split('|');
-            string role = string.Empty;
-            List<string> publicTransportLaneAllowanceParts = null;
-
             foreach (string rawSegment in segments)
             {
                 string segment = NormalizeText(rawSegment);
-                if (string.IsNullOrEmpty(segment))
+                if (!string.IsNullOrEmpty(segment))
                 {
-                    continue;
+                    return segment;
                 }
-
-                if (string.IsNullOrEmpty(role))
-                {
-                    role = segment;
-                    continue;
-                }
-
-                const string publicTransportLaneAllowancePrefix = "PT type:";
-                if (segment.StartsWith(
-                        publicTransportLaneAllowancePrefix,
-                        System.StringComparison.OrdinalIgnoreCase))
-                {
-                    string publicTransportLaneAllowance = NormalizeText(
-                        segment.Substring(publicTransportLaneAllowancePrefix.Length));
-                    if (!string.IsNullOrEmpty(publicTransportLaneAllowance))
-                    {
-                        (publicTransportLaneAllowanceParts ??= new List<string>())
-                            .Add(publicTransportLaneAllowance);
-                    }
-
-                    continue;
-                }
-
-                (publicTransportLaneAllowanceParts ??= new List<string>()).Add(segment);
             }
 
-            return (role, publicTransportLaneAllowanceParts == null ||
-                publicTransportLaneAllowanceParts.Count == 0
-                ? string.Empty
-                : string.Join(" | ", publicTransportLaneAllowanceParts));
+            return string.Empty;
         }
     }
 }

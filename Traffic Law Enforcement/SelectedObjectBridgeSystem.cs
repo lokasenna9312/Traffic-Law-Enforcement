@@ -42,6 +42,7 @@ namespace Traffic_Law_Enforcement
 
         public readonly int VehicleIndex;
         public readonly string RoleOrTypeText;
+        public readonly string PublicTransportLaneAllowanceText;
         public readonly bool HasTrafficLawProfile;
 
         public readonly Entity CurrentLaneEntity;
@@ -83,6 +84,7 @@ namespace Traffic_Law_Enforcement
             string compactLastReasonText,
             int vehicleIndex,
             string roleOrTypeText,
+            string publicTransportLaneAllowanceText,
             bool hasTrafficLawProfile,
             Entity currentLaneEntity,
             Entity previousLaneEntity,
@@ -120,6 +122,7 @@ namespace Traffic_Law_Enforcement
             CompactLastReasonText = compactLastReasonText;
             VehicleIndex = vehicleIndex;
             RoleOrTypeText = roleOrTypeText;
+            PublicTransportLaneAllowanceText = publicTransportLaneAllowanceText;
             HasTrafficLawProfile = hasTrafficLawProfile;
             CurrentLaneEntity = currentLaneEntity;
             PreviousLaneEntity = previousLaneEntity;
@@ -285,6 +288,7 @@ namespace Traffic_Law_Enforcement
                 BuildCompactLastReasonText(tleApplicable, lastReason),
                 resolveResult.IsVehicle && hasVehicleEntity ? vehicle.Index : -1,
                 BuildRoleOrTypeText(resolveResult),
+                BuildPublicTransportLaneAllowanceText(resolveResult, hasTrafficLawProfile),
                 hasTrafficLawProfile,
                 currentLaneEntity,
                 previousLaneEntity,
@@ -569,6 +573,44 @@ namespace Traffic_Law_Enforcement
                 default:
                     return "Vehicle";
             }
+        }
+
+        private string BuildPublicTransportLaneAllowanceText(
+            SelectedObjectResolveResult resolveResult,
+            bool hasTrafficLawProfile)
+        {
+            if (!hasTrafficLawProfile ||
+                !resolveResult.IsVehicle ||
+                (resolveResult.VehicleKind != SelectedObjectKind.RoadCar &&
+                 resolveResult.VehicleKind != SelectedObjectKind.ParkedRoadCar))
+            {
+                return string.Empty;
+            }
+
+            Entity vehicle = resolveResult.ResolvedVehicleEntity;
+            if (vehicle == Entity.Null ||
+                !m_ProfileData.TryGetComponent(vehicle, out VehicleTrafficLawProfile profile))
+            {
+                return string.Empty;
+            }
+
+            PublicTransportLaneAccessBits accessBits = profile.m_PublicTransportLaneAccessBits;
+            string type = PublicTransportLanePolicy.DescribeType(accessBits);
+
+            List<string> qualifiers = null;
+            if (PublicTransportLanePolicy.ModPrefersLanes(accessBits))
+            {
+                (qualifiers ??= new List<string>()).Add("PT");
+            }
+
+            if (profile.m_EmergencyVehicle != 0)
+            {
+                (qualifiers ??= new List<string>()).Add("Emergency");
+            }
+
+            return qualifiers == null || qualifiers.Count == 0
+                ? type
+                : $"{type} [{string.Join(", ", qualifiers)}]";
         }
 
         private string BuildPermissionStateSummary(
