@@ -166,8 +166,10 @@ namespace Traffic_Law_Enforcement
             if (m_PanelView == null)
             {
                 m_PanelView = m_PanelObject.AddComponent<SelectedObjectPanelView>();
-                m_PanelView.CloseRequested += HandleCloseRequested;
             }
+
+            m_PanelView.CloseRequested -= HandleCloseRequested;
+            m_PanelView.CloseRequested += HandleCloseRequested;
 
             return m_PanelView != null;
         }
