@@ -124,7 +124,7 @@ const styles = {
         display: "flex",
         flexDirection: "column",
         gap: "8px",
-        marginBottom: "14px",
+        marginBottom: "2px",
     },
     selectionRow: {
         display: "flex",
@@ -479,21 +479,21 @@ function SelectedObjectPanel() {
                 entitySelectionSubmitText
             )
         ),
-        h(
-            "div",
-            {
-                style: Object.assign(
-                    {},
-                    styles.selectionStatus,
-                    entitySelectionStatus
-                        ? entitySelectionStatusIsError
-                            ? styles.selectionStatusError
-                            : styles.selectionStatusSuccess
-                        : null
-                ),
-            },
-            entitySelectionStatus
-        )
+        entitySelectionStatus
+            ? h(
+                  "div",
+                  {
+                      style: Object.assign(
+                          {},
+                          styles.selectionStatus,
+                          entitySelectionStatusIsError
+                              ? styles.selectionStatusError
+                              : styles.selectionStatusSuccess
+                      ),
+                  },
+                  entitySelectionStatus
+              )
+            : null
     );
 
     const body = compact
