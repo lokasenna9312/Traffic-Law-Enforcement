@@ -25,6 +25,8 @@ namespace Traffic_Law_Enforcement
         private const float kStatusBlockHeight = 46f;
         private const float kSelectionBlockGraceSeconds = 0.12f;
         private const int kSortingOrder = 240;
+        private const float kHelpTextLineHeight = 20f;
+        private const float kHelpTextTopGap = 10f;
 
         private static readonly Color kPanelColor = new Color(0.08f, 0.12f, 0.17f, 0.92f);
         private static readonly Color kTitleBarColor = new Color(0.16f, 0.20f, 0.27f, 0.98f);
@@ -89,6 +91,7 @@ namespace Traffic_Law_Enforcement
         private RectTransform m_StatusBlockRect;
         private Image m_StatusBlockBackground;
         private Text m_StatusValueText;
+        private Text m_HelpText;
         private readonly RowView[] m_Rows = new RowView[6];
 
         internal void UpdateState(State state)
@@ -305,6 +308,14 @@ namespace Traffic_Law_Enforcement
                 TextAnchor.MiddleLeft,
                 Color.white);
 
+            m_HelpText = CreateText(
+                "HelpText",
+                m_PanelRect,
+                12,
+                FontStyle.Italic,
+                TextAnchor.MiddleLeft,
+                kFooterColor);
+
             CreateRows();
         }
 
@@ -370,6 +381,7 @@ namespace Traffic_Law_Enforcement
             m_MessageText.text = m_State.Message ?? string.Empty;
             m_StatusLabelText.text = "TLE status";
             m_StatusValueText.text = m_State.TleStatus ?? string.Empty;
+            m_HelpText.text = "If Developer Mode is enabled, press Tab for more details.";
 
             string[] rowValues =
             {
@@ -458,10 +470,12 @@ namespace Traffic_Law_Enforcement
                 m_MessageText.gameObject.SetActive(true);
                 m_StatusLabelText.gameObject.SetActive(false);
                 m_StatusBlockRect.gameObject.SetActive(false);
+                m_HelpText.gameObject.SetActive(false);
                 return;
             }
 
             m_MessageText.gameObject.SetActive(false);
+            m_HelpText.gameObject.SetActive(true);
 
             bool hasStatus = !string.IsNullOrWhiteSpace(m_State.TleStatus);
             m_StatusLabelText.gameObject.SetActive(hasStatus);
@@ -508,6 +522,13 @@ namespace Traffic_Law_Enforcement
                     kBodyLineHeight);
                 y += kBodyLineHeight;
             }
+
+            SetRect(
+                m_HelpText.rectTransform,
+                kPadding,
+                y + kHelpTextTopGap,
+                contentWidth,
+                kHelpTextLineHeight);
         }
 
         private float CalculateHeight()
@@ -542,7 +563,7 @@ namespace Traffic_Law_Enforcement
                 m_State.LastReason,
                 m_State.ResolvedEntity) * kBodyLineHeight;
 
-            return height + kPadding;
+            return height + kHelpTextTopGap + kHelpTextLineHeight + kPadding;
         }
 
         private void CloseCurrentSelection()
