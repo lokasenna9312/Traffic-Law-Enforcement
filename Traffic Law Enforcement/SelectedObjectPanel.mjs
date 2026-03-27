@@ -210,7 +210,7 @@ function FoldoutRow(props) {
             title: props.collapsed ? props.expandTooltip : props.collapseTooltip,
         },
         h("span", null, props.title),
-        h("span", { style: styles.foldoutIcon }, props.collapsed ? "▶" : "▼")
+        h("span", { style: styles.foldoutIcon }, props.collapsed ? "▷" : "▽")
     );
 }
 
