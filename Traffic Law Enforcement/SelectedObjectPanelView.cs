@@ -62,8 +62,6 @@ namespace Traffic_Law_Enforcement
         }
 
         private State m_State;
-        private string m_LastSelectionToken;
-        private string m_DismissedSelectionToken;
         private bool m_Collapsed;
         private bool m_HasCustomPosition;
         private bool m_IsDragging;
@@ -94,15 +92,10 @@ namespace Traffic_Law_Enforcement
         private Text m_HelpText;
         private readonly RowView[] m_Rows = new RowView[6];
 
+        internal event Action CloseRequested;
+
         internal void UpdateState(State state)
         {
-            if (!string.Equals(m_LastSelectionToken, state.SelectionToken))
-            {
-                m_LastSelectionToken = state.SelectionToken;
-                m_DismissedSelectionToken = string.Empty;
-                m_Collapsed = false;
-            }
-
             m_State = state;
             ApplyState();
         }
@@ -367,7 +360,7 @@ namespace Traffic_Law_Enforcement
         {
             EnsureUi();
 
-            bool visible = m_State.Visible && !IsDismissed();
+            bool visible = m_State.Visible;
             m_PanelRect.gameObject.SetActive(visible);
             if (!visible)
             {
@@ -568,8 +561,7 @@ namespace Traffic_Law_Enforcement
 
         private void CloseCurrentSelection()
         {
-            m_DismissedSelectionToken = m_State.SelectionToken;
-            ApplyState();
+            CloseRequested?.Invoke();
         }
 
         private void ToggleCollapsed()
@@ -598,12 +590,6 @@ namespace Traffic_Law_Enforcement
             m_WindowPosition = new Vector2(
                 Mathf.Clamp(m_WindowPosition.x, 0f, maxX),
                 Mathf.Clamp(m_WindowPosition.y, 0f, maxY));
-        }
-
-        private bool IsDismissed()
-        {
-            return !string.IsNullOrWhiteSpace(m_State.SelectionToken) &&
-                string.Equals(m_DismissedSelectionToken, m_State.SelectionToken);
         }
 
         private void RefreshPointerOverState()
@@ -782,4 +768,3 @@ namespace Traffic_Law_Enforcement
         }
     }
 }
-

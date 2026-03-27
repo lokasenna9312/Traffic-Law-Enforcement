@@ -16,7 +16,7 @@ namespace Traffic_Law_Enforcement
         private ProxyAction m_PanelToggleAction;
         private GameObject m_PanelObject;
         private SelectedObjectPanelView m_PanelView;
-        private bool m_IsPanelEnabled = true;
+        private bool m_IsPanelEnabled;
 
         public override GameMode gameMode => GameMode.Game;
 
@@ -66,7 +66,7 @@ namespace Traffic_Law_Enforcement
 
             if (m_SelectedObjectBridgeSystem == null || !m_SelectedObjectBridgeSystem.HasSnapshot)
             {
-                m_PanelView.UpdateState(default);
+                m_PanelView.UpdateState(BuildNoSelectionState());
                 return;
             }
 
@@ -78,7 +78,7 @@ namespace Traffic_Law_Enforcement
         {
             if (snapshot.ResolveState == SelectedObjectResolveState.None)
             {
-                return default;
+                return BuildNoSelectionState();
             }
 
             if (snapshot.ResolveState == SelectedObjectResolveState.NotVehicle)
@@ -166,6 +166,7 @@ namespace Traffic_Law_Enforcement
             if (m_PanelView == null)
             {
                 m_PanelView = m_PanelObject.AddComponent<SelectedObjectPanelView>();
+                m_PanelView.CloseRequested += HandleCloseRequested;
             }
 
             return m_PanelView != null;
@@ -173,11 +174,26 @@ namespace Traffic_Law_Enforcement
 
         private void DestroyPanelView()
         {
+            if (m_PanelView != null)
+            {
+                m_PanelView.CloseRequested -= HandleCloseRequested;
+            }
+
             if (m_PanelObject != null)
             {
                 Object.Destroy(m_PanelObject);
                 m_PanelObject = null;
                 m_PanelView = null;
+            }
+        }
+
+        private void HandleCloseRequested()
+        {
+            m_IsPanelEnabled = false;
+
+            if (m_PanelView != null)
+            {
+                m_PanelView.UpdateState(default);
             }
         }
 
@@ -219,6 +235,16 @@ namespace Traffic_Law_Enforcement
         {
             return
                 $"{snapshot.ResolveState}|{snapshot.SourceSelectedEntity}|{snapshot.ResolvedVehicleEntity}";
+        }
+
+        private static SelectedObjectPanelView.State BuildNoSelectionState()
+        {
+            return new SelectedObjectPanelView.State
+            {
+                Visible = true,
+                Compact = true,
+                Message = "No object selected"
+            };
         }
     }
 }

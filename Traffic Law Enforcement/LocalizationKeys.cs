@@ -132,6 +132,11 @@ namespace Traffic_Law_Enforcement
 
             AddOption(map, setting, nameof(Setting.SendMonthlyChirperPreviewNow));
 
+            map["BindingLabel.SelectedObjectPanelToggle"] =
+                setting.GetBindingKeyLocaleID(KeybindingIds.SelectedObjectPanelToggleActionName);
+            map["BindingHint.SelectedObjectPanelToggle"] =
+                setting.GetBindingKeyHintLocaleID(KeybindingIds.SelectedObjectPanelToggleActionName);
+
             map["MonthlyChirper.SenderText"] = MonthlyEnforcementChirperSystem.kSenderTextLocaleId;
             map["MonthlyChirper.PeriodPointFormat"] = MonthlyEnforcementChirperSystem.kPeriodPointFormatLocaleId;
             map["MonthlyChirper.ReportHeaderFormat"] = MonthlyEnforcementChirperSystem.kReportHeaderFormatLocaleId;
