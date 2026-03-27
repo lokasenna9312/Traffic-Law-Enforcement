@@ -14,6 +14,8 @@ namespace Traffic_Law_Enforcement
         private SelectedObjectBridgeSystem m_SelectedObjectBridgeSystem;
         private GameObject m_PanelObject;
         private SelectedObjectPanelView m_PanelView;
+        private bool m_IsPanelEnabled = true;
+        private bool m_WasTogglePressed;
 
         public override GameMode gameMode => GameMode.Game;
 
@@ -36,6 +38,8 @@ namespace Traffic_Law_Enforcement
         {
             base.OnUpdate();
 
+            UpdatePanelToggle();
+
             if (m_SelectedObjectBridgeSystem == null)
             {
                 m_SelectedObjectBridgeSystem =
@@ -44,6 +48,12 @@ namespace Traffic_Law_Enforcement
 
             if (!EnsurePanelView())
             {
+                return;
+            }
+
+            if (!m_IsPanelEnabled)
+            {
+                m_PanelView.UpdateState(default);
                 return;
             }
 
@@ -102,6 +112,34 @@ namespace Traffic_Law_Enforcement
                     : string.Empty,
                 ResolvedEntity = FormatEntity(snapshot.ResolvedVehicleEntity)
             };
+        }
+
+        private void UpdatePanelToggle()
+        {
+            bool isTogglePressed = IsPanelTogglePressed();
+
+            if (isTogglePressed && !m_WasTogglePressed)
+            {
+                m_IsPanelEnabled = !m_IsPanelEnabled;
+            }
+
+            m_WasTogglePressed = isTogglePressed;
+        }
+
+        private static bool IsPanelTogglePressed()
+        {
+            bool ctrlPressed =
+                Input.GetKey(KeyCode.LeftControl) ||
+                Input.GetKey(KeyCode.RightControl);
+
+            bool shiftPressed =
+                Input.GetKey(KeyCode.LeftShift) ||
+                Input.GetKey(KeyCode.RightShift);
+
+            bool iPressed =
+                Input.GetKey(KeyCode.I);
+
+            return ctrlPressed && shiftPressed && iPressed;
         }
 
         private bool EnsurePanelView()
