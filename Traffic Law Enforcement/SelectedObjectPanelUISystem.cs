@@ -1,6 +1,7 @@
 using Colossal.UI.Binding;
 using Game;
 using Game.Input;
+using Game.Pathfind;
 using Game.SceneFlow;
 using Game.UI;
 using Unity.Entities;
@@ -38,10 +39,28 @@ namespace Traffic_Law_Enforcement
         internal const string kPreviousLaneLabelLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Label.PreviousLane";
         internal const string kLaneChangesLabelLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Label.LaneChanges";
         internal const string kLiveLaneStateLabelLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Label.LiveLaneState";
+        internal const string kRouteDiagnosticsTitleLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Text.RouteDiagnosticsTitle";
+        internal const string kCurrentTargetLabelLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Label.CurrentTarget";
+        internal const string kCurrentRouteLabelLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Label.CurrentRoute";
+        internal const string kNavigationLanesLabelLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Label.NavigationLanes";
+        internal const string kPlannedPenaltiesLabelLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Label.PlannedPenalties";
+        internal const string kPenaltyTagsLabelLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Label.PenaltyTags";
+        internal const string kRouteExplanationLabelLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Label.RouteExplanation";
+        internal const string kWaypointRouteLaneLabelLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Label.WaypointRouteLane";
+        internal const string kConnectedStopLabelLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Label.ConnectedStop";
         internal const string kLiveLaneStateReadyLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Text.LiveLaneStateReady";
         internal const string kLiveLaneStateNoLiveLaneLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Text.LiveLaneStateNoLiveLane";
         internal const string kLiveLaneStateNotApplicableLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Text.LiveLaneStateNotApplicable";
         internal const string kLiveLaneStateParkedRoadCarLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Text.LiveLaneStateParkedRoadCar";
+        internal const string kLiveLaneStateNoPathOwnerLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Text.LiveLaneStateNoPathOwner";
+        internal const string kLiveLaneStateNoCurrentRouteLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Text.LiveLaneStateNoCurrentRoute";
+        internal const string kLiveLaneStateNoCurrentTargetLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Text.LiveLaneStateNoCurrentTarget";
+        internal const string kLiveLaneStatePathPendingLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Text.LiveLaneStatePathPending";
+        internal const string kLiveLaneStatePathScheduledLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Text.LiveLaneStatePathScheduled";
+        internal const string kLiveLaneStatePathObsoleteLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Text.LiveLaneStatePathObsolete";
+        internal const string kLiveLaneStatePathFailedLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Text.LiveLaneStatePathFailed";
+        internal const string kLiveLaneStatePathStuckLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Text.LiveLaneStatePathStuck";
+        internal const string kLiveLaneStatePathUpdatedLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Text.LiveLaneStatePathUpdated";
         internal const string kNoneLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Text.None";
 
         private SelectedObjectBridgeSystem m_SelectedObjectBridgeSystem;
@@ -77,15 +96,35 @@ namespace Traffic_Law_Enforcement
         private ValueBinding<string> m_PreviousLaneLabelBinding;
         private ValueBinding<string> m_LaneChangesLabelBinding;
         private ValueBinding<string> m_LiveLaneStateLabelBinding;
+        private ValueBinding<string> m_RouteDiagnosticsTitleBinding;
+        private ValueBinding<string> m_CurrentTargetLabelBinding;
+        private ValueBinding<string> m_CurrentRouteLabelBinding;
+        private ValueBinding<string> m_NavigationLanesLabelBinding;
+        private ValueBinding<string> m_PlannedPenaltiesLabelBinding;
+        private ValueBinding<string> m_PenaltyTagsLabelBinding;
+        private ValueBinding<string> m_RouteExplanationLabelBinding;
+        private ValueBinding<string> m_WaypointRouteLaneLabelBinding;
+        private ValueBinding<string> m_ConnectedStopLabelBinding;
         private ValueBinding<string> m_CurrentLaneBinding;
         private ValueBinding<string> m_PreviousLaneBinding;
         private ValueBinding<string> m_LaneChangesBinding;
         private ValueBinding<string> m_LiveLaneStateBinding;
         private ValueBinding<bool> m_LaneDetailsCollapsedBinding;
+        private ValueBinding<bool> m_RouteDiagnosticsVisibleBinding;
+        private ValueBinding<bool> m_RouteDiagnosticsCollapsedBinding;
+        private ValueBinding<string> m_CurrentTargetBinding;
+        private ValueBinding<string> m_CurrentRouteBinding;
+        private ValueBinding<string> m_NavigationLanesBinding;
+        private ValueBinding<string> m_PlannedPenaltiesBinding;
+        private ValueBinding<string> m_PenaltyTagsBinding;
+        private ValueBinding<string> m_RouteExplanationBinding;
+        private ValueBinding<string> m_WaypointRouteLaneBinding;
+        private ValueBinding<string> m_ConnectedStopBinding;
 
         private bool m_IsPanelEnabled;
         private bool m_IsCollapsed;
         private bool m_IsLaneDetailsCollapsed = true;
+        private bool m_IsRouteDiagnosticsCollapsed = true;
         private int m_LastSeenPendingLoadSequence = -1;
 
         public override GameMode gameMode => GameMode.Game;
@@ -108,6 +147,15 @@ namespace Traffic_Law_Enforcement
             public string PreviousLane;
             public string LaneChanges;
             public string LiveLaneState;
+            public bool RouteDiagnosticsVisible;
+            public string CurrentTarget;
+            public string CurrentRoute;
+            public string NavigationLanes;
+            public string PlannedPenalties;
+            public string PenaltyTags;
+            public string RouteExplanation;
+            public string WaypointRouteLane;
+            public string ConnectedStop;
         }
 
         protected override void OnCreate()
@@ -147,15 +195,35 @@ namespace Traffic_Law_Enforcement
             AddBinding(m_PreviousLaneLabelBinding = new ValueBinding<string>(kGroup, "previousLaneLabelText", string.Empty));
             AddBinding(m_LaneChangesLabelBinding = new ValueBinding<string>(kGroup, "laneChangesLabelText", string.Empty));
             AddBinding(m_LiveLaneStateLabelBinding = new ValueBinding<string>(kGroup, "liveLaneStateLabelText", string.Empty));
+            AddBinding(m_RouteDiagnosticsTitleBinding = new ValueBinding<string>(kGroup, "routeDiagnosticsTitleText", string.Empty));
+            AddBinding(m_CurrentTargetLabelBinding = new ValueBinding<string>(kGroup, "currentTargetLabelText", string.Empty));
+            AddBinding(m_CurrentRouteLabelBinding = new ValueBinding<string>(kGroup, "currentRouteLabelText", string.Empty));
+            AddBinding(m_NavigationLanesLabelBinding = new ValueBinding<string>(kGroup, "navigationLanesLabelText", string.Empty));
+            AddBinding(m_PlannedPenaltiesLabelBinding = new ValueBinding<string>(kGroup, "plannedPenaltiesLabelText", string.Empty));
+            AddBinding(m_PenaltyTagsLabelBinding = new ValueBinding<string>(kGroup, "penaltyTagsLabelText", string.Empty));
+            AddBinding(m_RouteExplanationLabelBinding = new ValueBinding<string>(kGroup, "routeExplanationLabelText", string.Empty));
+            AddBinding(m_WaypointRouteLaneLabelBinding = new ValueBinding<string>(kGroup, "waypointRouteLaneLabelText", string.Empty));
+            AddBinding(m_ConnectedStopLabelBinding = new ValueBinding<string>(kGroup, "connectedStopLabelText", string.Empty));
             AddBinding(m_CurrentLaneBinding = new ValueBinding<string>(kGroup, "currentLane", string.Empty));
             AddBinding(m_PreviousLaneBinding = new ValueBinding<string>(kGroup, "previousLane", string.Empty));
             AddBinding(m_LaneChangesBinding = new ValueBinding<string>(kGroup, "laneChanges", string.Empty));
             AddBinding(m_LiveLaneStateBinding = new ValueBinding<string>(kGroup, "liveLaneState", string.Empty));
             AddBinding(m_LaneDetailsCollapsedBinding = new ValueBinding<bool>(kGroup, "laneDetailsCollapsed", true));
+            AddBinding(m_RouteDiagnosticsVisibleBinding = new ValueBinding<bool>(kGroup, "routeDiagnosticsVisible", false));
+            AddBinding(m_RouteDiagnosticsCollapsedBinding = new ValueBinding<bool>(kGroup, "routeDiagnosticsCollapsed", true));
+            AddBinding(m_CurrentTargetBinding = new ValueBinding<string>(kGroup, "currentTarget", string.Empty));
+            AddBinding(m_CurrentRouteBinding = new ValueBinding<string>(kGroup, "currentRoute", string.Empty));
+            AddBinding(m_NavigationLanesBinding = new ValueBinding<string>(kGroup, "navigationLanes", string.Empty));
+            AddBinding(m_PlannedPenaltiesBinding = new ValueBinding<string>(kGroup, "plannedPenalties", string.Empty));
+            AddBinding(m_PenaltyTagsBinding = new ValueBinding<string>(kGroup, "penaltyTags", string.Empty));
+            AddBinding(m_RouteExplanationBinding = new ValueBinding<string>(kGroup, "routeExplanation", string.Empty));
+            AddBinding(m_WaypointRouteLaneBinding = new ValueBinding<string>(kGroup, "waypointRouteLane", string.Empty));
+            AddBinding(m_ConnectedStopBinding = new ValueBinding<string>(kGroup, "connectedStop", string.Empty));
 
             AddBinding(new TriggerBinding(kGroup, "close", HandleCloseRequested));
             AddBinding(new TriggerBinding(kGroup, "toggleCollapsed", ToggleCollapsed));
             AddBinding(new TriggerBinding(kGroup, "toggleLaneDetailsCollapsed", ToggleLaneDetailsCollapsed));
+            AddBinding(new TriggerBinding(kGroup, "toggleRouteDiagnosticsCollapsed", ToggleRouteDiagnosticsCollapsed));
         }
 
         protected override void OnDestroy()
@@ -248,7 +316,16 @@ namespace Traffic_Law_Enforcement
                 CurrentLane = FormatEntity(snapshot.CurrentLaneEntity),
                 PreviousLane = FormatEntity(snapshot.PreviousLaneEntity),
                 LaneChanges = snapshot.LaneChangeCount.ToString(),
-                LiveLaneState = BuildLiveLaneStateText(snapshot)
+                LiveLaneState = BuildLiveLaneStateText(snapshot),
+                RouteDiagnosticsVisible = snapshot.HasRouteDiagnostics,
+                CurrentTarget = NormalizeText(snapshot.RouteDiagnosticsCurrentTargetText),
+                CurrentRoute = NormalizeText(snapshot.RouteDiagnosticsCurrentRouteText),
+                NavigationLanes = NormalizeText(snapshot.RouteDiagnosticsNavigationLanesText),
+                PlannedPenalties = NormalizeText(snapshot.RouteDiagnosticsPlannedPenaltiesText),
+                PenaltyTags = NormalizeText(snapshot.RouteDiagnosticsPenaltyTagsText),
+                RouteExplanation = NormalizeText(snapshot.RouteDiagnosticsExplanationText),
+                WaypointRouteLane = NormalizeText(snapshot.RouteDiagnosticsWaypointRouteLaneText),
+                ConnectedStop = NormalizeText(snapshot.RouteDiagnosticsConnectedStopText)
             };
         }
 
@@ -272,6 +349,16 @@ namespace Traffic_Law_Enforcement
             m_LaneChangesBinding.Update(state.LaneChanges ?? string.Empty);
             m_LiveLaneStateBinding.Update(state.LiveLaneState ?? string.Empty);
             m_LaneDetailsCollapsedBinding.Update(m_IsLaneDetailsCollapsed);
+            m_RouteDiagnosticsVisibleBinding.Update(state.RouteDiagnosticsVisible);
+            m_RouteDiagnosticsCollapsedBinding.Update(m_IsRouteDiagnosticsCollapsed);
+            m_CurrentTargetBinding.Update(state.CurrentTarget ?? string.Empty);
+            m_CurrentRouteBinding.Update(state.CurrentRoute ?? string.Empty);
+            m_NavigationLanesBinding.Update(state.NavigationLanes ?? string.Empty);
+            m_PlannedPenaltiesBinding.Update(state.PlannedPenalties ?? string.Empty);
+            m_PenaltyTagsBinding.Update(state.PenaltyTags ?? string.Empty);
+            m_RouteExplanationBinding.Update(state.RouteExplanation ?? string.Empty);
+            m_WaypointRouteLaneBinding.Update(state.WaypointRouteLane ?? string.Empty);
+            m_ConnectedStopBinding.Update(state.ConnectedStop ?? string.Empty);
         }
 
         private void UpdateLocalizedTextBindings()
@@ -292,7 +379,16 @@ namespace Traffic_Law_Enforcement
             m_CurrentLaneLabelBinding.Update(LocalizeText(kCurrentLaneLabelLocaleId, "Current lane entity"));
             m_PreviousLaneLabelBinding.Update(LocalizeText(kPreviousLaneLabelLocaleId, "Previous lane entity"));
             m_LaneChangesLabelBinding.Update(LocalizeText(kLaneChangesLabelLocaleId, "Lane changes"));
-            m_LiveLaneStateLabelBinding.Update(LocalizeText(kLiveLaneStateLabelLocaleId, "Live lane state"));
+            m_LiveLaneStateLabelBinding.Update(LocalizeText(kLiveLaneStateLabelLocaleId, "Live routing state"));
+            m_RouteDiagnosticsTitleBinding.Update(LocalizeText(kRouteDiagnosticsTitleLocaleId, "Route diagnostics"));
+            m_CurrentTargetLabelBinding.Update(LocalizeText(kCurrentTargetLabelLocaleId, "Current target"));
+            m_CurrentRouteLabelBinding.Update(LocalizeText(kCurrentRouteLabelLocaleId, "Current route"));
+            m_NavigationLanesLabelBinding.Update(LocalizeText(kNavigationLanesLabelLocaleId, "Navigation lanes"));
+            m_PlannedPenaltiesLabelBinding.Update(LocalizeText(kPlannedPenaltiesLabelLocaleId, "Planned penalties"));
+            m_PenaltyTagsLabelBinding.Update(LocalizeText(kPenaltyTagsLabelLocaleId, "Penalty tags"));
+            m_RouteExplanationLabelBinding.Update(LocalizeText(kRouteExplanationLabelLocaleId, "Current explanation"));
+            m_WaypointRouteLaneLabelBinding.Update(LocalizeText(kWaypointRouteLaneLabelLocaleId, "Waypoint route lane"));
+            m_ConnectedStopLabelBinding.Update(LocalizeText(kConnectedStopLabelLocaleId, "Connected stop"));
         }
 
         private void UpdatePanelToggle()
@@ -342,6 +438,12 @@ namespace Traffic_Law_Enforcement
             m_LaneDetailsCollapsedBinding.Update(m_IsLaneDetailsCollapsed);
         }
 
+        private void ToggleRouteDiagnosticsCollapsed()
+        {
+            m_IsRouteDiagnosticsCollapsed = !m_IsRouteDiagnosticsCollapsed;
+            m_RouteDiagnosticsCollapsedBinding.Update(m_IsRouteDiagnosticsCollapsed);
+        }
+
         private static string NormalizeText(string text)
         {
             return string.IsNullOrWhiteSpace(text)
@@ -362,6 +464,8 @@ namespace Traffic_Law_Enforcement
             {
                 m_IsLaneDetailsCollapsed = true;
                 m_LaneDetailsCollapsedBinding.Update(true);
+                m_IsRouteDiagnosticsCollapsed = true;
+                m_RouteDiagnosticsCollapsedBinding.Update(true);
             }
 
             m_LastSeenPendingLoadSequence = pendingLoadSequence;
@@ -402,6 +506,69 @@ namespace Traffic_Law_Enforcement
             switch (snapshot.TleApplicability)
             {
                 case SelectedObjectTleApplicability.ApplicableReady:
+                    if (!snapshot.HasPathOwner)
+                    {
+                        return LocalizeText(
+                            kLiveLaneStateNoPathOwnerLocaleId,
+                            "Ready, no path owner");
+                    }
+
+                    if ((snapshot.CurrentPathFlags & PathFlags.Failed) != 0)
+                    {
+                        return LocalizeText(
+                            kLiveLaneStatePathFailedLocaleId,
+                            "Ready, path failed");
+                    }
+
+                    if ((snapshot.CurrentPathFlags & PathFlags.Stuck) != 0)
+                    {
+                        return LocalizeText(
+                            kLiveLaneStatePathStuckLocaleId,
+                            "Ready, path stuck");
+                    }
+
+                    if ((snapshot.CurrentPathFlags & PathFlags.Pending) != 0)
+                    {
+                        return LocalizeText(
+                            kLiveLaneStatePathPendingLocaleId,
+                            "Ready, path pending");
+                    }
+
+                    if ((snapshot.CurrentPathFlags & PathFlags.Scheduled) != 0)
+                    {
+                        return LocalizeText(
+                            kLiveLaneStatePathScheduledLocaleId,
+                            "Ready, path scheduled");
+                    }
+
+                    if (!snapshot.HasCurrentRoute)
+                    {
+                        return LocalizeText(
+                            kLiveLaneStateNoCurrentRouteLocaleId,
+                            "Ready, no current route");
+                    }
+
+                    if (!snapshot.HasCurrentTarget)
+                    {
+                        return LocalizeText(
+                            kLiveLaneStateNoCurrentTargetLocaleId,
+                            "Ready, no current target");
+                    }
+
+                    if ((snapshot.CurrentPathFlags & PathFlags.Obsolete) != 0)
+                    {
+                        return LocalizeText(
+                            kLiveLaneStatePathObsoleteLocaleId,
+                            "Ready, path obsolete");
+                    }
+
+                    if ((snapshot.CurrentPathFlags & PathFlags.Updated) != 0)
+                    {
+                        return LocalizeText(
+                            kLiveLaneStatePathUpdatedLocaleId,
+                            "Ready, path updated");
+                    }
+
                     return LocalizeText(kLiveLaneStateReadyLocaleId, "Ready");
 
                 case SelectedObjectTleApplicability.ApplicableNoLiveLaneData:

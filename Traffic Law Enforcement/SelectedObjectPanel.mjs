@@ -44,11 +44,30 @@ const currentLaneLabelTextBinding = api.bindValue(group, "currentLaneLabelText",
 const previousLaneLabelTextBinding = api.bindValue(group, "previousLaneLabelText", "");
 const laneChangesLabelTextBinding = api.bindValue(group, "laneChangesLabelText", "");
 const liveLaneStateLabelTextBinding = api.bindValue(group, "liveLaneStateLabelText", "");
+const routeDiagnosticsTitleTextBinding = api.bindValue(group, "routeDiagnosticsTitleText", "");
+const currentTargetLabelTextBinding = api.bindValue(group, "currentTargetLabelText", "");
+const currentRouteLabelTextBinding = api.bindValue(group, "currentRouteLabelText", "");
+const navigationLanesLabelTextBinding = api.bindValue(group, "navigationLanesLabelText", "");
+const plannedPenaltiesLabelTextBinding = api.bindValue(group, "plannedPenaltiesLabelText", "");
+const penaltyTagsLabelTextBinding = api.bindValue(group, "penaltyTagsLabelText", "");
+const routeExplanationLabelTextBinding = api.bindValue(group, "routeExplanationLabelText", "");
+const waypointRouteLaneLabelTextBinding = api.bindValue(group, "waypointRouteLaneLabelText", "");
+const connectedStopLabelTextBinding = api.bindValue(group, "connectedStopLabelText", "");
 const currentLaneBinding = api.bindValue(group, "currentLane", "");
 const previousLaneBinding = api.bindValue(group, "previousLane", "");
 const laneChangesBinding = api.bindValue(group, "laneChanges", "");
 const liveLaneStateBinding = api.bindValue(group, "liveLaneState", "");
 const laneDetailsCollapsedBinding = api.bindValue(group, "laneDetailsCollapsed", true);
+const routeDiagnosticsVisibleBinding = api.bindValue(group, "routeDiagnosticsVisible", false);
+const routeDiagnosticsCollapsedBinding = api.bindValue(group, "routeDiagnosticsCollapsed", true);
+const currentTargetBinding = api.bindValue(group, "currentTarget", "");
+const currentRouteBinding = api.bindValue(group, "currentRoute", "");
+const navigationLanesBinding = api.bindValue(group, "navigationLanes", "");
+const plannedPenaltiesBinding = api.bindValue(group, "plannedPenalties", "");
+const penaltyTagsBinding = api.bindValue(group, "penaltyTags", "");
+const routeExplanationBinding = api.bindValue(group, "routeExplanation", "");
+const waypointRouteLaneBinding = api.bindValue(group, "waypointRouteLane", "");
+const connectedStopBinding = api.bindValue(group, "connectedStop", "");
 
 const initialPosition = { x: 0.76, y: 0.1 };
 const ultraCompactPanelWidth = "240px";
@@ -246,11 +265,30 @@ function SelectedObjectPanel() {
     const previousLaneLabelText = api.useValue(previousLaneLabelTextBinding);
     const laneChangesLabelText = api.useValue(laneChangesLabelTextBinding);
     const liveLaneStateLabelText = api.useValue(liveLaneStateLabelTextBinding);
+    const routeDiagnosticsTitleText = api.useValue(routeDiagnosticsTitleTextBinding);
+    const currentTargetLabelText = api.useValue(currentTargetLabelTextBinding);
+    const currentRouteLabelText = api.useValue(currentRouteLabelTextBinding);
+    const navigationLanesLabelText = api.useValue(navigationLanesLabelTextBinding);
+    const plannedPenaltiesLabelText = api.useValue(plannedPenaltiesLabelTextBinding);
+    const penaltyTagsLabelText = api.useValue(penaltyTagsLabelTextBinding);
+    const routeExplanationLabelText = api.useValue(routeExplanationLabelTextBinding);
+    const waypointRouteLaneLabelText = api.useValue(waypointRouteLaneLabelTextBinding);
+    const connectedStopLabelText = api.useValue(connectedStopLabelTextBinding);
     const currentLane = api.useValue(currentLaneBinding);
     const previousLane = api.useValue(previousLaneBinding);
     const laneChanges = api.useValue(laneChangesBinding);
     const liveLaneState = api.useValue(liveLaneStateBinding);
     const laneDetailsCollapsed = api.useValue(laneDetailsCollapsedBinding);
+    const routeDiagnosticsVisible = api.useValue(routeDiagnosticsVisibleBinding);
+    const routeDiagnosticsCollapsed = api.useValue(routeDiagnosticsCollapsedBinding);
+    const currentTarget = api.useValue(currentTargetBinding);
+    const currentRoute = api.useValue(currentRouteBinding);
+    const navigationLanes = api.useValue(navigationLanesBinding);
+    const plannedPenalties = api.useValue(plannedPenaltiesBinding);
+    const penaltyTags = api.useValue(penaltyTagsBinding);
+    const routeExplanation = api.useValue(routeExplanationBinding);
+    const waypointRouteLane = api.useValue(waypointRouteLaneBinding);
+    const connectedStop = api.useValue(connectedStopBinding);
 
     const onClose = React.useCallback(function () {
         api.trigger(group, "close");
@@ -262,6 +300,10 @@ function SelectedObjectPanel() {
 
     const onToggleLaneDetails = React.useCallback(function () {
         api.trigger(group, "toggleLaneDetailsCollapsed");
+    }, []);
+
+    const onToggleRouteDiagnostics = React.useCallback(function () {
+        api.trigger(group, "toggleRouteDiagnosticsCollapsed");
     }, []);
 
     if (!visible) {
@@ -332,11 +374,11 @@ function SelectedObjectPanel() {
                       collapseTooltip: collapseSectionTooltipText,
                       style: styles.subsectionFoldout,
                   }),
-                  laneDetailsCollapsed
-                      ? null
-                      : h(
-                            "div",
-                            { style: styles.subsectionBody },
+                   laneDetailsCollapsed
+                       ? null
+                       : h(
+                             "div",
+                             { style: styles.subsectionBody },
                             h(Row, { label: currentLaneLabelText, value: currentLane }),
                             h(Row, { label: previousLaneLabelText, value: previousLane }),
                             h(Row, { label: laneChangesLabelText, value: laneChanges }),
@@ -344,11 +386,35 @@ function SelectedObjectPanel() {
                             h(
                                 "div",
                                 { style: styles.footer },
-                                footerText
-                            )
+                                 footerText
+                             )
                         ),
-                  null
-              );
+                   routeDiagnosticsVisible
+                       ? h(FoldoutRow, {
+                             title: routeDiagnosticsTitleText,
+                             collapsed: routeDiagnosticsCollapsed,
+                             onToggleCollapsed: onToggleRouteDiagnostics,
+                             expandTooltip: expandSectionTooltipText,
+                             collapseTooltip: collapseSectionTooltipText,
+                             style: styles.subsectionFoldout,
+                         })
+                       : null,
+                   routeDiagnosticsVisible && !routeDiagnosticsCollapsed
+                       ? h(
+                             "div",
+                             { style: styles.subsectionBody },
+                             h(Row, { label: currentTargetLabelText, value: currentTarget }),
+                             h(Row, { label: currentRouteLabelText, value: currentRoute }),
+                             h(Row, { label: navigationLanesLabelText, value: navigationLanes }),
+                             h(Row, { label: plannedPenaltiesLabelText, value: plannedPenalties }),
+                             h(Row, { label: penaltyTagsLabelText, value: penaltyTags }),
+                             h(Row, { label: routeExplanationLabelText, value: routeExplanation }),
+                             h(Row, { label: waypointRouteLaneLabelText, value: waypointRouteLane }),
+                             h(Row, { label: connectedStopLabelText, value: connectedStop })
+                         )
+                       : null,
+                   null
+               );
 
     return h(
         ui.Portal,

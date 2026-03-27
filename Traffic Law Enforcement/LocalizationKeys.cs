@@ -164,10 +164,28 @@ namespace Traffic_Law_Enforcement
             map["SelectedObjectPanel.PreviousLaneLabel"] = SelectedObjectPanelUISystem.kPreviousLaneLabelLocaleId;
             map["SelectedObjectPanel.LaneChangesLabel"] = SelectedObjectPanelUISystem.kLaneChangesLabelLocaleId;
             map["SelectedObjectPanel.LiveLaneStateLabel"] = SelectedObjectPanelUISystem.kLiveLaneStateLabelLocaleId;
+            map["SelectedObjectPanel.RouteDiagnosticsTitle"] = SelectedObjectPanelUISystem.kRouteDiagnosticsTitleLocaleId;
+            map["SelectedObjectPanel.CurrentTargetLabel"] = SelectedObjectPanelUISystem.kCurrentTargetLabelLocaleId;
+            map["SelectedObjectPanel.CurrentRouteLabel"] = SelectedObjectPanelUISystem.kCurrentRouteLabelLocaleId;
+            map["SelectedObjectPanel.NavigationLanesLabel"] = SelectedObjectPanelUISystem.kNavigationLanesLabelLocaleId;
+            map["SelectedObjectPanel.PlannedPenaltiesLabel"] = SelectedObjectPanelUISystem.kPlannedPenaltiesLabelLocaleId;
+            map["SelectedObjectPanel.PenaltyTagsLabel"] = SelectedObjectPanelUISystem.kPenaltyTagsLabelLocaleId;
+            map["SelectedObjectPanel.RouteExplanationLabel"] = SelectedObjectPanelUISystem.kRouteExplanationLabelLocaleId;
+            map["SelectedObjectPanel.WaypointRouteLaneLabel"] = SelectedObjectPanelUISystem.kWaypointRouteLaneLabelLocaleId;
+            map["SelectedObjectPanel.ConnectedStopLabel"] = SelectedObjectPanelUISystem.kConnectedStopLabelLocaleId;
             map["SelectedObjectPanel.LiveLaneStateReady"] = SelectedObjectPanelUISystem.kLiveLaneStateReadyLocaleId;
             map["SelectedObjectPanel.LiveLaneStateNoLiveLane"] = SelectedObjectPanelUISystem.kLiveLaneStateNoLiveLaneLocaleId;
             map["SelectedObjectPanel.LiveLaneStateNotApplicable"] = SelectedObjectPanelUISystem.kLiveLaneStateNotApplicableLocaleId;
             map["SelectedObjectPanel.LiveLaneStateParkedRoadCar"] = SelectedObjectPanelUISystem.kLiveLaneStateParkedRoadCarLocaleId;
+            map["SelectedObjectPanel.LiveLaneStateNoPathOwner"] = SelectedObjectPanelUISystem.kLiveLaneStateNoPathOwnerLocaleId;
+            map["SelectedObjectPanel.LiveLaneStateNoCurrentRoute"] = SelectedObjectPanelUISystem.kLiveLaneStateNoCurrentRouteLocaleId;
+            map["SelectedObjectPanel.LiveLaneStateNoCurrentTarget"] = SelectedObjectPanelUISystem.kLiveLaneStateNoCurrentTargetLocaleId;
+            map["SelectedObjectPanel.LiveLaneStatePathPending"] = SelectedObjectPanelUISystem.kLiveLaneStatePathPendingLocaleId;
+            map["SelectedObjectPanel.LiveLaneStatePathScheduled"] = SelectedObjectPanelUISystem.kLiveLaneStatePathScheduledLocaleId;
+            map["SelectedObjectPanel.LiveLaneStatePathObsolete"] = SelectedObjectPanelUISystem.kLiveLaneStatePathObsoleteLocaleId;
+            map["SelectedObjectPanel.LiveLaneStatePathFailed"] = SelectedObjectPanelUISystem.kLiveLaneStatePathFailedLocaleId;
+            map["SelectedObjectPanel.LiveLaneStatePathStuck"] = SelectedObjectPanelUISystem.kLiveLaneStatePathStuckLocaleId;
+            map["SelectedObjectPanel.LiveLaneStatePathUpdated"] = SelectedObjectPanelUISystem.kLiveLaneStatePathUpdatedLocaleId;
             map["SelectedObjectPanel.None"] = SelectedObjectPanelUISystem.kNoneLocaleId;
             map["SelectedObjectPanel.Classification.RoadCar"] = SelectedObjectBridgeSystem.kClassificationRoadCarLocaleId;
             map["SelectedObjectPanel.Classification.ParkedRoadCar"] = SelectedObjectBridgeSystem.kClassificationParkedRoadCarLocaleId;
@@ -231,6 +249,20 @@ namespace Traffic_Law_Enforcement
                 SelectedObjectBridgeSystem.kPublicTransportLanePolicyTleAllowLocaleId;
             map["SelectedObjectPanel.PublicTransportLanePolicyTleDeny"] =
                 SelectedObjectBridgeSystem.kPublicTransportLanePolicyTleDenyLocaleId;
+            map["SelectedObjectPanel.RouteExplanation.NoCurrentRoute"] =
+                SelectedObjectBridgeSystem.kRouteExplanationNoCurrentRouteLocaleId;
+            map["SelectedObjectPanel.RouteExplanation.NoCurrentTarget"] =
+                SelectedObjectBridgeSystem.kRouteExplanationNoCurrentTargetLocaleId;
+            map["SelectedObjectPanel.RouteExplanation.WaypointAlignment"] =
+                SelectedObjectBridgeSystem.kRouteExplanationWaypointAlignmentLocaleId;
+            map["SelectedObjectPanel.RouteExplanation.PenaltyPrimaryFormat"] =
+                SelectedObjectBridgeSystem.kRouteExplanationPenaltyPrimaryFormatLocaleId;
+            map["SelectedObjectPanel.RouteExplanation.PenaltyModifierFormat"] =
+                SelectedObjectBridgeSystem.kRouteExplanationPenaltyModifierFormatLocaleId;
+            map["SelectedObjectPanel.RouteExplanation.PtPermissive"] =
+                SelectedObjectBridgeSystem.kRouteExplanationPtPermissiveLocaleId;
+            map["SelectedObjectPanel.RouteExplanation.GenericFallback"] =
+                SelectedObjectBridgeSystem.kRouteExplanationGenericFallbackLocaleId;
 
             map["MonthlyChirper.SenderText"] = MonthlyEnforcementChirperSystem.kSenderTextLocaleId;
             map["MonthlyChirper.PeriodPointFormat"] = MonthlyEnforcementChirperSystem.kPeriodPointFormatLocaleId;

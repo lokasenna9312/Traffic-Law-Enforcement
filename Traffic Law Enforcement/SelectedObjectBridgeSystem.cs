@@ -1,5 +1,9 @@
 using System.Collections.Generic;
 using Game;
+using Game.Common;
+using Game.Net;
+using Game.Pathfind;
+using Game.Routes;
 using Game.SceneFlow;
 using Game.Vehicles;
 using Unity.Entities;
@@ -58,6 +62,19 @@ namespace Traffic_Law_Enforcement
         public readonly int TotalFines;
         public readonly int TotalViolations;
         public readonly string LastReason;
+        public readonly bool HasPathOwner;
+        public readonly bool HasCurrentTarget;
+        public readonly bool HasCurrentRoute;
+        public readonly PathFlags CurrentPathFlags;
+        public readonly bool HasRouteDiagnostics;
+        public readonly string RouteDiagnosticsCurrentTargetText;
+        public readonly string RouteDiagnosticsCurrentRouteText;
+        public readonly string RouteDiagnosticsNavigationLanesText;
+        public readonly string RouteDiagnosticsPlannedPenaltiesText;
+        public readonly string RouteDiagnosticsPenaltyTagsText;
+        public readonly string RouteDiagnosticsExplanationText;
+        public readonly string RouteDiagnosticsWaypointRouteLaneText;
+        public readonly string RouteDiagnosticsConnectedStopText;
 
         public SelectedObjectDebugSnapshot(
             SelectedObjectResolveState resolveState,
@@ -97,7 +114,20 @@ namespace Traffic_Law_Enforcement
             string permissionStateSummary,
             int totalFines,
             int totalViolations,
-            string lastReason)
+            string lastReason,
+            bool hasPathOwner,
+            bool hasCurrentTarget,
+            bool hasCurrentRoute,
+            PathFlags currentPathFlags,
+            bool hasRouteDiagnostics,
+            string routeDiagnosticsCurrentTargetText,
+            string routeDiagnosticsCurrentRouteText,
+            string routeDiagnosticsNavigationLanesText,
+            string routeDiagnosticsPlannedPenaltiesText,
+            string routeDiagnosticsPenaltyTagsText,
+            string routeDiagnosticsExplanationText,
+            string routeDiagnosticsWaypointRouteLaneText,
+            string routeDiagnosticsConnectedStopText)
         {
             ResolveState = resolveState;
             VehicleKind = vehicleKind;
@@ -137,6 +167,19 @@ namespace Traffic_Law_Enforcement
             TotalFines = totalFines;
             TotalViolations = totalViolations;
             LastReason = lastReason;
+            HasPathOwner = hasPathOwner;
+            HasCurrentTarget = hasCurrentTarget;
+            HasCurrentRoute = hasCurrentRoute;
+            CurrentPathFlags = currentPathFlags;
+            HasRouteDiagnostics = hasRouteDiagnostics;
+            RouteDiagnosticsCurrentTargetText = routeDiagnosticsCurrentTargetText;
+            RouteDiagnosticsCurrentRouteText = routeDiagnosticsCurrentRouteText;
+            RouteDiagnosticsNavigationLanesText = routeDiagnosticsNavigationLanesText;
+            RouteDiagnosticsPlannedPenaltiesText = routeDiagnosticsPlannedPenaltiesText;
+            RouteDiagnosticsPenaltyTagsText = routeDiagnosticsPenaltyTagsText;
+            RouteDiagnosticsExplanationText = routeDiagnosticsExplanationText;
+            RouteDiagnosticsWaypointRouteLaneText = routeDiagnosticsWaypointRouteLaneText;
+            RouteDiagnosticsConnectedStopText = routeDiagnosticsConnectedStopText;
         }
     }
 
@@ -252,16 +295,43 @@ namespace Traffic_Law_Enforcement
             "TrafficLawEnforcement.SelectedObjectPanel.Text.PublicTransportLanePolicyTleAllow";
         internal const string kPublicTransportLanePolicyTleDenyLocaleId =
             "TrafficLawEnforcement.SelectedObjectPanel.Text.PublicTransportLanePolicyTleDeny";
+        internal const string kRouteExplanationNoCurrentRouteLocaleId =
+            "TrafficLawEnforcement.SelectedObjectPanel.Text.RouteExplanation.NoCurrentRoute";
+        internal const string kRouteExplanationNoCurrentTargetLocaleId =
+            "TrafficLawEnforcement.SelectedObjectPanel.Text.RouteExplanation.NoCurrentTarget";
+        internal const string kRouteExplanationWaypointAlignmentLocaleId =
+            "TrafficLawEnforcement.SelectedObjectPanel.Text.RouteExplanation.WaypointAlignment";
+        internal const string kRouteExplanationPenaltyPrimaryFormatLocaleId =
+            "TrafficLawEnforcement.SelectedObjectPanel.Text.RouteExplanation.PenaltyPrimaryFormat";
+        internal const string kRouteExplanationPenaltyModifierFormatLocaleId =
+            "TrafficLawEnforcement.SelectedObjectPanel.Text.RouteExplanation.PenaltyModifierFormat";
+        internal const string kRouteExplanationPtPermissiveLocaleId =
+            "TrafficLawEnforcement.SelectedObjectPanel.Text.RouteExplanation.PtPermissive";
+        internal const string kRouteExplanationGenericFallbackLocaleId =
+            "TrafficLawEnforcement.SelectedObjectPanel.Text.RouteExplanation.GenericFallback";
 
         private SelectedObjectResolver m_SelectedObjectResolver;
         private PublicTransportLaneVehicleTypeLookups m_TypeLookups;
 
+        private ComponentLookup<Target> m_TargetData;
+        private ComponentLookup<CurrentRoute> m_CurrentRouteData;
+        private ComponentLookup<PathOwner> m_PathOwnerData;
+        private ComponentLookup<RouteLane> m_RouteLaneData;
+        private ComponentLookup<Waypoint> m_WaypointData;
+        private ComponentLookup<Connected> m_ConnectedData;
+        private BufferLookup<CarNavigationLane> m_NavigationLaneData;
         private ComponentLookup<CarCurrentLane> m_CurrentLaneData;
         private ComponentLookup<VehicleLaneHistory> m_HistoryData;
         private ComponentLookup<VehicleTrafficLawProfile> m_ProfileData;
         private ComponentLookup<PublicTransportLaneViolation> m_PublicTransportLaneViolationData;
         private ComponentLookup<PublicTransportLanePendingExit> m_PendingExitData;
         private ComponentLookup<PublicTransportLanePermissionState> m_PermissionStateData;
+        private ComponentLookup<Owner> m_OwnerData;
+        private ComponentLookup<CarLane> m_CarLaneData;
+        private ComponentLookup<EdgeLane> m_EdgeLaneData;
+        private ComponentLookup<ParkingLane> m_ParkingLaneData;
+        private ComponentLookup<GarageLane> m_GarageLaneData;
+        private ComponentLookup<ConnectionLane> m_ConnectionLaneData;
 
         private SelectedObjectDebugSnapshot m_CurrentSnapshot;
         private bool m_HasSnapshot;
@@ -275,6 +345,13 @@ namespace Traffic_Law_Enforcement
 
             m_SelectedObjectResolver = new SelectedObjectResolver(this);
             m_TypeLookups = PublicTransportLaneVehicleTypeLookups.Create(this);
+            m_TargetData = GetComponentLookup<Target>(true);
+            m_CurrentRouteData = GetComponentLookup<CurrentRoute>(true);
+            m_PathOwnerData = GetComponentLookup<PathOwner>(true);
+            m_RouteLaneData = GetComponentLookup<RouteLane>(true);
+            m_WaypointData = GetComponentLookup<Waypoint>(true);
+            m_ConnectedData = GetComponentLookup<Connected>(true);
+            m_NavigationLaneData = GetBufferLookup<CarNavigationLane>(true);
             m_CurrentLaneData = GetComponentLookup<CarCurrentLane>(true);
             m_HistoryData = GetComponentLookup<VehicleLaneHistory>(true);
             m_ProfileData = GetComponentLookup<VehicleTrafficLawProfile>(true);
@@ -283,18 +360,37 @@ namespace Traffic_Law_Enforcement
             m_PendingExitData = GetComponentLookup<PublicTransportLanePendingExit>(true);
             m_PermissionStateData =
                 GetComponentLookup<PublicTransportLanePermissionState>(true);
+            m_OwnerData = GetComponentLookup<Owner>(true);
+            m_CarLaneData = GetComponentLookup<CarLane>(true);
+            m_EdgeLaneData = GetComponentLookup<EdgeLane>(true);
+            m_ParkingLaneData = GetComponentLookup<ParkingLane>(true);
+            m_GarageLaneData = GetComponentLookup<GarageLane>(true);
+            m_ConnectionLaneData = GetComponentLookup<ConnectionLane>(true);
         }
 
         protected override void OnUpdate()
         {
             m_SelectedObjectResolver.Update(this);
             m_TypeLookups.Update(this);
+            m_TargetData.Update(this);
+            m_CurrentRouteData.Update(this);
+            m_PathOwnerData.Update(this);
+            m_RouteLaneData.Update(this);
+            m_WaypointData.Update(this);
+            m_ConnectedData.Update(this);
+            m_NavigationLaneData.Update(this);
             m_CurrentLaneData.Update(this);
             m_HistoryData.Update(this);
             m_ProfileData.Update(this);
             m_PublicTransportLaneViolationData.Update(this);
             m_PendingExitData.Update(this);
             m_PermissionStateData.Update(this);
+            m_OwnerData.Update(this);
+            m_CarLaneData.Update(this);
+            m_EdgeLaneData.Update(this);
+            m_ParkingLaneData.Update(this);
+            m_GarageLaneData.Update(this);
+            m_ConnectionLaneData.Update(this);
 
             SelectedObjectResolveResult resolveResult =
                 m_SelectedObjectResolver.ResolveCurrentSelection();
@@ -372,6 +468,13 @@ namespace Traffic_Law_Enforcement
                 }
             }
 
+            RouteDiagnosticsData routeDiagnostics =
+                BuildRouteDiagnosticsData(
+                    resolveResult,
+                    tleReady,
+                    vehicle,
+                    currentLaneEntity);
+
             return new SelectedObjectDebugSnapshot(
                 resolveResult.ResolveState,
                 resolveResult.VehicleKind,
@@ -410,7 +513,308 @@ namespace Traffic_Law_Enforcement
                 permissionStateSummary,
                 totalFines,
                 totalViolations,
-                lastReason);
+                lastReason,
+                routeDiagnostics.HasPathOwner,
+                routeDiagnostics.HasCurrentTarget,
+                routeDiagnostics.HasCurrentRoute,
+                routeDiagnostics.CurrentPathFlags,
+                routeDiagnostics.HasDiagnostics,
+                routeDiagnostics.CurrentTargetText,
+                routeDiagnostics.CurrentRouteText,
+                routeDiagnostics.NavigationLanesText,
+                routeDiagnostics.PlannedPenaltiesText,
+                routeDiagnostics.PenaltyTagsText,
+                routeDiagnostics.ExplanationText,
+                routeDiagnostics.WaypointRouteLaneText,
+                routeDiagnostics.ConnectedStopText);
+        }
+
+        private RoutePenaltyInspectionContext CreateRouteInspectionContext()
+        {
+            return new RoutePenaltyInspectionContext
+            {
+                EntityManager = EntityManager,
+                OwnerData = m_OwnerData,
+                CarLaneData = m_CarLaneData,
+                EdgeLaneData = m_EdgeLaneData,
+                ParkingLaneData = m_ParkingLaneData,
+                GarageLaneData = m_GarageLaneData,
+                ConnectionLaneData = m_ConnectionLaneData,
+                ProfileData = m_ProfileData,
+                TypeLookups = m_TypeLookups,
+            };
+        }
+
+        private RouteDiagnosticsData BuildRouteDiagnosticsData(
+            SelectedObjectResolveResult resolveResult,
+            bool tleReady,
+            Entity vehicle,
+            Entity currentLaneEntity)
+        {
+            if (!tleReady ||
+                resolveResult.VehicleKind != SelectedObjectKind.RoadCar ||
+                vehicle == Entity.Null)
+            {
+                return default;
+            }
+
+            bool hasCurrentTarget =
+                m_TargetData.TryGetComponent(vehicle, out Target targetData) &&
+                targetData.m_Target != Entity.Null;
+            Entity targetEntity =
+                hasCurrentTarget
+                    ? targetData.m_Target
+                    : Entity.Null;
+
+            bool hasCurrentRoute =
+                m_CurrentRouteData.TryGetComponent(vehicle, out CurrentRoute currentRouteData) &&
+                currentRouteData.m_Route != Entity.Null;
+            Entity currentRouteEntity =
+                hasCurrentRoute
+                    ? currentRouteData.m_Route
+                    : Entity.Null;
+
+            bool hasPathOwner =
+                m_PathOwnerData.TryGetComponent(vehicle, out PathOwner pathOwner);
+            PathFlags currentPathFlags =
+                hasPathOwner
+                    ? pathOwner.m_State
+                    : default;
+
+            bool hasNavigationLanes =
+                m_NavigationLaneData.TryGetBuffer(vehicle, out DynamicBuffer<CarNavigationLane> navigationLanes);
+
+            RoutePenaltyInspectionContext inspectionContext =
+                CreateRouteInspectionContext();
+            RoutePenaltyInspectionResult inspection =
+                RoutePenaltyInspection.InspectCurrentRoute(
+                    vehicle,
+                    currentLaneEntity,
+                    navigationLanes,
+                    hasNavigationLanes,
+                    ref inspectionContext,
+                    captureDebugStrings: true);
+
+            return new RouteDiagnosticsData(
+                hasDiagnostics: true,
+                hasPathOwner: hasPathOwner,
+                hasCurrentTarget: hasCurrentTarget,
+                hasCurrentRoute: hasCurrentRoute,
+                currentPathFlags: currentPathFlags,
+                currentTargetText: BuildCurrentTargetText(targetEntity),
+                currentRouteText: FormatEntityOrNone(currentRouteEntity),
+                navigationLanesText: NormalizeInspectionText(
+                    RoutePenaltyInspection.BuildNavigationPreview(
+                        currentLaneEntity,
+                        navigationLanes,
+                        hasNavigationLanes,
+                        ref inspectionContext)),
+                plannedPenaltiesText: NormalizeInspectionText(inspection.Breakdown),
+                penaltyTagsText: NormalizeInspectionText(inspection.Tags),
+                explanationText: BuildRouteDecisionExplanation(
+                    vehicle,
+                    currentLaneEntity,
+                    hasCurrentTarget,
+                    targetEntity,
+                    hasCurrentRoute,
+                    inspection),
+                waypointRouteLaneText: BuildWaypointRouteLaneText(targetEntity),
+                connectedStopText: BuildConnectedStopText(targetEntity));
+        }
+
+        private string BuildCurrentTargetText(Entity targetEntity)
+        {
+            if (targetEntity == Entity.Null)
+            {
+                return FormatEntityOrNone(Entity.Null);
+            }
+
+            string text = FormatEntityOrNone(targetEntity);
+            if (m_WaypointData.TryGetComponent(targetEntity, out Waypoint waypoint))
+            {
+                text += $" [waypoint {waypoint.m_Index}]";
+            }
+
+            return text;
+        }
+
+        private string BuildWaypointRouteLaneText(Entity targetEntity)
+        {
+            if (targetEntity == Entity.Null ||
+                !m_RouteLaneData.TryGetComponent(targetEntity, out RouteLane routeLane))
+            {
+                return string.Empty;
+            }
+
+            return
+                $"start {FormatEntityOrNone(routeLane.m_StartLane)} -> end {FormatEntityOrNone(routeLane.m_EndLane)} ({routeLane.m_StartCurvePos:0.###} -> {routeLane.m_EndCurvePos:0.###})";
+        }
+
+        private string BuildConnectedStopText(Entity targetEntity)
+        {
+            if (targetEntity == Entity.Null ||
+                !m_ConnectedData.TryGetComponent(targetEntity, out Connected connected))
+            {
+                return string.Empty;
+            }
+
+            return FormatEntityOrNone(connected.m_Connected);
+        }
+
+        private string BuildRouteDecisionExplanation(
+            Entity vehicle,
+            Entity currentLaneEntity,
+            bool hasCurrentTarget,
+            Entity targetEntity,
+            bool hasCurrentRoute,
+            RoutePenaltyInspectionResult inspection)
+        {
+            if (!hasCurrentRoute)
+            {
+                return LocalizeText(
+                    kRouteExplanationNoCurrentRouteLocaleId,
+                    "No current route is attached to this vehicle.");
+            }
+
+            if (!hasCurrentTarget)
+            {
+                return LocalizeText(
+                    kRouteExplanationNoCurrentTargetLocaleId,
+                    "No current target is attached to this vehicle.");
+            }
+
+            List<string> parts = new List<string>(3);
+            bool hasPrimaryExplanation = false;
+
+            if (TryHasWaypointRouteLaneMismatch(targetEntity, currentLaneEntity))
+            {
+                parts.Add(
+                    LocalizeText(
+                        kRouteExplanationWaypointAlignmentLocaleId,
+                        "Vehicle is aligning for the next waypoint / stop approach lane."));
+                hasPrimaryExplanation = true;
+            }
+
+            if (inspection.Profile.HasAnyPenalty)
+            {
+                string tagSummary = NormalizeInspectionText(inspection.Tags);
+                string format =
+                    parts.Count == 0
+                        ? LocalizeText(
+                            kRouteExplanationPenaltyPrimaryFormatLocaleId,
+                            "Current planned route contains deterrence tags: {0}.")
+                        : LocalizeText(
+                            kRouteExplanationPenaltyModifierFormatLocaleId,
+                            "Current planned route also contains deterrence tags: {0}.");
+                parts.Add(string.Format(format, tagSummary));
+                hasPrimaryExplanation = true;
+            }
+
+            if (IsRoadPublicTransportVehicle(vehicle) &&
+                inspection.PublicTransportLanePolicyResolved &&
+                inspection.AllowedOnPublicTransportLane)
+            {
+                parts.Add(
+                    LocalizeText(
+                        kRouteExplanationPtPermissiveLocaleId,
+                        "PT-lane policy is currently permissive for this vehicle."));
+            }
+
+            if (!hasPrimaryExplanation)
+            {
+                parts.Add(
+                    LocalizeText(
+                        kRouteExplanationGenericFallbackLocaleId,
+                        "No route-target mismatch or current TLE penalty tag was identified; current behavior is most likely vanilla lane-group alignment."));
+            }
+
+            return string.Join(" ", parts.ToArray());
+        }
+
+        private bool TryHasWaypointRouteLaneMismatch(
+            Entity targetEntity,
+            Entity currentLaneEntity)
+        {
+            if (targetEntity == Entity.Null ||
+                currentLaneEntity == Entity.Null ||
+                !m_RouteLaneData.TryGetComponent(targetEntity, out RouteLane routeLane) ||
+                routeLane.m_StartLane == Entity.Null)
+            {
+                return false;
+            }
+
+            return routeLane.m_StartLane != currentLaneEntity;
+        }
+
+        private bool IsRoadPublicTransportVehicle(Entity vehicle)
+        {
+            PublicTransportLaneVehicleCategory categories =
+                PublicTransportLanePolicy.GetVanillaAuthorizedCategories(vehicle, ref m_TypeLookups);
+            return (categories & PublicTransportLaneVehicleCategory.RoadPublicTransportVehicle) != 0;
+        }
+
+        private string NormalizeInspectionText(string text)
+        {
+            if (string.IsNullOrWhiteSpace(text) || text == "none")
+            {
+                return FormatEntityOrNone(Entity.Null);
+            }
+
+            return text.Trim();
+        }
+
+        private string FormatEntityOrNone(Entity entity)
+        {
+            return entity == Entity.Null
+                ? LocalizeText(SelectedObjectPanelUISystem.kNoneLocaleId, "None")
+                : $"#{entity.Index}:v{entity.Version}";
+        }
+
+        private readonly struct RouteDiagnosticsData
+        {
+            public readonly bool HasDiagnostics;
+            public readonly bool HasPathOwner;
+            public readonly bool HasCurrentTarget;
+            public readonly bool HasCurrentRoute;
+            public readonly PathFlags CurrentPathFlags;
+            public readonly string CurrentTargetText;
+            public readonly string CurrentRouteText;
+            public readonly string NavigationLanesText;
+            public readonly string PlannedPenaltiesText;
+            public readonly string PenaltyTagsText;
+            public readonly string ExplanationText;
+            public readonly string WaypointRouteLaneText;
+            public readonly string ConnectedStopText;
+
+            public RouteDiagnosticsData(
+                bool hasDiagnostics,
+                bool hasPathOwner,
+                bool hasCurrentTarget,
+                bool hasCurrentRoute,
+                PathFlags currentPathFlags,
+                string currentTargetText,
+                string currentRouteText,
+                string navigationLanesText,
+                string plannedPenaltiesText,
+                string penaltyTagsText,
+                string explanationText,
+                string waypointRouteLaneText,
+                string connectedStopText)
+            {
+                HasDiagnostics = hasDiagnostics;
+                HasPathOwner = hasPathOwner;
+                HasCurrentTarget = hasCurrentTarget;
+                HasCurrentRoute = hasCurrentRoute;
+                CurrentPathFlags = currentPathFlags;
+                CurrentTargetText = currentTargetText;
+                CurrentRouteText = currentRouteText;
+                NavigationLanesText = navigationLanesText;
+                PlannedPenaltiesText = plannedPenaltiesText;
+                PenaltyTagsText = penaltyTagsText;
+                ExplanationText = explanationText;
+                WaypointRouteLaneText = waypointRouteLaneText;
+                ConnectedStopText = connectedStopText;
+            }
         }
 
         private static string BuildRuntimeFamilyText(
