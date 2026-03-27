@@ -150,7 +150,7 @@ namespace Traffic_Law_Enforcement
     {
         public const CarFlags PublicTransportLanePermissionMask = CarFlags.UsePublicTransportLanes | CarFlags.PreferPublicTransportLanes;
 
-        public static bool IsAllowedOnPublicTransportLane(
+        public static bool CanUsePublicTransportLane(
             Entity vehicle,
             ref PublicTransportLaneVehicleTypeLookups lookups,
             ref ComponentLookup<VehicleTrafficLawProfile> profileData)
@@ -165,7 +165,7 @@ namespace Traffic_Law_Enforcement
                 return false;
             }
 
-            return ModAllowsAccess(profile.m_PublicTransportLaneAccessBits);
+            return CanUsePublicTransportLane(profile);
         }
 
         public static bool EngineHasPublicTransportLaneFlag(Entity vehicle, ref PublicTransportLaneVehicleTypeLookups lookups)
@@ -181,6 +181,115 @@ namespace Traffic_Law_Enforcement
         public static int GetPermissionSettingsMask(EnforcementGameplaySettingsState settings)
         {
             return settings.GetPermissionSettingsMask();
+        }
+
+        private static void GetConfiguredAccessState(
+            PublicTransportLaneVehicleCategory authorizedCategories,
+            PublicTransportLaneFlagGrantExperimentRole additionalRole,
+            EnforcementGameplaySettingsState settings,
+            out bool vanillaAllows,
+            out bool modAllows,
+            out bool isRoadPublicTransport)
+        {
+            vanillaAllows =
+                authorizedCategories != PublicTransportLaneVehicleCategory.None;
+
+            isRoadPublicTransport =
+                (authorizedCategories & PublicTransportLaneVehicleCategory.RoadPublicTransportVehicle) != 0;
+
+            bool modAllowsAuthorized =
+                settings.AllowsPublicTransportLaneCategories(authorizedCategories);
+
+            bool modAllowsAdditional =
+                settings.AllowsAdditionalPublicTransportLaneRole(additionalRole);
+
+            modAllows =
+                modAllowsAuthorized ||
+                modAllowsAdditional;
+        }
+
+        public static PublicTransportLaneAccessBits ApplyConfiguredAccessBits(
+            PublicTransportLaneAccessBits bits,
+            PublicTransportLaneVehicleCategory authorizedCategories,
+            PublicTransportLaneFlagGrantExperimentRole additionalRole,
+            EnforcementGameplaySettingsState settings,
+            bool emergencyActive)
+        {
+            bits &= ~(
+                PublicTransportLaneAccessBits.EffectiveVanillaAllowsAccess |
+                PublicTransportLaneAccessBits.VanillaPrefersLanes |
+                PublicTransportLaneAccessBits.EffectiveModAllowsAccess |
+                PublicTransportLaneAccessBits.ModPrefersLanes |
+                PublicTransportLaneAccessBits.IsRoadPublicTransport |
+                PublicTransportLaneAccessBits.VanillaAllowsAccess |
+                PublicTransportLaneAccessBits.ModAllowsAccess |
+                PublicTransportLaneAccessBits.PermissionChangedByMod);
+
+            GetConfiguredAccessState(
+                authorizedCategories,
+                additionalRole,
+                settings,
+                out bool vanillaAllows,
+                out bool modAllows,
+                out bool isRoadPublicTransport);
+
+            if (vanillaAllows)
+            {
+                bits |= PublicTransportLaneAccessBits.VanillaAllowsAccess;
+            }
+
+            if (modAllows)
+            {
+                bits |= PublicTransportLaneAccessBits.ModAllowsAccess;
+            }
+
+            bool vanillaPrefers =
+                isRoadPublicTransport;
+
+            bool modPrefers =
+                isRoadPublicTransport;
+
+            bool effectiveVanillaAllows =
+                emergencyActive || vanillaAllows;
+
+            bool effectiveModAllows =
+                emergencyActive || modAllows;
+
+            if (effectiveVanillaAllows)
+            {
+                bits |= PublicTransportLaneAccessBits.EffectiveVanillaAllowsAccess;
+            }
+
+            if (vanillaPrefers)
+            {
+                bits |= PublicTransportLaneAccessBits.VanillaPrefersLanes;
+            }
+
+            if (effectiveModAllows)
+            {
+                bits |= PublicTransportLaneAccessBits.EffectiveModAllowsAccess;
+            }
+
+            if (modPrefers)
+            {
+                bits |= PublicTransportLaneAccessBits.ModPrefersLanes;
+            }
+
+            bool permissionChangedByMod =
+                vanillaAllows != modAllows ||
+                vanillaPrefers != modPrefers;
+
+            if (permissionChangedByMod)
+            {
+                bits |= PublicTransportLaneAccessBits.PermissionChangedByMod;
+            }
+
+            if (isRoadPublicTransport)
+            {
+                bits |= PublicTransportLaneAccessBits.IsRoadPublicTransport;
+            }
+
+            return bits;
         }
 
         public static PublicTransportLaneAccessBits BuildAccessBits(
@@ -209,69 +318,12 @@ namespace Traffic_Law_Enforcement
 
             shouldTrack = true;
 
-            bool vanillaAllows =
-                emergency ||
-                authorizedCategories != PublicTransportLaneVehicleCategory.None;
-
-            bool isRoadPublicTransport =
-                (authorizedCategories & PublicTransportLaneVehicleCategory.RoadPublicTransportVehicle) != 0;
-
-            // Vanilla emergency response grants PT-lane access, but not the
-            // dedicated "prefer public transport lanes" routing bias.
-            bool vanillaPrefers =
-                isRoadPublicTransport;
-
-            bool modAllowsAuthorized =
-                settings.AllowsPublicTransportLaneCategories(authorizedCategories);
-
-            bool modAllowsAdditional =
-                settings.AllowsAdditionalPublicTransportLaneRole(additionalRole);
-
-            bool modAllows =
-                emergency ||
-                modAllowsAuthorized ||
-                modAllowsAdditional;
-
-            bool modPrefers =
-                isRoadPublicTransport;
-
-            PublicTransportLaneAccessBits bits = PublicTransportLaneAccessBits.None;
-
-            if (vanillaAllows)
-            {
-                bits |= PublicTransportLaneAccessBits.VanillaAllowsAccess;
-            }
-
-            if (vanillaPrefers)
-            {
-                bits |= PublicTransportLaneAccessBits.VanillaPrefersLanes;
-            }
-
-            if (modAllows)
-            {
-                bits |= PublicTransportLaneAccessBits.ModAllowsAccess;
-            }
-
-            if (modPrefers)
-            {
-                bits |= PublicTransportLaneAccessBits.ModPrefersLanes;
-            }
-
-            if (isRoadPublicTransport)
-            {
-                bits |= PublicTransportLaneAccessBits.IsRoadPublicTransport;
-            }
-
-            bool permissionChangedByMod =
-                vanillaAllows != modAllows ||
-                vanillaPrefers != modPrefers;
-
-            if (permissionChangedByMod)
-            {
-                bits |= PublicTransportLaneAccessBits.PermissionChangedByMod;
-            }
-
-            return bits;
+            return ApplyConfiguredAccessBits(
+                PublicTransportLaneAccessBits.None,
+                authorizedCategories,
+                additionalRole,
+                settings,
+                emergency);
         }
 
         public static bool HasBit(
@@ -311,6 +363,27 @@ namespace Traffic_Law_Enforcement
             return HasBit(bits, PublicTransportLaneAccessBits.PermissionChangedByMod);
         }
 
+        public static bool CanUsePublicTransportLane(
+            PublicTransportLaneAccessBits bits,
+            bool emergencyActive)
+        {
+            return emergencyActive || ModAllowsAccess(bits);
+        }
+
+        public static bool CanUsePublicTransportLane(VehicleTrafficLawProfile profile)
+        {
+            return CanUsePublicTransportLane(
+                profile.m_PublicTransportLaneAccessBits,
+                profile.m_EmergencyVehicle != 0);
+        }
+
+        public static bool HasEmergencyPublicTransportLaneOverride(
+            PublicTransportLaneAccessBits bits,
+            bool emergencyActive)
+        {
+            return emergencyActive && !ModAllowsAccess(bits);
+        }
+
         public static bool IsType1(PublicTransportLaneAccessBits bits)
         {
             return VanillaAllowsAccess(bits) && ModAllowsAccess(bits);
@@ -329,6 +402,31 @@ namespace Traffic_Law_Enforcement
         public static bool IsType4(PublicTransportLaneAccessBits bits)
         {
             return !VanillaAllowsAccess(bits) && !ModAllowsAccess(bits);
+        }
+
+        public static string DescribeType(PublicTransportLaneAccessBits bits)
+        {
+            if (IsType1(bits))
+            {
+                return "Type 1";
+            }
+
+            if (IsType2(bits))
+            {
+                return "Type 2";
+            }
+
+            if (IsType3(bits))
+            {
+                return "Type 3";
+            }
+
+            if (IsType4(bits))
+            {
+                return "Type 4";
+            }
+
+            return "Unknown";
         }
 
         public static bool ModAllowsPublicTransportLane(

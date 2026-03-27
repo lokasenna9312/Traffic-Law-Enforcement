@@ -161,7 +161,7 @@ namespace Traffic_Law_Enforcement
 
             VehicleTrafficLawProfile profile = entityManager.GetComponentData<VehicleTrafficLawProfile>(owner);
 
-            bool allowOnPublicTransportLane = PublicTransportLanePolicy.ModAllowsAccess(profile.m_PublicTransportLaneAccessBits);
+            bool allowOnPublicTransportLane = PublicTransportLanePolicy.CanUsePublicTransportLane(profile);
 
             if (!allowOnPublicTransportLane && entityManager.HasComponent<PublicTransportLanePendingExit>(owner))
             {

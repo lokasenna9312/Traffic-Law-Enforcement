@@ -509,9 +509,32 @@ namespace Traffic_Law_Enforcement
             switch (resolveResult.VehicleKind)
             {
                 case SelectedObjectKind.RoadCar:
-                    return PublicTransportLanePolicy.DescribeVehicleRole(
-                        resolveResult.ResolvedVehicleEntity,
-                        ref m_TypeLookups);
+                    {
+                        Entity vehicle = resolveResult.ResolvedVehicleEntity;
+                        string role = PublicTransportLanePolicy.DescribeVehicleRole(
+                            vehicle,
+                            ref m_TypeLookups);
+
+                        if (!m_ProfileData.TryGetComponent(
+                                vehicle,
+                                out VehicleTrafficLawProfile profile))
+                        {
+                            return role;
+                        }
+
+                        string type =
+                            PublicTransportLanePolicy.DescribeType(
+                                profile.m_PublicTransportLaneAccessBits);
+
+                        bool emergencyOverrideActive =
+                            PublicTransportLanePolicy.HasEmergencyPublicTransportLaneOverride(
+                                profile.m_PublicTransportLaneAccessBits,
+                                profile.m_EmergencyVehicle != 0);
+
+                        return emergencyOverrideActive
+                            ? $"{role} | PT type: {type} | emergency PT override active"
+                            : $"{role} | PT type: {type}";
+                    }
 
                 case SelectedObjectKind.ParkedRoadCar:
                     return "Parked road car";
@@ -569,13 +592,24 @@ namespace Traffic_Law_Enforcement
             PublicTransportLaneAccessBits accessBits =
                 permissionState.m_PublicTransportLaneAccessBits;
 
+            bool emergencyActive =
+                permissionState.m_EmergencyActive != 0;
+
+            bool emergencyOverrideActive =
+                PublicTransportLanePolicy.HasEmergencyPublicTransportLaneOverride(
+                    accessBits,
+                    emergencyActive);
+
             return
+                $"type={PublicTransportLanePolicy.DescribeType(accessBits)}, " +
                 $"vanillaAllow={PublicTransportLanePolicy.VanillaAllowsAccess(accessBits)}, " +
                 $"modAllow={PublicTransportLanePolicy.ModAllowsAccess(accessBits)}, " +
+                $"canUsePublicTransportLane={PublicTransportLanePolicy.CanUsePublicTransportLane(accessBits, emergencyActive)}, " +
                 $"vanillaPrefer={PublicTransportLanePolicy.VanillaPrefersLanes(accessBits)}, " +
                 $"modPrefer={PublicTransportLanePolicy.ModPrefersLanes(accessBits)}, " +
                 $"changedByMod={PublicTransportLanePolicy.PermissionChangedByMod(accessBits)}, " +
-                $"emergency={permissionState.m_EmergencyActive != 0}, " +
+                $"emergency={emergencyActive}, " +
+                $"emergencyOverride={emergencyOverrideActive}, " +
                 $"graceConsumed={permissionState.m_ImmediateEntryGraceConsumed != 0}";
         }
 

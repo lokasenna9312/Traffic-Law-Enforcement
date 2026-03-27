@@ -373,9 +373,26 @@ namespace Traffic_Law_Enforcement
                     vehicleProfile.m_PublicTransportLaneAccessBits).ToString()
                 : "n/a";
 
+            string canUsePublicTransportLane = hasProfile
+                ? PublicTransportLanePolicy.CanUsePublicTransportLane(
+                    vehicleProfile.m_PublicTransportLaneAccessBits,
+                    emergency).ToString()
+                : "n/a";
+
+            string type = hasProfile
+                ? PublicTransportLanePolicy.DescribeType(
+                    vehicleProfile.m_PublicTransportLaneAccessBits)
+                : "n/a";
+
             string permissionChangedByMod = hasProfile
                 ? PublicTransportLanePolicy.PermissionChangedByMod(
                     vehicleProfile.m_PublicTransportLaneAccessBits).ToString()
+                : "n/a";
+
+            string emergencyOverrideActive = hasProfile
+                ? PublicTransportLanePolicy.HasEmergencyPublicTransportLaneOverride(
+                    vehicleProfile.m_PublicTransportLaneAccessBits,
+                    emergency).ToString()
                 : "n/a";
 
             string accessBits = hasProfile
@@ -392,7 +409,9 @@ namespace Traffic_Law_Enforcement
                 $"publicOnly={publicOnly}, hasResolvedPolicy={hasResolvedPublicTransportLanePolicy}, " +
                 $"hasProfile={hasProfile}, allowedOnPublicTransportLane={allowedOnPublicTransportLane}, " +
                 $"unauthorizedPublicTransportLane={unauthorizedPublicTransportLane}, engineHasFlag={engineHasFlag}, " +
-                $"emergency={emergency}, vanillaAllows={vanillaAllows}, modAllows={modAllows}, " +
+                $"emergency={emergency}, emergencyOverrideActive={emergencyOverrideActive}, " +
+                $"type={type}, vanillaAllows={vanillaAllows}, modAllows={modAllows}, " +
+                $"canUsePublicTransportLane={canUsePublicTransportLane}, " +
                 $"permissionChangedByMod={permissionChangedByMod}, accessBits={accessBits}";
 
             EnforcementTelemetry.RecordEvent(message);
@@ -463,21 +482,15 @@ namespace Traffic_Law_Enforcement
             Entity vehicle,
             out bool allowedOnPublicTransportLane)
         {
-            if (EmergencyVehiclePolicy.IsEmergencyVehicle(vehicle, ref m_TypeLookups))
-            {
-                allowedOnPublicTransportLane = true;
-                return true;
-            }
-
             if (!m_ProfileData.TryGetComponent(vehicle, out VehicleTrafficLawProfile profile))
             {
-                allowedOnPublicTransportLane = false;
-                return false;
+                allowedOnPublicTransportLane =
+                    EmergencyVehiclePolicy.IsEmergencyVehicle(vehicle, ref m_TypeLookups);
+                return allowedOnPublicTransportLane;
             }
 
             allowedOnPublicTransportLane =
-                PublicTransportLanePolicy.ModAllowsAccess(
-                    profile.m_PublicTransportLaneAccessBits);
+                PublicTransportLanePolicy.CanUsePublicTransportLane(profile);
 
             return true;
         }

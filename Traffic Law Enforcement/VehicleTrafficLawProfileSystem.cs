@@ -83,7 +83,7 @@ namespace Traffic_Law_Enforcement
             int permissionSettingsMask = PublicTransportLanePolicy.GetPermissionSettingsMask(settings);
             if (m_ShouldAttemptPersistedSeed)
             {
-                SeedProfilesFromPersistedState(permissionSettingsMask);
+                SeedProfilesFromPersistedState(settings, permissionSettingsMask);
             }
             bool fullRefresh =
                 !m_HasEvaluated ||
@@ -154,7 +154,9 @@ namespace Traffic_Law_Enforcement
                 $"[SAVELOAD] VehicleTrafficLawProfileSystem runtime reset: generation={currentGeneration}");
         }
 
-        private void SeedProfilesFromPersistedState(int permissionSettingsMask)
+        private void SeedProfilesFromPersistedState(
+            EnforcementGameplaySettingsState settings,
+            int permissionSettingsMask)
         {
             int persistedCount = m_PersistedStateQuery.CalculateEntityCount();
             int persistedWithoutProfileCount = m_PersistedWithoutProfileQuery.CalculateEntityCount();
@@ -183,20 +185,32 @@ namespace Traffic_Law_Enforcement
                             continue;
                         }
 
+                        PublicTransportLaneVehicleCategory authorizedCategories =
+                            PublicTransportLanePolicy.GetVanillaAuthorizedCategories(
+                                vehicle,
+                                ref m_TypeLookups);
+
+                        PublicTransportLaneFlagGrantExperimentRole additionalRole =
+                            PublicTransportLanePolicy.GetFlagGrantExperimentRole(
+                                vehicle,
+                                ref m_TypeLookups);
+
                         VehicleTrafficLawProfile seededProfile =
                             new VehicleTrafficLawProfile
                             {
                                 m_ShouldTrack = persisted.m_ShouldTrack,
                                 m_EmergencyVehicle = persisted.m_EmergencyVehicle,
-                                m_PublicTransportLaneAccessBits = persisted.m_AccessBits,
+                                m_PublicTransportLaneAccessBits =
+                                    PublicTransportLanePolicy.ApplyConfiguredAccessBits(
+                                        persisted.m_AccessBits,
+                                        authorizedCategories,
+                                        additionalRole,
+                                        settings,
+                                        persisted.m_EmergencyVehicle != 0),
                                 m_VanillaAuthorizedCategories =
-                                    PublicTransportLanePolicy.GetVanillaAuthorizedCategories(
-                                        vehicle,
-                                        ref m_TypeLookups),
+                                    authorizedCategories,
                                 m_AdditionalRole =
-                                    PublicTransportLanePolicy.GetFlagGrantExperimentRole(
-                                        vehicle,
-                                        ref m_TypeLookups),
+                                    additionalRole,
                                 m_PermissionSettingsMask = permissionSettingsMask,
                             };
 
