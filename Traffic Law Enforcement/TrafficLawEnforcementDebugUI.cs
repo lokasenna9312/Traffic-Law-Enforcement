@@ -289,9 +289,61 @@ namespace Traffic_Law_Enforcement
                 getter = GetLastReasonText
             });
 
+            DebugUI.Foldout routeDiagnostics = new DebugUI.Foldout
+            {
+                displayName = "Route diagnostics",
+                opened = true
+            };
+            routeDiagnostics.children.Add(new DebugUI.Value
+            {
+                displayName = "Current target",
+                getter = GetRouteDiagnosticsCurrentTargetText
+            });
+            routeDiagnostics.children.Add(new DebugUI.Value
+            {
+                displayName = "Current route",
+                getter = GetRouteDiagnosticsCurrentRouteText
+            });
+            routeDiagnostics.children.Add(new DebugUI.Value
+            {
+                displayName = "Target road",
+                getter = GetRouteDiagnosticsTargetRoadText
+            });
+            routeDiagnostics.children.Add(new DebugUI.Value
+            {
+                displayName = "Navigation lanes",
+                getter = GetRouteDiagnosticsNavigationLanesText
+            });
+            routeDiagnostics.children.Add(new DebugUI.Value
+            {
+                displayName = "Planned penalties",
+                getter = GetRouteDiagnosticsPlannedPenaltiesText
+            });
+            routeDiagnostics.children.Add(new DebugUI.Value
+            {
+                displayName = "Penalty tags",
+                getter = GetRouteDiagnosticsPenaltyTagsText
+            });
+            routeDiagnostics.children.Add(new DebugUI.Value
+            {
+                displayName = "Current explanation",
+                getter = GetRouteDiagnosticsExplanationText
+            });
+            routeDiagnostics.children.Add(new DebugUI.Value
+            {
+                displayName = "Waypoint route lane",
+                getter = GetRouteDiagnosticsWaypointRouteLaneText
+            });
+            routeDiagnostics.children.Add(new DebugUI.Value
+            {
+                displayName = "Connected stop",
+                getter = GetRouteDiagnosticsConnectedStopText
+            });
+
             tle.children.Add(lane);
             tle.children.Add(enforcement);
             tle.children.Add(telemetry);
+            tle.children.Add(routeDiagnostics);
 
             DebugUI.Foldout resolution = new DebugUI.Foldout
             {
@@ -646,6 +698,60 @@ namespace Traffic_Law_Enforcement
                     : snapshot.LastReason);
         }
 
+        private static string GetRouteDiagnosticsCurrentTargetText()
+        {
+            return GetRouteDiagnosticsText(
+                snapshot => snapshot.RouteDiagnosticsCurrentTargetText);
+        }
+
+        private static string GetRouteDiagnosticsCurrentRouteText()
+        {
+            return GetRouteDiagnosticsText(
+                snapshot => snapshot.RouteDiagnosticsCurrentRouteText);
+        }
+
+        private static string GetRouteDiagnosticsTargetRoadText()
+        {
+            return GetRouteDiagnosticsOptionalText(
+                snapshot => snapshot.RouteDiagnosticsTargetRoadText);
+        }
+
+        private static string GetRouteDiagnosticsNavigationLanesText()
+        {
+            return GetRouteDiagnosticsOptionalText(
+                snapshot => snapshot.RouteDiagnosticsNavigationLanesText);
+        }
+
+        private static string GetRouteDiagnosticsPlannedPenaltiesText()
+        {
+            return GetRouteDiagnosticsOptionalText(
+                snapshot => snapshot.RouteDiagnosticsPlannedPenaltiesText);
+        }
+
+        private static string GetRouteDiagnosticsPenaltyTagsText()
+        {
+            return GetRouteDiagnosticsOptionalText(
+                snapshot => snapshot.RouteDiagnosticsPenaltyTagsText);
+        }
+
+        private static string GetRouteDiagnosticsExplanationText()
+        {
+            return GetRouteDiagnosticsOptionalText(
+                snapshot => snapshot.RouteDiagnosticsExplanationText);
+        }
+
+        private static string GetRouteDiagnosticsWaypointRouteLaneText()
+        {
+            return GetRouteDiagnosticsOptionalText(
+                snapshot => snapshot.RouteDiagnosticsWaypointRouteLaneText);
+        }
+
+        private static string GetRouteDiagnosticsConnectedStopText()
+        {
+            return GetRouteDiagnosticsOptionalText(
+                snapshot => snapshot.RouteDiagnosticsConnectedStopText);
+        }
+
         private static string GetTleStatusText()
         {
             if (!TryGetSelectedObjectSnapshot(out SelectedObjectDebugSnapshot snapshot))
@@ -727,6 +833,46 @@ namespace Traffic_Law_Enforcement
             }
 
             return formatter(snapshot);
+        }
+
+        private static string GetRouteDiagnosticsText(
+            System.Func<SelectedObjectDebugSnapshot, string> formatter)
+        {
+            if (!TryGetSelectedObjectSnapshot(out SelectedObjectDebugSnapshot snapshot))
+            {
+                return "Unavailable";
+            }
+
+            if (snapshot.TleApplicability != SelectedObjectTleApplicability.ApplicableReady ||
+                !snapshot.HasRouteDiagnostics)
+            {
+                return "Unavailable";
+            }
+
+            string text = formatter(snapshot);
+            return string.IsNullOrWhiteSpace(text)
+                ? "Unavailable"
+                : text.Trim();
+        }
+
+        private static string GetRouteDiagnosticsOptionalText(
+            System.Func<SelectedObjectDebugSnapshot, string> formatter)
+        {
+            if (!TryGetSelectedObjectSnapshot(out SelectedObjectDebugSnapshot snapshot))
+            {
+                return "Unavailable";
+            }
+
+            if (snapshot.TleApplicability != SelectedObjectTleApplicability.ApplicableReady ||
+                !snapshot.HasRouteDiagnostics)
+            {
+                return "Unavailable";
+            }
+
+            string text = formatter(snapshot);
+            return string.IsNullOrWhiteSpace(text)
+                ? "None"
+                : text.Trim();
         }
 
         private static string GetRawClassificationText(
