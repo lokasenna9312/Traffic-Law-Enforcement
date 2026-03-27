@@ -1,24 +1,52 @@
+using Colossal.UI.Binding;
 using Game;
 using Game.Input;
 using Game.SceneFlow;
 using Game.UI;
 using Unity.Entities;
-using UnityEngine;
 using Entity = Unity.Entities.Entity;
 
 namespace Traffic_Law_Enforcement
 {
     public partial class SelectedObjectPanelUISystem : UISystemBase
     {
-        private const string kPanelObjectName = "TrafficLawEnforcement.SelectedObjectPanel";
+        private const string kGroup = "selectedObjectPanel";
 
         private SelectedObjectBridgeSystem m_SelectedObjectBridgeSystem;
         private ProxyAction m_PanelToggleAction;
-        private GameObject m_PanelObject;
-        private SelectedObjectPanelView m_PanelView;
+
+        private ValueBinding<bool> m_VisibleBinding;
+        private ValueBinding<bool> m_CompactBinding;
+        private ValueBinding<bool> m_CollapsedBinding;
+        private ValueBinding<string> m_ClassificationBinding;
+        private ValueBinding<string> m_MessageBinding;
+        private ValueBinding<string> m_TleStatusBinding;
+        private ValueBinding<string> m_RoleOrTypeBinding;
+        private ValueBinding<string> m_VehicleIndexBinding;
+        private ValueBinding<string> m_ViolationPendingBinding;
+        private ValueBinding<string> m_TotalsBinding;
+        private ValueBinding<string> m_LastReasonBinding;
+        private ValueBinding<string> m_ResolvedEntityBinding;
+
         private bool m_IsPanelEnabled;
+        private bool m_IsCollapsed;
 
         public override GameMode gameMode => GameMode.Game;
+
+        private struct PanelState
+        {
+            public bool Visible;
+            public bool Compact;
+            public string Classification;
+            public string Message;
+            public string TleStatus;
+            public string RoleOrType;
+            public string VehicleIndex;
+            public string ViolationPending;
+            public string Totals;
+            public string LastReason;
+            public string ResolvedEntity;
+        }
 
         protected override void OnCreate()
         {
@@ -26,7 +54,22 @@ namespace Traffic_Law_Enforcement
 
             m_SelectedObjectBridgeSystem =
                 World.GetOrCreateSystemManaged<SelectedObjectBridgeSystem>();
-            EnsurePanelView();
+
+            AddBinding(m_VisibleBinding = new ValueBinding<bool>(kGroup, "visible", false));
+            AddBinding(m_CompactBinding = new ValueBinding<bool>(kGroup, "compact", false));
+            AddBinding(m_CollapsedBinding = new ValueBinding<bool>(kGroup, "collapsed", false));
+            AddBinding(m_ClassificationBinding = new ValueBinding<string>(kGroup, "classification", string.Empty));
+            AddBinding(m_MessageBinding = new ValueBinding<string>(kGroup, "message", string.Empty));
+            AddBinding(m_TleStatusBinding = new ValueBinding<string>(kGroup, "tleStatus", string.Empty));
+            AddBinding(m_RoleOrTypeBinding = new ValueBinding<string>(kGroup, "roleOrType", string.Empty));
+            AddBinding(m_VehicleIndexBinding = new ValueBinding<string>(kGroup, "vehicleIndex", string.Empty));
+            AddBinding(m_ViolationPendingBinding = new ValueBinding<string>(kGroup, "violationPending", string.Empty));
+            AddBinding(m_TotalsBinding = new ValueBinding<string>(kGroup, "totals", string.Empty));
+            AddBinding(m_LastReasonBinding = new ValueBinding<string>(kGroup, "lastReason", string.Empty));
+            AddBinding(m_ResolvedEntityBinding = new ValueBinding<string>(kGroup, "resolvedEntity", string.Empty));
+
+            AddBinding(new TriggerBinding(kGroup, "close", HandleCloseRequested));
+            AddBinding(new TriggerBinding(kGroup, "toggleCollapsed", ToggleCollapsed));
         }
 
         protected override void OnDestroy()
@@ -37,7 +80,6 @@ namespace Traffic_Law_Enforcement
                 m_PanelToggleAction = null;
             }
 
-            DestroyPanelView();
             base.OnDestroy();
         }
 
@@ -53,28 +95,22 @@ namespace Traffic_Law_Enforcement
                     World.GetExistingSystemManaged<SelectedObjectBridgeSystem>();
             }
 
-            if (!EnsurePanelView())
-            {
-                return;
-            }
-
             if (!m_IsPanelEnabled)
             {
-                m_PanelView.UpdateState(default);
+                UpdateBindings(default);
                 return;
             }
 
             if (m_SelectedObjectBridgeSystem == null || !m_SelectedObjectBridgeSystem.HasSnapshot)
             {
-                m_PanelView.UpdateState(BuildNoSelectionState());
+                UpdateBindings(BuildNoSelectionState());
                 return;
             }
 
-            m_PanelView.UpdateState(BuildState(m_SelectedObjectBridgeSystem.CurrentSnapshot));
+            UpdateBindings(BuildState(m_SelectedObjectBridgeSystem.CurrentSnapshot));
         }
 
-        private SelectedObjectPanelView.State BuildState(
-            SelectedObjectDebugSnapshot snapshot)
+        private PanelState BuildState(SelectedObjectDebugSnapshot snapshot)
         {
             if (snapshot.ResolveState == SelectedObjectResolveState.None)
             {
@@ -83,11 +119,10 @@ namespace Traffic_Law_Enforcement
 
             if (snapshot.ResolveState == SelectedObjectResolveState.NotVehicle)
             {
-                return new SelectedObjectPanelView.State
+                return new PanelState
                 {
                     Visible = true,
                     Compact = true,
-                    SelectionToken = BuildSelectionToken(snapshot),
                     Message = "Selected object is not a vehicle"
                 };
             }
@@ -97,11 +132,10 @@ namespace Traffic_Law_Enforcement
             bool tleReady =
                 snapshot.TleApplicability == SelectedObjectTleApplicability.ApplicableReady;
 
-            return new SelectedObjectPanelView.State
+            return new PanelState
             {
                 Visible = true,
                 Compact = false,
-                SelectionToken = BuildSelectionToken(snapshot),
                 Classification = snapshot.SummaryClassificationText,
                 TleStatus = BuildCompactTleStatus(snapshot),
                 RoleOrType = NormalizeText(snapshot.RoleOrTypeText),
@@ -119,6 +153,22 @@ namespace Traffic_Law_Enforcement
                     : string.Empty,
                 ResolvedEntity = FormatEntity(snapshot.ResolvedVehicleEntity)
             };
+        }
+
+        private void UpdateBindings(PanelState state)
+        {
+            m_VisibleBinding.Update(state.Visible);
+            m_CompactBinding.Update(state.Compact);
+            m_CollapsedBinding.Update(state.Visible && !state.Compact && m_IsCollapsed);
+            m_ClassificationBinding.Update(state.Classification ?? string.Empty);
+            m_MessageBinding.Update(state.Message ?? string.Empty);
+            m_TleStatusBinding.Update(state.TleStatus ?? string.Empty);
+            m_RoleOrTypeBinding.Update(state.RoleOrType ?? string.Empty);
+            m_VehicleIndexBinding.Update(state.VehicleIndex ?? string.Empty);
+            m_ViolationPendingBinding.Update(state.ViolationPending ?? string.Empty);
+            m_TotalsBinding.Update(state.Totals ?? string.Empty);
+            m_LastReasonBinding.Update(state.LastReason ?? string.Empty);
+            m_ResolvedEntityBinding.Update(state.ResolvedEntity ?? string.Empty);
         }
 
         private void UpdatePanelToggle()
@@ -146,57 +196,20 @@ namespace Traffic_Law_Enforcement
             return m_PanelToggleAction;
         }
 
-        private bool EnsurePanelView()
-        {
-            if (m_PanelView != null)
-            {
-                return true;
-            }
-
-            if (m_PanelObject == null)
-            {
-                m_PanelObject = new GameObject(kPanelObjectName)
-                {
-                    hideFlags = HideFlags.HideAndDontSave
-                };
-                Object.DontDestroyOnLoad(m_PanelObject);
-            }
-
-            m_PanelView = m_PanelObject.GetComponent<SelectedObjectPanelView>();
-            if (m_PanelView == null)
-            {
-                m_PanelView = m_PanelObject.AddComponent<SelectedObjectPanelView>();
-            }
-
-            m_PanelView.CloseRequested -= HandleCloseRequested;
-            m_PanelView.CloseRequested += HandleCloseRequested;
-
-            return m_PanelView != null;
-        }
-
-        private void DestroyPanelView()
-        {
-            if (m_PanelView != null)
-            {
-                m_PanelView.CloseRequested -= HandleCloseRequested;
-            }
-
-            if (m_PanelObject != null)
-            {
-                Object.Destroy(m_PanelObject);
-                m_PanelObject = null;
-                m_PanelView = null;
-            }
-        }
-
         private void HandleCloseRequested()
         {
             m_IsPanelEnabled = false;
+        }
 
-            if (m_PanelView != null)
+        private void ToggleCollapsed()
+        {
+            if (!m_IsPanelEnabled)
             {
-                m_PanelView.UpdateState(default);
+                return;
             }
+
+            m_IsCollapsed = !m_IsCollapsed;
+            m_CollapsedBinding.Update(m_IsCollapsed);
         }
 
         private static string NormalizeText(string text)
@@ -233,15 +246,9 @@ namespace Traffic_Law_Enforcement
             }
         }
 
-        private static string BuildSelectionToken(SelectedObjectDebugSnapshot snapshot)
+        private static PanelState BuildNoSelectionState()
         {
-            return
-                $"{snapshot.ResolveState}|{snapshot.SourceSelectedEntity}|{snapshot.ResolvedVehicleEntity}";
-        }
-
-        private static SelectedObjectPanelView.State BuildNoSelectionState()
-        {
-            return new SelectedObjectPanelView.State
+            return new PanelState
             {
                 Visible = true,
                 Compact = true,

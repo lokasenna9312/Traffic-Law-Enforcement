@@ -144,6 +144,9 @@
 		<Content Include="Localization\**\*.properties">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		</Content>
+		<Content Include="SelectedObjectPanel.mjs">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Content>
 	</ItemGroup>
 
 	<Target Name="CheckEntityPackagePath" Condition="Exists('$(EntityPackagePath)')" />
