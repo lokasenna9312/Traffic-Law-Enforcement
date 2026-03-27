@@ -126,20 +126,18 @@ const styles = {
         gap: "8px",
         marginBottom: "14px",
     },
-    selectionLabel: {
-        color: "#c2cfdf",
-        fontSize: "13px",
-        lineHeight: 1.3,
-        fontWeight: 700,
-    },
     selectionRow: {
         display: "flex",
         gap: "8px",
         alignItems: "center",
+        minHeight: "30px",
     },
-    selectionInput: {
+    selectionRowInputCell: {
         flex: 1,
         minWidth: 0,
+    },
+    selectionInput: {
+        width: "100%",
         height: "34px",
         padding: "6px 10px",
         boxSizing: "border-box",
@@ -167,6 +165,7 @@ const styles = {
         color: "#b8c6da",
         fontSize: "12px",
         lineHeight: 1.3,
+        paddingLeft: "146px",
     },
     selectionStatusError: {
         color: "#ffb39f",
@@ -444,27 +443,31 @@ function SelectedObjectPanel() {
             onMouseDown: stopPropagationOnly,
             onClick: stopPropagationOnly,
         },
-        h("div", { style: styles.selectionLabel }, entitySelectionLabelText),
         h(
             "div",
             { style: styles.selectionRow },
-            h("input", {
-                type: "text",
-                value: entitySelectionInput || "",
-                placeholder: entitySelectionPlaceholderText,
-                style: styles.selectionInput,
-                onChange: function (event) {
-                    setEntitySelectionInput(event.target.value);
-                },
-                onKeyDown: function (event) {
-                    stopPropagationOnly(event);
-                    if (event.key === "Enter") {
-                        onSubmitEntitySelection(event);
-                    }
-                },
-                onMouseDown: stopPropagationOnly,
-                onClick: stopPropagationOnly,
-            }),
+            h("div", { style: styles.label }, entitySelectionLabelText),
+            h(
+                "div",
+                { style: styles.selectionRowInputCell },
+                h("input", {
+                    type: "text",
+                    value: entitySelectionInput || "",
+                    placeholder: entitySelectionPlaceholderText,
+                    style: styles.selectionInput,
+                    onChange: function (event) {
+                        setEntitySelectionInput(event.target.value);
+                    },
+                    onKeyDown: function (event) {
+                        stopPropagationOnly(event);
+                        if (event.key === "Enter") {
+                            onSubmitEntitySelection(event);
+                        }
+                    },
+                    onMouseDown: stopPropagationOnly,
+                    onClick: stopPropagationOnly,
+                })
+            ),
             h(
                 "button",
                 {
