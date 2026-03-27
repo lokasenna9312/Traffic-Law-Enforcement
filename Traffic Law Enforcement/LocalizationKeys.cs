@@ -152,6 +152,16 @@ namespace Traffic_Law_Enforcement
             map["SelectedObjectPanel.FooterHint"] = SelectedObjectPanelUISystem.kFooterHintLocaleId;
             map["SelectedObjectPanel.ExpandSection"] = SelectedObjectPanelUISystem.kExpandSectionLocaleId;
             map["SelectedObjectPanel.CollapseSection"] = SelectedObjectPanelUISystem.kCollapseSectionLocaleId;
+            map["SelectedObjectPanel.PublicTransportLanePolicyMeaningFormat"] =
+                SelectedObjectBridgeSystem.kPublicTransportLanePolicyMeaningFormatLocaleId;
+            map["SelectedObjectPanel.PublicTransportLanePolicyVanillaAllow"] =
+                SelectedObjectBridgeSystem.kPublicTransportLanePolicyVanillaAllowLocaleId;
+            map["SelectedObjectPanel.PublicTransportLanePolicyVanillaDeny"] =
+                SelectedObjectBridgeSystem.kPublicTransportLanePolicyVanillaDenyLocaleId;
+            map["SelectedObjectPanel.PublicTransportLanePolicyTleAllow"] =
+                SelectedObjectBridgeSystem.kPublicTransportLanePolicyTleAllowLocaleId;
+            map["SelectedObjectPanel.PublicTransportLanePolicyTleDeny"] =
+                SelectedObjectBridgeSystem.kPublicTransportLanePolicyTleDenyLocaleId;
 
             map["MonthlyChirper.SenderText"] = MonthlyEnforcementChirperSystem.kSenderTextLocaleId;
             map["MonthlyChirper.PeriodPointFormat"] = MonthlyEnforcementChirperSystem.kPeriodPointFormatLocaleId;

@@ -138,6 +138,17 @@ namespace Traffic_Law_Enforcement
 
     public partial class SelectedObjectBridgeSystem : GameSystemBase
     {
+        internal const string kPublicTransportLanePolicyMeaningFormatLocaleId =
+            "TrafficLawEnforcement.SelectedObjectPanel.Text.PublicTransportLanePolicyMeaningFormat";
+        internal const string kPublicTransportLanePolicyVanillaAllowLocaleId =
+            "TrafficLawEnforcement.SelectedObjectPanel.Text.PublicTransportLanePolicyVanillaAllow";
+        internal const string kPublicTransportLanePolicyVanillaDenyLocaleId =
+            "TrafficLawEnforcement.SelectedObjectPanel.Text.PublicTransportLanePolicyVanillaDeny";
+        internal const string kPublicTransportLanePolicyTleAllowLocaleId =
+            "TrafficLawEnforcement.SelectedObjectPanel.Text.PublicTransportLanePolicyTleAllow";
+        internal const string kPublicTransportLanePolicyTleDenyLocaleId =
+            "TrafficLawEnforcement.SelectedObjectPanel.Text.PublicTransportLanePolicyTleDeny";
+
         private SelectedObjectResolver m_SelectedObjectResolver;
         private PublicTransportLaneVehicleTypeLookups m_TypeLookups;
 
@@ -576,6 +587,22 @@ namespace Traffic_Law_Enforcement
 
             PublicTransportLaneAccessBits accessBits = profile.m_PublicTransportLaneAccessBits;
             string type = PublicTransportLanePolicy.DescribeType(accessBits);
+            bool vanillaAllow = PublicTransportLanePolicy.VanillaAllowsAccess(accessBits);
+            bool modAllow = PublicTransportLanePolicy.ModAllowsAccess(accessBits);
+            string meaningFormat = LocalizeText(
+                kPublicTransportLanePolicyMeaningFormatLocaleId,
+                "{0} ({1}, {2})");
+            string vanillaMeaning = LocalizeText(
+                vanillaAllow
+                    ? kPublicTransportLanePolicyVanillaAllowLocaleId
+                    : kPublicTransportLanePolicyVanillaDenyLocaleId,
+                vanillaAllow ? "Vanilla allow" : "Vanilla deny");
+            string tleMeaning = LocalizeText(
+                modAllow
+                    ? kPublicTransportLanePolicyTleAllowLocaleId
+                    : kPublicTransportLanePolicyTleDenyLocaleId,
+                modAllow ? "TLE allow" : "TLE deny");
+            string meaning = string.Format(meaningFormat, type, vanillaMeaning, tleMeaning);
 
             List<string> qualifiers = null;
             if (PublicTransportLanePolicy.ModPrefersLanes(accessBits))
@@ -589,8 +616,20 @@ namespace Traffic_Law_Enforcement
             }
 
             return qualifiers == null || qualifiers.Count == 0
-                ? type
-                : $"{type} [{string.Join(", ", qualifiers)}]";
+                ? meaning
+                : $"{meaning} [{string.Join(", ", qualifiers)}]";
+        }
+
+        private static string LocalizeText(string localeId, string fallback)
+        {
+            if (GameManager.instance?.localizationManager?.activeDictionary != null &&
+                GameManager.instance.localizationManager.activeDictionary.TryGetValue(localeId, out string value) &&
+                !string.IsNullOrWhiteSpace(value))
+            {
+                return value;
+            }
+
+            return fallback;
         }
 
         private string BuildPermissionStateSummary(
