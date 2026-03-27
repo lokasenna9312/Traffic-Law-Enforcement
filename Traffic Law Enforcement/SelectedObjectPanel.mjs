@@ -150,8 +150,11 @@ const styles = {
     subsectionFoldout: {
         marginTop: "14px",
         marginBottom: "8px",
-        borderRadius: "4px",
-        background: "rgba(28, 40, 58, 0.72)",
+        marginLeft: "-18px",
+        marginRight: "-18px",
+        width: "calc(100% + 36px)",
+        borderRadius: "0",
+        background: "rgba(28, 40, 58, 0.94)",
     },
     subsectionBody: {
         display: "flex",

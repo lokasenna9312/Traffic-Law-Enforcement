@@ -275,8 +275,8 @@ namespace Traffic_Law_Enforcement
             m_ExpandSectionTooltipBinding.Update(LocalizeText(kExpandSectionLocaleId, "Expand section"));
             m_CollapseSectionTooltipBinding.Update(LocalizeText(kCollapseSectionLocaleId, "Collapse section"));
             m_LaneDetailsTitleBinding.Update(LocalizeText(kLaneDetailsTitleLocaleId, "Lane details"));
-            m_CurrentLaneLabelBinding.Update(LocalizeText(kCurrentLaneLabelLocaleId, "Current lane"));
-            m_PreviousLaneLabelBinding.Update(LocalizeText(kPreviousLaneLabelLocaleId, "Previous lane"));
+            m_CurrentLaneLabelBinding.Update(LocalizeText(kCurrentLaneLabelLocaleId, "Current lane entity"));
+            m_PreviousLaneLabelBinding.Update(LocalizeText(kPreviousLaneLabelLocaleId, "Previous lane entity"));
             m_LaneChangesLabelBinding.Update(LocalizeText(kLaneChangesLabelLocaleId, "Lane changes"));
             m_LiveLaneStateLabelBinding.Update(LocalizeText(kLiveLaneStateLabelLocaleId, "Live lane state"));
         }
