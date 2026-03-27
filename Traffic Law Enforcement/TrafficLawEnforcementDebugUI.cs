@@ -509,9 +509,9 @@ namespace Traffic_Law_Enforcement
         private static string GetRoleText()
         {
             return GetVehicleInfoText(
-                snapshot => string.IsNullOrWhiteSpace(snapshot.RoleOrTypeText)
+                snapshot => string.IsNullOrWhiteSpace(snapshot.RoleText)
                     ? "Unavailable"
-                    : ExtractRoleText(snapshot.RoleOrTypeText));
+                    : snapshot.RoleText);
         }
 
         private static string GetPublicTransportLaneAllowanceText()
@@ -711,26 +711,6 @@ namespace Traffic_Law_Enforcement
             }
 
             return formatter(snapshot);
-        }
-
-        private static string ExtractRoleText(string roleOrType)
-        {
-            if (string.IsNullOrWhiteSpace(roleOrType))
-            {
-                return "Unavailable";
-            }
-
-            string[] segments = roleOrType.Split('|');
-            foreach (string segment in segments)
-            {
-                string normalized = segment.Trim();
-                if (!string.IsNullOrEmpty(normalized))
-                {
-                    return normalized;
-                }
-            }
-
-            return "Unavailable";
         }
 
         private static string GetReadyTleText(

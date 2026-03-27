@@ -140,15 +140,13 @@ namespace Traffic_Law_Enforcement
                 };
             }
 
-            string role = ExtractRoleText(snapshot.RoleOrTypeText);
-
             return new PanelState
             {
                 Visible = true,
                 Compact = false,
                 Classification = snapshot.SummaryClassificationText,
                 TleStatus = BuildCompactTleStatus(snapshot),
-                Role = role,
+                Role = NormalizeText(snapshot.RoleText),
                 PublicTransportLaneAllowance =
                     NormalizeText(snapshot.PublicTransportLaneAllowanceText),
                 VehicleIndex = snapshot.VehicleIndex >= 0
@@ -256,25 +254,5 @@ namespace Traffic_Law_Enforcement
             };
         }
 
-        private static string ExtractRoleText(string roleOrType)
-        {
-            string normalized = NormalizeText(roleOrType);
-            if (string.IsNullOrEmpty(normalized))
-            {
-                return string.Empty;
-            }
-
-            string[] segments = normalized.Split('|');
-            foreach (string rawSegment in segments)
-            {
-                string segment = NormalizeText(rawSegment);
-                if (!string.IsNullOrEmpty(segment))
-                {
-                    return segment;
-                }
-            }
-
-            return string.Empty;
-        }
     }
 }

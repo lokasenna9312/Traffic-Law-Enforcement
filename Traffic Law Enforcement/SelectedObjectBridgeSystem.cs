@@ -41,7 +41,7 @@ namespace Traffic_Law_Enforcement
         public readonly string CompactLastReasonText;
 
         public readonly int VehicleIndex;
-        public readonly string RoleOrTypeText;
+        public readonly string RoleText;
         public readonly string PublicTransportLaneAllowanceText;
         public readonly bool HasTrafficLawProfile;
 
@@ -83,7 +83,7 @@ namespace Traffic_Law_Enforcement
             string summaryTleStatusText,
             string compactLastReasonText,
             int vehicleIndex,
-            string roleOrTypeText,
+            string roleText,
             string publicTransportLaneAllowanceText,
             bool hasTrafficLawProfile,
             Entity currentLaneEntity,
@@ -121,7 +121,7 @@ namespace Traffic_Law_Enforcement
             SummaryTleStatusText = summaryTleStatusText;
             CompactLastReasonText = compactLastReasonText;
             VehicleIndex = vehicleIndex;
-            RoleOrTypeText = roleOrTypeText;
+            RoleText = roleText;
             PublicTransportLaneAllowanceText = publicTransportLaneAllowanceText;
             HasTrafficLawProfile = hasTrafficLawProfile;
             CurrentLaneEntity = currentLaneEntity;
@@ -287,7 +287,7 @@ namespace Traffic_Law_Enforcement
                 BuildSummaryTleStatusText(resolveResult, tleApplicability),
                 BuildCompactLastReasonText(tleApplicable, lastReason),
                 resolveResult.IsVehicle && hasVehicleEntity ? vehicle.Index : -1,
-                BuildRoleOrTypeText(resolveResult),
+                BuildRoleText(resolveResult),
                 BuildPublicTransportLaneAllowanceText(resolveResult, hasTrafficLawProfile),
                 hasTrafficLawProfile,
                 currentLaneEntity,
@@ -498,7 +498,7 @@ namespace Traffic_Law_Enforcement
             return normalizedReason.Substring(0, maxLength - 3) + "...";
         }
 
-        private string BuildRoleOrTypeText(SelectedObjectResolveResult resolveResult)
+        private string BuildRoleText(SelectedObjectResolveResult resolveResult)
         {
             if (!resolveResult.HasSelection)
             {
@@ -515,29 +515,9 @@ namespace Traffic_Law_Enforcement
                 case SelectedObjectKind.RoadCar:
                     {
                         Entity vehicle = resolveResult.ResolvedVehicleEntity;
-                        string role = PublicTransportLanePolicy.DescribeVehicleRole(
+                        return PublicTransportLanePolicy.DescribeVehicleRole(
                             vehicle,
                             ref m_TypeLookups);
-
-                        if (!m_ProfileData.TryGetComponent(
-                                vehicle,
-                                out VehicleTrafficLawProfile profile))
-                        {
-                            return role;
-                        }
-
-                        string type =
-                            PublicTransportLanePolicy.DescribeType(
-                                profile.m_PublicTransportLaneAccessBits);
-
-                        bool emergencyOverrideActive =
-                            PublicTransportLanePolicy.HasEmergencyPublicTransportLaneOverride(
-                                profile.m_PublicTransportLaneAccessBits,
-                                profile.m_EmergencyVehicle != 0);
-
-                        return emergencyOverrideActive
-                            ? $"{role} | PT type: {type} | emergency PT override active"
-                            : $"{role} | PT type: {type}";
                     }
 
                 case SelectedObjectKind.ParkedRoadCar:
