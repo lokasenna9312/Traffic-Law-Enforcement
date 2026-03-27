@@ -1,10 +1,12 @@
 using System.Collections.Generic;
 using Game;
+using Game.Buildings;
 using Game.Common;
 using Game.Net;
 using Game.Pathfind;
 using Game.Routes;
 using Game.SceneFlow;
+using Game.UI;
 using Game.Vehicles;
 using Unity.Entities;
 using Entity = Unity.Entities.Entity;
@@ -69,6 +71,7 @@ namespace Traffic_Law_Enforcement
         public readonly bool HasRouteDiagnostics;
         public readonly string RouteDiagnosticsCurrentTargetText;
         public readonly string RouteDiagnosticsCurrentRouteText;
+        public readonly string RouteDiagnosticsTargetRoadText;
         public readonly string RouteDiagnosticsNavigationLanesText;
         public readonly string RouteDiagnosticsPlannedPenaltiesText;
         public readonly string RouteDiagnosticsPenaltyTagsText;
@@ -122,6 +125,7 @@ namespace Traffic_Law_Enforcement
             bool hasRouteDiagnostics,
             string routeDiagnosticsCurrentTargetText,
             string routeDiagnosticsCurrentRouteText,
+            string routeDiagnosticsTargetRoadText,
             string routeDiagnosticsNavigationLanesText,
             string routeDiagnosticsPlannedPenaltiesText,
             string routeDiagnosticsPenaltyTagsText,
@@ -174,6 +178,7 @@ namespace Traffic_Law_Enforcement
             HasRouteDiagnostics = hasRouteDiagnostics;
             RouteDiagnosticsCurrentTargetText = routeDiagnosticsCurrentTargetText;
             RouteDiagnosticsCurrentRouteText = routeDiagnosticsCurrentRouteText;
+            RouteDiagnosticsTargetRoadText = routeDiagnosticsTargetRoadText;
             RouteDiagnosticsNavigationLanesText = routeDiagnosticsNavigationLanesText;
             RouteDiagnosticsPlannedPenaltiesText = routeDiagnosticsPlannedPenaltiesText;
             RouteDiagnosticsPenaltyTagsText = routeDiagnosticsPenaltyTagsText;
@@ -312,6 +317,7 @@ namespace Traffic_Law_Enforcement
 
         private SelectedObjectResolver m_SelectedObjectResolver;
         private PublicTransportLaneVehicleTypeLookups m_TypeLookups;
+        private NameSystem m_NameSystem;
 
         private ComponentLookup<Target> m_TargetData;
         private ComponentLookup<CurrentRoute> m_CurrentRouteData;
@@ -327,6 +333,7 @@ namespace Traffic_Law_Enforcement
         private ComponentLookup<PublicTransportLanePendingExit> m_PendingExitData;
         private ComponentLookup<PublicTransportLanePermissionState> m_PermissionStateData;
         private ComponentLookup<Owner> m_OwnerData;
+        private ComponentLookup<Aggregated> m_AggregatedData;
         private ComponentLookup<CarLane> m_CarLaneData;
         private ComponentLookup<EdgeLane> m_EdgeLaneData;
         private ComponentLookup<ParkingLane> m_ParkingLaneData;
@@ -345,6 +352,7 @@ namespace Traffic_Law_Enforcement
 
             m_SelectedObjectResolver = new SelectedObjectResolver(this);
             m_TypeLookups = PublicTransportLaneVehicleTypeLookups.Create(this);
+            m_NameSystem = World.GetOrCreateSystemManaged<NameSystem>();
             m_TargetData = GetComponentLookup<Target>(true);
             m_CurrentRouteData = GetComponentLookup<CurrentRoute>(true);
             m_PathOwnerData = GetComponentLookup<PathOwner>(true);
@@ -361,6 +369,7 @@ namespace Traffic_Law_Enforcement
             m_PermissionStateData =
                 GetComponentLookup<PublicTransportLanePermissionState>(true);
             m_OwnerData = GetComponentLookup<Owner>(true);
+            m_AggregatedData = GetComponentLookup<Aggregated>(true);
             m_CarLaneData = GetComponentLookup<CarLane>(true);
             m_EdgeLaneData = GetComponentLookup<EdgeLane>(true);
             m_ParkingLaneData = GetComponentLookup<ParkingLane>(true);
@@ -386,6 +395,7 @@ namespace Traffic_Law_Enforcement
             m_PendingExitData.Update(this);
             m_PermissionStateData.Update(this);
             m_OwnerData.Update(this);
+            m_AggregatedData.Update(this);
             m_CarLaneData.Update(this);
             m_EdgeLaneData.Update(this);
             m_ParkingLaneData.Update(this);
@@ -521,6 +531,7 @@ namespace Traffic_Law_Enforcement
                 routeDiagnostics.HasDiagnostics,
                 routeDiagnostics.CurrentTargetText,
                 routeDiagnostics.CurrentRouteText,
+                routeDiagnostics.TargetRoadText,
                 routeDiagnostics.NavigationLanesText,
                 routeDiagnostics.PlannedPenaltiesText,
                 routeDiagnostics.PenaltyTagsText,
@@ -603,6 +614,7 @@ namespace Traffic_Law_Enforcement
                 currentPathFlags: currentPathFlags,
                 currentTargetText: BuildCurrentTargetText(targetEntity),
                 currentRouteText: FormatEntityOrNone(currentRouteEntity),
+                targetRoadText: BuildTargetRoadText(targetEntity),
                 navigationLanesText: NormalizeInspectionText(
                     RoutePenaltyInspection.BuildNavigationPreview(
                         currentLaneEntity,
@@ -658,7 +670,32 @@ namespace Traffic_Law_Enforcement
                 return string.Empty;
             }
 
-            return FormatEntityOrNone(connected.m_Connected);
+            return FormatNamedEntity(connected.m_Connected);
+        }
+
+        private string BuildTargetRoadText(Entity targetEntity)
+        {
+            if (targetEntity == Entity.Null)
+            {
+                return string.Empty;
+            }
+
+            if (m_ConnectedData.TryGetComponent(targetEntity, out Connected connected) &&
+                TryGetRoadEntityFromAddressable(connected.m_Connected, out Entity stopRoad))
+            {
+                return FormatNamedEntity(stopRoad);
+            }
+
+            if (m_RouteLaneData.TryGetComponent(targetEntity, out RouteLane routeLane))
+            {
+                Entity roadEntity = ResolveRoadEntityFromLane(routeLane.m_StartLane);
+                if (roadEntity != Entity.Null)
+                {
+                    return FormatNamedEntity(roadEntity);
+                }
+            }
+
+            return string.Empty;
         }
 
         private string BuildRouteDecisionExplanation(
@@ -763,11 +800,68 @@ namespace Traffic_Law_Enforcement
             return text.Trim();
         }
 
+        private string FormatNamedEntity(Entity entity)
+        {
+            string entityText = FormatEntityOrNone(entity);
+            string renderedName = TryGetRenderedName(entity);
+            return string.IsNullOrWhiteSpace(renderedName)
+                ? entityText
+                : $"{entityText} \"{renderedName}\"";
+        }
+
         private string FormatEntityOrNone(Entity entity)
         {
             return entity == Entity.Null
                 ? LocalizeText(SelectedObjectPanelUISystem.kNoneLocaleId, "None")
                 : $"#{entity.Index}:v{entity.Version}";
+        }
+
+        private string TryGetRenderedName(Entity entity)
+        {
+            if (entity == Entity.Null || m_NameSystem == null)
+            {
+                return string.Empty;
+            }
+
+            string renderedName = m_NameSystem.GetRenderedLabelName(entity);
+            return string.IsNullOrWhiteSpace(renderedName)
+                ? string.Empty
+                : renderedName.Trim();
+        }
+
+        private bool TryGetRoadEntityFromAddressable(Entity entity, out Entity road)
+        {
+            if (entity != Entity.Null &&
+                BuildingUtils.GetAddress(EntityManager, entity, out road, out _))
+            {
+                return true;
+            }
+
+            road = Entity.Null;
+            return false;
+        }
+
+        private Entity ResolveRoadEntityFromLane(Entity lane)
+        {
+            if (lane == Entity.Null ||
+                !m_OwnerData.TryGetComponent(lane, out Owner owner))
+            {
+                return Entity.Null;
+            }
+
+            Entity laneOwner = owner.m_Owner;
+            if (laneOwner == Entity.Null)
+            {
+                return Entity.Null;
+            }
+
+            if (m_AggregatedData.TryGetComponent(laneOwner, out Aggregated aggregated) &&
+                aggregated.m_Aggregate != Entity.Null)
+            {
+                return aggregated.m_Aggregate;
+            }
+
+            return laneOwner;
         }
 
         private readonly struct RouteDiagnosticsData
@@ -779,6 +873,7 @@ namespace Traffic_Law_Enforcement
             public readonly PathFlags CurrentPathFlags;
             public readonly string CurrentTargetText;
             public readonly string CurrentRouteText;
+            public readonly string TargetRoadText;
             public readonly string NavigationLanesText;
             public readonly string PlannedPenaltiesText;
             public readonly string PenaltyTagsText;
@@ -794,6 +889,7 @@ namespace Traffic_Law_Enforcement
                 PathFlags currentPathFlags,
                 string currentTargetText,
                 string currentRouteText,
+                string targetRoadText,
                 string navigationLanesText,
                 string plannedPenaltiesText,
                 string penaltyTagsText,
@@ -808,6 +904,7 @@ namespace Traffic_Law_Enforcement
                 CurrentPathFlags = currentPathFlags;
                 CurrentTargetText = currentTargetText;
                 CurrentRouteText = currentRouteText;
+                TargetRoadText = targetRoadText;
                 NavigationLanesText = navigationLanesText;
                 PlannedPenaltiesText = plannedPenaltiesText;
                 PenaltyTagsText = penaltyTagsText;

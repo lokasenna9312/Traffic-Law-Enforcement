@@ -47,6 +47,7 @@ const liveLaneStateLabelTextBinding = api.bindValue(group, "liveLaneStateLabelTe
 const routeDiagnosticsTitleTextBinding = api.bindValue(group, "routeDiagnosticsTitleText", "");
 const currentTargetLabelTextBinding = api.bindValue(group, "currentTargetLabelText", "");
 const currentRouteLabelTextBinding = api.bindValue(group, "currentRouteLabelText", "");
+const targetRoadLabelTextBinding = api.bindValue(group, "targetRoadLabelText", "");
 const navigationLanesLabelTextBinding = api.bindValue(group, "navigationLanesLabelText", "");
 const plannedPenaltiesLabelTextBinding = api.bindValue(group, "plannedPenaltiesLabelText", "");
 const penaltyTagsLabelTextBinding = api.bindValue(group, "penaltyTagsLabelText", "");
@@ -62,6 +63,7 @@ const routeDiagnosticsVisibleBinding = api.bindValue(group, "routeDiagnosticsVis
 const routeDiagnosticsCollapsedBinding = api.bindValue(group, "routeDiagnosticsCollapsed", true);
 const currentTargetBinding = api.bindValue(group, "currentTarget", "");
 const currentRouteBinding = api.bindValue(group, "currentRoute", "");
+const targetRoadBinding = api.bindValue(group, "targetRoad", "");
 const navigationLanesBinding = api.bindValue(group, "navigationLanes", "");
 const plannedPenaltiesBinding = api.bindValue(group, "plannedPenalties", "");
 const penaltyTagsBinding = api.bindValue(group, "penaltyTags", "");
@@ -268,6 +270,7 @@ function SelectedObjectPanel() {
     const routeDiagnosticsTitleText = api.useValue(routeDiagnosticsTitleTextBinding);
     const currentTargetLabelText = api.useValue(currentTargetLabelTextBinding);
     const currentRouteLabelText = api.useValue(currentRouteLabelTextBinding);
+    const targetRoadLabelText = api.useValue(targetRoadLabelTextBinding);
     const navigationLanesLabelText = api.useValue(navigationLanesLabelTextBinding);
     const plannedPenaltiesLabelText = api.useValue(plannedPenaltiesLabelTextBinding);
     const penaltyTagsLabelText = api.useValue(penaltyTagsLabelTextBinding);
@@ -283,6 +286,7 @@ function SelectedObjectPanel() {
     const routeDiagnosticsCollapsed = api.useValue(routeDiagnosticsCollapsedBinding);
     const currentTarget = api.useValue(currentTargetBinding);
     const currentRoute = api.useValue(currentRouteBinding);
+    const targetRoad = api.useValue(targetRoadBinding);
     const navigationLanes = api.useValue(navigationLanesBinding);
     const plannedPenalties = api.useValue(plannedPenaltiesBinding);
     const penaltyTags = api.useValue(penaltyTagsBinding);
@@ -405,6 +409,7 @@ function SelectedObjectPanel() {
                              { style: styles.subsectionBody },
                              h(Row, { label: currentTargetLabelText, value: currentTarget }),
                              h(Row, { label: currentRouteLabelText, value: currentRoute }),
+                             h(Row, { label: targetRoadLabelText, value: targetRoad }),
                              h(Row, { label: navigationLanesLabelText, value: navigationLanes }),
                              h(Row, { label: plannedPenaltiesLabelText, value: plannedPenalties }),
                              h(Row, { label: penaltyTagsLabelText, value: penaltyTags }),

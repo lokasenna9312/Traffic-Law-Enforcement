@@ -42,6 +42,7 @@ namespace Traffic_Law_Enforcement
         internal const string kRouteDiagnosticsTitleLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Text.RouteDiagnosticsTitle";
         internal const string kCurrentTargetLabelLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Label.CurrentTarget";
         internal const string kCurrentRouteLabelLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Label.CurrentRoute";
+        internal const string kTargetRoadLabelLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Label.TargetRoad";
         internal const string kNavigationLanesLabelLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Label.NavigationLanes";
         internal const string kPlannedPenaltiesLabelLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Label.PlannedPenalties";
         internal const string kPenaltyTagsLabelLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Label.PenaltyTags";
@@ -99,6 +100,7 @@ namespace Traffic_Law_Enforcement
         private ValueBinding<string> m_RouteDiagnosticsTitleBinding;
         private ValueBinding<string> m_CurrentTargetLabelBinding;
         private ValueBinding<string> m_CurrentRouteLabelBinding;
+        private ValueBinding<string> m_TargetRoadLabelBinding;
         private ValueBinding<string> m_NavigationLanesLabelBinding;
         private ValueBinding<string> m_PlannedPenaltiesLabelBinding;
         private ValueBinding<string> m_PenaltyTagsLabelBinding;
@@ -114,6 +116,7 @@ namespace Traffic_Law_Enforcement
         private ValueBinding<bool> m_RouteDiagnosticsCollapsedBinding;
         private ValueBinding<string> m_CurrentTargetBinding;
         private ValueBinding<string> m_CurrentRouteBinding;
+        private ValueBinding<string> m_TargetRoadBinding;
         private ValueBinding<string> m_NavigationLanesBinding;
         private ValueBinding<string> m_PlannedPenaltiesBinding;
         private ValueBinding<string> m_PenaltyTagsBinding;
@@ -150,6 +153,7 @@ namespace Traffic_Law_Enforcement
             public bool RouteDiagnosticsVisible;
             public string CurrentTarget;
             public string CurrentRoute;
+            public string TargetRoad;
             public string NavigationLanes;
             public string PlannedPenalties;
             public string PenaltyTags;
@@ -198,6 +202,7 @@ namespace Traffic_Law_Enforcement
             AddBinding(m_RouteDiagnosticsTitleBinding = new ValueBinding<string>(kGroup, "routeDiagnosticsTitleText", string.Empty));
             AddBinding(m_CurrentTargetLabelBinding = new ValueBinding<string>(kGroup, "currentTargetLabelText", string.Empty));
             AddBinding(m_CurrentRouteLabelBinding = new ValueBinding<string>(kGroup, "currentRouteLabelText", string.Empty));
+            AddBinding(m_TargetRoadLabelBinding = new ValueBinding<string>(kGroup, "targetRoadLabelText", string.Empty));
             AddBinding(m_NavigationLanesLabelBinding = new ValueBinding<string>(kGroup, "navigationLanesLabelText", string.Empty));
             AddBinding(m_PlannedPenaltiesLabelBinding = new ValueBinding<string>(kGroup, "plannedPenaltiesLabelText", string.Empty));
             AddBinding(m_PenaltyTagsLabelBinding = new ValueBinding<string>(kGroup, "penaltyTagsLabelText", string.Empty));
@@ -213,6 +218,7 @@ namespace Traffic_Law_Enforcement
             AddBinding(m_RouteDiagnosticsCollapsedBinding = new ValueBinding<bool>(kGroup, "routeDiagnosticsCollapsed", true));
             AddBinding(m_CurrentTargetBinding = new ValueBinding<string>(kGroup, "currentTarget", string.Empty));
             AddBinding(m_CurrentRouteBinding = new ValueBinding<string>(kGroup, "currentRoute", string.Empty));
+            AddBinding(m_TargetRoadBinding = new ValueBinding<string>(kGroup, "targetRoad", string.Empty));
             AddBinding(m_NavigationLanesBinding = new ValueBinding<string>(kGroup, "navigationLanes", string.Empty));
             AddBinding(m_PlannedPenaltiesBinding = new ValueBinding<string>(kGroup, "plannedPenalties", string.Empty));
             AddBinding(m_PenaltyTagsBinding = new ValueBinding<string>(kGroup, "penaltyTags", string.Empty));
@@ -320,6 +326,7 @@ namespace Traffic_Law_Enforcement
                 RouteDiagnosticsVisible = snapshot.HasRouteDiagnostics,
                 CurrentTarget = NormalizeText(snapshot.RouteDiagnosticsCurrentTargetText),
                 CurrentRoute = NormalizeText(snapshot.RouteDiagnosticsCurrentRouteText),
+                TargetRoad = NormalizeText(snapshot.RouteDiagnosticsTargetRoadText),
                 NavigationLanes = NormalizeText(snapshot.RouteDiagnosticsNavigationLanesText),
                 PlannedPenalties = NormalizeText(snapshot.RouteDiagnosticsPlannedPenaltiesText),
                 PenaltyTags = NormalizeText(snapshot.RouteDiagnosticsPenaltyTagsText),
@@ -353,6 +360,7 @@ namespace Traffic_Law_Enforcement
             m_RouteDiagnosticsCollapsedBinding.Update(m_IsRouteDiagnosticsCollapsed);
             m_CurrentTargetBinding.Update(state.CurrentTarget ?? string.Empty);
             m_CurrentRouteBinding.Update(state.CurrentRoute ?? string.Empty);
+            m_TargetRoadBinding.Update(state.TargetRoad ?? string.Empty);
             m_NavigationLanesBinding.Update(state.NavigationLanes ?? string.Empty);
             m_PlannedPenaltiesBinding.Update(state.PlannedPenalties ?? string.Empty);
             m_PenaltyTagsBinding.Update(state.PenaltyTags ?? string.Empty);
@@ -383,6 +391,7 @@ namespace Traffic_Law_Enforcement
             m_RouteDiagnosticsTitleBinding.Update(LocalizeText(kRouteDiagnosticsTitleLocaleId, "Route diagnostics"));
             m_CurrentTargetLabelBinding.Update(LocalizeText(kCurrentTargetLabelLocaleId, "Current target"));
             m_CurrentRouteLabelBinding.Update(LocalizeText(kCurrentRouteLabelLocaleId, "Current route"));
+            m_TargetRoadLabelBinding.Update(LocalizeText(kTargetRoadLabelLocaleId, "Target road"));
             m_NavigationLanesLabelBinding.Update(LocalizeText(kNavigationLanesLabelLocaleId, "Navigation lanes"));
             m_PlannedPenaltiesLabelBinding.Update(LocalizeText(kPlannedPenaltiesLabelLocaleId, "Planned penalties"));
             m_PenaltyTagsLabelBinding.Update(LocalizeText(kPenaltyTagsLabelLocaleId, "Penalty tags"));

@@ -167,6 +167,7 @@ namespace Traffic_Law_Enforcement
             map["SelectedObjectPanel.RouteDiagnosticsTitle"] = SelectedObjectPanelUISystem.kRouteDiagnosticsTitleLocaleId;
             map["SelectedObjectPanel.CurrentTargetLabel"] = SelectedObjectPanelUISystem.kCurrentTargetLabelLocaleId;
             map["SelectedObjectPanel.CurrentRouteLabel"] = SelectedObjectPanelUISystem.kCurrentRouteLabelLocaleId;
+            map["SelectedObjectPanel.TargetRoadLabel"] = SelectedObjectPanelUISystem.kTargetRoadLabelLocaleId;
             map["SelectedObjectPanel.NavigationLanesLabel"] = SelectedObjectPanelUISystem.kNavigationLanesLabelLocaleId;
             map["SelectedObjectPanel.PlannedPenaltiesLabel"] = SelectedObjectPanelUISystem.kPlannedPenaltiesLabelLocaleId;
             map["SelectedObjectPanel.PenaltyTagsLabel"] = SelectedObjectPanelUISystem.kPenaltyTagsLabelLocaleId;
