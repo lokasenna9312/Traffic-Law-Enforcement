@@ -33,20 +33,8 @@ const fullPanelWidth = "560px";
 
 const styles = {
     wrapper: {
-        position: "fixed",
-        inset: 0,
-        pointerEvents: "none",
-        zIndex: 999,
-    },
-    panel: {
-        position: "fixed",
-        width: fullPanelWidth,
-        maxWidth: fullPanelWidth,
-        background: "rgba(35, 49, 70, 0.96)",
-        border: "1px solid rgba(255, 255, 255, 0.08)",
-        boxShadow: "0 8px 32px rgba(0, 0, 0, 0.35)",
-        pointerEvents: "auto",
-        overflow: "hidden",
+        display: "inline-block",
+        width: "auto",
     },
     header: {
         display: "flex",
@@ -57,36 +45,34 @@ const styles = {
         color: "#f7f9ff",
         fontWeight: 700,
         fontSize: "20px",
-        background: "rgba(18, 26, 38, 0.98)",
-        padding: "14px 16px",
-        boxSizing: "border-box",
-        cursor: "move",
     },
     headerActions: {
         display: "flex",
         alignItems: "center",
         gap: "8px",
     },
-    headerButton: {
-        width: "22px",
-        height: "22px",
-        border: "1px solid rgba(255, 255, 255, 0.18)",
-        background: "rgba(255, 255, 255, 0.10)",
-        color: "#f7f9ff",
-        borderRadius: "4px",
-        cursor: "pointer",
-        padding: 0,
-        fontSize: "15px",
-        lineHeight: "20px",
-        fontWeight: 700,
-    },
-    content: {
+    foldout: {
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
         width: "100%",
+        padding: "10px 18px",
         boxSizing: "border-box",
+        background: "rgba(28, 40, 58, 0.94)",
+        borderTop: "1px solid rgba(255, 255, 255, 0.06)",
+        borderBottom: "1px solid rgba(255, 255, 255, 0.06)",
+        cursor: "pointer",
+        color: "#e6eefc",
+        fontWeight: 700,
+        fontSize: "14px",
+    },
+    foldoutIcon: {
+        fontSize: "12px",
+        color: "#b8c6da",
     },
     body: {
         padding: "18px",
-        width: fullPanelWidth,
+        width: "100%",
         boxSizing: "border-box",
     },
     classification: {
@@ -175,46 +161,28 @@ function Row(props) {
 }
 
 function Header(props) {
-    const collapseText = props.collapsed ? "+" : "-";
-
     return h(
         "div",
-        { style: styles.header, onMouseDown: props.onStartDrag },
+        { style: styles.header },
         h("span", null, "Selected Object"),
-        h(
-            "div",
-            { style: styles.headerActions },
-            props.compact
-                ? null
-                : h(
-                      "button",
-                      {
-                          type: "button",
-                          style: styles.headerButton,
-                          onMouseDown: stopEvent,
-                          onClick: function (event) {
-                              stopEvent(event);
-                              props.onToggleCollapsed();
-                          },
-                          title: props.collapsed ? "Expand" : "Collapse",
-                      },
-                      collapseText
-                  ),
-            h(
-                "button",
-                {
-                    type: "button",
-                    style: styles.headerButton,
-                    onMouseDown: stopEvent,
-                    onClick: function (event) {
-                        stopEvent(event);
-                        props.onClose();
-                    },
-                    title: "Close",
-                },
-                "×"
-            )
-        )
+        h("div", { style: styles.headerActions })
+    );
+}
+
+function FoldoutRow(props) {
+    return h(
+        "div",
+        {
+            style: styles.foldout,
+            onMouseDown: stopEvent,
+            onClick: function (event) {
+                stopEvent(event);
+                props.onToggleCollapsed();
+            },
+            title: props.collapsed ? "Expand section" : "Collapse section",
+        },
+        h("span", null, props.title),
+        h("span", { style: styles.foldoutIcon }, props.collapsed ? "▶" : "▼")
     );
 }
 
@@ -231,14 +199,6 @@ function SelectedObjectPanel() {
     const totals = api.useValue(totalsBinding);
     const lastReason = api.useValue(lastReasonBinding);
     const resolvedEntity = api.useValue(resolvedEntityBinding);
-    const dragRef = React.useRef(null);
-    const panelRef = React.useRef(null);
-    const [position, setPosition] = React.useState(function () {
-        return {
-            left: Math.round(window.innerWidth * initialPosition.x),
-            top: Math.round(window.innerHeight * initialPosition.y),
-        };
-    });
 
     const onClose = React.useCallback(function () {
         api.trigger(group, "close");
@@ -248,61 +208,19 @@ function SelectedObjectPanel() {
         api.trigger(group, "toggleCollapsed");
     }, []);
 
-    const onStartDrag = React.useCallback(
-        function (event) {
-            stopEvent(event);
-            dragRef.current = {
-                startX: event.clientX,
-                startY: event.clientY,
-                left: position.left,
-                top: position.top,
-            };
-        },
-        [position.left, position.top]
-    );
-
-    React.useEffect(function () {
-        function onMouseMove(event) {
-            if (!dragRef.current) {
-                return;
-            }
-
-            event.preventDefault();
-
-            const nextLeft = dragRef.current.left + (event.clientX - dragRef.current.startX);
-            const nextTop = dragRef.current.top + (event.clientY - dragRef.current.startY);
-            const panelRect = panelRef.current
-                ? panelRef.current.getBoundingClientRect()
-                : { width: 560, height: 240 };
-            const maxLeft = Math.max(0, window.innerWidth - panelRect.width);
-            const maxTop = Math.max(0, window.innerHeight - panelRect.height);
-
-            setPosition({
-                left: Math.min(Math.max(0, nextLeft), maxLeft),
-                top: Math.min(Math.max(0, nextTop), maxTop),
-            });
-        }
-
-        function onMouseUp() {
-            dragRef.current = null;
-        }
-
-        window.addEventListener("mousemove", onMouseMove, true);
-        window.addEventListener("mouseup", onMouseUp, true);
-
-        return function () {
-            window.removeEventListener("mousemove", onMouseMove, true);
-            window.removeEventListener("mouseup", onMouseUp, true);
-        };
-    }, []);
-
     const header = h(Header, {
         compact,
         collapsed,
-        onClose,
         onToggleCollapsed,
-        onStartDrag,
     });
+
+    const foldout = compact
+        ? null
+        : h(FoldoutRow, {
+              title: "Summary",
+              collapsed,
+              onToggleCollapsed,
+          });
 
     const body = compact
         ? h(
@@ -321,7 +239,7 @@ function SelectedObjectPanel() {
                   h(
                       "div",
                       { style: styles.rows },
-                      h(Row, { label: "Role / type", value: roleOrType }),
+                      h(Row, { label: "Role / PT type", value: roleOrType }),
                       h(Row, { label: "Vehicle index", value: vehicleIndex }),
                       h(Row, { label: "Violation / pending", value: violationPending }),
                       h(Row, { label: "Violations / fines", value: totals }),
@@ -340,26 +258,22 @@ function SelectedObjectPanel() {
         null,
         h(
             "div",
-            { style: Object.assign({}, styles.wrapper, { display: visible ? "block" : "none" }) },
+            { style: Object.assign({}, styles.wrapper, { display: visible ? "inline-block" : "none" }) },
             h(
-                "div",
+                ui.Panel,
                 {
-                    ref: panelRef,
-                    style: Object.assign({}, styles.panel, {
-                        left: position.left + "px",
-                        top: position.top + "px",
+                    draggable: true,
+                    onClose,
+                    initialPosition,
+                    style: {
                         width: compact ? compactPanelWidth : fullPanelWidth,
                         maxWidth: compact ? compactPanelWidth : fullPanelWidth,
-                    }),
+                        overflow: "hidden",
+                    },
                 },
                 header,
-                collapsed
-                    ? null
-                    : h(
-                          "div",
-                          { style: styles.content },
-                          body
-                      )
+                foldout,
+                body
             )
         )
     );
