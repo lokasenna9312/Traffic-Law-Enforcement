@@ -93,33 +93,16 @@ const styles = {
         fontSize: "18px",
     },
     classificationIndex: {
-        color: "#d6e1f2",
-        fontWeight: 600,
-        fontSize: "14px",
+        color: "rgba(214, 225, 242, 0.72)",
+        fontWeight: 500,
+        fontSize: "12px",
+        letterSpacing: "0.2px",
     },
     compactMessage: {
         fontSize: "14px",
         lineHeight: 1.35,
         fontWeight: 600,
         color: "#f7f9ff",
-    },
-    statusLabel: {
-        color: "#c2cfdf",
-        fontWeight: 700,
-        fontSize: "13px",
-        marginBottom: "8px",
-    },
-    statusBlock: {
-        background: "rgba(45, 56, 75, 0.95)",
-        border: "1px solid rgba(255, 255, 255, 0.06)",
-        padding: "12px",
-        minHeight: "48px",
-        display: "flex",
-        alignItems: "center",
-        fontWeight: 700,
-        fontSize: "16px",
-        color: "#ffffff",
-        marginBottom: "12px",
     },
     rows: {
         display: "flex",
@@ -262,8 +245,11 @@ function SelectedObjectPanel() {
                                 ? h("div", { style: styles.classificationIndex }, "#" + vehicleIndex)
                                 : null
                         ),
-                        h("div", { style: styles.statusLabel, key: "label" }, tleStatusLabelText),
-                        h("div", { style: styles.statusBlock, key: "status" }, tleStatus),
+                        h(
+                            "div",
+                            { style: styles.rows, key: "rows" },
+                            h(Row, { label: tleStatusLabelText, value: tleStatus })
+                        ),
                     ]
           )
         : collapsed
@@ -279,11 +265,10 @@ function SelectedObjectPanel() {
                           ? h("div", { style: styles.classificationIndex }, "#" + vehicleIndex)
                           : null
                   ),
-                  h("div", { style: styles.statusLabel }, tleStatusLabelText),
-                  h("div", { style: styles.statusBlock }, tleStatus),
                   h(
                       "div",
                       { style: styles.rows },
+                      h(Row, { label: tleStatusLabelText, value: tleStatus }),
                       h(Row, { label: roleLabelText, value: role }),
                       h(Row, { label: activeFlagsLabelText, value: violationPending }),
                       h(Row, { label: violationsFinesLabelText, value: totals }),
