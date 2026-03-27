@@ -216,8 +216,10 @@ namespace Traffic_Law_Enforcement
             bool isRoadPublicTransport =
                 (authorizedCategories & PublicTransportLaneVehicleCategory.RoadPublicTransportVehicle) != 0;
 
+            // Vanilla emergency response grants PT-lane access, but not the
+            // dedicated "prefer public transport lanes" routing bias.
             bool vanillaPrefers =
-                emergency || isRoadPublicTransport;
+                isRoadPublicTransport;
 
             bool modAllowsAuthorized =
                 settings.AllowsPublicTransportLaneCategories(authorizedCategories);
@@ -231,7 +233,7 @@ namespace Traffic_Law_Enforcement
                 modAllowsAdditional;
 
             bool modPrefers =
-                emergency || isRoadPublicTransport;
+                isRoadPublicTransport;
 
             PublicTransportLaneAccessBits bits = PublicTransportLaneAccessBits.None;
 
