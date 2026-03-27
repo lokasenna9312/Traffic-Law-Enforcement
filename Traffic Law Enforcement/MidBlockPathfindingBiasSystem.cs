@@ -107,9 +107,7 @@ namespace Traffic_Law_Enforcement
                 midBlockPenalty);
             if (EnforcementLoggingPolicy.ShouldLogPathfindingPenaltyDiagnostics())
             {
-                Mod.log.Info(
-                    $"Applied mid-block pathfinding bias overrides: prefabs={prefabCount}, enabled={enforcementEnabled}, {MidBlockPathfindingBiasTelemetry.OverrideSummary}");
-                LogSharedPathfindPrefabDiagnostics();
+                Mod.log.Info($"Applied mid-block pathfinding bias overrides: prefabs={prefabCount}, enabled={enforcementEnabled}, {MidBlockPathfindingBiasTelemetry.OverrideSummary}");
             }
         }
 
@@ -159,29 +157,6 @@ namespace Traffic_Law_Enforcement
             });
 
             return currentData;
-        }
-
-        private void LogSharedPathfindPrefabDiagnostics()
-        {
-            NativeArray<Entity> prefabs = m_PathfindCarDataQuery.ToEntityArray(Allocator.Temp);
-
-            try
-            {
-                for (int index = 0; index < prefabs.Length; index++)
-                {
-                    Entity prefab = prefabs[index];
-                    PathfindCarData currentData = EntityManager.GetComponentData<PathfindCarData>(prefab);
-                    PathfindCarData originalData = m_OriginalPathfindCarDataLookup.TryGetComponent(prefab, out OriginalPathfindCarData originalComponent)
-                        ? originalComponent.m_Value
-                        : currentData;
-
-                    string prefabName = m_PrefabSystem != null ? m_PrefabSystem.GetPrefabName(prefab) : prefab.ToString();
-                }
-            }
-            finally
-            {
-                prefabs.Dispose();
-            }
         }
 
         private static void AddMoneyPenalty(ref PathfindCosts cost, float penalty)
