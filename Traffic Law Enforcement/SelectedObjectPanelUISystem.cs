@@ -31,6 +31,12 @@ namespace Traffic_Law_Enforcement
 
         protected override void OnDestroy()
         {
+            if (m_PanelToggleAction != null)
+            {
+                m_PanelToggleAction.shouldBeEnabled = false;
+                m_PanelToggleAction = null;
+            }
+
             DestroyPanelView();
             base.OnDestroy();
         }
@@ -130,6 +136,11 @@ namespace Traffic_Law_Enforcement
             {
                 m_PanelToggleAction =
                     Mod.Settings.GetAction(KeybindingIds.SelectedObjectPanelToggleActionName);
+
+                if (m_PanelToggleAction != null)
+                {
+                    m_PanelToggleAction.shouldBeEnabled = true;
+                }
             }
 
             return m_PanelToggleAction;
