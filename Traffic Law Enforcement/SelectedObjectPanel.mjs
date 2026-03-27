@@ -46,6 +46,7 @@ const currentLaneBinding = api.bindValue(group, "currentLane", "");
 const previousLaneBinding = api.bindValue(group, "previousLane", "");
 const laneChangesBinding = api.bindValue(group, "laneChanges", "");
 const liveLaneStateBinding = api.bindValue(group, "liveLaneState", "");
+const laneDetailsCollapsedBinding = api.bindValue(group, "laneDetailsCollapsed", true);
 
 const initialPosition = { x: 0.76, y: 0.1 };
 const ultraCompactPanelWidth = "240px";
@@ -243,7 +244,7 @@ function SelectedObjectPanel() {
     const previousLane = api.useValue(previousLaneBinding);
     const laneChanges = api.useValue(laneChangesBinding);
     const liveLaneState = api.useValue(liveLaneStateBinding);
-    const [laneDetailsCollapsed, setLaneDetailsCollapsed] = React.useState(true);
+    const laneDetailsCollapsed = api.useValue(laneDetailsCollapsedBinding);
 
     const onClose = React.useCallback(function () {
         api.trigger(group, "close");
@@ -254,9 +255,7 @@ function SelectedObjectPanel() {
     }, []);
 
     const onToggleLaneDetails = React.useCallback(function () {
-        setLaneDetailsCollapsed(function (value) {
-            return !value;
-        });
+        api.trigger(group, "toggleLaneDetailsCollapsed");
     }, []);
 
     if (!visible) {
@@ -334,13 +333,14 @@ function SelectedObjectPanel() {
                             h(Row, { label: currentLaneLabelText, value: currentLane }),
                             h(Row, { label: previousLaneLabelText, value: previousLane }),
                             h(Row, { label: laneChangesLabelText, value: laneChanges }),
-                            h(Row, { label: liveLaneStateLabelText, value: liveLaneState })
+                            h(Row, { label: liveLaneStateLabelText, value: liveLaneState }),
+                            h(
+                                "div",
+                                { style: styles.footer },
+                                footerText
+                            )
                         ),
-                  h(
-                      "div",
-                      { style: styles.footer },
-                      footerText
-                  )
+                  null
               );
 
     return h(

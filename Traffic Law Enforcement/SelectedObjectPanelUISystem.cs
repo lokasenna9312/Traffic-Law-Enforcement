@@ -71,9 +71,12 @@ namespace Traffic_Law_Enforcement
         private ValueBinding<string> m_PreviousLaneBinding;
         private ValueBinding<string> m_LaneChangesBinding;
         private ValueBinding<string> m_LiveLaneStateBinding;
+        private ValueBinding<bool> m_LaneDetailsCollapsedBinding;
 
         private bool m_IsPanelEnabled;
         private bool m_IsCollapsed;
+        private bool m_IsLaneDetailsCollapsed = true;
+        private int m_LastSeenPendingLoadSequence = -1;
 
         public override GameMode gameMode => GameMode.Game;
 
@@ -135,9 +138,11 @@ namespace Traffic_Law_Enforcement
             AddBinding(m_PreviousLaneBinding = new ValueBinding<string>(kGroup, "previousLane", string.Empty));
             AddBinding(m_LaneChangesBinding = new ValueBinding<string>(kGroup, "laneChanges", string.Empty));
             AddBinding(m_LiveLaneStateBinding = new ValueBinding<string>(kGroup, "liveLaneState", string.Empty));
+            AddBinding(m_LaneDetailsCollapsedBinding = new ValueBinding<bool>(kGroup, "laneDetailsCollapsed", true));
 
             AddBinding(new TriggerBinding(kGroup, "close", HandleCloseRequested));
             AddBinding(new TriggerBinding(kGroup, "toggleCollapsed", ToggleCollapsed));
+            AddBinding(new TriggerBinding(kGroup, "toggleLaneDetailsCollapsed", ToggleLaneDetailsCollapsed));
         }
 
         protected override void OnDestroy()
@@ -156,6 +161,7 @@ namespace Traffic_Law_Enforcement
             base.OnUpdate();
 
             UpdatePanelToggle();
+            UpdateSaveScopedUiState();
             UpdateLocalizedTextBindings();
 
             if (m_SelectedObjectBridgeSystem == null)
@@ -252,6 +258,7 @@ namespace Traffic_Law_Enforcement
             m_PreviousLaneBinding.Update(state.PreviousLane ?? string.Empty);
             m_LaneChangesBinding.Update(state.LaneChanges ?? string.Empty);
             m_LiveLaneStateBinding.Update(state.LiveLaneState ?? string.Empty);
+            m_LaneDetailsCollapsedBinding.Update(m_IsLaneDetailsCollapsed);
         }
 
         private void UpdateLocalizedTextBindings()
@@ -315,11 +322,35 @@ namespace Traffic_Law_Enforcement
             m_CollapsedBinding.Update(m_IsCollapsed);
         }
 
+        private void ToggleLaneDetailsCollapsed()
+        {
+            m_IsLaneDetailsCollapsed = !m_IsLaneDetailsCollapsed;
+            m_LaneDetailsCollapsedBinding.Update(m_IsLaneDetailsCollapsed);
+        }
+
         private static string NormalizeText(string text)
         {
             return string.IsNullOrWhiteSpace(text)
                 ? string.Empty
                 : text.Trim();
+        }
+
+        private void UpdateSaveScopedUiState()
+        {
+            int pendingLoadSequence = SaveLoadTraceService.PendingLoadSequence;
+            if (pendingLoadSequence == m_LastSeenPendingLoadSequence)
+            {
+                return;
+            }
+
+            if (m_LastSeenPendingLoadSequence >= 0 &&
+                pendingLoadSequence > m_LastSeenPendingLoadSequence)
+            {
+                m_IsLaneDetailsCollapsed = true;
+                m_LaneDetailsCollapsedBinding.Update(true);
+            }
+
+            m_LastSeenPendingLoadSequence = pendingLoadSequence;
         }
 
         private string BuildCompactTleStatusText(SelectedObjectDebugSnapshot snapshot)
