@@ -404,7 +404,7 @@ namespace Traffic_Law_Enforcement
         {
             return entity == Entity.Null
                 ? "None"
-                : $"Entity({entity.Index}:{entity.Version})";
+                : $"#{entity.Index}:v{entity.Version}";
         }
 
         private static string LocalizeText(string localeId, string fallback)
