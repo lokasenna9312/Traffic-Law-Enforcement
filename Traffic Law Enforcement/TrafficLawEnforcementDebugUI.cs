@@ -385,6 +385,21 @@ namespace Traffic_Law_Enforcement
             });
             routeDiagnostics.children.Add(new DebugUI.Value
             {
+                displayName = "Route start road",
+                getter = GetRouteDiagnosticsStartOwnerRoadText
+            });
+            routeDiagnostics.children.Add(new DebugUI.Value
+            {
+                displayName = "Route end road",
+                getter = GetRouteDiagnosticsEndOwnerRoadText
+            });
+            routeDiagnostics.children.Add(new DebugUI.Value
+            {
+                displayName = "Current -> target start",
+                getter = GetRouteDiagnosticsDirectConnectText
+            });
+            routeDiagnostics.children.Add(new DebugUI.Value
+            {
                 displayName = "Navigation lanes",
                 getter = GetRouteDiagnosticsNavigationLanesText
             });
@@ -788,6 +803,24 @@ namespace Traffic_Law_Enforcement
         {
             return GetRouteDiagnosticsOptionalText(
                 snapshot => snapshot.RouteDiagnosticsTargetRoadText);
+        }
+
+        private static string GetRouteDiagnosticsStartOwnerRoadText()
+        {
+            return GetRouteDiagnosticsOptionalText(
+                snapshot => snapshot.RouteDiagnosticsStartOwnerRoadText);
+        }
+
+        private static string GetRouteDiagnosticsEndOwnerRoadText()
+        {
+            return GetRouteDiagnosticsOptionalText(
+                snapshot => snapshot.RouteDiagnosticsEndOwnerRoadText);
+        }
+
+        private static string GetRouteDiagnosticsDirectConnectText()
+        {
+            return GetRouteDiagnosticsOptionalText(
+                snapshot => snapshot.RouteDiagnosticsDirectConnectText);
         }
 
         private static string GetRouteDiagnosticsNavigationLanesText()

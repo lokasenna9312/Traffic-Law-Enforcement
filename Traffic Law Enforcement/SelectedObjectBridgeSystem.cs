@@ -74,6 +74,9 @@ namespace Traffic_Law_Enforcement
         public readonly string RouteDiagnosticsCurrentTargetText;
         public readonly string RouteDiagnosticsCurrentRouteText;
         public readonly string RouteDiagnosticsTargetRoadText;
+        public readonly string RouteDiagnosticsStartOwnerRoadText;
+        public readonly string RouteDiagnosticsEndOwnerRoadText;
+        public readonly string RouteDiagnosticsDirectConnectText;
         public readonly string RouteDiagnosticsNavigationLanesText;
         public readonly string RouteDiagnosticsPlannedPenaltiesText;
         public readonly string RouteDiagnosticsPenaltyTagsText;
@@ -130,6 +133,9 @@ namespace Traffic_Law_Enforcement
             string routeDiagnosticsCurrentTargetText,
             string routeDiagnosticsCurrentRouteText,
             string routeDiagnosticsTargetRoadText,
+            string routeDiagnosticsStartOwnerRoadText,
+            string routeDiagnosticsEndOwnerRoadText,
+            string routeDiagnosticsDirectConnectText,
             string routeDiagnosticsNavigationLanesText,
             string routeDiagnosticsPlannedPenaltiesText,
             string routeDiagnosticsPenaltyTagsText,
@@ -185,6 +191,9 @@ namespace Traffic_Law_Enforcement
             RouteDiagnosticsCurrentTargetText = routeDiagnosticsCurrentTargetText;
             RouteDiagnosticsCurrentRouteText = routeDiagnosticsCurrentRouteText;
             RouteDiagnosticsTargetRoadText = routeDiagnosticsTargetRoadText;
+            RouteDiagnosticsStartOwnerRoadText = routeDiagnosticsStartOwnerRoadText;
+            RouteDiagnosticsEndOwnerRoadText = routeDiagnosticsEndOwnerRoadText;
+            RouteDiagnosticsDirectConnectText = routeDiagnosticsDirectConnectText;
             RouteDiagnosticsNavigationLanesText = routeDiagnosticsNavigationLanesText;
             RouteDiagnosticsPlannedPenaltiesText = routeDiagnosticsPlannedPenaltiesText;
             RouteDiagnosticsPenaltyTagsText = routeDiagnosticsPenaltyTagsText;
@@ -320,6 +329,16 @@ namespace Traffic_Law_Enforcement
             "TrafficLawEnforcement.SelectedObjectPanel.Text.RouteExplanation.PtPermissive";
         internal const string kRouteExplanationGenericFallbackLocaleId =
             "TrafficLawEnforcement.SelectedObjectPanel.Text.RouteExplanation.GenericFallback";
+        internal const string kRouteDirectConnectAlreadyOnStartLocaleId =
+            "TrafficLawEnforcement.SelectedObjectPanel.Text.RouteDirectConnect.AlreadyOnStart";
+        internal const string kRouteDirectConnectNextHopLocaleId =
+            "TrafficLawEnforcement.SelectedObjectPanel.Text.RouteDirectConnect.NextHop";
+        internal const string kRouteDirectConnectViaFormatLocaleId =
+            "TrafficLawEnforcement.SelectedObjectPanel.Text.RouteDirectConnect.ViaFormat";
+        internal const string kRouteDirectConnectNoPreviewLocaleId =
+            "TrafficLawEnforcement.SelectedObjectPanel.Text.RouteDirectConnect.NoPreview";
+        internal const string kRouteDirectConnectMissingStartLocaleId =
+            "TrafficLawEnforcement.SelectedObjectPanel.Text.RouteDirectConnect.MissingStart";
 
         private SelectedObjectResolver m_SelectedObjectResolver;
         private PublicTransportLaneVehicleTypeLookups m_TypeLookups;
@@ -543,6 +562,9 @@ namespace Traffic_Law_Enforcement
                 routeDiagnostics.CurrentTargetText,
                 routeDiagnostics.CurrentRouteText,
                 routeDiagnostics.TargetRoadText,
+                routeDiagnostics.StartOwnerRoadText,
+                routeDiagnostics.EndOwnerRoadText,
+                routeDiagnostics.DirectConnectText,
                 routeDiagnostics.NavigationLanesText,
                 routeDiagnostics.PlannedPenaltiesText,
                 routeDiagnostics.PenaltyTagsText,
@@ -624,8 +646,15 @@ namespace Traffic_Law_Enforcement
                 hasCurrentRoute: hasCurrentRoute,
                 currentPathFlags: currentPathFlags,
                 currentTargetText: BuildCurrentTargetText(targetEntity),
-                currentRouteText: FormatEntityOrNone(currentRouteEntity),
+                currentRouteText: BuildCurrentRouteText(currentRouteEntity),
                 targetRoadText: BuildTargetRoadText(targetEntity),
+                startOwnerRoadText: BuildRouteLaneOwnerRoadText(targetEntity, useStartLane: true),
+                endOwnerRoadText: BuildRouteLaneOwnerRoadText(targetEntity, useStartLane: false),
+                directConnectText: BuildCurrentToTargetStartDirectConnectText(
+                    currentLaneEntity,
+                    targetEntity,
+                    navigationLanes,
+                    hasNavigationLanes),
                 navigationLanesText: BuildNavigationLanesText(
                     currentLaneEntity,
                     navigationLanes,
@@ -705,12 +734,28 @@ namespace Traffic_Law_Enforcement
             }
 
             string text = FormatEntityOrNone(targetEntity);
+            string targetName = TryGetCurrentTargetName(targetEntity);
             if (m_WaypointData.TryGetComponent(targetEntity, out Waypoint waypoint))
             {
                 text += $" [waypoint {waypoint.m_Index}]";
             }
 
+            if (!string.IsNullOrWhiteSpace(targetName))
+            {
+                text += $" \"{targetName}\"";
+            }
+
             return text;
+        }
+
+        private string BuildCurrentRouteText(Entity currentRouteEntity)
+        {
+            if (currentRouteEntity == Entity.Null)
+            {
+                return FormatEntityOrNone(Entity.Null);
+            }
+
+            return FormatNamedEntity(currentRouteEntity);
         }
 
         private string BuildWaypointRouteLaneText(Entity targetEntity)
@@ -761,6 +806,145 @@ namespace Traffic_Law_Enforcement
             }
 
             return string.Empty;
+        }
+
+        private string TryGetCurrentTargetName(Entity targetEntity)
+        {
+            string renderedName = TryGetRenderedName(targetEntity);
+            if (!string.IsNullOrWhiteSpace(renderedName))
+            {
+                return renderedName;
+            }
+
+            if (m_ConnectedData.TryGetComponent(targetEntity, out Connected connected))
+            {
+                renderedName = TryGetRenderedName(connected.m_Connected);
+                if (!string.IsNullOrWhiteSpace(renderedName))
+                {
+                    return renderedName;
+                }
+            }
+
+            Entity roadEntity = Entity.Null;
+            if (m_RouteLaneData.TryGetComponent(targetEntity, out RouteLane routeLane))
+            {
+                roadEntity = ResolveRoadEntityFromLane(routeLane.m_StartLane);
+            }
+
+            return roadEntity == Entity.Null
+                ? string.Empty
+                : TryGetRenderedName(roadEntity);
+        }
+
+        private string BuildRouteLaneOwnerRoadText(Entity targetEntity, bool useStartLane)
+        {
+            if (targetEntity == Entity.Null ||
+                !m_RouteLaneData.TryGetComponent(targetEntity, out RouteLane routeLane))
+            {
+                return string.Empty;
+            }
+
+            Entity lane = useStartLane
+                ? routeLane.m_StartLane
+                : routeLane.m_EndLane;
+            if (lane == Entity.Null)
+            {
+                return string.Empty;
+            }
+
+            Entity roadEntity = ResolveRoadEntityFromLane(lane);
+            if (roadEntity != Entity.Null)
+            {
+                return FormatRoadName(roadEntity);
+            }
+
+            string laneOwnerName = TryGetLaneOwnerName(lane);
+            return string.IsNullOrWhiteSpace(laneOwnerName)
+                ? string.Empty
+                : laneOwnerName;
+        }
+
+        private string BuildCurrentToTargetStartDirectConnectText(
+            Entity currentLaneEntity,
+            Entity targetEntity,
+            DynamicBuffer<CarNavigationLane> navigationLanes,
+            bool hasNavigationLanes)
+        {
+            if (targetEntity == Entity.Null ||
+                !m_RouteLaneData.TryGetComponent(targetEntity, out RouteLane routeLane) ||
+                routeLane.m_StartLane == Entity.Null)
+            {
+                return LocalizeText(
+                    kRouteDirectConnectMissingStartLocaleId,
+                    "Target start lane unavailable.");
+            }
+
+            if (currentLaneEntity == routeLane.m_StartLane)
+            {
+                return LocalizeText(
+                    kRouteDirectConnectAlreadyOnStartLocaleId,
+                    "Yes, already on the target start lane.");
+            }
+
+            if (!hasNavigationLanes || navigationLanes.Length == 0)
+            {
+                return LocalizeText(
+                    kRouteDirectConnectNoPreviewLocaleId,
+                    "No, no current navigation preview reaches the target start lane.");
+            }
+
+            List<Entity> upcomingLanes = new List<Entity>(navigationLanes.Length);
+            bool skippedLeadingCurrentLane = false;
+
+            for (int index = 0; index < navigationLanes.Length; index++)
+            {
+                Entity lane = navigationLanes[index].m_Lane;
+                if (lane == Entity.Null)
+                {
+                    continue;
+                }
+
+                if (!skippedLeadingCurrentLane &&
+                    currentLaneEntity != Entity.Null &&
+                    lane == currentLaneEntity)
+                {
+                    skippedLeadingCurrentLane = true;
+                    continue;
+                }
+
+                upcomingLanes.Add(lane);
+            }
+
+            if (upcomingLanes.Count == 0)
+            {
+                return LocalizeText(
+                    kRouteDirectConnectNoPreviewLocaleId,
+                    "No, no current navigation preview reaches the target start lane.");
+            }
+
+            if (upcomingLanes[0] == routeLane.m_StartLane)
+            {
+                return LocalizeText(
+                    kRouteDirectConnectNextHopLocaleId,
+                    "Yes, the next hop reaches the target start lane.");
+            }
+
+            for (int index = 1; index < upcomingLanes.Count; index++)
+            {
+                if (upcomingLanes[index] == routeLane.m_StartLane)
+                {
+                    return string.Format(
+                        LocalizeText(
+                            kRouteDirectConnectViaFormatLocaleId,
+                            "No, reaches the target start lane after {0} intermediate lane(s) via {1}."),
+                        index,
+                        BuildLaneDisplayText(upcomingLanes[0]));
+                }
+            }
+
+            return LocalizeText(
+                kRouteDirectConnectNoPreviewLocaleId,
+                "No, no current navigation preview reaches the target start lane.");
         }
 
         private string BuildRouteDecisionExplanation(
@@ -882,22 +1066,22 @@ namespace Traffic_Law_Enforcement
 
             if (m_ConnectionLaneData.HasComponent(lane))
             {
-                return $"{prefix} | connection{ptSuffix}";
+                return $"{prefix}, connection{ptSuffix}";
             }
 
             if (m_ParkingLaneData.HasComponent(lane))
             {
-                return $"{prefix} | parking{ptSuffix}";
+                return $"{prefix}, parking{ptSuffix}";
             }
 
             if (m_GarageLaneData.HasComponent(lane))
             {
-                return $"{prefix} | garage{ptSuffix}";
+                return $"{prefix}, garage{ptSuffix}";
             }
 
             if (TryBuildLaneOrdinal(lane, out int laneNumber, out int laneCount))
             {
-                return $"{prefix} | {laneNumber}/{laneCount}{ptSuffix}";
+                return $"{prefix}, {laneNumber}/{laneCount}{ptSuffix}";
             }
 
             return prefix + ptSuffix;
@@ -941,6 +1125,30 @@ namespace Traffic_Law_Enforcement
             return string.IsNullOrWhiteSpace(renderedName)
                 ? FormatEntityOrNone(roadEntity)
                 : renderedName;
+        }
+
+        private string TryGetLaneOwnerName(Entity lane)
+        {
+            if (lane == Entity.Null ||
+                !m_OwnerData.TryGetComponent(lane, out Owner owner) ||
+                owner.m_Owner == Entity.Null)
+            {
+                return string.Empty;
+            }
+
+            string renderedName = TryGetRenderedName(owner.m_Owner);
+            if (!string.IsNullOrWhiteSpace(renderedName))
+            {
+                return renderedName;
+            }
+
+            if (m_AggregatedData.TryGetComponent(owner.m_Owner, out Aggregated aggregated) &&
+                aggregated.m_Aggregate != Entity.Null)
+            {
+                return TryGetRenderedName(aggregated.m_Aggregate);
+            }
+
+            return string.Empty;
         }
 
         private string FormatNamedEntity(Entity entity)
@@ -1017,6 +1225,9 @@ namespace Traffic_Law_Enforcement
             public readonly string CurrentTargetText;
             public readonly string CurrentRouteText;
             public readonly string TargetRoadText;
+            public readonly string StartOwnerRoadText;
+            public readonly string EndOwnerRoadText;
+            public readonly string DirectConnectText;
             public readonly string NavigationLanesText;
             public readonly string PlannedPenaltiesText;
             public readonly string PenaltyTagsText;
@@ -1033,6 +1244,9 @@ namespace Traffic_Law_Enforcement
                 string currentTargetText,
                 string currentRouteText,
                 string targetRoadText,
+                string startOwnerRoadText,
+                string endOwnerRoadText,
+                string directConnectText,
                 string navigationLanesText,
                 string plannedPenaltiesText,
                 string penaltyTagsText,
@@ -1048,6 +1262,9 @@ namespace Traffic_Law_Enforcement
                 CurrentTargetText = currentTargetText;
                 CurrentRouteText = currentRouteText;
                 TargetRoadText = targetRoadText;
+                StartOwnerRoadText = startOwnerRoadText;
+                EndOwnerRoadText = endOwnerRoadText;
+                DirectConnectText = directConnectText;
                 NavigationLanesText = navigationLanesText;
                 PlannedPenaltiesText = plannedPenaltiesText;
                 PenaltyTagsText = penaltyTagsText;

@@ -54,6 +54,9 @@ const routeDiagnosticsTitleTextBinding = api.bindValue(group, "routeDiagnosticsT
 const currentTargetLabelTextBinding = api.bindValue(group, "currentTargetLabelText", "");
 const currentRouteLabelTextBinding = api.bindValue(group, "currentRouteLabelText", "");
 const targetRoadLabelTextBinding = api.bindValue(group, "targetRoadLabelText", "");
+const startOwnerRoadLabelTextBinding = api.bindValue(group, "startOwnerRoadLabelText", "");
+const endOwnerRoadLabelTextBinding = api.bindValue(group, "endOwnerRoadLabelText", "");
+const currentToTargetStartLabelTextBinding = api.bindValue(group, "currentToTargetStartLabelText", "");
 const navigationLanesLabelTextBinding = api.bindValue(group, "navigationLanesLabelText", "");
 const plannedPenaltiesLabelTextBinding = api.bindValue(group, "plannedPenaltiesLabelText", "");
 const penaltyTagsLabelTextBinding = api.bindValue(group, "penaltyTagsLabelText", "");
@@ -71,6 +74,9 @@ const routeDiagnosticsCollapsedBinding = api.bindValue(group, "routeDiagnosticsC
 const currentTargetBinding = api.bindValue(group, "currentTarget", "");
 const currentRouteBinding = api.bindValue(group, "currentRoute", "");
 const targetRoadBinding = api.bindValue(group, "targetRoad", "");
+const startOwnerRoadBinding = api.bindValue(group, "startOwnerRoad", "");
+const endOwnerRoadBinding = api.bindValue(group, "endOwnerRoad", "");
+const currentToTargetStartBinding = api.bindValue(group, "currentToTargetStart", "");
 const navigationLanesBinding = api.bindValue(group, "navigationLanes", "");
 const plannedPenaltiesBinding = api.bindValue(group, "plannedPenalties", "");
 const penaltyTagsBinding = api.bindValue(group, "penaltyTags", "");
@@ -209,6 +215,11 @@ const styles = {
         whiteSpace: "pre-line",
         wordBreak: "break-word",
     },
+    valueMultiline: {
+        display: "flex",
+        flexDirection: "column",
+        gap: "2px",
+    },
     classificationLabel: {
         width: "138px",
         display: "flex",
@@ -277,6 +288,9 @@ function Row(props) {
 
     const isMultiline =
         typeof props.value === "string" && props.value.indexOf("\n") >= 0;
+    const valueLines = isMultiline
+        ? props.value.split(/\r?\n/).filter(function (line) { return line.length > 0; })
+        : null;
 
     return h(
         "div",
@@ -286,7 +300,19 @@ function Row(props) {
                 : styles.row,
         },
         h("div", { style: styles.label }, props.label),
-        h("div", { style: styles.value }, props.value)
+        h(
+            "div",
+            {
+                style: isMultiline
+                    ? Object.assign({}, styles.value, styles.valueMultiline)
+                    : styles.value,
+            },
+            isMultiline
+                ? valueLines.map(function (line, index) {
+                      return h("div", { key: index }, line);
+                  })
+                : props.value
+        )
     );
 }
 
@@ -363,6 +389,9 @@ function SelectedObjectPanel() {
     const currentTargetLabelText = api.useValue(currentTargetLabelTextBinding);
     const currentRouteLabelText = api.useValue(currentRouteLabelTextBinding);
     const targetRoadLabelText = api.useValue(targetRoadLabelTextBinding);
+    const startOwnerRoadLabelText = api.useValue(startOwnerRoadLabelTextBinding);
+    const endOwnerRoadLabelText = api.useValue(endOwnerRoadLabelTextBinding);
+    const currentToTargetStartLabelText = api.useValue(currentToTargetStartLabelTextBinding);
     const navigationLanesLabelText = api.useValue(navigationLanesLabelTextBinding);
     const plannedPenaltiesLabelText = api.useValue(plannedPenaltiesLabelTextBinding);
     const penaltyTagsLabelText = api.useValue(penaltyTagsLabelTextBinding);
@@ -380,6 +409,9 @@ function SelectedObjectPanel() {
     const currentTarget = api.useValue(currentTargetBinding);
     const currentRoute = api.useValue(currentRouteBinding);
     const targetRoad = api.useValue(targetRoadBinding);
+    const startOwnerRoad = api.useValue(startOwnerRoadBinding);
+    const endOwnerRoad = api.useValue(endOwnerRoadBinding);
+    const currentToTargetStart = api.useValue(currentToTargetStartBinding);
     const navigationLanes = api.useValue(navigationLanesBinding);
     const plannedPenalties = api.useValue(plannedPenaltiesBinding);
     const penaltyTags = api.useValue(penaltyTagsBinding);
@@ -599,6 +631,9 @@ function SelectedObjectPanel() {
                              h(Row, { label: currentTargetLabelText, value: currentTarget }),
                              h(Row, { label: currentRouteLabelText, value: currentRoute }),
                              h(Row, { label: targetRoadLabelText, value: targetRoad }),
+                             h(Row, { label: startOwnerRoadLabelText, value: startOwnerRoad }),
+                             h(Row, { label: endOwnerRoadLabelText, value: endOwnerRoad }),
+                             h(Row, { label: currentToTargetStartLabelText, value: currentToTargetStart }),
                              h(Row, { label: navigationLanesLabelText, value: navigationLanes }),
                              h(Row, { label: plannedPenaltiesLabelText, value: plannedPenalties }),
                              h(Row, { label: penaltyTagsLabelText, value: penaltyTags }),

@@ -182,6 +182,9 @@ namespace Traffic_Law_Enforcement
             map["SelectedObjectPanel.CurrentTargetLabel"] = SelectedObjectPanelUISystem.kCurrentTargetLabelLocaleId;
             map["SelectedObjectPanel.CurrentRouteLabel"] = SelectedObjectPanelUISystem.kCurrentRouteLabelLocaleId;
             map["SelectedObjectPanel.TargetRoadLabel"] = SelectedObjectPanelUISystem.kTargetRoadLabelLocaleId;
+            map["SelectedObjectPanel.StartOwnerRoadLabel"] = SelectedObjectPanelUISystem.kStartOwnerRoadLabelLocaleId;
+            map["SelectedObjectPanel.EndOwnerRoadLabel"] = SelectedObjectPanelUISystem.kEndOwnerRoadLabelLocaleId;
+            map["SelectedObjectPanel.CurrentToTargetStartLabel"] = SelectedObjectPanelUISystem.kCurrentToTargetStartLabelLocaleId;
             map["SelectedObjectPanel.NavigationLanesLabel"] = SelectedObjectPanelUISystem.kNavigationLanesLabelLocaleId;
             map["SelectedObjectPanel.PlannedPenaltiesLabel"] = SelectedObjectPanelUISystem.kPlannedPenaltiesLabelLocaleId;
             map["SelectedObjectPanel.PenaltyTagsLabel"] = SelectedObjectPanelUISystem.kPenaltyTagsLabelLocaleId;
@@ -278,6 +281,16 @@ namespace Traffic_Law_Enforcement
                 SelectedObjectBridgeSystem.kRouteExplanationPtPermissiveLocaleId;
             map["SelectedObjectPanel.RouteExplanation.GenericFallback"] =
                 SelectedObjectBridgeSystem.kRouteExplanationGenericFallbackLocaleId;
+            map["SelectedObjectPanel.RouteDirectConnect.AlreadyOnStart"] =
+                SelectedObjectBridgeSystem.kRouteDirectConnectAlreadyOnStartLocaleId;
+            map["SelectedObjectPanel.RouteDirectConnect.NextHop"] =
+                SelectedObjectBridgeSystem.kRouteDirectConnectNextHopLocaleId;
+            map["SelectedObjectPanel.RouteDirectConnect.ViaFormat"] =
+                SelectedObjectBridgeSystem.kRouteDirectConnectViaFormatLocaleId;
+            map["SelectedObjectPanel.RouteDirectConnect.NoPreview"] =
+                SelectedObjectBridgeSystem.kRouteDirectConnectNoPreviewLocaleId;
+            map["SelectedObjectPanel.RouteDirectConnect.MissingStart"] =
+                SelectedObjectBridgeSystem.kRouteDirectConnectMissingStartLocaleId;
             map["FocusedLoggingPanel.HeaderText"] =
                 FocusedLoggingPanelUISystem.kHeaderTextLocaleId;
             map["FocusedLoggingPanel.SelectedVehicleLabel"] =

@@ -45,6 +45,9 @@ namespace Traffic_Law_Enforcement
         internal const string kCurrentTargetLabelLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Label.CurrentTarget";
         internal const string kCurrentRouteLabelLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Label.CurrentRoute";
         internal const string kTargetRoadLabelLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Label.TargetRoad";
+        internal const string kStartOwnerRoadLabelLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Label.StartOwnerRoad";
+        internal const string kEndOwnerRoadLabelLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Label.EndOwnerRoad";
+        internal const string kCurrentToTargetStartLabelLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Label.CurrentToTargetStart";
         internal const string kNavigationLanesLabelLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Label.NavigationLanes";
         internal const string kPlannedPenaltiesLabelLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Label.PlannedPenalties";
         internal const string kPenaltyTagsLabelLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Label.PenaltyTags";
@@ -121,6 +124,9 @@ namespace Traffic_Law_Enforcement
         private ValueBinding<string> m_CurrentTargetLabelBinding;
         private ValueBinding<string> m_CurrentRouteLabelBinding;
         private ValueBinding<string> m_TargetRoadLabelBinding;
+        private ValueBinding<string> m_StartOwnerRoadLabelBinding;
+        private ValueBinding<string> m_EndOwnerRoadLabelBinding;
+        private ValueBinding<string> m_CurrentToTargetStartLabelBinding;
         private ValueBinding<string> m_NavigationLanesLabelBinding;
         private ValueBinding<string> m_PlannedPenaltiesLabelBinding;
         private ValueBinding<string> m_PenaltyTagsLabelBinding;
@@ -138,6 +144,9 @@ namespace Traffic_Law_Enforcement
         private ValueBinding<string> m_CurrentTargetBinding;
         private ValueBinding<string> m_CurrentRouteBinding;
         private ValueBinding<string> m_TargetRoadBinding;
+        private ValueBinding<string> m_StartOwnerRoadBinding;
+        private ValueBinding<string> m_EndOwnerRoadBinding;
+        private ValueBinding<string> m_CurrentToTargetStartBinding;
         private ValueBinding<string> m_NavigationLanesBinding;
         private ValueBinding<string> m_PlannedPenaltiesBinding;
         private ValueBinding<string> m_PenaltyTagsBinding;
@@ -152,6 +161,7 @@ namespace Traffic_Law_Enforcement
         private int m_LastSeenPendingLoadSequence = -1;
         private string m_EntitySelectionStatus = string.Empty;
         private bool m_EntitySelectionStatusIsError;
+        private string m_EntitySelectionStatusSelectedEntity = string.Empty;
 
         public override GameMode gameMode => GameMode.Game;
 
@@ -181,6 +191,9 @@ namespace Traffic_Law_Enforcement
             public string CurrentTarget;
             public string CurrentRoute;
             public string TargetRoad;
+            public string StartOwnerRoad;
+            public string EndOwnerRoad;
+            public string CurrentToTargetStart;
             public string NavigationLanes;
             public string PlannedPenalties;
             public string PenaltyTags;
@@ -238,6 +251,9 @@ namespace Traffic_Law_Enforcement
             AddBinding(m_CurrentTargetLabelBinding = new ValueBinding<string>(kGroup, "currentTargetLabelText", string.Empty));
             AddBinding(m_CurrentRouteLabelBinding = new ValueBinding<string>(kGroup, "currentRouteLabelText", string.Empty));
             AddBinding(m_TargetRoadLabelBinding = new ValueBinding<string>(kGroup, "targetRoadLabelText", string.Empty));
+            AddBinding(m_StartOwnerRoadLabelBinding = new ValueBinding<string>(kGroup, "startOwnerRoadLabelText", string.Empty));
+            AddBinding(m_EndOwnerRoadLabelBinding = new ValueBinding<string>(kGroup, "endOwnerRoadLabelText", string.Empty));
+            AddBinding(m_CurrentToTargetStartLabelBinding = new ValueBinding<string>(kGroup, "currentToTargetStartLabelText", string.Empty));
             AddBinding(m_NavigationLanesLabelBinding = new ValueBinding<string>(kGroup, "navigationLanesLabelText", string.Empty));
             AddBinding(m_PlannedPenaltiesLabelBinding = new ValueBinding<string>(kGroup, "plannedPenaltiesLabelText", string.Empty));
             AddBinding(m_PenaltyTagsLabelBinding = new ValueBinding<string>(kGroup, "penaltyTagsLabelText", string.Empty));
@@ -255,6 +271,9 @@ namespace Traffic_Law_Enforcement
             AddBinding(m_CurrentTargetBinding = new ValueBinding<string>(kGroup, "currentTarget", string.Empty));
             AddBinding(m_CurrentRouteBinding = new ValueBinding<string>(kGroup, "currentRoute", string.Empty));
             AddBinding(m_TargetRoadBinding = new ValueBinding<string>(kGroup, "targetRoad", string.Empty));
+            AddBinding(m_StartOwnerRoadBinding = new ValueBinding<string>(kGroup, "startOwnerRoad", string.Empty));
+            AddBinding(m_EndOwnerRoadBinding = new ValueBinding<string>(kGroup, "endOwnerRoad", string.Empty));
+            AddBinding(m_CurrentToTargetStartBinding = new ValueBinding<string>(kGroup, "currentToTargetStart", string.Empty));
             AddBinding(m_NavigationLanesBinding = new ValueBinding<string>(kGroup, "navigationLanes", string.Empty));
             AddBinding(m_PlannedPenaltiesBinding = new ValueBinding<string>(kGroup, "plannedPenalties", string.Empty));
             AddBinding(m_PenaltyTagsBinding = new ValueBinding<string>(kGroup, "penaltyTags", string.Empty));
@@ -300,12 +319,17 @@ namespace Traffic_Law_Enforcement
                 return;
             }
 
+            string currentSuggestedEntitySelectionValue = string.Empty;
             if (m_SelectedObjectBridgeSystem == null || !m_SelectedObjectBridgeSystem.HasSnapshot)
             {
+                RefreshEntitySelectionStatus(currentSuggestedEntitySelectionValue);
                 UpdateBindings(BuildNoSelectionState());
                 return;
             }
 
+            currentSuggestedEntitySelectionValue =
+                BuildSuggestedEntitySelectionValue(m_SelectedObjectBridgeSystem.CurrentSnapshot);
+            RefreshEntitySelectionStatus(currentSuggestedEntitySelectionValue);
             UpdateBindings(BuildState(m_SelectedObjectBridgeSystem.CurrentSnapshot));
         }
 
@@ -363,6 +387,9 @@ namespace Traffic_Law_Enforcement
                 CurrentTarget = NormalizeText(snapshot.RouteDiagnosticsCurrentTargetText),
                 CurrentRoute = NormalizeText(snapshot.RouteDiagnosticsCurrentRouteText),
                 TargetRoad = NormalizeText(snapshot.RouteDiagnosticsTargetRoadText),
+                StartOwnerRoad = NormalizeText(snapshot.RouteDiagnosticsStartOwnerRoadText),
+                EndOwnerRoad = NormalizeText(snapshot.RouteDiagnosticsEndOwnerRoadText),
+                CurrentToTargetStart = NormalizeText(snapshot.RouteDiagnosticsDirectConnectText),
                 NavigationLanes = NormalizeText(snapshot.RouteDiagnosticsNavigationLanesText),
                 PlannedPenalties = NormalizeText(snapshot.RouteDiagnosticsPlannedPenaltiesText),
                 PenaltyTags = NormalizeText(snapshot.RouteDiagnosticsPenaltyTagsText),
@@ -401,6 +428,9 @@ namespace Traffic_Law_Enforcement
             m_CurrentTargetBinding.Update(state.CurrentTarget ?? string.Empty);
             m_CurrentRouteBinding.Update(state.CurrentRoute ?? string.Empty);
             m_TargetRoadBinding.Update(state.TargetRoad ?? string.Empty);
+            m_StartOwnerRoadBinding.Update(state.StartOwnerRoad ?? string.Empty);
+            m_EndOwnerRoadBinding.Update(state.EndOwnerRoad ?? string.Empty);
+            m_CurrentToTargetStartBinding.Update(state.CurrentToTargetStart ?? string.Empty);
             m_NavigationLanesBinding.Update(state.NavigationLanes ?? string.Empty);
             m_PlannedPenaltiesBinding.Update(state.PlannedPenalties ?? string.Empty);
             m_PenaltyTagsBinding.Update(state.PenaltyTags ?? string.Empty);
@@ -435,6 +465,9 @@ namespace Traffic_Law_Enforcement
             m_CurrentTargetLabelBinding.Update(LocalizeText(kCurrentTargetLabelLocaleId, "Current target"));
             m_CurrentRouteLabelBinding.Update(LocalizeText(kCurrentRouteLabelLocaleId, "Current route"));
             m_TargetRoadLabelBinding.Update(LocalizeText(kTargetRoadLabelLocaleId, "Target road"));
+            m_StartOwnerRoadLabelBinding.Update(LocalizeText(kStartOwnerRoadLabelLocaleId, "Route start road"));
+            m_EndOwnerRoadLabelBinding.Update(LocalizeText(kEndOwnerRoadLabelLocaleId, "Route end road"));
+            m_CurrentToTargetStartLabelBinding.Update(LocalizeText(kCurrentToTargetStartLabelLocaleId, "Current -> target start"));
             m_NavigationLanesLabelBinding.Update(LocalizeText(kNavigationLanesLabelLocaleId, "Navigation lanes"));
             m_PlannedPenaltiesLabelBinding.Update(LocalizeText(kPlannedPenaltiesLabelLocaleId, "Planned penalties"));
             m_PenaltyTagsLabelBinding.Update(LocalizeText(kPenaltyTagsLabelLocaleId, "Penalty tags"));
@@ -471,6 +504,7 @@ namespace Traffic_Law_Enforcement
         private void HandleCloseRequested()
         {
             m_IsPanelEnabled = false;
+            ClearEntitySelectionStatus();
         }
 
         private void ToggleCollapsed()
@@ -537,13 +571,7 @@ namespace Traffic_Law_Enforcement
             }
 
             m_SelectedInfoSystem.SetSelection(entity);
-            SetEntitySelectionStatus(
-                string.Format(
-                    LocalizeText(
-                        kEntitySelectionStatusSelectedFormatLocaleId,
-                        "Selected {0}."),
-                    FormatEntity(entity)),
-                isError: false);
+            SetEntitySelectionSuccessStatus(entity);
         }
 
         private static string NormalizeText(string text)
@@ -764,6 +792,46 @@ namespace Traffic_Law_Enforcement
             m_EntitySelectionStatusIsError = isError;
             m_EntitySelectionStatusBinding.Update(m_EntitySelectionStatus);
             m_EntitySelectionStatusIsErrorBinding.Update(m_EntitySelectionStatusIsError);
+        }
+
+        private void SetEntitySelectionSuccessStatus(Entity entity)
+        {
+            string selectedEntityText = FormatEntity(entity);
+            m_EntitySelectionStatusSelectedEntity = selectedEntityText;
+
+            SetEntitySelectionStatus(
+                string.Format(
+                    LocalizeText(
+                        kEntitySelectionStatusSelectedFormatLocaleId,
+                        "Selected {0}."),
+                    selectedEntityText),
+                isError: false);
+        }
+
+        private void RefreshEntitySelectionStatus(string currentSuggestedEntitySelectionValue)
+        {
+            if (m_EntitySelectionStatusIsError || string.IsNullOrEmpty(m_EntitySelectionStatus))
+            {
+                return;
+            }
+
+            bool selectedEntityChanged =
+                !string.IsNullOrEmpty(m_EntitySelectionStatusSelectedEntity) &&
+                !string.Equals(
+                    m_EntitySelectionStatusSelectedEntity,
+                    currentSuggestedEntitySelectionValue ?? string.Empty,
+                    System.StringComparison.Ordinal);
+
+            if (selectedEntityChanged)
+            {
+                ClearEntitySelectionStatus();
+            }
+        }
+
+        private void ClearEntitySelectionStatus()
+        {
+            m_EntitySelectionStatusSelectedEntity = string.Empty;
+            SetEntitySelectionStatus(string.Empty, isError: false);
         }
 
         private string FormatEntity(Entity entity)
