@@ -224,7 +224,7 @@ function SelectedObjectPanel() {
     const isUltraCompact = compact && !classification;
     const panelWidth = isUltraCompact
         ? ultraCompactPanelWidth
-        : compact
+        : compact || collapsed
             ? compactPanelWidth
             : fullPanelWidth;
 
