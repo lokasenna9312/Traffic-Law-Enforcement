@@ -122,6 +122,7 @@ namespace Traffic_Law_Enforcement
             AddOption(map, setting, nameof(Setting.EnableType4PublicTransportLaneUsageLogging));
             AddOption(map, setting, nameof(Setting.EnablePathObsoleteSourceLogging));
             AddOption(map, setting, nameof(Setting.EnableSaveIdentificationLogging));
+            AddOption(map, setting, nameof(Setting.EnableAllVehicleRouteSelectionChangeLogging));
             AddOption(map, setting, nameof(Setting.SelectedObjectPanelToggleBinding));
             AddOption(map, setting, nameof(Setting.ModLogPath));
 

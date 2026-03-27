@@ -2,6 +2,8 @@ using System.Collections.Generic;
 using Game;
 using Game.Common;
 using Game.Net;
+using Game.Pathfind;
+using Game.Routes;
 using Game.Vehicles;
 using Unity.Collections;
 using Unity.Entities;
@@ -31,6 +33,7 @@ namespace Traffic_Law_Enforcement
         private EntityQuery m_CachedVehicleQuery;
         private const int MaxPenaltyTags = 6;
         private const int MaxLogsPerUpdate = 4;
+        private const int MaxRouteSelectionChangeLogsPerUpdate = 12;
         private const int SnapshotSweepInterval = 2048;
         private const int MaxPublicTransportLaneDecisionDiagnosticLogsPerUpdate = 8;
         private int m_PublicTransportLaneDecisionDiagnosticLogsThisUpdate;
@@ -39,8 +42,14 @@ namespace Traffic_Law_Enforcement
         private EntityQuery m_CurrentLaneChangedQuery;
         private EntityQuery m_NavigationLaneChangedQuery;
         private EntityQuery m_CarChangedQuery;
+        private EntityQuery m_TargetChangedQuery;
+        private EntityQuery m_CurrentRouteChangedQuery;
+        private EntityQuery m_PathOwnerChangedQuery;
         private BufferLookup<CarNavigationLane> m_NavigationLaneData;
         private ComponentLookup<CarCurrentLane> m_CurrentLaneData;
+        private ComponentLookup<Target> m_TargetData;
+        private ComponentLookup<CurrentRoute> m_CurrentRouteData;
+        private ComponentLookup<PathOwner> m_PathOwnerData;
         private ComponentLookup<Owner> m_OwnerData;
         private ComponentLookup<CarLane> m_CarLaneData;
         private ComponentLookup<VehicleTrafficLawProfile> m_ProfileData;
@@ -50,6 +59,7 @@ namespace Traffic_Law_Enforcement
         private ComponentLookup<ConnectionLane> m_ConnectionLaneData;
         private PublicTransportLaneVehicleTypeLookups m_TypeLookups;
         private readonly Dictionary<Entity, RoutePenaltyInspectionResult> m_LastSnapshots = new Dictionary<Entity, RoutePenaltyInspectionResult>();
+        private readonly Dictionary<Entity, RouteSelectionChangeSnapshot> m_LastRouteSelectionSnapshots = new Dictionary<Entity, RouteSelectionChangeSnapshot>();
         private readonly HashSet<Entity> m_CandidateVehicles = new HashSet<Entity>();
         private int m_UpdateCount;
         private int m_LastObservedRuntimeWorldGeneration = -1;
@@ -73,8 +83,26 @@ namespace Traffic_Law_Enforcement
                 ComponentType.ReadOnly<Car>(),
                 ComponentType.ReadOnly<CarCurrentLane>());
             m_CarChangedQuery.SetChangedVersionFilter(ComponentType.ReadOnly<Car>());
+            m_TargetChangedQuery = GetEntityQuery(
+                ComponentType.ReadOnly<Car>(),
+                ComponentType.ReadOnly<CarCurrentLane>(),
+                ComponentType.ReadOnly<Target>());
+            m_TargetChangedQuery.SetChangedVersionFilter(ComponentType.ReadOnly<Target>());
+            m_CurrentRouteChangedQuery = GetEntityQuery(
+                ComponentType.ReadOnly<Car>(),
+                ComponentType.ReadOnly<CarCurrentLane>(),
+                ComponentType.ReadOnly<CurrentRoute>());
+            m_CurrentRouteChangedQuery.SetChangedVersionFilter(ComponentType.ReadOnly<CurrentRoute>());
+            m_PathOwnerChangedQuery = GetEntityQuery(
+                ComponentType.ReadOnly<Car>(),
+                ComponentType.ReadOnly<CarCurrentLane>(),
+                ComponentType.ReadOnly<PathOwner>());
+            m_PathOwnerChangedQuery.SetChangedVersionFilter(ComponentType.ReadOnly<PathOwner>());
             m_NavigationLaneData = GetBufferLookup<CarNavigationLane>(true);
             m_CurrentLaneData = GetComponentLookup<CarCurrentLane>(true);
+            m_TargetData = GetComponentLookup<Target>(true);
+            m_CurrentRouteData = GetComponentLookup<CurrentRoute>(true);
+            m_PathOwnerData = GetComponentLookup<PathOwner>(true);
             m_OwnerData = GetComponentLookup<Owner>(true);
             m_CarLaneData = GetComponentLookup<CarLane>(true);
             m_EdgeLaneData = GetComponentLookup<EdgeLane>(true);
@@ -92,16 +120,22 @@ namespace Traffic_Law_Enforcement
         {
             HandleRuntimeWorldReload();
             bool loggingEnabled = EnforcementLoggingPolicy.ShouldLogEstimatedReroutes();
+            bool routeSelectionLoggingEnabled =
+                EnforcementLoggingPolicy.ShouldLogAllVehicleRouteSelectionChanges();
             m_PublicTransportLaneDecisionDiagnosticLogsThisUpdate = 0;
             if (!Mod.IsEnforcementEnabled)
             {
                 m_LastSnapshots.Clear();
+                m_LastRouteSelectionSnapshots.Clear();
                 RerouteLoggingTelemetry.SetState(false, 0, 0, 0);
                 return;
             }
 
             m_NavigationLaneData.Update(this);
             m_CurrentLaneData.Update(this);
+            m_TargetData.Update(this);
+            m_CurrentRouteData.Update(this);
+            m_PathOwnerData.Update(this);
             m_OwnerData.Update(this);
             m_CarLaneData.Update(this);
             m_EdgeLaneData.Update(this);
@@ -115,8 +149,20 @@ namespace Traffic_Law_Enforcement
             CollectCandidateVehicles(m_CurrentLaneChangedQuery);
             CollectCandidateVehicles(m_NavigationLaneChangedQuery);
             CollectCandidateVehicles(m_CarChangedQuery);
+            if (routeSelectionLoggingEnabled)
+            {
+                CollectCandidateVehicles(m_TargetChangedQuery);
+                CollectCandidateVehicles(m_CurrentRouteChangedQuery);
+                CollectCandidateVehicles(m_PathOwnerChangedQuery);
+            }
+            else
+            {
+                m_LastRouteSelectionSnapshots.Clear();
+            }
 
             int logsEmitted = 0;
+            int routeSelectionLogsEmitted = 0;
+            int routeSelectionLogsDropped = 0;
             foreach (Entity vehicle in m_CandidateVehicles)
             {
                 if (!m_CurrentLaneData.TryGetComponent(vehicle, out CarCurrentLane currentLane))
@@ -125,11 +171,17 @@ namespace Traffic_Law_Enforcement
                 }
 
                 RoutePenaltyInspectionResult snapshot =
-                    BuildSnapshot(vehicle, currentLane, captureDebugStrings: loggingEnabled);
+                    BuildSnapshot(
+                        vehicle,
+                        currentLane,
+                        captureDebugStrings: loggingEnabled || routeSelectionLoggingEnabled);
+
+                bool rerouteDetected = false;
 
                 if (m_LastSnapshots.TryGetValue(vehicle, out RoutePenaltyInspectionResult previousSnapshot))
                 {
-                    if (ShouldLogReroute(previousSnapshot, snapshot))
+                    rerouteDetected = ShouldLogReroute(previousSnapshot, snapshot);
+                    if (rerouteDetected)
                     {
                         RecordRerouteTelemetry(vehicle, previousSnapshot, snapshot);
 
@@ -146,6 +198,53 @@ namespace Traffic_Law_Enforcement
                 {
                     m_LastSnapshots[vehicle] = snapshot;
                 }
+
+                if (!routeSelectionLoggingEnabled)
+                {
+                    continue;
+                }
+
+                RouteSelectionChangeSnapshot routeSelectionSnapshot =
+                    BuildRouteSelectionSnapshot(vehicle, currentLane.m_Lane, snapshot);
+
+                if (m_LastRouteSelectionSnapshots.TryGetValue(
+                        vehicle,
+                        out RouteSelectionChangeSnapshot previousRouteSelectionSnapshot))
+                {
+                    if (ShouldLogRouteSelectionChange(
+                            previousRouteSelectionSnapshot,
+                            routeSelectionSnapshot,
+                            rerouteDetected))
+                    {
+                        if (routeSelectionLogsEmitted < MaxRouteSelectionChangeLogsPerUpdate)
+                        {
+                            LogRouteSelectionChange(
+                                vehicle,
+                                previousRouteSelectionSnapshot,
+                                routeSelectionSnapshot,
+                                rerouteDetected);
+                            routeSelectionLogsEmitted += 1;
+                        }
+                        else
+                        {
+                            routeSelectionLogsDropped += 1;
+                        }
+                    }
+
+                    m_LastRouteSelectionSnapshots[vehicle] = routeSelectionSnapshot;
+                }
+                else
+                {
+                    m_LastRouteSelectionSnapshots[vehicle] = routeSelectionSnapshot;
+                }
+            }
+
+            if (routeSelectionLoggingEnabled && routeSelectionLogsDropped > 0)
+            {
+                string droppedMessage =
+                    $"Route selection change logging throttled: dropped={routeSelectionLogsDropped}, emitted={routeSelectionLogsEmitted}, candidates={m_CandidateVehicles.Count}";
+                EnforcementTelemetry.RecordEvent(droppedMessage);
+                Mod.log.Info(droppedMessage);
             }
 
             int emittedLogs = logsEmitted;
@@ -170,6 +269,7 @@ namespace Traffic_Law_Enforcement
             m_LastObservedRuntimeWorldGeneration = currentGeneration;
 
             m_LastSnapshots.Clear();
+            m_LastRouteSelectionSnapshots.Clear();
             m_CandidateVehicles.Clear();
             m_UpdateCount = 0;
             RerouteLoggingTelemetry.SetState(false, 0, 0, 0);
@@ -219,6 +319,45 @@ namespace Traffic_Law_Enforcement
                 MaxPenaltyTags);
         }
 
+        private RouteSelectionChangeSnapshot BuildRouteSelectionSnapshot(
+            Entity vehicle,
+            Entity currentLane,
+            RoutePenaltyInspectionResult inspection)
+        {
+            bool hasCurrentTarget =
+                m_TargetData.TryGetComponent(vehicle, out Target targetData) &&
+                targetData.m_Target != Entity.Null;
+            Entity currentTarget =
+                hasCurrentTarget
+                    ? targetData.m_Target
+                    : Entity.Null;
+
+            bool hasCurrentRoute =
+                m_CurrentRouteData.TryGetComponent(vehicle, out CurrentRoute currentRouteData) &&
+                currentRouteData.m_Route != Entity.Null;
+            Entity currentRoute =
+                hasCurrentRoute
+                    ? currentRouteData.m_Route
+                    : Entity.Null;
+
+            bool hasPathOwner =
+                m_PathOwnerData.TryGetComponent(vehicle, out PathOwner pathOwner);
+            PathFlags pathFlags =
+                hasPathOwner
+                    ? pathOwner.m_State
+                    : default;
+
+            return new RouteSelectionChangeSnapshot(
+                inspection,
+                currentLane,
+                hasCurrentRoute,
+                currentRoute,
+                hasCurrentTarget,
+                currentTarget,
+                hasPathOwner,
+                pathFlags);
+        }
+
         private RoutePenaltyInspectionContext CreateInspectionContext()
         {
             return new RoutePenaltyInspectionContext
@@ -233,6 +372,102 @@ namespace Traffic_Law_Enforcement
                 ProfileData = m_ProfileData,
                 TypeLookups = m_TypeLookups,
             };
+        }
+
+        private static bool ShouldLogRouteSelectionChange(
+            RouteSelectionChangeSnapshot previousSnapshot,
+            RouteSelectionChangeSnapshot currentSnapshot,
+            bool rerouteDetected)
+        {
+            return rerouteDetected ||
+                previousSnapshot.RouteHash != currentSnapshot.RouteHash ||
+                previousSnapshot.HasCurrentRoute != currentSnapshot.HasCurrentRoute ||
+                previousSnapshot.CurrentRoute != currentSnapshot.CurrentRoute ||
+                previousSnapshot.HasCurrentTarget != currentSnapshot.HasCurrentTarget ||
+                previousSnapshot.CurrentTarget != currentSnapshot.CurrentTarget ||
+                previousSnapshot.HasPathOwner != currentSnapshot.HasPathOwner ||
+                previousSnapshot.PathFlags != currentSnapshot.PathFlags;
+        }
+
+        private void LogRouteSelectionChange(
+            Entity vehicle,
+            RouteSelectionChangeSnapshot previousSnapshot,
+            RouteSelectionChangeSnapshot currentSnapshot,
+            bool rerouteDetected)
+        {
+            string role =
+                PublicTransportLanePolicy.DescribeVehicleRole(vehicle, ref m_TypeLookups);
+            string reasons =
+                BuildRouteSelectionChangeReasons(
+                    previousSnapshot,
+                    currentSnapshot,
+                    rerouteDetected);
+
+            string message =
+                $"Route selection change: vehicle={vehicle}, role={role}, reasons={reasons}, " +
+                $"currentLane={currentSnapshot.CurrentLane}, " +
+                $"routeHash={previousSnapshot.RouteHash}->{currentSnapshot.RouteHash}, " +
+                $"currentRoute={FormatOptionalEntity(previousSnapshot.HasCurrentRoute, previousSnapshot.CurrentRoute)}->{FormatOptionalEntity(currentSnapshot.HasCurrentRoute, currentSnapshot.CurrentRoute)}, " +
+                $"currentTarget={FormatOptionalEntity(previousSnapshot.HasCurrentTarget, previousSnapshot.CurrentTarget)}->{FormatOptionalEntity(currentSnapshot.HasCurrentTarget, currentSnapshot.CurrentTarget)}, " +
+                $"pathState={FormatPathState(previousSnapshot)}->{FormatPathState(currentSnapshot)}, " +
+                $"plannedPenalty={previousSnapshot.Inspection.TotalPenalty} [{previousSnapshot.Inspection.Breakdown}] -> {currentSnapshot.Inspection.TotalPenalty} [{currentSnapshot.Inspection.Breakdown}], " +
+                $"tags={previousSnapshot.Inspection.Tags} -> {currentSnapshot.Inspection.Tags}";
+
+            EnforcementTelemetry.RecordEvent(message);
+            Mod.log.Info(message);
+        }
+
+        private static string BuildRouteSelectionChangeReasons(
+            RouteSelectionChangeSnapshot previousSnapshot,
+            RouteSelectionChangeSnapshot currentSnapshot,
+            bool rerouteDetected)
+        {
+            List<string> reasons = new List<string>(5);
+            if (rerouteDetected)
+            {
+                reasons.Add("reroute");
+            }
+
+            if (previousSnapshot.RouteHash != currentSnapshot.RouteHash)
+            {
+                reasons.Add("route-hash");
+            }
+
+            if (previousSnapshot.HasCurrentRoute != currentSnapshot.HasCurrentRoute ||
+                previousSnapshot.CurrentRoute != currentSnapshot.CurrentRoute)
+            {
+                reasons.Add("current-route");
+            }
+
+            if (previousSnapshot.HasCurrentTarget != currentSnapshot.HasCurrentTarget ||
+                previousSnapshot.CurrentTarget != currentSnapshot.CurrentTarget)
+            {
+                reasons.Add("target");
+            }
+
+            if (previousSnapshot.HasPathOwner != currentSnapshot.HasPathOwner ||
+                previousSnapshot.PathFlags != currentSnapshot.PathFlags)
+            {
+                reasons.Add("path-state");
+            }
+
+            return reasons.Count == 0
+                ? "none"
+                : string.Join(",", reasons.ToArray());
+        }
+
+        private static string FormatOptionalEntity(bool hasValue, Entity entity)
+        {
+            return hasValue && entity != Entity.Null
+                ? entity.ToString()
+                : "none";
+        }
+
+        private static string FormatPathState(RouteSelectionChangeSnapshot snapshot)
+        {
+            return snapshot.HasPathOwner
+                ? snapshot.PathFlags.ToString()
+                : "none";
         }
 
         private void LogPublicTransportLaneDecisionDiagnostics(
@@ -703,6 +938,7 @@ namespace Traffic_Law_Enforcement
             for (int index = 0; index < removedVehicles.Count; index++)
             {
                 m_LastSnapshots.Remove(removedVehicles[index]);
+                m_LastRouteSelectionSnapshots.Remove(removedVehicles[index]);
             }
         }
 
@@ -979,6 +1215,40 @@ namespace Traffic_Law_Enforcement
             }
 
             return movement;
+        }
+
+        private readonly struct RouteSelectionChangeSnapshot
+        {
+            public readonly uint RouteHash;
+            public readonly RoutePenaltyInspectionResult Inspection;
+            public readonly Entity CurrentLane;
+            public readonly bool HasCurrentRoute;
+            public readonly Entity CurrentRoute;
+            public readonly bool HasCurrentTarget;
+            public readonly Entity CurrentTarget;
+            public readonly bool HasPathOwner;
+            public readonly PathFlags PathFlags;
+
+            public RouteSelectionChangeSnapshot(
+                RoutePenaltyInspectionResult inspection,
+                Entity currentLane,
+                bool hasCurrentRoute,
+                Entity currentRoute,
+                bool hasCurrentTarget,
+                Entity currentTarget,
+                bool hasPathOwner,
+                PathFlags pathFlags)
+            {
+                RouteHash = inspection.RouteHash;
+                Inspection = inspection;
+                CurrentLane = currentLane;
+                HasCurrentRoute = hasCurrentRoute;
+                CurrentRoute = currentRoute;
+                HasCurrentTarget = hasCurrentTarget;
+                CurrentTarget = currentTarget;
+                HasPathOwner = hasPathOwner;
+                PathFlags = pathFlags;
+            }
         }
 
         private struct RoutePenaltyProfile

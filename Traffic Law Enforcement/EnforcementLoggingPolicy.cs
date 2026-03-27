@@ -16,6 +16,9 @@ namespace Traffic_Law_Enforcement
 
         public static bool EnablePathObsoleteSourceLogging => Mod.Settings?.EnablePathObsoleteSourceLogging ?? false;
 
+        public static bool EnableAllVehicleRouteSelectionChangeLogging =>
+            Mod.Settings?.EnableAllVehicleRouteSelectionChangeLogging ?? false;
+
         public static bool ShouldLogEstimatedReroutes()
         {
             return Mod.IsEnforcementEnabled && EnableEstimatedRerouteLogging;
@@ -50,6 +53,11 @@ namespace Traffic_Law_Enforcement
         public static bool ShouldLogPathObsoleteSources()
         {
             return EnablePathObsoleteSourceLogging;
+        }
+
+        public static bool ShouldLogAllVehicleRouteSelectionChanges()
+        {
+            return Mod.IsEnforcementEnabled && EnableAllVehicleRouteSelectionChangeLogging;
         }
 
         public static bool EnableSaveIdentificationLogging => Mod.Settings?.EnableSaveIdentificationLogging ?? false;

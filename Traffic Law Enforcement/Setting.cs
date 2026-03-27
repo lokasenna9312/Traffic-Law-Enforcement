@@ -607,6 +607,10 @@ namespace Traffic_Law_Enforcement
         [SettingsUISection(kDebugTab, kDebugGroup)]
         public bool EnableSaveIdentificationLogging { get; set; }
 
+        [Exclude]
+        [SettingsUISection(kDebugTab, kDebugGroup)]
+        public bool EnableAllVehicleRouteSelectionChangeLogging { get; set; }
+
         [SettingsUISection(kDebugTab, kDebugGroup)]
         [SettingsUIKeyboardBinding(
             BindingKeyboard.I,
@@ -646,6 +650,7 @@ namespace Traffic_Law_Enforcement
             EnablePathfindingPenaltyDiagnosticLogging = false;
             EnablePathObsoleteSourceLogging = false;
             EnableSaveIdentificationLogging = false;
+            EnableAllVehicleRouteSelectionChangeLogging = false;
             ResetKeyBindings();
         }
 
