@@ -129,12 +129,10 @@ namespace Traffic_Law_Enforcement
         private static bool IsPanelTogglePressed()
         {
             bool ctrlPressed =
-                Input.GetKey(KeyCode.LeftControl) ||
-                Input.GetKey(KeyCode.RightControl);
+                Input.GetKey(KeyCode.LeftControl);
 
             bool shiftPressed =
-                Input.GetKey(KeyCode.LeftShift) ||
-                Input.GetKey(KeyCode.RightShift);
+                Input.GetKey(KeyCode.LeftShift);
 
             bool iPressed =
                 Input.GetKey(KeyCode.I);
