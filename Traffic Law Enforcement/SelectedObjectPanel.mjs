@@ -120,6 +120,8 @@ const styles = {
     },
     classificationLabel: {
         width: "138px",
+        display: "flex",
+        alignItems: "center",
         color: "#b0defc",
         fontWeight: 700,
         fontSize: "18px",
@@ -128,8 +130,11 @@ const styles = {
     },
     classificationValue: {
         flex: 1,
-        color: "#b0defc",
-        fontSize: "18px",
+        display: "flex",
+        alignItems: "center",
+        minHeight: "30px",
+        color: "#d7ebfd",
+        fontSize: "14px",
         fontWeight: 700,
         lineHeight: 1.35,
         wordBreak: "break-word",
