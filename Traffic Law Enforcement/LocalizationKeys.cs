@@ -152,6 +152,13 @@ namespace Traffic_Law_Enforcement
             map["SelectedObjectPanel.LastReasonLabel"] = SelectedObjectPanelUISystem.kLastReasonLabelLocaleId;
             map["SelectedObjectPanel.RepeatPenaltyLabel"] = SelectedObjectPanelUISystem.kRepeatPenaltyLabelLocaleId;
             map["SelectedObjectPanel.PublicTransportLanePolicyLabel"] = SelectedObjectPanelUISystem.kPublicTransportLanePolicyLabelLocaleId;
+            map["SelectedObjectPanel.EntitySelectionLabel"] = SelectedObjectPanelUISystem.kEntitySelectionLabelLocaleId;
+            map["SelectedObjectPanel.EntitySelectionPlaceholder"] = SelectedObjectPanelUISystem.kEntitySelectionPlaceholderLocaleId;
+            map["SelectedObjectPanel.EntitySelectionSubmit"] = SelectedObjectPanelUISystem.kEntitySelectionSubmitLocaleId;
+            map["SelectedObjectPanel.EntitySelectionStatusInvalidFormat"] = SelectedObjectPanelUISystem.kEntitySelectionStatusInvalidFormatLocaleId;
+            map["SelectedObjectPanel.EntitySelectionStatusEntityNotFoundFormat"] = SelectedObjectPanelUISystem.kEntitySelectionStatusEntityNotFoundFormatLocaleId;
+            map["SelectedObjectPanel.EntitySelectionStatusSelectedFormat"] = SelectedObjectPanelUISystem.kEntitySelectionStatusSelectedFormatLocaleId;
+            map["SelectedObjectPanel.EntitySelectionStatusUnavailable"] = SelectedObjectPanelUISystem.kEntitySelectionStatusUnavailableLocaleId;
             map["SelectedObjectPanel.ActiveFlagsFormat"] = SelectedObjectPanelUISystem.kActiveFlagsValueFormatLocaleId;
             map["SelectedObjectPanel.ActiveFlagsViolationName"] = SelectedObjectPanelUISystem.kActiveFlagsViolationNameLocaleId;
             map["SelectedObjectPanel.ActiveFlagsPendingName"] = SelectedObjectPanelUISystem.kActiveFlagsPendingNameLocaleId;

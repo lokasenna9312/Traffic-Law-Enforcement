@@ -27,6 +27,12 @@ const violationPendingBinding = api.bindValue(group, "violationPending", "");
 const totalsBinding = api.bindValue(group, "totals", "");
 const lastReasonBinding = api.bindValue(group, "lastReason", "");
 const repeatPenaltyBinding = api.bindValue(group, "repeatPenalty", "");
+const entitySelectionLabelTextBinding = api.bindValue(group, "entitySelectionLabelText", "");
+const entitySelectionPlaceholderTextBinding = api.bindValue(group, "entitySelectionPlaceholderText", "");
+const entitySelectionSubmitTextBinding = api.bindValue(group, "entitySelectionSubmitText", "");
+const entitySelectionSuggestedValueBinding = api.bindValue(group, "entitySelectionSuggestedValue", "");
+const entitySelectionStatusBinding = api.bindValue(group, "entitySelectionStatus", "");
+const entitySelectionStatusIsErrorBinding = api.bindValue(group, "entitySelectionStatusIsError", false);
 const headerTextBinding = api.bindValue(group, "headerText", "");
 const summaryTitleBinding = api.bindValue(group, "summaryTitle", "");
 const tleStatusLabelTextBinding = api.bindValue(group, "tleStatusLabelText", "");
@@ -58,6 +64,7 @@ const currentLaneBinding = api.bindValue(group, "currentLane", "");
 const previousLaneBinding = api.bindValue(group, "previousLane", "");
 const laneChangesBinding = api.bindValue(group, "laneChanges", "");
 const liveLaneStateBinding = api.bindValue(group, "liveLaneState", "");
+const laneDetailsVisibleBinding = api.bindValue(group, "laneDetailsVisible", false);
 const laneDetailsCollapsedBinding = api.bindValue(group, "laneDetailsCollapsed", true);
 const routeDiagnosticsVisibleBinding = api.bindValue(group, "routeDiagnosticsVisible", false);
 const routeDiagnosticsCollapsedBinding = api.bindValue(group, "routeDiagnosticsCollapsed", true);
@@ -111,6 +118,61 @@ const styles = {
         lineHeight: 1.35,
         fontWeight: 600,
         color: "#f7f9ff",
+        marginBottom: "12px",
+    },
+    selectionBlock: {
+        display: "flex",
+        flexDirection: "column",
+        gap: "8px",
+        marginBottom: "14px",
+    },
+    selectionLabel: {
+        color: "#c2cfdf",
+        fontSize: "13px",
+        lineHeight: 1.3,
+        fontWeight: 700,
+    },
+    selectionRow: {
+        display: "flex",
+        gap: "8px",
+        alignItems: "center",
+    },
+    selectionInput: {
+        flex: 1,
+        minWidth: 0,
+        height: "34px",
+        padding: "6px 10px",
+        boxSizing: "border-box",
+        borderRadius: "6px",
+        border: "1px solid rgba(163, 187, 214, 0.32)",
+        background: "rgba(14, 22, 34, 0.9)",
+        color: "#ffffff",
+        fontSize: "14px",
+        outline: "none",
+    },
+    selectionButton: {
+        height: "34px",
+        padding: "0 12px",
+        borderRadius: "6px",
+        border: "1px solid rgba(89, 168, 255, 0.42)",
+        background: "rgba(41, 103, 168, 0.9)",
+        color: "#ffffff",
+        fontSize: "13px",
+        fontWeight: 700,
+        cursor: "pointer",
+        flexShrink: 0,
+    },
+    selectionStatus: {
+        minHeight: "16px",
+        color: "#b8c6da",
+        fontSize: "12px",
+        lineHeight: 1.3,
+    },
+    selectionStatusError: {
+        color: "#ffb39f",
+    },
+    selectionStatusSuccess: {
+        color: "#b8ebc0",
     },
     rows: {
         display: "flex",
@@ -195,6 +257,14 @@ function stopEvent(event) {
     event.stopPropagation();
 }
 
+function stopPropagationOnly(event) {
+    if (!event) {
+        return;
+    }
+
+    event.stopPropagation();
+}
+
 function Row(props) {
     if (!props.value) {
         return null;
@@ -209,6 +279,10 @@ function Row(props) {
 }
 
 function ClassificationRow(props) {
+    if (!props.label && !props.value) {
+        return null;
+    }
+
     return h(
         "div",
         { style: styles.classificationRow },
@@ -250,6 +324,12 @@ function SelectedObjectPanel() {
     const totals = api.useValue(totalsBinding);
     const lastReason = api.useValue(lastReasonBinding);
     const repeatPenalty = api.useValue(repeatPenaltyBinding);
+    const entitySelectionLabelText = api.useValue(entitySelectionLabelTextBinding);
+    const entitySelectionPlaceholderText = api.useValue(entitySelectionPlaceholderTextBinding);
+    const entitySelectionSubmitText = api.useValue(entitySelectionSubmitTextBinding);
+    const entitySelectionSuggestedValue = api.useValue(entitySelectionSuggestedValueBinding);
+    const entitySelectionStatus = api.useValue(entitySelectionStatusBinding);
+    const entitySelectionStatusIsError = api.useValue(entitySelectionStatusIsErrorBinding);
     const headerText = api.useValue(headerTextBinding);
     const summaryTitle = api.useValue(summaryTitleBinding);
     const tleStatusLabelText = api.useValue(tleStatusLabelTextBinding);
@@ -281,6 +361,7 @@ function SelectedObjectPanel() {
     const previousLane = api.useValue(previousLaneBinding);
     const laneChanges = api.useValue(laneChangesBinding);
     const liveLaneState = api.useValue(liveLaneStateBinding);
+    const laneDetailsVisible = api.useValue(laneDetailsVisibleBinding);
     const laneDetailsCollapsed = api.useValue(laneDetailsCollapsedBinding);
     const routeDiagnosticsVisible = api.useValue(routeDiagnosticsVisibleBinding);
     const routeDiagnosticsCollapsed = api.useValue(routeDiagnosticsCollapsedBinding);
@@ -293,6 +374,23 @@ function SelectedObjectPanel() {
     const routeExplanation = api.useValue(routeExplanationBinding);
     const waypointRouteLane = api.useValue(waypointRouteLaneBinding);
     const connectedStop = api.useValue(connectedStopBinding);
+    const [entitySelectionInput, setEntitySelectionInput] = React.useState(entitySelectionSuggestedValue);
+    const previousSuggestedValueRef = React.useRef(entitySelectionSuggestedValue);
+
+    React.useEffect(
+        function () {
+            const suggestedValue = entitySelectionSuggestedValue || "";
+            if (
+                entitySelectionInput === "" ||
+                entitySelectionInput === previousSuggestedValueRef.current
+            ) {
+                setEntitySelectionInput(suggestedValue);
+            }
+
+            previousSuggestedValueRef.current = suggestedValue;
+        },
+        [entitySelectionSuggestedValue]
+    );
 
     const onClose = React.useCallback(function () {
         api.trigger(group, "close");
@@ -309,6 +407,14 @@ function SelectedObjectPanel() {
     const onToggleRouteDiagnostics = React.useCallback(function () {
         api.trigger(group, "toggleRouteDiagnosticsCollapsed");
     }, []);
+
+    const onSubmitEntitySelection = React.useCallback(
+        function (event) {
+            stopEvent(event);
+            api.trigger(group, "submitEntitySelection", entitySelectionInput || "");
+        },
+        [entitySelectionInput]
+    );
 
     if (!visible) {
         return null;
@@ -331,16 +437,74 @@ function SelectedObjectPanel() {
               collapseTooltip: collapseSectionTooltipText,
           });
 
+    const selectionBlock = h(
+        "div",
+        {
+            style: styles.selectionBlock,
+            onMouseDown: stopPropagationOnly,
+            onClick: stopPropagationOnly,
+        },
+        h("div", { style: styles.selectionLabel }, entitySelectionLabelText),
+        h(
+            "div",
+            { style: styles.selectionRow },
+            h("input", {
+                type: "text",
+                value: entitySelectionInput || "",
+                placeholder: entitySelectionPlaceholderText,
+                style: styles.selectionInput,
+                onChange: function (event) {
+                    setEntitySelectionInput(event.target.value);
+                },
+                onKeyDown: function (event) {
+                    stopPropagationOnly(event);
+                    if (event.key === "Enter") {
+                        onSubmitEntitySelection(event);
+                    }
+                },
+                onMouseDown: stopPropagationOnly,
+                onClick: stopPropagationOnly,
+            }),
+            h(
+                "button",
+                {
+                    type: "button",
+                    style: styles.selectionButton,
+                    onMouseDown: stopEvent,
+                    onClick: onSubmitEntitySelection,
+                },
+                entitySelectionSubmitText
+            )
+        ),
+        h(
+            "div",
+            {
+                style: Object.assign(
+                    {},
+                    styles.selectionStatus,
+                    entitySelectionStatus
+                        ? entitySelectionStatusIsError
+                            ? styles.selectionStatusError
+                            : styles.selectionStatusSuccess
+                        : null
+                ),
+            },
+            entitySelectionStatus
+        )
+    );
+
     const body = compact
         ? h(
               "div",
               { style: Object.assign({}, styles.compactBody, { width: panelWidth }) },
-              isUltraCompact
-                  ? h("div", { style: styles.compactMessage }, message)
-                  : [
+              [
+                  selectionBlock,
+                  isUltraCompact
+                      ? h("div", { style: styles.compactMessage, key: "message" }, message)
+                      : [
                         h(ClassificationRow, {
                             label: classification,
-                            value: vehicleIndex ? "#" + vehicleIndex : "",
+                            value: vehicleIndex,
                             key: "classification",
                         }),
                         h(
@@ -348,16 +512,21 @@ function SelectedObjectPanel() {
                             { style: styles.rows, key: "rows" },
                             h(Row, { label: tleStatusLabelText, value: tleStatus })
                         ),
-                    ]
+                    ],
+              ]
           )
         : collapsed
             ? null
             : h(
                   "div",
                   { style: styles.body },
+                  selectionBlock,
+                  message
+                      ? h("div", { style: styles.compactMessage }, message)
+                      : null,
                   h(ClassificationRow, {
                       label: classification,
-                      value: vehicleIndex ? "#" + vehicleIndex : "",
+                      value: vehicleIndex,
                   }),
                   h(
                       "div",
@@ -370,29 +539,33 @@ function SelectedObjectPanel() {
                       h(Row, { label: repeatPenaltyLabelText, value: repeatPenalty }),
                       h(Row, { label: publicTransportLanePolicyLabelText, value: publicTransportLanePolicy })
                   ),
-                  h(FoldoutRow, {
-                      title: laneDetailsTitleText,
-                      collapsed: laneDetailsCollapsed,
-                      onToggleCollapsed: onToggleLaneDetails,
-                      expandTooltip: expandSectionTooltipText,
-                      collapseTooltip: collapseSectionTooltipText,
-                      style: styles.subsectionFoldout,
-                  }),
-                   laneDetailsCollapsed
+                  laneDetailsVisible
+                      ? h(FoldoutRow, {
+                            title: laneDetailsTitleText,
+                            collapsed: laneDetailsCollapsed,
+                            onToggleCollapsed: onToggleLaneDetails,
+                            expandTooltip: expandSectionTooltipText,
+                            collapseTooltip: collapseSectionTooltipText,
+                            style: styles.subsectionFoldout,
+                        })
+                      : null,
+                   laneDetailsVisible && laneDetailsCollapsed
                        ? null
-                       : h(
-                             "div",
-                             { style: styles.subsectionBody },
-                            h(Row, { label: currentLaneLabelText, value: currentLane }),
-                            h(Row, { label: previousLaneLabelText, value: previousLane }),
-                            h(Row, { label: laneChangesLabelText, value: laneChanges }),
-                            h(Row, { label: liveLaneStateLabelText, value: liveLaneState }),
-                            h(
-                                "div",
-                                { style: styles.footer },
-                                 footerText
-                             )
-                        ),
+                       : !laneDetailsVisible
+                           ? null
+                           : h(
+                                 "div",
+                                 { style: styles.subsectionBody },
+                                h(Row, { label: currentLaneLabelText, value: currentLane }),
+                                h(Row, { label: previousLaneLabelText, value: previousLane }),
+                                h(Row, { label: laneChangesLabelText, value: laneChanges }),
+                                h(Row, { label: liveLaneStateLabelText, value: liveLaneState }),
+                                h(
+                                    "div",
+                                    { style: styles.footer },
+                                     footerText
+                                 )
+                            ),
                    routeDiagnosticsVisible
                        ? h(FoldoutRow, {
                              title: routeDiagnosticsTitleText,
