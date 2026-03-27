@@ -196,8 +196,13 @@ namespace Traffic_Law_Enforcement
             });
             vehicleInfo.children.Add(new DebugUI.Value
             {
-                displayName = "Role / type",
-                getter = GetRoleOrTypeText
+                displayName = "Role",
+                getter = GetRoleText
+            });
+            vehicleInfo.children.Add(new DebugUI.Value
+            {
+                displayName = "PT lane policy",
+                getter = GetPublicTransportLaneAllowanceText
             });
             vehicleInfo.children.Add(new DebugUI.Value
             {
@@ -501,12 +506,20 @@ namespace Traffic_Law_Enforcement
                     : "Unavailable");
         }
 
-        private static string GetRoleOrTypeText()
+        private static string GetRoleText()
         {
             return GetVehicleInfoText(
                 snapshot => string.IsNullOrWhiteSpace(snapshot.RoleOrTypeText)
                     ? "Unavailable"
-                    : snapshot.RoleOrTypeText);
+                    : ExtractRoleText(snapshot.RoleOrTypeText));
+        }
+
+        private static string GetPublicTransportLaneAllowanceText()
+        {
+            return GetVehicleInfoText(
+                snapshot => string.IsNullOrWhiteSpace(snapshot.PublicTransportLaneAllowanceText)
+                    ? "Unavailable"
+                    : snapshot.PublicTransportLaneAllowanceText);
         }
 
         private static string GetHasTrafficLawProfileText()
@@ -698,6 +711,26 @@ namespace Traffic_Law_Enforcement
             }
 
             return formatter(snapshot);
+        }
+
+        private static string ExtractRoleText(string roleOrType)
+        {
+            if (string.IsNullOrWhiteSpace(roleOrType))
+            {
+                return "Unavailable";
+            }
+
+            string[] segments = roleOrType.Split('|');
+            foreach (string segment in segments)
+            {
+                string normalized = segment.Trim();
+                if (!string.IsNullOrEmpty(normalized))
+                {
+                    return normalized;
+                }
+            }
+
+            return "Unavailable";
         }
 
         private static string GetReadyTleText(
