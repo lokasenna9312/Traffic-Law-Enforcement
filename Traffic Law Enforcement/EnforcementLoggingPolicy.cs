@@ -2,6 +2,8 @@ namespace Traffic_Law_Enforcement
 {
     public static class EnforcementLoggingPolicy
     {
+        public static bool IsBurstLoggingActive => BurstLoggingService.IsActive;
+
         public static bool EnableEstimatedRerouteLogging => Mod.Settings?.EnableEstimatedRerouteLogging ?? false;
 
         public static bool EnableEnforcementEventLogging => Mod.Settings?.EnableEnforcementEventLogging ?? false;

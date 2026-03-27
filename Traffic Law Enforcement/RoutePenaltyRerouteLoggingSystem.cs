@@ -119,9 +119,20 @@ namespace Traffic_Law_Enforcement
         protected override void OnUpdate()
         {
             HandleRuntimeWorldReload();
-            bool loggingEnabled = EnforcementLoggingPolicy.ShouldLogEstimatedReroutes();
+            bool estimatedRerouteLoggingEnabled = EnforcementLoggingPolicy.ShouldLogEstimatedReroutes();
             bool routeSelectionLoggingEnabled =
                 EnforcementLoggingPolicy.ShouldLogAllVehicleRouteSelectionChanges();
+            bool pathfindingPenaltyDiagnosticLoggingEnabled =
+                EnforcementLoggingPolicy.ShouldLogPathfindingPenaltyDiagnostics();
+            bool burstLoggingActive = EnforcementLoggingPolicy.IsBurstLoggingActive;
+            int rerouteLogLimit =
+                burstLoggingActive
+                    ? BurstLoggingService.BurstEstimatedRerouteLogsPerUpdate
+                    : MaxLogsPerUpdate;
+            int routeSelectionLogLimit =
+                burstLoggingActive
+                    ? BurstLoggingService.BurstRouteSelectionChangeLogsPerUpdate
+                    : MaxRouteSelectionChangeLogsPerUpdate;
             m_PublicTransportLaneDecisionDiagnosticLogsThisUpdate = 0;
             if (!Mod.IsEnforcementEnabled)
             {
@@ -144,12 +155,16 @@ namespace Traffic_Law_Enforcement
             m_ConnectionLaneData.Update(this);
             m_ProfileData.Update(this);
             m_TypeLookups.Update(this);
+            FocusedLoggingService.PruneMissingVehicles(EntityManager);
+            bool hasWatchedVehicles = FocusedLoggingService.HasWatchedVehicles;
+            bool trackRouteSelectionChanges =
+                routeSelectionLoggingEnabled || hasWatchedVehicles;
 
             m_CandidateVehicles.Clear();
             CollectCandidateVehicles(m_CurrentLaneChangedQuery);
             CollectCandidateVehicles(m_NavigationLaneChangedQuery);
             CollectCandidateVehicles(m_CarChangedQuery);
-            if (routeSelectionLoggingEnabled)
+            if (trackRouteSelectionChanges)
             {
                 CollectCandidateVehicles(m_TargetChangedQuery);
                 CollectCandidateVehicles(m_CurrentRouteChangedQuery);
@@ -170,11 +185,18 @@ namespace Traffic_Law_Enforcement
                     continue;
                 }
 
+                bool watchedVehicle = FocusedLoggingService.IsWatched(vehicle);
+
                 RoutePenaltyInspectionResult snapshot =
                     BuildSnapshot(
                         vehicle,
                         currentLane,
-                        captureDebugStrings: loggingEnabled || routeSelectionLoggingEnabled);
+                        captureDebugStrings:
+                            estimatedRerouteLoggingEnabled ||
+                            routeSelectionLoggingEnabled ||
+                            watchedVehicle,
+                        forcePathfindingPenaltyDiagnostics:
+                            watchedVehicle && !pathfindingPenaltyDiagnosticLoggingEnabled);
 
                 bool rerouteDetected = false;
 
@@ -185,10 +207,19 @@ namespace Traffic_Law_Enforcement
                     {
                         RecordRerouteTelemetry(vehicle, previousSnapshot, snapshot);
 
-                        if (loggingEnabled && logsEmitted < MaxLogsPerUpdate)
+                        if (watchedVehicle ||
+                            (estimatedRerouteLoggingEnabled && logsEmitted < rerouteLogLimit))
                         {
-                            LogReroute(vehicle, previousSnapshot, snapshot);
-                            logsEmitted += 1;
+                            LogReroute(
+                                vehicle,
+                                previousSnapshot,
+                                snapshot,
+                                watchedVehicle);
+
+                            if (!watchedVehicle)
+                            {
+                                logsEmitted += 1;
+                            }
                         }
                     }
 
@@ -199,7 +230,7 @@ namespace Traffic_Law_Enforcement
                     m_LastSnapshots[vehicle] = snapshot;
                 }
 
-                if (!routeSelectionLoggingEnabled)
+                if (!trackRouteSelectionChanges)
                 {
                     continue;
                 }
@@ -216,14 +247,19 @@ namespace Traffic_Law_Enforcement
                             routeSelectionSnapshot,
                             rerouteDetected))
                     {
-                        if (routeSelectionLogsEmitted < MaxRouteSelectionChangeLogsPerUpdate)
+                        if (watchedVehicle || routeSelectionLogsEmitted < routeSelectionLogLimit)
                         {
                             LogRouteSelectionChange(
                                 vehicle,
                                 previousRouteSelectionSnapshot,
                                 routeSelectionSnapshot,
-                                rerouteDetected);
-                            routeSelectionLogsEmitted += 1;
+                                rerouteDetected,
+                                watchedVehicle);
+
+                            if (!watchedVehicle)
+                            {
+                                routeSelectionLogsEmitted += 1;
+                            }
                         }
                         else
                         {
@@ -239,10 +275,10 @@ namespace Traffic_Law_Enforcement
                 }
             }
 
-            if (routeSelectionLoggingEnabled && routeSelectionLogsDropped > 0)
+            if (trackRouteSelectionChanges && routeSelectionLogsDropped > 0)
             {
                 string droppedMessage =
-                    $"Route selection change logging throttled: dropped={routeSelectionLogsDropped}, emitted={routeSelectionLogsEmitted}, candidates={m_CandidateVehicles.Count}";
+                    $"Route selection change logging throttled: dropped={routeSelectionLogsDropped}, emitted={routeSelectionLogsEmitted}, candidates={m_CandidateVehicles.Count}, limit={routeSelectionLogLimit}, burstActive={burstLoggingActive}";
                 EnforcementTelemetry.RecordEvent(droppedMessage);
                 Mod.log.Info(droppedMessage);
             }
@@ -272,6 +308,7 @@ namespace Traffic_Law_Enforcement
             m_LastRouteSelectionSnapshots.Clear();
             m_CandidateVehicles.Clear();
             m_UpdateCount = 0;
+            FocusedLoggingService.ClearWatchedVehiclesForRuntimeWorldReset(currentGeneration);
             RerouteLoggingTelemetry.SetState(false, 0, 0, 0);
 
             Mod.log.Info(
@@ -294,18 +331,24 @@ namespace Traffic_Law_Enforcement
             }
         }
 
-        private RoutePenaltyInspectionResult BuildSnapshot(Entity vehicle, CarCurrentLane currentLane, bool captureDebugStrings)
+        private RoutePenaltyInspectionResult BuildSnapshot(
+            Entity vehicle,
+            CarCurrentLane currentLane,
+            bool captureDebugStrings,
+            bool forcePathfindingPenaltyDiagnostics)
         {
             bool hasNavigationLanes =
                 m_NavigationLaneData.TryGetBuffer(vehicle, out DynamicBuffer<CarNavigationLane> navigationLanes);
 
-            if (EnforcementLoggingPolicy.ShouldLogPathfindingPenaltyDiagnostics())
+            if (EnforcementLoggingPolicy.ShouldLogPathfindingPenaltyDiagnostics() ||
+                forcePathfindingPenaltyDiagnostics)
             {
                 LogPublicTransportLaneDecisionDiagnostics(
                     vehicle,
                     currentLane.m_Lane,
                     navigationLanes,
-                    hasNavigationLanes);
+                    hasNavigationLanes,
+                    forcePathfindingPenaltyDiagnostics);
             }
 
             RoutePenaltyInspectionContext context = CreateInspectionContext();
@@ -393,7 +436,8 @@ namespace Traffic_Law_Enforcement
             Entity vehicle,
             RouteSelectionChangeSnapshot previousSnapshot,
             RouteSelectionChangeSnapshot currentSnapshot,
-            bool rerouteDetected)
+            bool rerouteDetected,
+            bool focusedWatch)
         {
             string role =
                 PublicTransportLanePolicy.DescribeVehicleRole(vehicle, ref m_TypeLookups);
@@ -404,7 +448,7 @@ namespace Traffic_Law_Enforcement
                     rerouteDetected);
 
             string message =
-                $"Route selection change: vehicle={vehicle}, role={role}, reasons={reasons}, " +
+                $"Route selection change: vehicle={vehicle}, role={role}, focusedWatch={focusedWatch}, reasons={reasons}, " +
                 $"currentLane={currentSnapshot.CurrentLane}, " +
                 $"routeHash={previousSnapshot.RouteHash}->{currentSnapshot.RouteHash}, " +
                 $"currentRoute={FormatOptionalEntity(previousSnapshot.HasCurrentRoute, previousSnapshot.CurrentRoute)}->{FormatOptionalEntity(currentSnapshot.HasCurrentRoute, currentSnapshot.CurrentRoute)}, " +
@@ -474,7 +518,8 @@ namespace Traffic_Law_Enforcement
             Entity vehicle,
             Entity currentLane,
             DynamicBuffer<CarNavigationLane> navigationLanes,
-            bool hasNavigationLanes)
+            bool hasNavigationLanes,
+            bool forceLogging)
         {
             RoutePenaltyInspectionContext context = CreateInspectionContext();
             bool hasResolvedPublicTransportLanePolicy =
@@ -487,7 +532,8 @@ namespace Traffic_Law_Enforcement
                 vehicle,
                 currentLane,
                 hasResolvedPublicTransportLanePolicy,
-                allowedOnPublicTransportLane);
+                allowedOnPublicTransportLane,
+                forceLogging);
 
             if (!hasNavigationLanes)
             {
@@ -511,7 +557,8 @@ namespace Traffic_Law_Enforcement
                     vehicle,
                     lane,
                     hasResolvedPublicTransportLanePolicy,
-                    allowedOnPublicTransportLane);
+                    allowedOnPublicTransportLane,
+                    forceLogging);
             }
         }
 
@@ -557,7 +604,8 @@ namespace Traffic_Law_Enforcement
                 vehicle,
                 lane,
                 hasResolvedPublicTransportLanePolicy,
-                allowedOnPublicTransportLane);
+                allowedOnPublicTransportLane,
+                forceLogging: false);
 
             if (unauthorizedPublicTransportLane && !previousUnauthorizedPublicTransportLane)
             {
@@ -575,15 +623,18 @@ namespace Traffic_Law_Enforcement
             Entity vehicle,
             Entity lane,
             bool hasResolvedPublicTransportLanePolicy,
-            bool allowedOnPublicTransportLane)
+            bool allowedOnPublicTransportLane,
+            bool forceLogging)
         {
-            if (!EnforcementLoggingPolicy.ShouldLogPathfindingPenaltyDiagnostics())
+            if (!EnforcementLoggingPolicy.ShouldLogPathfindingPenaltyDiagnostics() &&
+                !forceLogging)
             {
                 return;
             }
 
-            if (m_PublicTransportLaneDecisionDiagnosticLogsThisUpdate >=
-                MaxPublicTransportLaneDecisionDiagnosticLogsPerUpdate)
+            if (!forceLogging &&
+                m_PublicTransportLaneDecisionDiagnosticLogsThisUpdate >=
+                GetPublicTransportLaneDecisionDiagnosticLogLimit())
             {
                 return;
             }
@@ -667,6 +718,7 @@ namespace Traffic_Law_Enforcement
 
             string message =
                 $"PT_ROUTE_DIAG: vehicle={vehicle}, role={role}, lane={lane}, laneKind={laneKind}, " +
+                $"focusedWatch={forceLogging}, " +
                 $"publicOnly={publicOnly}, hasResolvedPolicy={hasResolvedPublicTransportLanePolicy}, " +
                 $"hasProfile={hasProfile}, allowedOnPublicTransportLane={allowedOnPublicTransportLane}, " +
                 $"unauthorizedPublicTransportLane={unauthorizedPublicTransportLane}, engineHasFlag={engineHasFlag}, " +
@@ -677,7 +729,17 @@ namespace Traffic_Law_Enforcement
 
             EnforcementTelemetry.RecordEvent(message);
             Mod.log.Info(message);
-            m_PublicTransportLaneDecisionDiagnosticLogsThisUpdate += 1;
+            if (!forceLogging)
+            {
+                m_PublicTransportLaneDecisionDiagnosticLogsThisUpdate += 1;
+            }
+        }
+
+        private static int GetPublicTransportLaneDecisionDiagnosticLogLimit()
+        {
+            return EnforcementLoggingPolicy.IsBurstLoggingActive
+                ? BurstLoggingService.BurstPublicTransportLaneDecisionDiagnosticLogsPerUpdate
+                : MaxPublicTransportLaneDecisionDiagnosticLogsPerUpdate;
         }
 
         private bool TryGetMidBlockPenaltyTag(
@@ -839,7 +901,8 @@ namespace Traffic_Law_Enforcement
         private void LogReroute(
             Entity vehicle,
             RoutePenaltyInspectionResult previousSnapshot,
-            RoutePenaltyInspectionResult currentSnapshot)
+            RoutePenaltyInspectionResult currentSnapshot,
+            bool focusedWatch)
         {
             bool allowPublicTransportLaneComparison =
                 previousSnapshot.PublicTransportLanePolicyResolved &&
@@ -873,7 +936,7 @@ namespace Traffic_Law_Enforcement
                 : "excluding-unresolved-pt";
 
             string message =
-                $"Pathfinding reroute (estimated): vehicle={vehicle}, role={role}, comparisonMode={comparisonMode}, " +
+                $"Pathfinding reroute (estimated): vehicle={vehicle}, role={role}, focusedWatch={focusedWatch}, comparisonMode={comparisonMode}, " +
                 $"avoidedPenalty={avoidedPenalty}, " +
                 $"fromPenalty={previousComparablePenalty} [{previousComparableBreakdown}], " +
                 $"toPenalty={currentComparablePenalty} [{currentComparableBreakdown}], " +

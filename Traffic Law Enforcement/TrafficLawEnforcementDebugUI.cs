@@ -90,6 +90,11 @@ namespace Traffic_Law_Enforcement
             });
             overview.children.Add(new DebugUI.Value
             {
+                displayName = "Burst logging status",
+                getter = BurstLoggingService.DescribeStatus
+            });
+            overview.children.Add(new DebugUI.Value
+            {
                 displayName = "PT-lane repeat policy",
                 getter = () => EnforcementPenaltyService.GetRepeatPolicyDebugSummary(EnforcementKinds.PublicTransportLane)
             });
@@ -137,6 +142,7 @@ namespace Traffic_Law_Enforcement
             });
 
             DebugUI.Foldout SelectedObject = BuildSelectedObjectInspector();
+            DebugUI.Foldout focusedLogging = BuildFocusedLoggingInspector();
 
             return new List<DebugUI.Widget>
             {
@@ -148,11 +154,79 @@ namespace Traffic_Law_Enforcement
                         DebugSystem.Rebuild(BuildTrafficLawEnforcementDebugUI);
                     }
                 },
+                new DebugUI.Button
+                {
+                    displayName = "Start burst logging (5s)",
+                    action = BurstLoggingService.RequestDefaultBurst
+                },
                 overview,
+                focusedLogging,
                 SelectedObject,
                 recent,
                 records
             };
+        }
+
+        private static DebugUI.Foldout BuildFocusedLoggingInspector()
+        {
+            DebugUI.Foldout focusedLogging = new DebugUI.Foldout
+            {
+                displayName = "Focused logging",
+                opened = true
+            };
+
+            focusedLogging.children.Add(new DebugUI.Value
+            {
+                displayName = "Window",
+                getter = GetFocusedLoggingWindowStatusText
+            });
+            focusedLogging.children.Add(new DebugUI.Value
+            {
+                displayName = "Watched vehicle count",
+                getter = GetFocusedLoggingWatchedVehicleCountText
+            });
+            focusedLogging.children.Add(new DebugUI.Value
+            {
+                displayName = "Watched vehicles",
+                getter = GetFocusedLoggingWatchedVehiclesText
+            });
+            focusedLogging.children.Add(new DebugUI.Value
+            {
+                displayName = "Selected vehicle",
+                getter = GetFocusedLoggingSelectedVehicleText
+            });
+            focusedLogging.children.Add(new DebugUI.Value
+            {
+                displayName = "Selected role",
+                getter = GetFocusedLoggingSelectedRoleText
+            });
+            focusedLogging.children.Add(new DebugUI.Value
+            {
+                displayName = "Selected watch status",
+                getter = GetFocusedLoggingSelectedWatchStatusText
+            });
+            focusedLogging.children.Add(new DebugUI.Button
+            {
+                displayName = "Toggle focused logging window",
+                action = FocusedLoggingService.ToggleWindowVisible
+            });
+            focusedLogging.children.Add(new DebugUI.Button
+            {
+                displayName = "Watch selected road vehicle",
+                action = WatchSelectedRoadVehicle
+            });
+            focusedLogging.children.Add(new DebugUI.Button
+            {
+                displayName = "Unwatch selected road vehicle",
+                action = UnwatchSelectedRoadVehicle
+            });
+            focusedLogging.children.Add(new DebugUI.Button
+            {
+                displayName = "Clear watched vehicles",
+                action = FocusedLoggingService.ClearWatchedVehicles
+            });
+
+            return focusedLogging;
         }
 
         private static DebugUI.Foldout BuildSelectedObjectInspector()
@@ -819,6 +893,77 @@ namespace Traffic_Law_Enforcement
             return formatter(snapshot);
         }
 
+        private static string GetFocusedLoggingWindowStatusText()
+        {
+            return FocusedLoggingService.IsWindowVisible
+                ? "Visible"
+                : "Hidden";
+        }
+
+        private static string GetFocusedLoggingWatchedVehicleCountText()
+        {
+            return FocusedLoggingService.WatchedVehicleCount.ToString();
+        }
+
+        private static string GetFocusedLoggingWatchedVehiclesText()
+        {
+            string summary = FocusedLoggingService.DescribeWatchedVehicles();
+            return string.IsNullOrWhiteSpace(summary)
+                ? "None"
+                : summary;
+        }
+
+        private static string GetFocusedLoggingSelectedVehicleText()
+        {
+            return TryGetSelectedReadyRoadVehicle(
+                    out SelectedObjectDebugSnapshot _,
+                    out Entity vehicle)
+                ? FocusedLoggingService.FormatEntity(vehicle)
+                : "None";
+        }
+
+        private static string GetFocusedLoggingSelectedRoleText()
+        {
+            return TryGetSelectedReadyRoadVehicle(
+                    out SelectedObjectDebugSnapshot snapshot,
+                    out Entity _)
+                ? string.IsNullOrWhiteSpace(snapshot.RoleText)
+                    ? "Unavailable"
+                    : snapshot.RoleText.Trim()
+                : "Unavailable";
+        }
+
+        private static string GetFocusedLoggingSelectedWatchStatusText()
+        {
+            return TryGetSelectedReadyRoadVehicle(
+                    out SelectedObjectDebugSnapshot _,
+                    out Entity vehicle)
+                ? FocusedLoggingService.IsWatched(vehicle)
+                    ? "Watched"
+                    : "Not watched"
+                : "Unavailable";
+        }
+
+        private static void WatchSelectedRoadVehicle()
+        {
+            if (TryGetSelectedReadyRoadVehicle(
+                    out SelectedObjectDebugSnapshot _,
+                    out Entity vehicle))
+            {
+                FocusedLoggingService.AddWatchedVehicle(vehicle);
+            }
+        }
+
+        private static void UnwatchSelectedRoadVehicle()
+        {
+            if (TryGetSelectedReadyRoadVehicle(
+                    out SelectedObjectDebugSnapshot _,
+                    out Entity vehicle))
+            {
+                FocusedLoggingService.RemoveWatchedVehicle(vehicle);
+            }
+        }
+
         private static string GetReadyTleText(
             System.Func<SelectedObjectDebugSnapshot, string> formatter)
         {
@@ -911,6 +1056,22 @@ namespace Traffic_Law_Enforcement
             }
 
             snapshot = bridgeSystem.CurrentSnapshot;
+            return true;
+        }
+
+        private static bool TryGetSelectedReadyRoadVehicle(
+            out SelectedObjectDebugSnapshot snapshot,
+            out Entity vehicle)
+        {
+            vehicle = Entity.Null;
+            if (!TryGetSelectedObjectSnapshot(out snapshot) ||
+                snapshot.TleApplicability != SelectedObjectTleApplicability.ApplicableReady ||
+                snapshot.ResolvedVehicleEntity == Entity.Null)
+            {
+                return false;
+            }
+
+            vehicle = snapshot.ResolvedVehicleEntity;
             return true;
         }
 

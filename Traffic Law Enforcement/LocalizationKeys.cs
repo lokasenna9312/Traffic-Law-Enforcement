@@ -123,7 +123,9 @@ namespace Traffic_Law_Enforcement
             AddOption(map, setting, nameof(Setting.EnablePathObsoleteSourceLogging));
             AddOption(map, setting, nameof(Setting.EnableSaveIdentificationLogging));
             AddOption(map, setting, nameof(Setting.EnableAllVehicleRouteSelectionChangeLogging));
+            AddOption(map, setting, nameof(Setting.StartBurstLogging));
             AddOption(map, setting, nameof(Setting.SelectedObjectPanelToggleBinding));
+            AddOption(map, setting, nameof(Setting.FocusedLoggingPanelToggleBinding));
             AddOption(map, setting, nameof(Setting.ModLogPath));
 
             AddOption(map, setting, nameof(Setting.PolicyImpactTotalStatistics));
@@ -137,6 +139,10 @@ namespace Traffic_Law_Enforcement
                 setting.GetBindingKeyLocaleID(KeybindingIds.SelectedObjectPanelToggleActionName);
             map["BindingHint.SelectedObjectPanelToggle"] =
                 setting.GetBindingKeyHintLocaleID(KeybindingIds.SelectedObjectPanelToggleActionName);
+            map["BindingLabel.FocusedLoggingPanelToggle"] =
+                setting.GetBindingKeyLocaleID(KeybindingIds.FocusedLoggingPanelToggleActionName);
+            map["BindingHint.FocusedLoggingPanelToggle"] =
+                setting.GetBindingKeyHintLocaleID(KeybindingIds.FocusedLoggingPanelToggleActionName);
             map["SelectedObjectPanel.HeaderText"] = SelectedObjectPanelUISystem.kHeaderTextLocaleId;
             map["SelectedObjectPanel.SummaryTitle"] = SelectedObjectPanelUISystem.kSummaryTitleLocaleId;
             map["SelectedObjectPanel.TleStatusLabel"] = SelectedObjectPanelUISystem.kTleStatusLabelLocaleId;
@@ -265,6 +271,44 @@ namespace Traffic_Law_Enforcement
                 SelectedObjectBridgeSystem.kRouteExplanationPtPermissiveLocaleId;
             map["SelectedObjectPanel.RouteExplanation.GenericFallback"] =
                 SelectedObjectBridgeSystem.kRouteExplanationGenericFallbackLocaleId;
+            map["FocusedLoggingPanel.HeaderText"] =
+                FocusedLoggingPanelUISystem.kHeaderTextLocaleId;
+            map["FocusedLoggingPanel.SelectedVehicleLabel"] =
+                FocusedLoggingPanelUISystem.kSelectedVehicleLabelLocaleId;
+            map["FocusedLoggingPanel.SelectedRoleLabel"] =
+                FocusedLoggingPanelUISystem.kSelectedRoleLabelLocaleId;
+            map["FocusedLoggingPanel.SelectedWatchStatusLabel"] =
+                FocusedLoggingPanelUISystem.kSelectedWatchStatusLabelLocaleId;
+            map["FocusedLoggingPanel.WatchedCountLabel"] =
+                FocusedLoggingPanelUISystem.kWatchedCountLabelLocaleId;
+            map["FocusedLoggingPanel.WatchedVehiclesLabel"] =
+                FocusedLoggingPanelUISystem.kWatchedVehiclesLabelLocaleId;
+            map["FocusedLoggingPanel.BurstLoggingLabel"] =
+                FocusedLoggingPanelUISystem.kBurstLoggingLabelLocaleId;
+            map["FocusedLoggingPanel.WatchSelected"] =
+                FocusedLoggingPanelUISystem.kWatchSelectedButtonLocaleId;
+            map["FocusedLoggingPanel.UnwatchSelected"] =
+                FocusedLoggingPanelUISystem.kUnwatchSelectedButtonLocaleId;
+            map["FocusedLoggingPanel.ClearWatched"] =
+                FocusedLoggingPanelUISystem.kClearWatchedButtonLocaleId;
+            map["FocusedLoggingPanel.ToggleBurstLogging"] =
+                FocusedLoggingPanelUISystem.kToggleBurstLoggingButtonLocaleId;
+            map["FocusedLoggingPanel.BurstLoggingActiveFormat"] =
+                FocusedLoggingPanelUISystem.kBurstLoggingActiveFormatLocaleId;
+            map["FocusedLoggingPanel.BurstLoggingInactive"] =
+                FocusedLoggingPanelUISystem.kBurstLoggingInactiveLocaleId;
+            map["FocusedLoggingPanel.WatchedCountFormat"] =
+                FocusedLoggingPanelUISystem.kWatchedCountFormatLocaleId;
+            map["FocusedLoggingPanel.WatchedStatus"] =
+                FocusedLoggingPanelUISystem.kWatchedStatusLocaleId;
+            map["FocusedLoggingPanel.NotWatchedStatus"] =
+                FocusedLoggingPanelUISystem.kNotWatchedStatusLocaleId;
+            map["FocusedLoggingPanel.NoEligibleSelection"] =
+                FocusedLoggingPanelUISystem.kNoEligibleSelectionLocaleId;
+            map["FocusedLoggingPanel.FooterHint"] =
+                FocusedLoggingPanelUISystem.kFooterHintLocaleId;
+            map["FocusedLoggingPanel.None"] =
+                FocusedLoggingPanelUISystem.kNoneLocaleId;
 
             map["MonthlyChirper.SenderText"] = MonthlyEnforcementChirperSystem.kSenderTextLocaleId;
             map["MonthlyChirper.PeriodPointFormat"] = MonthlyEnforcementChirperSystem.kPeriodPointFormatLocaleId;

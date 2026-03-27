@@ -18,6 +18,8 @@ namespace Traffic_Law_Enforcement
     {
         public const string SelectedObjectPanelToggleActionName =
             "SelectedObjectPanelToggle";
+        public const string FocusedLoggingPanelToggleActionName =
+            "FocusedLoggingPanelToggle";
     }
 
     [FileLocation(nameof(Traffic_Law_Enforcement))]
@@ -26,6 +28,9 @@ namespace Traffic_Law_Enforcement
     [SettingsUIShowGroupName(kGeneralGroup, kPublicTransportLaneAuthorizedGroup, kPublicTransportLaneAdditionalGroup, kPublicTransportLanePressureGroup, kFineGroup, kRepeatOffenderGroup, kTemplateActionsGroup, kPolicyImpactGroup, kDebugGroup, kLogPathGroup)]
     [SettingsUIKeyboardAction(
         KeybindingIds.SelectedObjectPanelToggleActionName,
+        canBeEmpty: false)]
+    [SettingsUIKeyboardAction(
+        KeybindingIds.FocusedLoggingPanelToggleActionName,
         canBeEmpty: false)]
     public class Setting : ModSetting
     {
@@ -611,6 +616,23 @@ namespace Traffic_Law_Enforcement
         [SettingsUISection(kDebugTab, kDebugGroup)]
         public bool EnableAllVehicleRouteSelectionChangeLogging { get; set; }
 
+        [Exclude]
+        [SettingsUIButton]
+        [SettingsUIDisableByCondition(typeof(Setting), nameof(IsBurstLoggingButtonDisabled))]
+        [SettingsUISection(kDebugTab, kDebugGroup)]
+        public bool StartBurstLogging
+        {
+            set
+            {
+                if (!value)
+                {
+                    return;
+                }
+
+                BurstLoggingService.RequestDefaultBurst();
+            }
+        }
+
         [SettingsUISection(kDebugTab, kDebugGroup)]
         [SettingsUIKeyboardBinding(
             BindingKeyboard.I,
@@ -618,6 +640,14 @@ namespace Traffic_Law_Enforcement
             ctrl: true,
             shift: true)]
         public ProxyBinding SelectedObjectPanelToggleBinding { get; set; }
+
+        [SettingsUISection(kDebugTab, kDebugGroup)]
+        [SettingsUIKeyboardBinding(
+            BindingKeyboard.L,
+            KeybindingIds.FocusedLoggingPanelToggleActionName,
+            ctrl: true,
+            shift: true)]
+        public ProxyBinding FocusedLoggingPanelToggleBinding { get; set; }
 
         [Exclude]
         [SettingsUISection(kDebugTab, kLogPathGroup)]
@@ -746,6 +776,10 @@ namespace Traffic_Law_Enforcement
         public bool IsNewSavePublicTransportLaneRepeatSettingsDisabled() => !DefaultEnablePublicTransportLaneRepeatPenalty;
         public bool IsNewSaveMidBlockCrossingRepeatSettingsDisabled() => !DefaultEnableMidBlockCrossingRepeatPenalty;
         public bool IsNewSaveIntersectionMovementRepeatSettingsDisabled() => !DefaultEnableIntersectionMovementRepeatPenalty;
+        public bool IsBurstLoggingButtonDisabled() =>
+            !EnableEstimatedRerouteLogging &&
+            !EnablePathfindingPenaltyDiagnosticLogging &&
+            !EnableAllVehicleRouteSelectionChangeLogging;
         public bool IsMonthlyChirperPreviewButtonDisabled() => !IsGameplayContextAvailable() || !EnforcementGameplaySettingsService.Current.HasAnyEnforcementEnabled();
 
         private static void UpdateCurrentSaveSettings(CurrentSaveSettingsMutator mutator)
