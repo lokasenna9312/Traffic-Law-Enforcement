@@ -43,7 +43,7 @@ namespace Traffic_Law_Enforcement
 
         public readonly int VehicleIndex;
         public readonly string RoleText;
-        public readonly string PublicTransportLaneAllowanceText;
+        public readonly string PublicTransportLanePolicyText;
         public readonly bool HasTrafficLawProfile;
 
         public readonly Entity CurrentLaneEntity;
@@ -85,7 +85,7 @@ namespace Traffic_Law_Enforcement
             string compactLastReasonText,
             int vehicleIndex,
             string roleText,
-            string publicTransportLaneAllowanceText,
+            string publicTransportLanePolicyText,
             bool hasTrafficLawProfile,
             Entity currentLaneEntity,
             Entity previousLaneEntity,
@@ -123,7 +123,7 @@ namespace Traffic_Law_Enforcement
             CompactLastReasonText = compactLastReasonText;
             VehicleIndex = vehicleIndex;
             RoleText = roleText;
-            PublicTransportLaneAllowanceText = publicTransportLaneAllowanceText;
+            PublicTransportLanePolicyText = publicTransportLanePolicyText;
             HasTrafficLawProfile = hasTrafficLawProfile;
             CurrentLaneEntity = currentLaneEntity;
             PreviousLaneEntity = previousLaneEntity;
@@ -300,7 +300,7 @@ namespace Traffic_Law_Enforcement
                 BuildCompactLastReasonText(tleApplicable, lastReason),
                 resolveResult.IsVehicle && hasVehicleEntity ? vehicle.Index : -1,
                 BuildRoleText(resolveResult),
-                BuildPublicTransportLaneAllowanceText(resolveResult, hasTrafficLawProfile),
+                BuildPublicTransportLanePolicyText(resolveResult, hasTrafficLawProfile),
                 hasTrafficLawProfile,
                 currentLaneEntity,
                 previousLaneEntity,
@@ -567,7 +567,7 @@ namespace Traffic_Law_Enforcement
             }
         }
 
-        private string BuildPublicTransportLaneAllowanceText(
+        private string BuildPublicTransportLanePolicyText(
             SelectedObjectResolveResult resolveResult,
             bool hasTrafficLawProfile)
         {
@@ -597,12 +597,12 @@ namespace Traffic_Law_Enforcement
                 vanillaAllow
                     ? kPublicTransportLanePolicyVanillaAllowLocaleId
                     : kPublicTransportLanePolicyVanillaDenyLocaleId,
-                vanillaAllow ? "Vanilla allow" : "Vanilla deny");
+                vanillaAllow ? "Vanilla allowed" : "Vanilla denied");
             string tleMeaning = LocalizeText(
                 modAllow
                     ? kPublicTransportLanePolicyTleAllowLocaleId
                     : kPublicTransportLanePolicyTleDenyLocaleId,
-                modAllow ? "TLE allow" : "TLE deny");
+                modAllow ? "TLE allowed" : "TLE denied");
             string meaning = string.Format(meaningFormat, type, vanillaMeaning, tleMeaning);
 
             List<string> qualifiers = null;

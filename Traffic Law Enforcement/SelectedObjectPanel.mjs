@@ -21,7 +21,7 @@ const classificationBinding = api.bindValue(group, "classification", "");
 const messageBinding = api.bindValue(group, "message", "");
 const tleStatusBinding = api.bindValue(group, "tleStatus", "");
 const roleBinding = api.bindValue(group, "role", "");
-const publicTransportLaneAllowanceBinding = api.bindValue(group, "publicTransportLaneAllowance", "");
+const publicTransportLanePolicyBinding = api.bindValue(group, "publicTransportLanePolicy", "");
 const vehicleIndexBinding = api.bindValue(group, "vehicleIndex", "");
 const violationPendingBinding = api.bindValue(group, "violationPending", "");
 const totalsBinding = api.bindValue(group, "totals", "");
@@ -117,6 +117,14 @@ const styles = {
         lineHeight: 1.35,
         flexShrink: 0,
     },
+    classificationValue: {
+        flex: 1,
+        color: "#ffffff",
+        fontSize: "16px",
+        fontWeight: 700,
+        lineHeight: 1.35,
+        wordBreak: "break-word",
+    },
     footer: {
         marginTop: "10px",
         color: "rgba(220, 229, 238, 0.95)",
@@ -154,7 +162,7 @@ function ClassificationRow(props) {
         { style: styles.classificationRow },
         h("div", { style: styles.classificationLabel }, props.label),
         props.value
-            ? h("div", { style: styles.value }, props.value)
+            ? h("div", { style: styles.classificationValue }, props.value)
             : null
     );
 }
@@ -184,7 +192,7 @@ function SelectedObjectPanel() {
     const message = api.useValue(messageBinding);
     const tleStatus = api.useValue(tleStatusBinding);
     const role = api.useValue(roleBinding);
-    const publicTransportLaneAllowance = api.useValue(publicTransportLaneAllowanceBinding);
+    const publicTransportLanePolicy = api.useValue(publicTransportLanePolicyBinding);
     const vehicleIndex = api.useValue(vehicleIndexBinding);
     const violationPending = api.useValue(violationPendingBinding);
     const totals = api.useValue(totalsBinding);
@@ -266,7 +274,7 @@ function SelectedObjectPanel() {
                       h(Row, { label: activeFlagsLabelText, value: violationPending }),
                       h(Row, { label: violationsFinesLabelText, value: totals }),
                       h(Row, { label: lastReasonLabelText, value: lastReason }),
-                      h(Row, { label: publicTransportLanePolicyLabelText, value: publicTransportLaneAllowance })
+                      h(Row, { label: publicTransportLanePolicyLabelText, value: publicTransportLanePolicy })
                   ),
                   h(
                       "div",

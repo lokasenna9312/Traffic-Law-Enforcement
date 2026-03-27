@@ -202,7 +202,7 @@ namespace Traffic_Law_Enforcement
             vehicleInfo.children.Add(new DebugUI.Value
             {
                 displayName = "PT lane policy",
-                getter = GetPublicTransportLaneAllowanceText
+                getter = GetPublicTransportLanePolicyText
             });
             vehicleInfo.children.Add(new DebugUI.Value
             {
@@ -514,12 +514,12 @@ namespace Traffic_Law_Enforcement
                     : snapshot.RoleText);
         }
 
-        private static string GetPublicTransportLaneAllowanceText()
+        private static string GetPublicTransportLanePolicyText()
         {
             return GetVehicleInfoText(
-                snapshot => string.IsNullOrWhiteSpace(snapshot.PublicTransportLaneAllowanceText)
+                snapshot => string.IsNullOrWhiteSpace(snapshot.PublicTransportLanePolicyText)
                     ? "Unavailable"
-                    : snapshot.PublicTransportLaneAllowanceText);
+                    : snapshot.PublicTransportLanePolicyText);
         }
 
         private static string GetHasTrafficLawProfileText()

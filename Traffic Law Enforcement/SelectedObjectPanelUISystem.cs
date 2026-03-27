@@ -37,7 +37,7 @@ namespace Traffic_Law_Enforcement
         private ValueBinding<string> m_MessageBinding;
         private ValueBinding<string> m_TleStatusBinding;
         private ValueBinding<string> m_RoleBinding;
-        private ValueBinding<string> m_PublicTransportLaneAllowanceBinding;
+        private ValueBinding<string> m_PublicTransportLanePolicyBinding;
         private ValueBinding<string> m_VehicleIndexBinding;
         private ValueBinding<string> m_ViolationPendingBinding;
         private ValueBinding<string> m_TotalsBinding;
@@ -67,7 +67,7 @@ namespace Traffic_Law_Enforcement
             public string Message;
             public string TleStatus;
             public string Role;
-            public string PublicTransportLaneAllowance;
+            public string PublicTransportLanePolicy;
             public string VehicleIndex;
             public string ViolationPending;
             public string Totals;
@@ -88,7 +88,7 @@ namespace Traffic_Law_Enforcement
             AddBinding(m_MessageBinding = new ValueBinding<string>(kGroup, "message", string.Empty));
             AddBinding(m_TleStatusBinding = new ValueBinding<string>(kGroup, "tleStatus", string.Empty));
             AddBinding(m_RoleBinding = new ValueBinding<string>(kGroup, "role", string.Empty));
-            AddBinding(m_PublicTransportLaneAllowanceBinding = new ValueBinding<string>(kGroup, "publicTransportLaneAllowance", string.Empty));
+            AddBinding(m_PublicTransportLanePolicyBinding = new ValueBinding<string>(kGroup, "publicTransportLanePolicy", string.Empty));
             AddBinding(m_VehicleIndexBinding = new ValueBinding<string>(kGroup, "vehicleIndex", string.Empty));
             AddBinding(m_ViolationPendingBinding = new ValueBinding<string>(kGroup, "violationPending", string.Empty));
             AddBinding(m_TotalsBinding = new ValueBinding<string>(kGroup, "totals", string.Empty));
@@ -186,8 +186,8 @@ namespace Traffic_Law_Enforcement
                 Classification = snapshot.SummaryClassificationText,
                 TleStatus = BuildCompactTleStatusText(snapshot),
                 Role = NormalizeText(snapshot.RoleText),
-                PublicTransportLaneAllowance =
-                    NormalizeText(snapshot.PublicTransportLaneAllowanceText),
+                PublicTransportLanePolicy =
+                    NormalizeText(snapshot.PublicTransportLanePolicyText),
                 VehicleIndex = snapshot.VehicleIndex >= 0
                     ? snapshot.VehicleIndex.ToString()
                     : string.Empty,
@@ -208,7 +208,7 @@ namespace Traffic_Law_Enforcement
             m_MessageBinding.Update(state.Message ?? string.Empty);
             m_TleStatusBinding.Update(state.TleStatus ?? string.Empty);
             m_RoleBinding.Update(state.Role ?? string.Empty);
-            m_PublicTransportLaneAllowanceBinding.Update(state.PublicTransportLaneAllowance ?? string.Empty);
+            m_PublicTransportLanePolicyBinding.Update(state.PublicTransportLanePolicy ?? string.Empty);
             m_VehicleIndexBinding.Update(state.VehicleIndex ?? string.Empty);
             m_ViolationPendingBinding.Update(state.ViolationPending ?? string.Empty);
             m_TotalsBinding.Update(state.Totals ?? string.Empty);
