@@ -26,6 +26,17 @@ const vehicleIndexBinding = api.bindValue(group, "vehicleIndex", "");
 const violationPendingBinding = api.bindValue(group, "violationPending", "");
 const totalsBinding = api.bindValue(group, "totals", "");
 const lastReasonBinding = api.bindValue(group, "lastReason", "");
+const headerTextBinding = api.bindValue(group, "headerText", "");
+const summaryTitleBinding = api.bindValue(group, "summaryTitle", "");
+const tleStatusLabelTextBinding = api.bindValue(group, "tleStatusLabelText", "");
+const roleLabelTextBinding = api.bindValue(group, "roleLabelText", "");
+const activeFlagsLabelTextBinding = api.bindValue(group, "activeFlagsLabelText", "");
+const violationsFinesLabelTextBinding = api.bindValue(group, "violationsFinesLabelText", "");
+const lastReasonLabelTextBinding = api.bindValue(group, "lastReasonLabelText", "");
+const publicTransportLanePolicyLabelTextBinding = api.bindValue(group, "publicTransportLanePolicyLabelText", "");
+const footerTextBinding = api.bindValue(group, "footerText", "");
+const expandSectionTooltipTextBinding = api.bindValue(group, "expandSectionTooltipText", "");
+const collapseSectionTooltipTextBinding = api.bindValue(group, "collapseSectionTooltipText", "");
 
 const initialPosition = { x: 0.76, y: 0.1 };
 const ultraCompactPanelWidth = "240px";
@@ -175,7 +186,7 @@ function FoldoutRow(props) {
                 stopEvent(event);
                 props.onToggleCollapsed();
             },
-            title: props.collapsed ? "Expand section" : "Collapse section",
+            title: props.collapsed ? props.expandTooltip : props.collapseTooltip,
         },
         h("span", null, props.title),
         h("span", { style: styles.foldoutIcon }, props.collapsed ? "▶" : "▼")
@@ -195,6 +206,17 @@ function SelectedObjectPanel() {
     const violationPending = api.useValue(violationPendingBinding);
     const totals = api.useValue(totalsBinding);
     const lastReason = api.useValue(lastReasonBinding);
+    const headerText = api.useValue(headerTextBinding);
+    const summaryTitle = api.useValue(summaryTitleBinding);
+    const tleStatusLabelText = api.useValue(tleStatusLabelTextBinding);
+    const roleLabelText = api.useValue(roleLabelTextBinding);
+    const activeFlagsLabelText = api.useValue(activeFlagsLabelTextBinding);
+    const violationsFinesLabelText = api.useValue(violationsFinesLabelTextBinding);
+    const lastReasonLabelText = api.useValue(lastReasonLabelTextBinding);
+    const publicTransportLanePolicyLabelText = api.useValue(publicTransportLanePolicyLabelTextBinding);
+    const footerText = api.useValue(footerTextBinding);
+    const expandSectionTooltipText = api.useValue(expandSectionTooltipTextBinding);
+    const collapseSectionTooltipText = api.useValue(collapseSectionTooltipTextBinding);
 
     const onClose = React.useCallback(function () {
         api.trigger(group, "close");
@@ -218,9 +240,11 @@ function SelectedObjectPanel() {
     const foldout = compact
         ? null
         : h(FoldoutRow, {
-              title: "Summary",
+              title: summaryTitle,
               collapsed,
               onToggleCollapsed,
+              expandTooltip: expandSectionTooltipText,
+              collapseTooltip: collapseSectionTooltipText,
           });
 
     const body = compact
@@ -238,7 +262,7 @@ function SelectedObjectPanel() {
                                 ? h("div", { style: styles.classificationIndex }, "#" + vehicleIndex)
                                 : null
                         ),
-                        h("div", { style: styles.statusLabel, key: "label" }, "TLE status"),
+                        h("div", { style: styles.statusLabel, key: "label" }, tleStatusLabelText),
                         h("div", { style: styles.statusBlock, key: "status" }, tleStatus),
                     ]
           )
@@ -255,21 +279,21 @@ function SelectedObjectPanel() {
                           ? h("div", { style: styles.classificationIndex }, "#" + vehicleIndex)
                           : null
                   ),
-                  h("div", { style: styles.statusLabel }, "TLE status"),
+                  h("div", { style: styles.statusLabel }, tleStatusLabelText),
                   h("div", { style: styles.statusBlock }, tleStatus),
                   h(
                       "div",
                       { style: styles.rows },
-                      h(Row, { label: "Role / type", value: role }),
-                      h(Row, { label: "Active flags", value: violationPending }),
-                      h(Row, { label: "Violations / fines", value: totals }),
-                      h(Row, { label: "Last reason", value: lastReason }),
-                      h(Row, { label: "PT lane policy", value: publicTransportLaneAllowance })
+                      h(Row, { label: roleLabelText, value: role }),
+                      h(Row, { label: activeFlagsLabelText, value: violationPending }),
+                      h(Row, { label: violationsFinesLabelText, value: totals }),
+                      h(Row, { label: lastReasonLabelText, value: lastReason }),
+                      h(Row, { label: publicTransportLanePolicyLabelText, value: publicTransportLaneAllowance })
                   ),
                   h(
                       "div",
                       { style: styles.footer },
-                      "If Developer Mode is enabled, press Tab for more details."
+                      footerText
                   )
               );
 
@@ -280,7 +304,7 @@ function SelectedObjectPanel() {
             ui.Panel,
             {
                 draggable: true,
-                header: "Selected Object",
+                header: headerText,
                 onClose,
                 initialPosition,
                 style: {

@@ -10,6 +10,22 @@ namespace Traffic_Law_Enforcement
     public partial class SelectedObjectPanelUISystem : UISystemBase
     {
         private const string kGroup = "selectedObjectPanel";
+        internal const string kHeaderTextLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Text.Header";
+        internal const string kSummaryTitleLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Text.SummaryTitle";
+        internal const string kTleStatusLabelLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Label.TleStatus";
+        internal const string kRoleLabelLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Label.RoleOrType";
+        internal const string kActiveFlagsLabelLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Label.ActiveFlags";
+        internal const string kViolationsFinesLabelLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Label.ViolationsFines";
+        internal const string kLastReasonLabelLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Label.LastReason";
+        internal const string kPublicTransportLanePolicyLabelLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Label.PublicTransportLanePolicy";
+        internal const string kNoSelectionLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Text.NoSelection";
+        internal const string kNotVehicleLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Text.NotVehicle";
+        internal const string kNotApplicableLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Text.NotApplicable";
+        internal const string kNoLiveLaneLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Text.NoLiveLane";
+        internal const string kTrackingLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Text.Tracking";
+        internal const string kFooterHintLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Text.FooterHint";
+        internal const string kExpandSectionLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Text.ExpandSection";
+        internal const string kCollapseSectionLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Text.CollapseSection";
 
         private SelectedObjectBridgeSystem m_SelectedObjectBridgeSystem;
         private ProxyAction m_PanelToggleAction;
@@ -26,6 +42,17 @@ namespace Traffic_Law_Enforcement
         private ValueBinding<string> m_ViolationPendingBinding;
         private ValueBinding<string> m_TotalsBinding;
         private ValueBinding<string> m_LastReasonBinding;
+        private ValueBinding<string> m_HeaderTextBinding;
+        private ValueBinding<string> m_SummaryTitleBinding;
+        private ValueBinding<string> m_TleStatusLabelBinding;
+        private ValueBinding<string> m_RoleLabelBinding;
+        private ValueBinding<string> m_ActiveFlagsLabelBinding;
+        private ValueBinding<string> m_ViolationsFinesLabelBinding;
+        private ValueBinding<string> m_LastReasonLabelBinding;
+        private ValueBinding<string> m_PublicTransportLanePolicyLabelBinding;
+        private ValueBinding<string> m_FooterTextBinding;
+        private ValueBinding<string> m_ExpandSectionTooltipBinding;
+        private ValueBinding<string> m_CollapseSectionTooltipBinding;
 
         private bool m_IsPanelEnabled;
         private bool m_IsCollapsed;
@@ -66,6 +93,17 @@ namespace Traffic_Law_Enforcement
             AddBinding(m_ViolationPendingBinding = new ValueBinding<string>(kGroup, "violationPending", string.Empty));
             AddBinding(m_TotalsBinding = new ValueBinding<string>(kGroup, "totals", string.Empty));
             AddBinding(m_LastReasonBinding = new ValueBinding<string>(kGroup, "lastReason", string.Empty));
+            AddBinding(m_HeaderTextBinding = new ValueBinding<string>(kGroup, "headerText", string.Empty));
+            AddBinding(m_SummaryTitleBinding = new ValueBinding<string>(kGroup, "summaryTitle", string.Empty));
+            AddBinding(m_TleStatusLabelBinding = new ValueBinding<string>(kGroup, "tleStatusLabelText", string.Empty));
+            AddBinding(m_RoleLabelBinding = new ValueBinding<string>(kGroup, "roleLabelText", string.Empty));
+            AddBinding(m_ActiveFlagsLabelBinding = new ValueBinding<string>(kGroup, "activeFlagsLabelText", string.Empty));
+            AddBinding(m_ViolationsFinesLabelBinding = new ValueBinding<string>(kGroup, "violationsFinesLabelText", string.Empty));
+            AddBinding(m_LastReasonLabelBinding = new ValueBinding<string>(kGroup, "lastReasonLabelText", string.Empty));
+            AddBinding(m_PublicTransportLanePolicyLabelBinding = new ValueBinding<string>(kGroup, "publicTransportLanePolicyLabelText", string.Empty));
+            AddBinding(m_FooterTextBinding = new ValueBinding<string>(kGroup, "footerText", string.Empty));
+            AddBinding(m_ExpandSectionTooltipBinding = new ValueBinding<string>(kGroup, "expandSectionTooltipText", string.Empty));
+            AddBinding(m_CollapseSectionTooltipBinding = new ValueBinding<string>(kGroup, "collapseSectionTooltipText", string.Empty));
 
             AddBinding(new TriggerBinding(kGroup, "close", HandleCloseRequested));
             AddBinding(new TriggerBinding(kGroup, "toggleCollapsed", ToggleCollapsed));
@@ -87,6 +125,7 @@ namespace Traffic_Law_Enforcement
             base.OnUpdate();
 
             UpdatePanelToggle();
+            UpdateLocalizedTextBindings();
 
             if (m_SelectedObjectBridgeSystem == null)
             {
@@ -122,7 +161,7 @@ namespace Traffic_Law_Enforcement
                 {
                     Visible = true,
                     Compact = true,
-                    Message = "Not a vehicle"
+                    Message = LocalizeText(kNotVehicleLocaleId, "Not a vehicle")
                 };
             }
 
@@ -133,7 +172,7 @@ namespace Traffic_Law_Enforcement
                     Visible = true,
                     Compact = true,
                     Classification = snapshot.SummaryClassificationText,
-                    TleStatus = BuildCompactTleStatus(snapshot),
+                    TleStatus = BuildCompactTleStatusText(snapshot),
                     VehicleIndex = snapshot.VehicleIndex >= 0
                         ? snapshot.VehicleIndex.ToString()
                         : string.Empty,
@@ -145,7 +184,7 @@ namespace Traffic_Law_Enforcement
                 Visible = true,
                 Compact = false,
                 Classification = snapshot.SummaryClassificationText,
-                TleStatus = BuildCompactTleStatus(snapshot),
+                TleStatus = BuildCompactTleStatusText(snapshot),
                 Role = NormalizeText(snapshot.RoleText),
                 PublicTransportLaneAllowance =
                     NormalizeText(snapshot.PublicTransportLaneAllowanceText),
@@ -174,6 +213,21 @@ namespace Traffic_Law_Enforcement
             m_ViolationPendingBinding.Update(state.ViolationPending ?? string.Empty);
             m_TotalsBinding.Update(state.Totals ?? string.Empty);
             m_LastReasonBinding.Update(state.LastReason ?? string.Empty);
+        }
+
+        private void UpdateLocalizedTextBindings()
+        {
+            m_HeaderTextBinding.Update(LocalizeText(kHeaderTextLocaleId, "Selected Object"));
+            m_SummaryTitleBinding.Update(LocalizeText(kSummaryTitleLocaleId, "Summary"));
+            m_TleStatusLabelBinding.Update(LocalizeText(kTleStatusLabelLocaleId, "TLE status"));
+            m_RoleLabelBinding.Update(LocalizeText(kRoleLabelLocaleId, "Role / type"));
+            m_ActiveFlagsLabelBinding.Update(LocalizeText(kActiveFlagsLabelLocaleId, "Active flags"));
+            m_ViolationsFinesLabelBinding.Update(LocalizeText(kViolationsFinesLabelLocaleId, "Violations / fines"));
+            m_LastReasonLabelBinding.Update(LocalizeText(kLastReasonLabelLocaleId, "Last reason"));
+            m_PublicTransportLanePolicyLabelBinding.Update(LocalizeText(kPublicTransportLanePolicyLabelLocaleId, "PT lane policy"));
+            m_FooterTextBinding.Update(LocalizeText(kFooterHintLocaleId, "If Developer Mode is enabled, press Tab for more details."));
+            m_ExpandSectionTooltipBinding.Update(LocalizeText(kExpandSectionLocaleId, "Expand section"));
+            m_CollapseSectionTooltipBinding.Update(LocalizeText(kCollapseSectionLocaleId, "Collapse section"));
         }
 
         private void UpdatePanelToggle()
@@ -224,34 +278,46 @@ namespace Traffic_Law_Enforcement
                 : text.Trim();
         }
 
-        private static string BuildCompactTleStatus(SelectedObjectDebugSnapshot snapshot)
+        private string BuildCompactTleStatusText(SelectedObjectDebugSnapshot snapshot)
         {
             switch (snapshot.TleApplicability)
             {
                 case SelectedObjectTleApplicability.NotApplicable:
                     return snapshot.ResolveState == SelectedObjectResolveState.NotVehicle
                         ? string.Empty
-                        : "Not applicable";
+                        : LocalizeText(kNotApplicableLocaleId, "Not applicable");
 
                 case SelectedObjectTleApplicability.ApplicableNoLiveLaneData:
-                    return "No live lane";
+                    return LocalizeText(kNoLiveLaneLocaleId, "No live lane");
 
                 case SelectedObjectTleApplicability.ApplicableReady:
-                    return "Tracking";
+                    return LocalizeText(kTrackingLocaleId, "Tracking");
 
                 default:
                     return NormalizeText(snapshot.SummaryTleStatusText);
             }
         }
 
-        private static PanelState BuildNoSelectionState()
+        private PanelState BuildNoSelectionState()
         {
             return new PanelState
             {
                 Visible = true,
                 Compact = true,
-                Message = "No selection"
+                Message = LocalizeText(kNoSelectionLocaleId, "No selection")
             };
+        }
+
+        private static string LocalizeText(string localeId, string fallback)
+        {
+            if (GameManager.instance?.localizationManager?.activeDictionary != null &&
+                GameManager.instance.localizationManager.activeDictionary.TryGetValue(localeId, out string value) &&
+                !string.IsNullOrWhiteSpace(value))
+            {
+                return value;
+            }
+
+            return fallback;
         }
 
     }

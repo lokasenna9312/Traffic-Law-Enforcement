@@ -136,6 +136,22 @@ namespace Traffic_Law_Enforcement
                 setting.GetBindingKeyLocaleID(KeybindingIds.SelectedObjectPanelToggleActionName);
             map["BindingHint.SelectedObjectPanelToggle"] =
                 setting.GetBindingKeyHintLocaleID(KeybindingIds.SelectedObjectPanelToggleActionName);
+            map["SelectedObjectPanel.HeaderText"] = SelectedObjectPanelUISystem.kHeaderTextLocaleId;
+            map["SelectedObjectPanel.SummaryTitle"] = SelectedObjectPanelUISystem.kSummaryTitleLocaleId;
+            map["SelectedObjectPanel.TleStatusLabel"] = SelectedObjectPanelUISystem.kTleStatusLabelLocaleId;
+            map["SelectedObjectPanel.RoleLabel"] = SelectedObjectPanelUISystem.kRoleLabelLocaleId;
+            map["SelectedObjectPanel.ActiveFlagsLabel"] = SelectedObjectPanelUISystem.kActiveFlagsLabelLocaleId;
+            map["SelectedObjectPanel.ViolationsFinesLabel"] = SelectedObjectPanelUISystem.kViolationsFinesLabelLocaleId;
+            map["SelectedObjectPanel.LastReasonLabel"] = SelectedObjectPanelUISystem.kLastReasonLabelLocaleId;
+            map["SelectedObjectPanel.PublicTransportLanePolicyLabel"] = SelectedObjectPanelUISystem.kPublicTransportLanePolicyLabelLocaleId;
+            map["SelectedObjectPanel.NoSelection"] = SelectedObjectPanelUISystem.kNoSelectionLocaleId;
+            map["SelectedObjectPanel.NotVehicle"] = SelectedObjectPanelUISystem.kNotVehicleLocaleId;
+            map["SelectedObjectPanel.NotApplicable"] = SelectedObjectPanelUISystem.kNotApplicableLocaleId;
+            map["SelectedObjectPanel.NoLiveLane"] = SelectedObjectPanelUISystem.kNoLiveLaneLocaleId;
+            map["SelectedObjectPanel.Tracking"] = SelectedObjectPanelUISystem.kTrackingLocaleId;
+            map["SelectedObjectPanel.FooterHint"] = SelectedObjectPanelUISystem.kFooterHintLocaleId;
+            map["SelectedObjectPanel.ExpandSection"] = SelectedObjectPanelUISystem.kExpandSectionLocaleId;
+            map["SelectedObjectPanel.CollapseSection"] = SelectedObjectPanelUISystem.kCollapseSectionLocaleId;
 
             map["MonthlyChirper.SenderText"] = MonthlyEnforcementChirperSystem.kSenderTextLocaleId;
             map["MonthlyChirper.PeriodPointFormat"] = MonthlyEnforcementChirperSystem.kPeriodPointFormatLocaleId;
