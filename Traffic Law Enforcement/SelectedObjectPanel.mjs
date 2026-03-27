@@ -28,10 +28,13 @@ const lastReasonBinding = api.bindValue(group, "lastReason", "");
 const resolvedEntityBinding = api.bindValue(group, "resolvedEntity", "");
 
 const initialPosition = { x: 0.76, y: 0.1 };
+const compactPanelWidth = "420rem";
+const fullPanelWidth = "560rem";
 
 const styles = {
     wrapper: {
-        display: "block",
+        display: "inline-block",
+        width: "auto",
     },
     header: {
         display: "flex",
@@ -64,7 +67,8 @@ const styles = {
     },
     body: {
         padding: "18px",
-        minWidth: "520px",
+        width: fullPanelWidth,
+        boxSizing: "border-box",
     },
     classification: {
         color: "#b0defc",
@@ -210,7 +214,11 @@ function SelectedObjectPanel() {
     });
 
     const body = compact
-        ? h("div", { style: styles.body }, h("div", { style: styles.compactMessage }, message))
+        ? h(
+              "div",
+              { style: Object.assign({}, styles.body, { width: compactPanelWidth }) },
+              h("div", { style: styles.compactMessage }, message)
+          )
         : collapsed
             ? null
             : h(
@@ -241,13 +249,17 @@ function SelectedObjectPanel() {
         null,
         h(
             "div",
-            { style: { display: visible ? "block" : "none" } },
+            { style: Object.assign({}, styles.wrapper, { display: visible ? "inline-block" : "none" }) },
             h(
                 ui.Panel,
                 {
                     draggable: true,
                     onClose,
                     initialPosition,
+                    style: {
+                        width: compact ? compactPanelWidth : fullPanelWidth,
+                        maxWidth: compact ? compactPanelWidth : fullPanelWidth,
+                    },
                     className: "",
                     header,
                 },
