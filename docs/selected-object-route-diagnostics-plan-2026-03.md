@@ -35,6 +35,12 @@ Do not reopen them unless there is a strong technical reason.
 2. The foldout should apply to all eligible live road vehicles, not only buses.
 3. PT-specific information should appear only when it is actually relevant to the selected vehicle.
 4. Parked vehicles, non-road vehicles, and selections without live lane data should not get a full route-diagnostics dump.
+5. The new foldout should not add a separate `Path state` row if that state can be absorbed into the existing panel's current `Live lane state` row.
+6. PT-specific explanatory text should be folded into the main explanation line instead of becoming a redundant standalone row.
+7. Route inspection logic should be extracted into a shared current-route helper, but `RoutePenaltyRerouteLoggingSystem`'s cache should not be reused directly by the panel.
+8. The helper and the logger should share classification rules, while keeping separate responsibilities:
+   - panel = current-state explanation,
+   - logger = delta / historical reroute logging.
 
 Relevant implementation files:
 
@@ -49,7 +55,7 @@ Please review the baseline proposal in this note and answer these questions.
 1. Is extending the existing Selected Object panel with a new foldout the right v1 design, or is there a cleaner diagnostic surface inside the same panel model?
 2. For a common `all live road vehicles` foldout, what is the minimum high-signal information that every vehicle should show?
 3. What PT-specific extra rows are justified for road public transport vehicles, and which PT-only details should be deferred from v1?
-4. Should route-inspection logic be extracted from `RoutePenaltyRerouteLoggingSystem` into a shared helper, or duplicated in a lighter form for the panel?
+4. Given that route-inspection logic should live in a shared helper and the logger cache should not be reused directly, what is the cleanest helper boundary and API shape?
 5. Is the proposed snapshot-and-binding shape appropriate for this codebase, or should the data contract be simpler?
 6. Is the proposed explanation heuristic sound, especially the priority order between:
    - waypoint / stop alignment,
@@ -57,7 +63,8 @@ Please review the baseline proposal in this note and answer these questions.
    - mod-side `mid-block`,
    - mod-side `intersection`,
    - PT-lane policy?
-7. What should be included in v1, and what should be explicitly deferred?
+7. Should the existing `Live lane state` row simply be strengthened, or should it be renamed to something like `Live routing state` once it absorbs route-readiness details?
+8. What should be included in v1, and what should be explicitly deferred?
 
 Please do not write code.
 
@@ -81,6 +88,14 @@ But it does not show the route-selection data needed to answer the actual questi
 For buses, the missing question becomes more specific:
 
 > Is the bus leaving the center PT lane because the next waypoint / stop resolves to a curb-side route lane, or because TLE path penalties made a future maneuver more expensive?
+
+It also means the design should avoid duplicating information that already exists in the panel.
+
+At this point, the baseline proposal is:
+
+- do not add a new `Path state` row inside the route-diagnostics foldout,
+- strengthen the existing `Live lane state` row so it can carry route-readiness meaning too,
+- do not add a separate PT-only explanatory row if the same idea can live inside `Best current explanation`.
 
 ## Confirmed Technical Background
 
@@ -179,7 +194,6 @@ The contents use progressive disclosure.
 
 - `Current target`
 - `Current route`
-- `Path state`
 - `Navigation lanes`
 - `Planned penalties`
 - `Penalty tags`
@@ -193,12 +207,32 @@ Show these only when the selected vehicle is a road public transport vehicle or 
 
 - `Waypoint route lane`
 - `Connected stop`
-- `PT-specific note` or equivalent explanation text
 
 Important nuance:
 
 - the main summary area can keep the existing `PT lane policy` row,
-- the new foldout should avoid duplicating the same PT policy text unless it is needed to explain the decision.
+- the new foldout should avoid duplicating the same PT policy text unless it is needed to explain the decision,
+- PT-specific explanatory wording should normally be appended to `Best current explanation`, not shown as a standalone extra row.
+
+### State Row Consolidation
+
+The baseline proposal is to avoid creating a second state row inside the new foldout.
+
+Instead:
+
+- keep the existing panel-level state row,
+- strengthen it so it can represent route-readiness as well as live-lane readiness,
+- optionally rename it if ChatGPT 5.4 thinks the current label becomes misleading.
+
+Examples of the intended richer state family:
+
+- `Ready`
+- `Ready, no current route`
+- `Ready, target unresolved`
+- `Ready, path obsolete`
+- `No live lane`
+- `Parked road car`
+- `Not applicable`
 
 ### Display Rules
 
@@ -238,13 +272,14 @@ Possible snapshot additions:
 - `bool HasPtRouteDiagnostics`
 - `string CurrentTargetText`
 - `string CurrentRouteText`
-- `string PathStateText`
 - `string NavigationLanePreviewText`
 - `string PlannedPenaltyBreakdownText`
 - `string PlannedPenaltyTagsText`
 - `string RouteDecisionExplanationText`
 - `string WaypointRouteLaneText`
 - `string ConnectedStopText`
+
+The baseline assumption is that route-readiness state should reuse or extend the current panel's existing state field rather than introducing a second `PathStateText` field.
 
 I am intentionally not locking the exact field list yet.
 
@@ -256,6 +291,8 @@ One of the questions for ChatGPT 5.4 is whether this should be even simpler, for
 ## Current Baseline Implementation Architecture
 
 ### Preferred approach: compute current route diagnostics on demand
+
+This is now a fixed baseline decision.
 
 Do not reuse `RoutePenaltyRerouteLoggingSystem` snapshot cache directly.
 
@@ -276,6 +313,12 @@ Move or mirror the route-penalty classification logic so it can be used both by:
 
 - `RoutePenaltyRerouteLoggingSystem`,
 - `SelectedObjectBridgeSystem`.
+
+The intended separation of responsibility is:
+
+- the helper owns current-route classification rules,
+- the panel consumes the helper to explain the selected vehicle's current route,
+- the logger consumes the helper to compare previous vs current snapshots and emit reroute logs.
 
 At minimum, the helper should be able to:
 
@@ -355,7 +398,6 @@ Suggested binding names:
 - `routeDiagnosticsTitleText`
 - `currentTargetLabelText`
 - `currentRouteLabelText`
-- `pathStateLabelText`
 - `navigationLanesLabelText`
 - `plannedPenaltiesLabelText`
 - `penaltyTagsLabelText`
@@ -364,13 +406,14 @@ Suggested binding names:
 - `connectedStopLabelText`
 - `currentTarget`
 - `currentRoute`
-- `pathState`
 - `navigationLanes`
 - `plannedPenalties`
 - `penaltyTags`
 - `routeDecisionExplanation`
 - `waypointRouteLane`
 - `connectedStop`
+
+If the existing state row is renamed, the expectation is to evolve the already-existing state binding rather than introduce a second parallel state field just for the foldout.
 
 ### 4. Extend the frontend panel
 
@@ -546,13 +589,14 @@ Do not include these in the first implementation:
 
 If this note is handed to ChatGPT 5.4, use a prompt like this:
 
-> Read this consultation brief and critique the proposed design for adding `Route diagnostics` to the existing Selected Object panel. Do not write code. I want design guidance only. Scope is already fixed to `all eligible live road vehicles`, with PT-specific extra rows only when relevant. Please:
+> Read this consultation brief and critique the proposed design for adding `Route diagnostics` to the existing Selected Object panel. Do not write code. I want design guidance only. Scope is already fixed to `all eligible live road vehicles`, with PT-specific extra rows only when relevant. Also treat the following as already decided: route classification should move into a shared current-route helper, and `RoutePenaltyRerouteLoggingSystem`'s cache should not be reused directly by the panel. Please:
 > 1. say whether the existing-panel foldout approach is the right v1,
 > 2. recommend the minimum common diagnostics that every live road vehicle should show,
 > 3. recommend which PT-specific extras belong in v1,
-> 4. say whether route-inspection logic should be extracted from `RoutePenaltyRerouteLoggingSystem` or kept separate,
+> 4. recommend the cleanest helper API and ownership boundary between helper, panel bridge, and reroute logger,
 > 5. refine the snapshot / binding contract,
-> 6. refine the explanation heuristic for both generic road vehicles and PT vehicles,
-> 7. identify risks, weak assumptions, and what should be deferred from v1.
+> 6. say whether the existing `Live lane state` row should absorb route-readiness state and whether it should be renamed,
+> 7. refine the explanation heuristic for both generic road vehicles and PT vehicles,
+> 8. identify risks, weak assumptions, and what should be deferred from v1.
 >
 > Assume Codex will read your answer and then do the actual design and implementation. Optimize your response for that handoff.
