@@ -119,8 +119,8 @@ const styles = {
     },
     classificationValue: {
         flex: 1,
-        color: "#ffffff",
-        fontSize: "16px",
+        color: "#b0defc",
+        fontSize: "18px",
         fontWeight: 700,
         lineHeight: 1.35,
         wordBreak: "break-word",

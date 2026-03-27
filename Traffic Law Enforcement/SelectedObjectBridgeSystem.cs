@@ -597,12 +597,12 @@ namespace Traffic_Law_Enforcement
                 vanillaAllow
                     ? kPublicTransportLanePolicyVanillaAllowLocaleId
                     : kPublicTransportLanePolicyVanillaDenyLocaleId,
-                vanillaAllow ? "Vanilla allowed" : "Vanilla denied");
+                vanillaAllow ? "Vanilla Allowed" : "Vanilla Denied");
             string tleMeaning = LocalizeText(
                 modAllow
                     ? kPublicTransportLanePolicyTleAllowLocaleId
                     : kPublicTransportLanePolicyTleDenyLocaleId,
-                modAllow ? "TLE allowed" : "TLE denied");
+                modAllow ? "TLE Allowed" : "TLE Denied");
             string meaning = string.Format(meaningFormat, type, vanillaMeaning, tleMeaning);
 
             List<string> qualifiers = null;
