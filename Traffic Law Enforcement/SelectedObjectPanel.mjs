@@ -26,7 +26,6 @@ const vehicleIndexBinding = api.bindValue(group, "vehicleIndex", "");
 const violationPendingBinding = api.bindValue(group, "violationPending", "");
 const totalsBinding = api.bindValue(group, "totals", "");
 const lastReasonBinding = api.bindValue(group, "lastReason", "");
-const resolvedEntityBinding = api.bindValue(group, "resolvedEntity", "");
 
 const initialPosition = { x: 0.76, y: 0.1 };
 const ultraCompactPanelWidth = "240px";
@@ -196,7 +195,6 @@ function SelectedObjectPanel() {
     const violationPending = api.useValue(violationPendingBinding);
     const totals = api.useValue(totalsBinding);
     const lastReason = api.useValue(lastReasonBinding);
-    const resolvedEntity = api.useValue(resolvedEntityBinding);
 
     const onClose = React.useCallback(function () {
         api.trigger(group, "close");

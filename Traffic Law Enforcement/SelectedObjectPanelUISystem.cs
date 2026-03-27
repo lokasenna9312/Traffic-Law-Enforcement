@@ -4,7 +4,6 @@ using Game.Input;
 using Game.SceneFlow;
 using Game.UI;
 using Unity.Entities;
-using Entity = Unity.Entities.Entity;
 
 namespace Traffic_Law_Enforcement
 {
@@ -21,14 +20,12 @@ namespace Traffic_Law_Enforcement
         private ValueBinding<string> m_ClassificationBinding;
         private ValueBinding<string> m_MessageBinding;
         private ValueBinding<string> m_TleStatusBinding;
-        private ValueBinding<string> m_RoleOrTypeBinding;
         private ValueBinding<string> m_RoleBinding;
         private ValueBinding<string> m_PublicTransportLaneAllowanceBinding;
         private ValueBinding<string> m_VehicleIndexBinding;
         private ValueBinding<string> m_ViolationPendingBinding;
         private ValueBinding<string> m_TotalsBinding;
         private ValueBinding<string> m_LastReasonBinding;
-        private ValueBinding<string> m_ResolvedEntityBinding;
 
         private bool m_IsPanelEnabled;
         private bool m_IsCollapsed;
@@ -42,14 +39,12 @@ namespace Traffic_Law_Enforcement
             public string Classification;
             public string Message;
             public string TleStatus;
-            public string RoleOrType;
             public string Role;
             public string PublicTransportLaneAllowance;
             public string VehicleIndex;
             public string ViolationPending;
             public string Totals;
             public string LastReason;
-            public string ResolvedEntity;
         }
 
         protected override void OnCreate()
@@ -65,14 +60,12 @@ namespace Traffic_Law_Enforcement
             AddBinding(m_ClassificationBinding = new ValueBinding<string>(kGroup, "classification", string.Empty));
             AddBinding(m_MessageBinding = new ValueBinding<string>(kGroup, "message", string.Empty));
             AddBinding(m_TleStatusBinding = new ValueBinding<string>(kGroup, "tleStatus", string.Empty));
-            AddBinding(m_RoleOrTypeBinding = new ValueBinding<string>(kGroup, "roleOrType", string.Empty));
             AddBinding(m_RoleBinding = new ValueBinding<string>(kGroup, "role", string.Empty));
             AddBinding(m_PublicTransportLaneAllowanceBinding = new ValueBinding<string>(kGroup, "publicTransportLaneAllowance", string.Empty));
             AddBinding(m_VehicleIndexBinding = new ValueBinding<string>(kGroup, "vehicleIndex", string.Empty));
             AddBinding(m_ViolationPendingBinding = new ValueBinding<string>(kGroup, "violationPending", string.Empty));
             AddBinding(m_TotalsBinding = new ValueBinding<string>(kGroup, "totals", string.Empty));
             AddBinding(m_LastReasonBinding = new ValueBinding<string>(kGroup, "lastReason", string.Empty));
-            AddBinding(m_ResolvedEntityBinding = new ValueBinding<string>(kGroup, "resolvedEntity", string.Empty));
 
             AddBinding(new TriggerBinding(kGroup, "close", HandleCloseRequested));
             AddBinding(new TriggerBinding(kGroup, "toggleCollapsed", ToggleCollapsed));
@@ -147,8 +140,6 @@ namespace Traffic_Law_Enforcement
                 };
             }
 
-            bool tleApplicable = true;
-            bool tleReady = true;
             string role = ExtractRoleText(snapshot.RoleOrTypeText);
 
             return new PanelState
@@ -157,23 +148,17 @@ namespace Traffic_Law_Enforcement
                 Compact = false,
                 Classification = snapshot.SummaryClassificationText,
                 TleStatus = BuildCompactTleStatus(snapshot),
-                RoleOrType = NormalizeText(snapshot.RoleOrTypeText),
                 Role = role,
                 PublicTransportLaneAllowance =
                     NormalizeText(snapshot.PublicTransportLaneAllowanceText),
                 VehicleIndex = snapshot.VehicleIndex >= 0
                     ? snapshot.VehicleIndex.ToString()
                     : string.Empty,
-                ViolationPending = tleReady
-                    ? $"Violation {snapshot.PtLaneViolationActive}, Pending {snapshot.PendingExitActive}"
-                    : string.Empty,
-                Totals = tleApplicable
-                    ? $"Violations {snapshot.TotalViolations}, Fines {snapshot.TotalFines}"
-                    : string.Empty,
-                LastReason = tleApplicable
-                    ? NormalizeText(snapshot.CompactLastReasonText)
-                    : string.Empty,
-                ResolvedEntity = FormatEntity(snapshot.ResolvedVehicleEntity)
+                ViolationPending =
+                    $"Violation {snapshot.PtLaneViolationActive}, Pending {snapshot.PendingExitActive}",
+                Totals =
+                    $"Violations {snapshot.TotalViolations}, Fines {snapshot.TotalFines}",
+                LastReason = NormalizeText(snapshot.CompactLastReasonText)
             };
         }
 
@@ -185,14 +170,12 @@ namespace Traffic_Law_Enforcement
             m_ClassificationBinding.Update(state.Classification ?? string.Empty);
             m_MessageBinding.Update(state.Message ?? string.Empty);
             m_TleStatusBinding.Update(state.TleStatus ?? string.Empty);
-            m_RoleOrTypeBinding.Update(state.RoleOrType ?? string.Empty);
             m_RoleBinding.Update(state.Role ?? string.Empty);
             m_PublicTransportLaneAllowanceBinding.Update(state.PublicTransportLaneAllowance ?? string.Empty);
             m_VehicleIndexBinding.Update(state.VehicleIndex ?? string.Empty);
             m_ViolationPendingBinding.Update(state.ViolationPending ?? string.Empty);
             m_TotalsBinding.Update(state.Totals ?? string.Empty);
             m_LastReasonBinding.Update(state.LastReason ?? string.Empty);
-            m_ResolvedEntityBinding.Update(state.ResolvedEntity ?? string.Empty);
         }
 
         private void UpdatePanelToggle()
@@ -241,13 +224,6 @@ namespace Traffic_Law_Enforcement
             return string.IsNullOrWhiteSpace(text)
                 ? string.Empty
                 : text.Trim();
-        }
-
-        private static string FormatEntity(Entity entity)
-        {
-            return entity == Entity.Null
-                ? "None"
-                : entity.ToString();
         }
 
         private static string BuildCompactTleStatus(SelectedObjectDebugSnapshot snapshot)
