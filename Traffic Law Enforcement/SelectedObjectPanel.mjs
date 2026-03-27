@@ -183,6 +183,11 @@ const styles = {
         minHeight: "30px",
         alignItems: "center",
     },
+    rowMultiline: {
+        alignItems: "flex-start",
+        paddingTop: "2px",
+        paddingBottom: "2px",
+    },
     classificationRow: {
         display: "flex",
         minHeight: "34px",
@@ -201,6 +206,7 @@ const styles = {
         color: "#ffffff",
         fontSize: "14px",
         lineHeight: 1.35,
+        whiteSpace: "pre-line",
         wordBreak: "break-word",
     },
     classificationLabel: {
@@ -269,9 +275,16 @@ function Row(props) {
         return null;
     }
 
+    const isMultiline =
+        typeof props.value === "string" && props.value.indexOf("\n") >= 0;
+
     return h(
         "div",
-        { style: styles.row },
+        {
+            style: isMultiline
+                ? Object.assign({}, styles.row, styles.rowMultiline)
+                : styles.row,
+        },
         h("div", { style: styles.label }, props.label),
         h("div", { style: styles.value }, props.value)
     );

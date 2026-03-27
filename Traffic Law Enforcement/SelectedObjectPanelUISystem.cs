@@ -355,8 +355,8 @@ namespace Traffic_Law_Enforcement
                 EntitySelectionStatus = m_EntitySelectionStatus,
                 EntitySelectionStatusIsError = m_EntitySelectionStatusIsError,
                 LaneDetailsVisible = true,
-                CurrentLane = FormatEntity(snapshot.CurrentLaneEntity),
-                PreviousLane = FormatEntity(snapshot.PreviousLaneEntity),
+                CurrentLane = NormalizeText(snapshot.CurrentLaneText),
+                PreviousLane = NormalizeText(snapshot.PreviousLaneText),
                 LaneChanges = snapshot.LaneChangeCount.ToString(),
                 LiveLaneState = BuildLiveLaneStateText(snapshot),
                 RouteDiagnosticsVisible = snapshot.HasRouteDiagnostics,
@@ -427,8 +427,8 @@ namespace Traffic_Law_Enforcement
             m_ExpandSectionTooltipBinding.Update(LocalizeText(kExpandSectionLocaleId, "Expand section"));
             m_CollapseSectionTooltipBinding.Update(LocalizeText(kCollapseSectionLocaleId, "Collapse section"));
             m_LaneDetailsTitleBinding.Update(LocalizeText(kLaneDetailsTitleLocaleId, "Lane details"));
-            m_CurrentLaneLabelBinding.Update(LocalizeText(kCurrentLaneLabelLocaleId, "Current lane entity"));
-            m_PreviousLaneLabelBinding.Update(LocalizeText(kPreviousLaneLabelLocaleId, "Previous lane entity"));
+            m_CurrentLaneLabelBinding.Update(LocalizeText(kCurrentLaneLabelLocaleId, "Current lane"));
+            m_PreviousLaneLabelBinding.Update(LocalizeText(kPreviousLaneLabelLocaleId, "Previous lane"));
             m_LaneChangesLabelBinding.Update(LocalizeText(kLaneChangesLabelLocaleId, "Lane changes"));
             m_LiveLaneStateLabelBinding.Update(LocalizeText(kLiveLaneStateLabelLocaleId, "Live routing state"));
             m_RouteDiagnosticsTitleBinding.Update(LocalizeText(kRouteDiagnosticsTitleLocaleId, "Route diagnostics"));

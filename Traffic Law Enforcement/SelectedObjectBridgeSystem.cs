@@ -55,6 +55,8 @@ namespace Traffic_Law_Enforcement
 
         public readonly Entity CurrentLaneEntity;
         public readonly Entity PreviousLaneEntity;
+        public readonly string CurrentLaneText;
+        public readonly string PreviousLaneText;
         public readonly int LaneChangeCount;
 
         public readonly bool PublicTransportLaneViolationActive;
@@ -111,6 +113,8 @@ namespace Traffic_Law_Enforcement
             bool hasTrafficLawProfile,
             Entity currentLaneEntity,
             Entity previousLaneEntity,
+            string currentLaneText,
+            string previousLaneText,
             int laneChangeCount,
             bool ptLaneViolationActive,
             bool pendingExitActive,
@@ -164,6 +168,8 @@ namespace Traffic_Law_Enforcement
             HasTrafficLawProfile = hasTrafficLawProfile;
             CurrentLaneEntity = currentLaneEntity;
             PreviousLaneEntity = previousLaneEntity;
+            CurrentLaneText = currentLaneText;
+            PreviousLaneText = previousLaneText;
             LaneChangeCount = laneChangeCount;
             PublicTransportLaneViolationActive = ptLaneViolationActive;
             PendingExitActive = pendingExitActive;
@@ -334,6 +340,7 @@ namespace Traffic_Law_Enforcement
         private ComponentLookup<PublicTransportLanePermissionState> m_PermissionStateData;
         private ComponentLookup<Owner> m_OwnerData;
         private ComponentLookup<Aggregated> m_AggregatedData;
+        private ComponentLookup<SlaveLane> m_SlaveLaneData;
         private ComponentLookup<CarLane> m_CarLaneData;
         private ComponentLookup<EdgeLane> m_EdgeLaneData;
         private ComponentLookup<ParkingLane> m_ParkingLaneData;
@@ -370,6 +377,7 @@ namespace Traffic_Law_Enforcement
                 GetComponentLookup<PublicTransportLanePermissionState>(true);
             m_OwnerData = GetComponentLookup<Owner>(true);
             m_AggregatedData = GetComponentLookup<Aggregated>(true);
+            m_SlaveLaneData = GetComponentLookup<SlaveLane>(true);
             m_CarLaneData = GetComponentLookup<CarLane>(true);
             m_EdgeLaneData = GetComponentLookup<EdgeLane>(true);
             m_ParkingLaneData = GetComponentLookup<ParkingLane>(true);
@@ -396,6 +404,7 @@ namespace Traffic_Law_Enforcement
             m_PermissionStateData.Update(this);
             m_OwnerData.Update(this);
             m_AggregatedData.Update(this);
+            m_SlaveLaneData.Update(this);
             m_CarLaneData.Update(this);
             m_EdgeLaneData.Update(this);
             m_ParkingLaneData.Update(this);
@@ -517,6 +526,8 @@ namespace Traffic_Law_Enforcement
                 hasTrafficLawProfile,
                 currentLaneEntity,
                 previousLaneEntity,
+                BuildLaneDisplayText(currentLaneEntity),
+                BuildLaneDisplayText(previousLaneEntity),
                 laneChangeCount,
                 ptLaneViolationActive,
                 pendingExitActive,
@@ -615,12 +626,10 @@ namespace Traffic_Law_Enforcement
                 currentTargetText: BuildCurrentTargetText(targetEntity),
                 currentRouteText: FormatEntityOrNone(currentRouteEntity),
                 targetRoadText: BuildTargetRoadText(targetEntity),
-                navigationLanesText: NormalizeInspectionText(
-                    RoutePenaltyInspection.BuildNavigationPreview(
-                        currentLaneEntity,
-                        navigationLanes,
-                        hasNavigationLanes,
-                        ref inspectionContext)),
+                navigationLanesText: BuildNavigationLanesText(
+                    currentLaneEntity,
+                    navigationLanes,
+                    hasNavigationLanes),
                 plannedPenaltiesText: NormalizeInspectionText(inspection.Breakdown),
                 penaltyTagsText: NormalizeInspectionText(inspection.Tags),
                 explanationText: BuildRouteDecisionExplanation(
@@ -632,6 +641,60 @@ namespace Traffic_Law_Enforcement
                     inspection),
                 waypointRouteLaneText: BuildWaypointRouteLaneText(targetEntity),
                 connectedStopText: BuildConnectedStopText(targetEntity));
+        }
+
+        private string BuildNavigationLanesText(
+            Entity currentLaneEntity,
+            DynamicBuffer<CarNavigationLane> navigationLanes,
+            bool hasNavigationLanes,
+            int maxPreviewLanes = 4)
+        {
+            if (!hasNavigationLanes || navigationLanes.Length == 0)
+            {
+                return "none";
+            }
+
+            List<string> lines = new List<string>(maxPreviewLanes + 2);
+            int totalUpcoming = 0;
+
+            for (int index = 0; index < navigationLanes.Length; index++)
+            {
+                Entity lane = navigationLanes[index].m_Lane;
+                if (lane == Entity.Null)
+                {
+                    continue;
+                }
+
+                if (index == 0 && lane == currentLaneEntity)
+                {
+                    continue;
+                }
+
+                totalUpcoming += 1;
+                if (lines.Count >= maxPreviewLanes)
+                {
+                    continue;
+                }
+
+                lines.Add($"{lines.Count + 1}. {BuildLaneDisplayText(lane)}");
+            }
+
+            if (totalUpcoming == 0)
+            {
+                return "none";
+            }
+
+            List<string> summary = new List<string>(lines.Count + 2)
+            {
+                $"{totalUpcoming} total"
+            };
+            summary.AddRange(lines);
+            if (totalUpcoming > lines.Count)
+            {
+                summary.Add($"(+{totalUpcoming - lines.Count} more)");
+            }
+
+            return string.Join("\n", summary.ToArray());
         }
 
         private string BuildCurrentTargetText(Entity targetEntity)
@@ -659,7 +722,9 @@ namespace Traffic_Law_Enforcement
             }
 
             return
-                $"start {FormatEntityOrNone(routeLane.m_StartLane)} -> end {FormatEntityOrNone(routeLane.m_EndLane)} ({routeLane.m_StartCurvePos:0.###} -> {routeLane.m_EndCurvePos:0.###})";
+                $"start: {BuildLaneDisplayText(routeLane.m_StartLane)}\n" +
+                $"end: {BuildLaneDisplayText(routeLane.m_EndLane)}\n" +
+                $"curve: {routeLane.m_StartCurvePos:0.###} -> {routeLane.m_EndCurvePos:0.###}";
         }
 
         private string BuildConnectedStopText(Entity targetEntity)
@@ -683,7 +748,7 @@ namespace Traffic_Law_Enforcement
             if (m_ConnectedData.TryGetComponent(targetEntity, out Connected connected) &&
                 TryGetRoadEntityFromAddressable(connected.m_Connected, out Entity stopRoad))
             {
-                return FormatNamedEntity(stopRoad);
+                return FormatRoadName(stopRoad);
             }
 
             if (m_RouteLaneData.TryGetComponent(targetEntity, out RouteLane routeLane))
@@ -691,7 +756,7 @@ namespace Traffic_Law_Enforcement
                 Entity roadEntity = ResolveRoadEntityFromLane(routeLane.m_StartLane);
                 if (roadEntity != Entity.Null)
                 {
-                    return FormatNamedEntity(roadEntity);
+                    return FormatRoadName(roadEntity);
                 }
             }
 
@@ -798,6 +863,84 @@ namespace Traffic_Law_Enforcement
             }
 
             return text.Trim();
+        }
+
+        private string BuildLaneDisplayText(Entity lane)
+        {
+            if (lane == Entity.Null)
+            {
+                return FormatEntityOrNone(Entity.Null);
+            }
+
+            string roadName = BuildRoadNameFromLane(lane);
+            string ptSuffix = IsPublicTransportOnlyLane(lane)
+                ? " [PT]"
+                : string.Empty;
+            string prefix = string.IsNullOrWhiteSpace(roadName)
+                ? FormatEntityOrNone(lane)
+                : roadName;
+
+            if (m_ConnectionLaneData.HasComponent(lane))
+            {
+                return $"{prefix} | connection{ptSuffix}";
+            }
+
+            if (m_ParkingLaneData.HasComponent(lane))
+            {
+                return $"{prefix} | parking{ptSuffix}";
+            }
+
+            if (m_GarageLaneData.HasComponent(lane))
+            {
+                return $"{prefix} | garage{ptSuffix}";
+            }
+
+            if (TryBuildLaneOrdinal(lane, out int laneNumber, out int laneCount))
+            {
+                return $"{prefix} | {laneNumber}/{laneCount}{ptSuffix}";
+            }
+
+            return prefix + ptSuffix;
+        }
+
+        private bool TryBuildLaneOrdinal(Entity lane, out int laneNumber, out int laneCount)
+        {
+            if (m_SlaveLaneData.TryGetComponent(lane, out SlaveLane slaveLane) &&
+                slaveLane.m_MaxIndex >= slaveLane.m_MinIndex &&
+                slaveLane.m_SubIndex >= slaveLane.m_MinIndex &&
+                slaveLane.m_SubIndex <= slaveLane.m_MaxIndex)
+            {
+                laneNumber = slaveLane.m_SubIndex - slaveLane.m_MinIndex + 1;
+                laneCount = slaveLane.m_MaxIndex - slaveLane.m_MinIndex + 1;
+                return laneCount > 0;
+            }
+
+            laneNumber = 0;
+            laneCount = 0;
+            return false;
+        }
+
+        private bool IsPublicTransportOnlyLane(Entity lane)
+        {
+            return lane != Entity.Null &&
+                m_CarLaneData.TryGetComponent(lane, out CarLane carLane) &&
+                (carLane.m_Flags & Game.Net.CarLaneFlags.PublicOnly) != 0;
+        }
+
+        private string BuildRoadNameFromLane(Entity lane)
+        {
+            Entity roadEntity = ResolveRoadEntityFromLane(lane);
+            return roadEntity == Entity.Null
+                ? string.Empty
+                : FormatRoadName(roadEntity);
+        }
+
+        private string FormatRoadName(Entity roadEntity)
+        {
+            string renderedName = TryGetRenderedName(roadEntity);
+            return string.IsNullOrWhiteSpace(renderedName)
+                ? FormatEntityOrNone(roadEntity)
+                : renderedName;
         }
 
         private string FormatNamedEntity(Entity entity)
