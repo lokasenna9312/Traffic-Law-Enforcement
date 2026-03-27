@@ -40,6 +40,7 @@ namespace Traffic_Law_Enforcement
         public readonly string SummaryClassificationText;
         public readonly string SummaryTleStatusText;
         public readonly string CompactLastReasonText;
+        public readonly string CompactRepeatPenaltyText;
 
         public readonly int VehicleIndex;
         public readonly string RoleText;
@@ -50,7 +51,7 @@ namespace Traffic_Law_Enforcement
         public readonly Entity PreviousLaneEntity;
         public readonly int LaneChangeCount;
 
-        public readonly bool PtLaneViolationActive;
+        public readonly bool PublicTransportLaneViolationActive;
         public readonly bool PendingExitActive;
         public readonly string PermissionStateSummary;
 
@@ -83,6 +84,7 @@ namespace Traffic_Law_Enforcement
             string summaryClassificationText,
             string summaryTleStatusText,
             string compactLastReasonText,
+            string compactRepeatPenaltyText,
             int vehicleIndex,
             string roleText,
             string publicTransportLanePolicyText,
@@ -121,6 +123,7 @@ namespace Traffic_Law_Enforcement
             SummaryClassificationText = summaryClassificationText;
             SummaryTleStatusText = summaryTleStatusText;
             CompactLastReasonText = compactLastReasonText;
+            CompactRepeatPenaltyText = compactRepeatPenaltyText;
             VehicleIndex = vehicleIndex;
             RoleText = roleText;
             PublicTransportLanePolicyText = publicTransportLanePolicyText;
@@ -128,7 +131,7 @@ namespace Traffic_Law_Enforcement
             CurrentLaneEntity = currentLaneEntity;
             PreviousLaneEntity = previousLaneEntity;
             LaneChangeCount = laneChangeCount;
-            PtLaneViolationActive = ptLaneViolationActive;
+            PublicTransportLaneViolationActive = ptLaneViolationActive;
             PendingExitActive = pendingExitActive;
             PermissionStateSummary = permissionStateSummary;
             TotalFines = totalFines;
@@ -139,6 +142,106 @@ namespace Traffic_Law_Enforcement
 
     public partial class SelectedObjectBridgeSystem : GameSystemBase
     {
+        internal const string kClassificationRoadCarLocaleId =
+            "TrafficLawEnforcement.SelectedObjectPanel.Text.Classification.RoadCar";
+        internal const string kClassificationParkedRoadCarLocaleId =
+            "TrafficLawEnforcement.SelectedObjectPanel.Text.Classification.ParkedRoadCar";
+        internal const string kClassificationRailVehicleLocaleId =
+            "TrafficLawEnforcement.SelectedObjectPanel.Text.Classification.RailVehicle";
+        internal const string kClassificationParkedRailVehicleLocaleId =
+            "TrafficLawEnforcement.SelectedObjectPanel.Text.Classification.ParkedRailVehicle";
+        internal const string kClassificationTramLocaleId =
+            "TrafficLawEnforcement.SelectedObjectPanel.Text.Classification.Tram";
+        internal const string kClassificationParkedTramLocaleId =
+            "TrafficLawEnforcement.SelectedObjectPanel.Text.Classification.ParkedTram";
+        internal const string kClassificationTrainLocaleId =
+            "TrafficLawEnforcement.SelectedObjectPanel.Text.Classification.Train";
+        internal const string kClassificationParkedTrainLocaleId =
+            "TrafficLawEnforcement.SelectedObjectPanel.Text.Classification.ParkedTrain";
+        internal const string kClassificationSubwayLocaleId =
+            "TrafficLawEnforcement.SelectedObjectPanel.Text.Classification.Subway";
+        internal const string kClassificationParkedSubwayLocaleId =
+            "TrafficLawEnforcement.SelectedObjectPanel.Text.Classification.ParkedSubway";
+        internal const string kClassificationOtherVehicleLocaleId =
+            "TrafficLawEnforcement.SelectedObjectPanel.Text.Classification.OtherVehicle";
+        internal const string kRoleRoadPublicTransportLocaleId =
+            "TrafficLawEnforcement.SelectedObjectPanel.Text.Role.RoadPublicTransportVehicle";
+        internal const string kRoleTaxiLocaleId =
+            "TrafficLawEnforcement.SelectedObjectPanel.Text.Role.Taxi";
+        internal const string kRolePoliceCarLocaleId =
+            "TrafficLawEnforcement.SelectedObjectPanel.Text.Role.PoliceCar";
+        internal const string kRoleFireEngineLocaleId =
+            "TrafficLawEnforcement.SelectedObjectPanel.Text.Role.FireEngine";
+        internal const string kRoleAmbulanceLocaleId =
+            "TrafficLawEnforcement.SelectedObjectPanel.Text.Role.Ambulance";
+        internal const string kRoleGarbageTruckLocaleId =
+            "TrafficLawEnforcement.SelectedObjectPanel.Text.Role.GarbageTruck";
+        internal const string kRolePostVanLocaleId =
+            "TrafficLawEnforcement.SelectedObjectPanel.Text.Role.PostVan";
+        internal const string kRoleRoadMaintenanceVehicleLocaleId =
+            "TrafficLawEnforcement.SelectedObjectPanel.Text.Role.RoadMaintenanceVehicle";
+        internal const string kRoleSnowplowLocaleId =
+            "TrafficLawEnforcement.SelectedObjectPanel.Text.Role.Snowplow";
+        internal const string kRoleVehicleMaintenanceVehicleLocaleId =
+            "TrafficLawEnforcement.SelectedObjectPanel.Text.Role.VehicleMaintenanceVehicle";
+        internal const string kRolePersonalCarLocaleId =
+            "TrafficLawEnforcement.SelectedObjectPanel.Text.Role.PersonalCar";
+        internal const string kRoleDeliveryTruckLocaleId =
+            "TrafficLawEnforcement.SelectedObjectPanel.Text.Role.DeliveryTruck";
+        internal const string kRoleCargoTransportLocaleId =
+            "TrafficLawEnforcement.SelectedObjectPanel.Text.Role.CargoTransport";
+        internal const string kRoleHearseLocaleId =
+            "TrafficLawEnforcement.SelectedObjectPanel.Text.Role.Hearse";
+        internal const string kRolePrisonerTransportLocaleId =
+            "TrafficLawEnforcement.SelectedObjectPanel.Text.Role.PrisonerTransport";
+        internal const string kRoleParkMaintenanceVehicleLocaleId =
+            "TrafficLawEnforcement.SelectedObjectPanel.Text.Role.ParkMaintenanceVehicle";
+        internal const string kRoleUnclassifiedRoadVehicleLocaleId =
+            "TrafficLawEnforcement.SelectedObjectPanel.Text.Role.UnclassifiedRoadVehicle";
+        internal const string kRoleEmergencyQualifierLocaleId =
+            "TrafficLawEnforcement.SelectedObjectPanel.Text.Role.EmergencyQualifier";
+        internal const string kReasonNoneRecordedLocaleId =
+            "TrafficLawEnforcement.SelectedObjectPanel.Text.Reason.NoneRecorded";
+        internal const string kReasonPublicTransportLaneRevokedByModFormatLocaleId =
+            "TrafficLawEnforcement.SelectedObjectPanel.Text.Reason.PublicTransportLaneRevokedByModFormat";
+        internal const string kReasonPublicTransportLaneMissingVanillaCategoriesFormatLocaleId =
+            "TrafficLawEnforcement.SelectedObjectPanel.Text.Reason.PublicTransportLaneMissingVanillaCategoriesFormat";
+        internal const string kReasonPublicTransportLaneMissingGrantedRoleFormatLocaleId =
+            "TrafficLawEnforcement.SelectedObjectPanel.Text.Reason.PublicTransportLaneMissingGrantedRoleFormat";
+        internal const string kReasonPublicTransportLaneNotGrantedRoleFormatLocaleId =
+            "TrafficLawEnforcement.SelectedObjectPanel.Text.Reason.PublicTransportLaneNotGrantedRoleFormat";
+        internal const string kReasonNoPublicTransportLanePermissionFlagsLocaleId =
+            "TrafficLawEnforcement.SelectedObjectPanel.Text.Reason.NoPublicTransportLanePermissionFlags";
+        internal const string kReasonOppositeFlowSameSegmentLocaleId =
+            "TrafficLawEnforcement.SelectedObjectPanel.Text.Reason.OppositeFlowSameSegment";
+        internal const string kReasonEnteredGarageAccessNoSideAccessLocaleId =
+            "TrafficLawEnforcement.SelectedObjectPanel.Text.Reason.EnteredGarageAccessNoSideAccess";
+        internal const string kReasonEnteredParkingAccessNoSideAccessLocaleId =
+            "TrafficLawEnforcement.SelectedObjectPanel.Text.Reason.EnteredParkingAccessNoSideAccess";
+        internal const string kReasonEnteredParkingConnectionNoSideAccessLocaleId =
+            "TrafficLawEnforcement.SelectedObjectPanel.Text.Reason.EnteredParkingConnectionNoSideAccess";
+        internal const string kReasonEnteredBuildingAccessNoSideAccessLocaleId =
+            "TrafficLawEnforcement.SelectedObjectPanel.Text.Reason.EnteredBuildingAccessNoSideAccess";
+        internal const string kReasonExitedParkingAccessNoSideAccessLocaleId =
+            "TrafficLawEnforcement.SelectedObjectPanel.Text.Reason.ExitedParkingAccessNoSideAccess";
+        internal const string kReasonExitedGarageAccessNoSideAccessLocaleId =
+            "TrafficLawEnforcement.SelectedObjectPanel.Text.Reason.ExitedGarageAccessNoSideAccess";
+        internal const string kReasonExitedParkingConnectionNoSideAccessLocaleId =
+            "TrafficLawEnforcement.SelectedObjectPanel.Text.Reason.ExitedParkingConnectionNoSideAccess";
+        internal const string kReasonExitedBuildingAccessNoSideAccessLocaleId =
+            "TrafficLawEnforcement.SelectedObjectPanel.Text.Reason.ExitedBuildingAccessNoSideAccess";
+        internal const string kReasonIntersectionMovementFormatLocaleId =
+            "TrafficLawEnforcement.SelectedObjectPanel.Text.Reason.IntersectionMovementFormat";
+        internal const string kReasonRepeatPenaltyAppliedFormatLocaleId =
+            "TrafficLawEnforcement.SelectedObjectPanel.Text.Reason.RepeatPenaltyAppliedFormat";
+        internal const string kReasonRepeatPenaltyAppliedLocaleId =
+            "TrafficLawEnforcement.SelectedObjectPanel.Text.Reason.RepeatPenaltyApplied";
+        internal const string kReasonRepeatPenaltyNotAppliedLocaleId =
+            "TrafficLawEnforcement.SelectedObjectPanel.Text.Reason.RepeatPenaltyNotApplied";
+        internal const string kPublicTransportLanePolicyQualifierPublicTransportLocaleId =
+            "TrafficLawEnforcement.SelectedObjectPanel.Text.PublicTransportLanePolicyQualifier.PublicTransport";
+        internal const string kPublicTransportLanePolicyQualifierEmergencyLocaleId =
+            "TrafficLawEnforcement.SelectedObjectPanel.Text.PublicTransportLanePolicyQualifier.Emergency";
         internal const string kPublicTransportLanePolicyMeaningFormatLocaleId =
             "TrafficLawEnforcement.SelectedObjectPanel.Text.PublicTransportLanePolicyMeaningFormat";
         internal const string kPublicTransportLanePolicyVanillaAllowLocaleId =
@@ -294,6 +397,7 @@ namespace Traffic_Law_Enforcement
                 BuildSummaryClassificationText(resolveResult),
                 BuildSummaryTleStatusText(resolveResult, tleApplicability),
                 BuildCompactLastReasonText(tleApplicable, lastReason),
+                BuildCompactRepeatPenaltyText(tleApplicable, lastReason),
                 resolveResult.IsVehicle && hasVehicleEntity ? vehicle.Index : -1,
                 BuildRoleText(resolveResult),
                 BuildPublicTransportLanePolicyText(resolveResult, hasTrafficLawProfile),
@@ -406,43 +510,43 @@ namespace Traffic_Law_Enforcement
             }
         }
 
-        private static string BuildSummaryClassificationText(
+        private string BuildSummaryClassificationText(
             SelectedObjectResolveResult resolveResult)
         {
             switch (resolveResult.VehicleKind)
             {
                 case SelectedObjectKind.RoadCar:
-                    return "Road car";
+                    return LocalizeText(kClassificationRoadCarLocaleId, "Road car");
 
                 case SelectedObjectKind.ParkedRoadCar:
-                    return "Parked road car";
+                    return LocalizeText(kClassificationParkedRoadCarLocaleId, "Parked road car");
 
                 case SelectedObjectKind.RailVehicle:
-                    return "Rail vehicle";
+                    return LocalizeText(kClassificationRailVehicleLocaleId, "Rail vehicle");
 
                 case SelectedObjectKind.ParkedRailVehicle:
-                    return "Parked rail vehicle";
+                    return LocalizeText(kClassificationParkedRailVehicleLocaleId, "Parked rail vehicle");
 
                 case SelectedObjectKind.Tram:
-                    return "Tram";
+                    return LocalizeText(kClassificationTramLocaleId, "Tram");
 
                 case SelectedObjectKind.ParkedTram:
-                    return "Parked tram";
+                    return LocalizeText(kClassificationParkedTramLocaleId, "Parked tram");
 
                 case SelectedObjectKind.Train:
-                    return "Train";
+                    return LocalizeText(kClassificationTrainLocaleId, "Train");
 
                 case SelectedObjectKind.ParkedTrain:
-                    return "Parked train";
+                    return LocalizeText(kClassificationParkedTrainLocaleId, "Parked train");
 
                 case SelectedObjectKind.Subway:
-                    return "Subway";
+                    return LocalizeText(kClassificationSubwayLocaleId, "Subway");
 
                 case SelectedObjectKind.ParkedSubway:
-                    return "Parked subway";
+                    return LocalizeText(kClassificationParkedSubwayLocaleId, "Parked subway");
 
                 case SelectedObjectKind.OtherVehicle:
-                    return "Other vehicle";
+                    return LocalizeText(kClassificationOtherVehicleLocaleId, "Other vehicle");
 
                 default:
                     return string.Empty;
@@ -481,7 +585,7 @@ namespace Traffic_Law_Enforcement
             }
         }
 
-        private static string BuildCompactLastReasonText(
+        private string BuildCompactLastReasonText(
             bool tleApplicable,
             string lastReason)
         {
@@ -490,12 +594,14 @@ namespace Traffic_Law_Enforcement
                 return string.Empty;
             }
 
-            string normalizedReason = string.IsNullOrWhiteSpace(lastReason)
-                ? "None recorded"
-                : lastReason
-                    .Replace('\r', ' ')
-                    .Replace('\n', ' ')
-                    .Trim();
+            SplitRepeatPenaltyReason(
+                NormalizeReasonText(lastReason),
+                out string reasonText,
+                out _);
+
+            string normalizedReason = string.IsNullOrWhiteSpace(reasonText)
+                ? LocalizeText(kReasonNoneRecordedLocaleId, "None recorded")
+                : SummarizeReasonText(reasonText);
 
             const int maxLength = 56;
             if (normalizedReason.Length <= maxLength)
@@ -504,6 +610,27 @@ namespace Traffic_Law_Enforcement
             }
 
             return normalizedReason.Substring(0, maxLength - 3) + "...";
+        }
+
+        private string BuildCompactRepeatPenaltyText(
+            bool tleApplicable,
+            string lastReason)
+        {
+            if (!tleApplicable)
+            {
+                return string.Empty;
+            }
+
+            SplitRepeatPenaltyReason(
+                NormalizeReasonText(lastReason),
+                out _,
+                out string repeatPenaltyText);
+
+            return string.IsNullOrWhiteSpace(repeatPenaltyText)
+                ? LocalizeText(
+                    kReasonRepeatPenaltyNotAppliedLocaleId,
+                    "Not applied")
+                : repeatPenaltyText;
         }
 
         private string BuildRoleText(SelectedObjectResolveResult resolveResult)
@@ -523,43 +650,41 @@ namespace Traffic_Law_Enforcement
                 case SelectedObjectKind.RoadCar:
                     {
                         Entity vehicle = resolveResult.ResolvedVehicleEntity;
-                        return PublicTransportLanePolicy.DescribeVehicleRole(
-                            vehicle,
-                            ref m_TypeLookups);
+                        return BuildLocalizedRoadVehicleRoleText(vehicle);
                     }
 
                 case SelectedObjectKind.ParkedRoadCar:
-                    return "Parked road car";
+                    return LocalizeText(kClassificationParkedRoadCarLocaleId, "Parked road car");
 
                 case SelectedObjectKind.RailVehicle:
-                    return "Rail vehicle";
+                    return LocalizeText(kClassificationRailVehicleLocaleId, "Rail vehicle");
 
                 case SelectedObjectKind.ParkedRailVehicle:
-                    return "Parked rail vehicle";
+                    return LocalizeText(kClassificationParkedRailVehicleLocaleId, "Parked rail vehicle");
 
                 case SelectedObjectKind.Tram:
-                    return "Tram";
+                    return LocalizeText(kClassificationTramLocaleId, "Tram");
 
                 case SelectedObjectKind.ParkedTram:
-                    return "Parked tram";
+                    return LocalizeText(kClassificationParkedTramLocaleId, "Parked tram");
 
                 case SelectedObjectKind.Train:
-                    return "Train";
+                    return LocalizeText(kClassificationTrainLocaleId, "Train");
 
                 case SelectedObjectKind.ParkedTrain:
-                    return "Parked train";
+                    return LocalizeText(kClassificationParkedTrainLocaleId, "Parked train");
 
                 case SelectedObjectKind.Subway:
-                    return "Subway";
+                    return LocalizeText(kClassificationSubwayLocaleId, "Subway");
 
                 case SelectedObjectKind.ParkedSubway:
-                    return "Parked subway";
+                    return LocalizeText(kClassificationParkedSubwayLocaleId, "Parked subway");
 
                 case SelectedObjectKind.OtherVehicle:
-                    return "Other vehicle";
+                    return LocalizeText(kClassificationOtherVehicleLocaleId, "Other vehicle");
 
                 default:
-                    return "Vehicle";
+                    return LocalizeText(kClassificationOtherVehicleLocaleId, "Other vehicle");
             }
         }
 
@@ -604,12 +729,18 @@ namespace Traffic_Law_Enforcement
             List<string> qualifiers = null;
             if (PublicTransportLanePolicy.ModPrefersLanes(accessBits))
             {
-                (qualifiers ??= new List<string>()).Add("PT");
+                (qualifiers ??= new List<string>()).Add(
+                    LocalizeText(
+                        kPublicTransportLanePolicyQualifierPublicTransportLocaleId,
+                        "PT"));
             }
 
             if (profile.m_EmergencyVehicle != 0)
             {
-                (qualifiers ??= new List<string>()).Add("Emergency");
+                (qualifiers ??= new List<string>()).Add(
+                    LocalizeText(
+                        kPublicTransportLanePolicyQualifierEmergencyLocaleId,
+                        "Emergency"));
             }
 
             return qualifiers == null || qualifiers.Count == 0
@@ -627,6 +758,298 @@ namespace Traffic_Law_Enforcement
             }
 
             return fallback;
+        }
+
+        private string BuildLocalizedRoadVehicleRoleText(Entity vehicle)
+        {
+            List<string> names = new List<string>(4);
+
+            PublicTransportLaneVehicleCategory authorizedCategories =
+                PublicTransportLanePolicy.GetVanillaAuthorizedCategories(vehicle, ref m_TypeLookups);
+            AppendAuthorizedCategoryNamesLocalized(authorizedCategories, names);
+
+            PublicTransportLaneFlagGrantExperimentRole additionalRole =
+                PublicTransportLanePolicy.GetFlagGrantExperimentRole(vehicle, ref m_TypeLookups);
+
+            if (additionalRole != PublicTransportLaneFlagGrantExperimentRole.None)
+            {
+                names.Add(GetRoleDisplayNameLocalized(additionalRole));
+            }
+
+            if (names.Count == 0)
+            {
+                names.Add(LocalizeText(kRoleUnclassifiedRoadVehicleLocaleId, "Unclassified road vehicle"));
+            }
+
+            string description = string.Join(", ", names);
+            if (EmergencyVehiclePolicy.IsEmergencyVehicle(vehicle, ref m_TypeLookups))
+            {
+                description += " [" + LocalizeText(kRoleEmergencyQualifierLocaleId, "emergency") + "]";
+            }
+
+            return description;
+        }
+
+        private string GetRoleDisplayNameLocalized(PublicTransportLaneFlagGrantExperimentRole role)
+        {
+            switch (role)
+            {
+                case PublicTransportLaneFlagGrantExperimentRole.PersonalCar:
+                    return LocalizeText(kRolePersonalCarLocaleId, "Personal cars");
+                case PublicTransportLaneFlagGrantExperimentRole.DeliveryTruck:
+                    return LocalizeText(kRoleDeliveryTruckLocaleId, "Delivery trucks");
+                case PublicTransportLaneFlagGrantExperimentRole.CargoTransport:
+                    return LocalizeText(kRoleCargoTransportLocaleId, "Cargo transport vehicles");
+                case PublicTransportLaneFlagGrantExperimentRole.Hearse:
+                    return LocalizeText(kRoleHearseLocaleId, "Hearses");
+                case PublicTransportLaneFlagGrantExperimentRole.PrisonerTransport:
+                    return LocalizeText(kRolePrisonerTransportLocaleId, "Prisoner transports");
+                case PublicTransportLaneFlagGrantExperimentRole.ParkMaintenanceVehicle:
+                    return LocalizeText(kRoleParkMaintenanceVehicleLocaleId, "Park maintenance vehicles");
+                default:
+                    return LocalizeText(kRoleUnclassifiedRoadVehicleLocaleId, "Unclassified road vehicle");
+            }
+        }
+
+        private void AppendAuthorizedCategoryNamesLocalized(
+            PublicTransportLaneVehicleCategory categories,
+            List<string> names)
+        {
+            if ((categories & PublicTransportLaneVehicleCategory.RoadPublicTransportVehicle) != 0)
+            {
+                names.Add(LocalizeText(kRoleRoadPublicTransportLocaleId, "Road public transport vehicles"));
+            }
+
+            if ((categories & PublicTransportLaneVehicleCategory.Taxi) != 0)
+            {
+                names.Add(LocalizeText(kRoleTaxiLocaleId, "Taxis"));
+            }
+
+            if ((categories & PublicTransportLaneVehicleCategory.PoliceCar) != 0)
+            {
+                names.Add(LocalizeText(kRolePoliceCarLocaleId, "Police cars"));
+            }
+
+            if ((categories & PublicTransportLaneVehicleCategory.FireEngine) != 0)
+            {
+                names.Add(LocalizeText(kRoleFireEngineLocaleId, "Fire engines"));
+            }
+
+            if ((categories & PublicTransportLaneVehicleCategory.Ambulance) != 0)
+            {
+                names.Add(LocalizeText(kRoleAmbulanceLocaleId, "Ambulances"));
+            }
+
+            if ((categories & PublicTransportLaneVehicleCategory.GarbageTruck) != 0)
+            {
+                names.Add(LocalizeText(kRoleGarbageTruckLocaleId, "Garbage trucks"));
+            }
+
+            if ((categories & PublicTransportLaneVehicleCategory.PostVan) != 0)
+            {
+                names.Add(LocalizeText(kRolePostVanLocaleId, "Post vans"));
+            }
+
+            if ((categories & PublicTransportLaneVehicleCategory.RoadMaintenanceVehicle) != 0)
+            {
+                names.Add(LocalizeText(kRoleRoadMaintenanceVehicleLocaleId, "Road maintenance vehicles"));
+            }
+
+            if ((categories & PublicTransportLaneVehicleCategory.Snowplow) != 0)
+            {
+                names.Add(LocalizeText(kRoleSnowplowLocaleId, "Snowplows"));
+            }
+
+            if ((categories & PublicTransportLaneVehicleCategory.VehicleMaintenanceVehicle) != 0)
+            {
+                names.Add(LocalizeText(kRoleVehicleMaintenanceVehicleLocaleId, "Vehicle maintenance vehicles"));
+            }
+        }
+
+        private string SummarizeReasonText(string reason)
+        {
+            if (string.IsNullOrWhiteSpace(reason))
+            {
+                return LocalizeText(kReasonNoneRecordedLocaleId, "None recorded");
+            }
+
+            const string ptLaneRevokedPrefix = "PT-lane flags revoked by mod setting: ";
+            const string ptLaneMissingVanillaPrefix = "PT-lane flags missing for vanilla-authorized categories: ";
+            const string ptLaneMissingGrantedRolePrefix = "PT-lane flags missing for granted role: ";
+            const string ptLaneNotGrantedRolePrefix = "PT-lane flags not granted for role: ";
+            const string actualMovementPrefix = "actual ";
+            const string allowedMovementDelimiter = ", allowed ";
+
+            if (reason.StartsWith(ptLaneRevokedPrefix))
+            {
+                return string.Format(
+                    LocalizeText(
+                        kReasonPublicTransportLaneRevokedByModFormatLocaleId,
+                        "PT-lane access revoked by mod: {0}"),
+                    reason.Substring(ptLaneRevokedPrefix.Length));
+            }
+
+            if (reason.StartsWith(ptLaneMissingVanillaPrefix))
+            {
+                return string.Format(
+                    LocalizeText(
+                        kReasonPublicTransportLaneMissingVanillaCategoriesFormatLocaleId,
+                        "Vanilla-authorized PT-lane flags missing: {0}"),
+                    reason.Substring(ptLaneMissingVanillaPrefix.Length));
+            }
+
+            if (reason.StartsWith(ptLaneMissingGrantedRolePrefix))
+            {
+                return string.Format(
+                    LocalizeText(
+                        kReasonPublicTransportLaneMissingGrantedRoleFormatLocaleId,
+                        "Granted role missing PT-lane flags: {0}"),
+                    reason.Substring(ptLaneMissingGrantedRolePrefix.Length));
+            }
+
+            if (reason.StartsWith(ptLaneNotGrantedRolePrefix))
+            {
+                return string.Format(
+                    LocalizeText(
+                        kReasonPublicTransportLaneNotGrantedRoleFormatLocaleId,
+                        "PT-lane not granted for role: {0}"),
+                    reason.Substring(ptLaneNotGrantedRolePrefix.Length));
+            }
+
+            if (reason == "vehicle has no PT-lane permission flags")
+            {
+                return LocalizeText(
+                    kReasonNoPublicTransportLanePermissionFlagsLocaleId,
+                    "Vehicle has no PT-lane permission flags");
+            }
+
+            switch (reason)
+            {
+                case "vehicle switched to the opposite flow on the same road segment":
+                    return LocalizeText(
+                        kReasonOppositeFlowSameSegmentLocaleId,
+                        "Switched to opposite flow on the same segment");
+                case "vehicle entered garage access from a lane without side-access permission":
+                    return LocalizeText(
+                        kReasonEnteredGarageAccessNoSideAccessLocaleId,
+                        "Entered garage access without side access");
+                case "vehicle entered parking access from a lane without side-access permission":
+                    return LocalizeText(
+                        kReasonEnteredParkingAccessNoSideAccessLocaleId,
+                        "Entered parking access without side access");
+                case "vehicle crossed into parking connection from a lane without side-access permission":
+                    return LocalizeText(
+                        kReasonEnteredParkingConnectionNoSideAccessLocaleId,
+                        "Entered parking connection without side access");
+                case "vehicle crossed into building/service access connection from a lane without side-access permission":
+                    return LocalizeText(
+                        kReasonEnteredBuildingAccessNoSideAccessLocaleId,
+                        "Entered building/service access without side access");
+                case "vehicle exited parking access into a lane without side-access permission":
+                    return LocalizeText(
+                        kReasonExitedParkingAccessNoSideAccessLocaleId,
+                        "Exited parking access without side access");
+                case "vehicle exited garage access into a lane without side-access permission":
+                    return LocalizeText(
+                        kReasonExitedGarageAccessNoSideAccessLocaleId,
+                        "Exited garage access without side access");
+                case "vehicle exited parking connection into a lane without side-access permission":
+                    return LocalizeText(
+                        kReasonExitedParkingConnectionNoSideAccessLocaleId,
+                        "Exited parking connection without side access");
+                case "vehicle exited building/service access connection into a lane without side-access permission":
+                    return LocalizeText(
+                        kReasonExitedBuildingAccessNoSideAccessLocaleId,
+                        "Exited building/service access without side access");
+            }
+
+            if (reason.StartsWith(actualMovementPrefix) &&
+                reason.Contains(allowedMovementDelimiter))
+            {
+                int delimiterIndex = reason.IndexOf(allowedMovementDelimiter);
+                string actualMovement = reason.Substring(
+                    actualMovementPrefix.Length,
+                    delimiterIndex - actualMovementPrefix.Length);
+                string allowedMovement = reason.Substring(
+                    delimiterIndex + allowedMovementDelimiter.Length);
+                return string.Format(
+                    LocalizeText(
+                        kReasonIntersectionMovementFormatLocaleId,
+                        "Actual {0}, allowed {1}"),
+                    actualMovement,
+                    allowedMovement);
+            }
+
+            return reason;
+        }
+
+        private static string NormalizeReasonText(string reason)
+        {
+            if (string.IsNullOrWhiteSpace(reason))
+            {
+                return string.Empty;
+            }
+
+            return reason
+                .Replace("public-transport-lane", "PT-lane")
+                .Replace('\r', ' ')
+                .Replace('\n', ' ')
+                .Trim();
+        }
+
+        private string BuildRepeatPenaltySummaryText(int baseFine, int adjustedFine)
+        {
+            return string.Format(
+                LocalizeText(
+                    kReasonRepeatPenaltyAppliedFormatLocaleId,
+                    "Repeat offender {0} -> {1}"),
+                baseFine,
+                adjustedFine);
+        }
+
+        private string BuildRepeatPenaltySummaryText()
+        {
+            return LocalizeText(
+                kReasonRepeatPenaltyAppliedLocaleId,
+                "Repeat offender multiplier applied");
+        }
+
+        private void SplitRepeatPenaltyReason(
+            string normalizedReason,
+            out string baseReason,
+            out string repeatPenaltyText)
+        {
+            const string marker = " Repeat offender multiplier applied: ";
+
+            repeatPenaltyText = string.Empty;
+            baseReason = normalizedReason;
+
+            if (string.IsNullOrWhiteSpace(normalizedReason))
+            {
+                return;
+            }
+
+            int markerIndex = normalizedReason.IndexOf(marker);
+            if (markerIndex < 0)
+            {
+                return;
+            }
+
+            baseReason = normalizedReason.Substring(0, markerIndex).Trim();
+
+            string repeatPayload = normalizedReason.Substring(markerIndex + marker.Length).Trim();
+            repeatPayload = repeatPayload.TrimEnd('.');
+
+            string[] parts = repeatPayload.Split(new[] { " -> " }, System.StringSplitOptions.None);
+            if (parts.Length == 2 &&
+                int.TryParse(parts[0], out int baseFine) &&
+                int.TryParse(parts[1], out int adjustedFine))
+            {
+                repeatPenaltyText = BuildRepeatPenaltySummaryText(baseFine, adjustedFine);
+                return;
+            }
+
+            repeatPenaltyText = BuildRepeatPenaltySummaryText();
         }
 
         private string BuildPermissionStateSummary(

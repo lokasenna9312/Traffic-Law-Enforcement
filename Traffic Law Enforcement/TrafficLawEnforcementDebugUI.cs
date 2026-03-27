@@ -254,8 +254,8 @@ namespace Traffic_Law_Enforcement
             };
             enforcement.children.Add(new DebugUI.Value
             {
-                displayName = "PT-lane violation active",
-                getter = GetPtLaneViolationActiveText
+                displayName = "Public transport lane violation active",
+                getter = GetPublicTransportLaneViolationActiveText
             });
             enforcement.children.Add(new DebugUI.Value
             {
@@ -606,10 +606,10 @@ namespace Traffic_Law_Enforcement
                 snapshot => snapshot.LaneChangeCount.ToString());
         }
 
-        private static string GetPtLaneViolationActiveText()
+        private static string GetPublicTransportLaneViolationActiveText()
         {
             return GetReadyTleText(
-                snapshot => snapshot.PtLaneViolationActive.ToString());
+                snapshot => snapshot.PublicTransportLaneViolationActive.ToString());
         }
 
         private static string GetPendingExitActiveText()

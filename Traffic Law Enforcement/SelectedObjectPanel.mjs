@@ -26,6 +26,7 @@ const vehicleIndexBinding = api.bindValue(group, "vehicleIndex", "");
 const violationPendingBinding = api.bindValue(group, "violationPending", "");
 const totalsBinding = api.bindValue(group, "totals", "");
 const lastReasonBinding = api.bindValue(group, "lastReason", "");
+const repeatPenaltyBinding = api.bindValue(group, "repeatPenalty", "");
 const headerTextBinding = api.bindValue(group, "headerText", "");
 const summaryTitleBinding = api.bindValue(group, "summaryTitle", "");
 const tleStatusLabelTextBinding = api.bindValue(group, "tleStatusLabelText", "");
@@ -33,6 +34,7 @@ const roleLabelTextBinding = api.bindValue(group, "roleLabelText", "");
 const activeFlagsLabelTextBinding = api.bindValue(group, "activeFlagsLabelText", "");
 const violationsFinesLabelTextBinding = api.bindValue(group, "violationsFinesLabelText", "");
 const lastReasonLabelTextBinding = api.bindValue(group, "lastReasonLabelText", "");
+const repeatPenaltyLabelTextBinding = api.bindValue(group, "repeatPenaltyLabelText", "");
 const publicTransportLanePolicyLabelTextBinding = api.bindValue(group, "publicTransportLanePolicyLabelText", "");
 const footerTextBinding = api.bindValue(group, "footerText", "");
 const expandSectionTooltipTextBinding = api.bindValue(group, "expandSectionTooltipText", "");
@@ -144,7 +146,6 @@ const styles = {
         marginTop: "10px",
         color: "rgba(220, 229, 238, 0.95)",
         fontSize: "12px",
-        fontStyle: "italic",
         lineHeight: 1.35,
     },
     subsectionFoldout: {
@@ -227,6 +228,7 @@ function SelectedObjectPanel() {
     const violationPending = api.useValue(violationPendingBinding);
     const totals = api.useValue(totalsBinding);
     const lastReason = api.useValue(lastReasonBinding);
+    const repeatPenalty = api.useValue(repeatPenaltyBinding);
     const headerText = api.useValue(headerTextBinding);
     const summaryTitle = api.useValue(summaryTitleBinding);
     const tleStatusLabelText = api.useValue(tleStatusLabelTextBinding);
@@ -234,6 +236,7 @@ function SelectedObjectPanel() {
     const activeFlagsLabelText = api.useValue(activeFlagsLabelTextBinding);
     const violationsFinesLabelText = api.useValue(violationsFinesLabelTextBinding);
     const lastReasonLabelText = api.useValue(lastReasonLabelTextBinding);
+    const repeatPenaltyLabelText = api.useValue(repeatPenaltyLabelTextBinding);
     const publicTransportLanePolicyLabelText = api.useValue(publicTransportLanePolicyLabelTextBinding);
     const footerText = api.useValue(footerTextBinding);
     const expandSectionTooltipText = api.useValue(expandSectionTooltipTextBinding);
@@ -318,6 +321,7 @@ function SelectedObjectPanel() {
                       h(Row, { label: activeFlagsLabelText, value: violationPending }),
                       h(Row, { label: violationsFinesLabelText, value: totals }),
                       h(Row, { label: lastReasonLabelText, value: lastReason }),
+                      h(Row, { label: repeatPenaltyLabelText, value: repeatPenalty }),
                       h(Row, { label: publicTransportLanePolicyLabelText, value: publicTransportLanePolicy })
                   ),
                   h(FoldoutRow, {

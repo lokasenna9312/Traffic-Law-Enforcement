@@ -483,10 +483,10 @@ namespace Traffic_Law_Enforcement
             {
                 if (!settings.AllowsPublicTransportLaneCategories(authorizedCategories))
                 {
-                    return $"public-transport-lane flags revoked by mod setting: {authorizedCategories}";
+                    return $"PT-lane flags revoked by mod setting: {authorizedCategories}";
                 }
 
-                return $"public-transport-lane flags missing for vanilla-authorized categories: {authorizedCategories}";
+                return $"PT-lane flags missing for vanilla-authorized categories: {authorizedCategories}";
             }
 
             if (additionalRole != PublicTransportLaneFlagGrantExperimentRole.None)
@@ -494,13 +494,13 @@ namespace Traffic_Law_Enforcement
                 var displayName = GetRoleDisplayNameEnglish(additionalRole);
                 if (settings.AllowsAdditionalPublicTransportLaneRole(additionalRole))
                 {
-                    return $"public-transport-lane flags missing for granted role: {displayName}";
+                    return $"PT-lane flags missing for granted role: {displayName}";
                 }
 
-                return $"public-transport-lane flags not granted for role: {displayName}";
+                return $"PT-lane flags not granted for role: {displayName}";
             }
 
-            return "vehicle has no public-transport-lane permission flags";
+            return "vehicle has no PT-lane permission flags";
         }
 
         public static bool TryGetAllowedType3Role(Entity vehicle, EnforcementGameplaySettingsState settings, ref PublicTransportLaneVehicleTypeLookups lookups, out PublicTransportLaneFlagGrantExperimentRole role)
