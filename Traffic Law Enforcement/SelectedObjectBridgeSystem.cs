@@ -259,18 +259,14 @@ namespace Traffic_Law_Enforcement
             if (tleApplicable && resolveResult.IsVehicle)
             {
                 int vehicleIndex = vehicle.Index;
-                totalViolations = EnforcementTelemetry.GetVehicleViolationCount(vehicleIndex);
-
-                IReadOnlyDictionary<int, (int violationCount, int fineTotal)> penaltySnapshot =
-                    EnforcementTelemetry.GetVehiclePenaltySnapshot();
-
-                if (penaltySnapshot.TryGetValue(vehicleIndex, out (int violationCount, int fineTotal) totals))
+                if (EnforcementTelemetry.TryGetVehicleEnforcementRecord(
+                        vehicleIndex,
+                        out VehicleEnforcementRecord enforcementRecord))
                 {
-                    totalViolations = totals.violationCount;
-                    totalFines = totals.fineTotal;
+                    totalViolations = enforcementRecord.TotalViolations;
+                    totalFines = enforcementRecord.TotalFines;
+                    lastReason = enforcementRecord.LastReason ?? string.Empty;
                 }
-
-                lastReason = FindLastReason(vehicleIndex);
             }
 
             return new SelectedObjectDebugSnapshot(
@@ -673,28 +669,6 @@ namespace Traffic_Law_Enforcement
                 $"emergency={emergencyActive}, " +
                 $"emergencyOverride={emergencyOverrideActive}, " +
                 $"graceConsumed={permissionState.m_ImmediateEntryGraceConsumed != 0}";
-        }
-
-        private static string FindLastReason(int vehicleIndex)
-        {
-            IReadOnlyCollection<EnforcementRecord> recentRecords =
-                EnforcementTelemetry.GetRecentRecordsSnapshot();
-
-            if (recentRecords == null || recentRecords.Count == 0)
-            {
-                return string.Empty;
-            }
-
-            string lastReason = string.Empty;
-            foreach (EnforcementRecord record in recentRecords)
-            {
-                if (record.VehicleId == vehicleIndex)
-                {
-                    lastReason = record.Reason ?? string.Empty;
-                }
-            }
-
-            return lastReason;
         }
 
         private static SelectedObjectTleApplicability GetTleApplicability(

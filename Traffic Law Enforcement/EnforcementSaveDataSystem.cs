@@ -11,7 +11,7 @@ namespace Traffic_Law_Enforcement {
                                                      ISerializable,
                                                      IPreDeserialize,
                                                      IPostDeserialize {
-        private const int kSerializationVersion = 11;
+        private const int kSerializationVersion = 12;
 
         private EntityQuery m_StatisticsQuery;
         private EntityQuery m_PublicTransportLaneViolationQuery;
@@ -684,15 +684,14 @@ namespace Traffic_Law_Enforcement {
             writer.Write(statistics.m_IntersectionMovementViolationCount);
             writer.Write(EnforcementTelemetry.TotalFineAmount);
 
-            IReadOnlyDictionary<int, (int violationCount, int fineTotal)>
-                vehiclePenaltySnapshot =
-                    EnforcementTelemetry.GetVehiclePenaltySnapshot();
-            writer.Write(vehiclePenaltySnapshot.Count);
-            foreach (KeyValuePair<int, (int violationCount, int fineTotal)>
-                         pair in vehiclePenaltySnapshot) {
+            IReadOnlyDictionary<int, VehicleEnforcementRecord>
+                vehicleRecordSnapshot =
+                    EnforcementTelemetry.GetVehicleRecordSnapshot();
+            writer.Write(vehicleRecordSnapshot.Count);
+            foreach (KeyValuePair<int, VehicleEnforcementRecord> pair in
+                     vehicleRecordSnapshot) {
                 writer.Write(pair.Key);
-                writer.Write(pair.Value.violationCount);
-                writer.Write(pair.Value.fineTotal);
+                WriteVehicleEnforcementRecord(writer, pair.Value);
             }
 
             IReadOnlyCollection<EnforcementRecord> recentRecords =
@@ -704,18 +703,6 @@ namespace Traffic_Law_Enforcement {
                 writer.Write(record.LaneId);
                 writer.Write(record.FineAmount);
                 writer.Write(record.Reason);
-            }
-
-            IReadOnlyCollection<(string kind, int vehicleId,
-                                 long timestampMonthTicks)>
-                violationTimestamps =
-                    EnforcementTelemetry.GetViolationTimestampSnapshot();
-            writer.Write(violationTimestamps.Count);
-            foreach ((string kind, int vehicleId,
-                      long timestampMonthTicks)entry in violationTimestamps) {
-                writer.Write(entry.kind);
-                writer.Write(entry.vehicleId);
-                writer.Write(entry.timestampMonthTicks);
             }
 
             IReadOnlyCollection<EnforcementBudgetUIService.FineIncomeEvent>
@@ -795,39 +782,72 @@ namespace Traffic_Law_Enforcement {
             reader.Read(out statistics.m_IntersectionMovementViolationCount);
             reader.Read(out int totalFineAmount);
 
-            Dictionary<int, int> vehicleViolationCounts =
-                new Dictionary<int, int>();
-            Dictionary<int, int> vehicleFineTotals = new Dictionary<int, int>();
-            reader.Read(out int vehiclePenaltyCount);
-            for (int index = 0; index < vehiclePenaltyCount; index += 1) {
-                reader.Read(out int vehicleId);
-                reader.Read(out int violationCount);
-                reader.Read(out int fineTotal);
-                vehicleViolationCounts[vehicleId] = violationCount;
-                vehicleFineTotals[vehicleId] = fineTotal;
-            }
-
             List<EnforcementRecord> records = new List<EnforcementRecord>();
-            reader.Read(out int recordCount);
-            for (int index = 0; index < recordCount; index += 1) {
-                reader.Read(out string kind);
-                reader.Read(out int vehicleId);
-                reader.Read(out int laneId);
-                reader.Read(out int fineAmount);
-                reader.Read(out string reason);
-                records.Add(new EnforcementRecord(kind, vehicleId, laneId,
-                                                  fineAmount, reason));
-            }
+            Dictionary<int, VehicleEnforcementRecord> vehicleRecords =
+                new Dictionary<int, VehicleEnforcementRecord>();
+            int migratedLegacyTimestampCount = 0;
 
-            List<(string kind, int vehicleId, long timestampMonthTicks)>
-                timestamps = new List<(string kind, int vehicleId,
-                                       long timestampMonthTicks)>();
-            reader.Read(out int timestampCount);
-            for (int index = 0; index < timestampCount; index += 1) {
-                reader.Read(out string kind);
-                reader.Read(out int vehicleId);
-                reader.Read(out long timestampMonthTicks);
-                timestamps.Add((kind, vehicleId, timestampMonthTicks));
+            if (version >= 12) {
+                reader.Read(out int vehicleRecordCount);
+                for (int index = 0; index < vehicleRecordCount; index += 1) {
+                    reader.Read(out int vehicleId);
+                    vehicleRecords[vehicleId] =
+                        ReadVehicleEnforcementRecord(reader);
+                }
+
+                reader.Read(out int recordCount);
+                for (int index = 0; index < recordCount; index += 1) {
+                    reader.Read(out string kind);
+                    reader.Read(out int vehicleId);
+                    reader.Read(out int laneId);
+                    reader.Read(out int fineAmount);
+                    reader.Read(out string reason);
+                    records.Add(new EnforcementRecord(kind, vehicleId, laneId,
+                                                      fineAmount, reason));
+                }
+            } else {
+                Dictionary<int, int> vehicleViolationCounts =
+                    new Dictionary<int, int>();
+                Dictionary<int, int> vehicleFineTotals =
+                    new Dictionary<int, int>();
+
+                reader.Read(out int vehiclePenaltyCount);
+                for (int index = 0; index < vehiclePenaltyCount; index += 1) {
+                    reader.Read(out int vehicleId);
+                    reader.Read(out int violationCount);
+                    reader.Read(out int fineTotal);
+                    vehicleViolationCounts[vehicleId] = violationCount;
+                    vehicleFineTotals[vehicleId] = fineTotal;
+                }
+
+                reader.Read(out int recordCount);
+                for (int index = 0; index < recordCount; index += 1) {
+                    reader.Read(out string kind);
+                    reader.Read(out int vehicleId);
+                    reader.Read(out int laneId);
+                    reader.Read(out int fineAmount);
+                    reader.Read(out string reason);
+                    records.Add(new EnforcementRecord(kind, vehicleId, laneId,
+                                                      fineAmount, reason));
+                }
+
+                List<(string kind, int vehicleId, long timestampMonthTicks)>
+                    timestamps = new List<(string kind, int vehicleId,
+                                           long timestampMonthTicks)>();
+                reader.Read(out int timestampCount);
+                migratedLegacyTimestampCount = timestampCount;
+                for (int index = 0; index < timestampCount; index += 1) {
+                    reader.Read(out string kind);
+                    reader.Read(out int vehicleId);
+                    reader.Read(out long timestampMonthTicks);
+                    timestamps.Add((kind, vehicleId, timestampMonthTicks));
+                }
+
+                vehicleRecords = MigrateLegacyVehicleEnforcementRecords(
+                    vehicleFineTotals,
+                    vehicleViolationCounts,
+                    records,
+                    timestamps);
             }
 
             List<EnforcementBudgetUIService.FineIncomeEvent> fineIncomeEvents =
@@ -865,8 +885,10 @@ namespace Traffic_Law_Enforcement {
 
             EnforcementGameplaySettingsService.Apply(gameplaySettings);
             EnforcementTelemetry.LoadPersistentData(
-                statistics, totalFineAmount, vehicleFineTotals,
-                vehicleViolationCounts, records, timestamps);
+                statistics,
+                totalFineAmount,
+                vehicleRecords,
+                records);
             EnforcementBudgetUIService.LoadPersistentData(fineIncomeEvents);
             MonthlyEnforcementChirperService.LoadPersistentData(trackingState,
                                                                 reports);
@@ -907,7 +929,7 @@ namespace Traffic_Law_Enforcement {
                 $"loadedPtVehicleStates={m_LoadedPublicTransportLaneVehicleStates.Count}, " +
                 $"hasTrackingState={trackingState.HasValue}, " +
                 $"hasPolicyImpactTrackingState={policyImpactTrackingState.HasValue}, " +
-                $"records={records.Count}, timestamps={timestamps.Count}, fineIncomeEvents={fineIncomeEvents.Count}, " +
+                $"records={records.Count}, migratedLegacyTimestamps={migratedLegacyTimestampCount}, fineIncomeEvents={fineIncomeEvents.Count}, " +
                 $"pathRequestEvents={policyImpactEventsReadResult.PathRequestEvents.Count}, actualViolationEvents={policyImpactEventsReadResult.ActualViolationEvents.Count}, " +
                 $"avoidedRerouteEvents={policyImpactEventsReadResult.AvoidedRerouteEvents.Count}, " +
                 $"totalFineAmount={totalFineAmount}, totalPathRequestCount={totalsReadResult.TotalPathRequestCount}, " +
@@ -1198,6 +1220,124 @@ namespace Traffic_Law_Enforcement {
                 writer.Write(entry.AvoidedMidBlockPenalty);
                 writer.Write(entry.AvoidedIntersectionPenalty);
             }
+        }
+
+        private static void WriteVehicleEnforcementRecord<TWriter>(
+            TWriter writer,
+            VehicleEnforcementRecord record)
+            where TWriter : IWriter {
+            writer.Write(record.TotalViolations);
+            writer.Write(record.TotalFines);
+            writer.Write(record.LastKind ?? string.Empty);
+            writer.Write(record.LastLaneId);
+            writer.Write(record.LastFineAmount);
+            writer.Write(record.LastReason ?? string.Empty);
+            writer.Write(record.LastTimestampMonthTicks);
+            WriteTimestampList(writer, record.PublicTransportLaneTimestamps);
+            WriteTimestampList(writer, record.MidBlockCrossingTimestamps);
+            WriteTimestampList(writer, record.IntersectionMovementTimestamps);
+        }
+
+        private static VehicleEnforcementRecord ReadVehicleEnforcementRecord<TReader>(
+            TReader reader)
+            where TReader : IReader {
+            VehicleEnforcementRecord record = new VehicleEnforcementRecord();
+            reader.Read(out record.TotalViolations);
+            reader.Read(out record.TotalFines);
+            reader.Read(out record.LastKind);
+            reader.Read(out record.LastLaneId);
+            reader.Read(out record.LastFineAmount);
+            reader.Read(out record.LastReason);
+            reader.Read(out record.LastTimestampMonthTicks);
+            ReadTimestampList(reader, record.PublicTransportLaneTimestamps);
+            ReadTimestampList(reader, record.MidBlockCrossingTimestamps);
+            ReadTimestampList(reader, record.IntersectionMovementTimestamps);
+            return record;
+        }
+
+        private static void WriteTimestampList<TWriter>(
+            TWriter writer,
+            IReadOnlyCollection<long> timestamps)
+            where TWriter : IWriter {
+            writer.Write(timestamps.Count);
+            foreach (long timestamp in timestamps) {
+                writer.Write(timestamp);
+            }
+        }
+
+        private static void ReadTimestampList<TReader>(
+            TReader reader,
+            ICollection<long> target)
+            where TReader : IReader {
+            reader.Read(out int count);
+            for (int index = 0; index < count; index += 1) {
+                reader.Read(out long timestampMonthTicks);
+                target.Add(timestampMonthTicks);
+            }
+        }
+
+        private static Dictionary<int, VehicleEnforcementRecord>
+        MigrateLegacyVehicleEnforcementRecords(
+            IDictionary<int, int> vehicleFineTotals,
+            IDictionary<int, int> vehicleViolationCounts,
+            IEnumerable<EnforcementRecord> records,
+            IEnumerable<(string kind, int vehicleId, long timestampMonthTicks)>
+                timestamps) {
+            Dictionary<int, VehicleEnforcementRecord> vehicleRecords =
+                new Dictionary<int, VehicleEnforcementRecord>();
+
+            foreach (KeyValuePair<int, int> pair in vehicleViolationCounts) {
+                GetOrCreateVehicleEnforcementRecord(vehicleRecords, pair.Key)
+                    .TotalViolations = pair.Value;
+            }
+
+            foreach (KeyValuePair<int, int> pair in vehicleFineTotals) {
+                GetOrCreateVehicleEnforcementRecord(vehicleRecords, pair.Key)
+                    .TotalFines = pair.Value;
+            }
+
+            foreach (EnforcementRecord record in records) {
+                VehicleEnforcementRecord vehicleRecord =
+                    GetOrCreateVehicleEnforcementRecord(vehicleRecords,
+                                                       record.VehicleId);
+                vehicleRecord.LastReason = record.Reason ?? string.Empty;
+                vehicleRecord.LastKind = record.Kind ?? string.Empty;
+                vehicleRecord.LastLaneId = record.LaneId;
+                vehicleRecord.LastFineAmount = record.FineAmount;
+            }
+
+            foreach ((string kind, int vehicleId,
+                      long timestampMonthTicks) entry in timestamps) {
+                VehicleEnforcementRecord vehicleRecord =
+                    GetOrCreateVehicleEnforcementRecord(vehicleRecords,
+                                                       entry.vehicleId);
+                List<long> history = vehicleRecord.GetTimestampHistory(entry.kind);
+                history?.Add(entry.timestampMonthTicks);
+            }
+
+            foreach (VehicleEnforcementRecord record in vehicleRecords.Values) {
+                // Legacy recent records do not store per-record timestamps, so
+                // the latest timestamp can only be reconstructed on a
+                // best-effort basis from the latest known kind-specific
+                // timestamp still present in the save data.
+                record.LastTimestampMonthTicks =
+                    record.GetLatestKnownTimestampMonthTicks();
+            }
+
+            return vehicleRecords;
+        }
+
+        private static VehicleEnforcementRecord GetOrCreateVehicleEnforcementRecord(
+            IDictionary<int, VehicleEnforcementRecord> vehicleRecords,
+            int vehicleId) {
+            if (!vehicleRecords.TryGetValue(vehicleId,
+                                            out VehicleEnforcementRecord
+                                                record)) {
+                record = new VehicleEnforcementRecord();
+                vehicleRecords[vehicleId] = record;
+            }
+
+            return record;
         }
 
         private void WriteLoadedPublicTransportLaneVehicleStates<TWriter>(
