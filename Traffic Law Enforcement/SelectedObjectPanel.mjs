@@ -73,31 +73,6 @@ const styles = {
         width: "100%",
         boxSizing: "border-box",
     },
-    compactClassificationRow: {
-        display: "flex",
-        alignItems: "baseline",
-        gap: "8px",
-        marginBottom: "8px",
-        flexWrap: "wrap",
-    },
-    classificationRow: {
-        display: "flex",
-        alignItems: "baseline",
-        gap: "8px",
-        marginBottom: "10px",
-        flexWrap: "wrap",
-    },
-    classificationText: {
-        color: "#b0defc",
-        fontWeight: 700,
-        fontSize: "18px",
-    },
-    classificationIndex: {
-        color: "rgba(214, 225, 242, 0.72)",
-        fontWeight: 500,
-        fontSize: "12px",
-        letterSpacing: "0.2px",
-    },
     compactMessage: {
         fontSize: "14px",
         lineHeight: 1.35,
@@ -114,6 +89,12 @@ const styles = {
         minHeight: "30px",
         alignItems: "center",
     },
+    classificationRow: {
+        display: "flex",
+        minHeight: "34px",
+        alignItems: "center",
+        marginBottom: "2px",
+    },
     label: {
         width: "138px",
         color: "#c2cfdf",
@@ -127,6 +108,14 @@ const styles = {
         fontSize: "14px",
         lineHeight: 1.35,
         wordBreak: "break-word",
+    },
+    classificationLabel: {
+        width: "138px",
+        color: "#b0defc",
+        fontWeight: 700,
+        fontSize: "18px",
+        lineHeight: 1.35,
+        flexShrink: 0,
     },
     footer: {
         marginTop: "10px",
@@ -156,6 +145,17 @@ function Row(props) {
         { style: styles.row },
         h("div", { style: styles.label }, props.label),
         h("div", { style: styles.value }, props.value)
+    );
+}
+
+function ClassificationRow(props) {
+    return h(
+        "div",
+        { style: styles.classificationRow },
+        h("div", { style: styles.classificationLabel }, props.label),
+        props.value
+            ? h("div", { style: styles.value }, props.value)
+            : null
     );
 }
 
@@ -237,14 +237,11 @@ function SelectedObjectPanel() {
               isUltraCompact
                   ? h("div", { style: styles.compactMessage }, message)
                   : [
-                        h(
-                            "div",
-                            { style: styles.compactClassificationRow, key: "classification" },
-                            h("div", { style: styles.classificationText }, classification),
-                            vehicleIndex
-                                ? h("div", { style: styles.classificationIndex }, "#" + vehicleIndex)
-                                : null
-                        ),
+                        h(ClassificationRow, {
+                            label: classification,
+                            value: vehicleIndex ? "#" + vehicleIndex : "",
+                            key: "classification",
+                        }),
                         h(
                             "div",
                             { style: styles.rows, key: "rows" },
@@ -257,14 +254,10 @@ function SelectedObjectPanel() {
             : h(
                   "div",
                   { style: styles.body },
-                  h(
-                      "div",
-                      { style: styles.classificationRow },
-                      h("div", { style: styles.classificationText }, classification),
-                      vehicleIndex
-                          ? h("div", { style: styles.classificationIndex }, "#" + vehicleIndex)
-                          : null
-                  ),
+                  h(ClassificationRow, {
+                      label: classification,
+                      value: vehicleIndex ? "#" + vehicleIndex : "",
+                  }),
                   h(
                       "div",
                       { style: styles.rows },
