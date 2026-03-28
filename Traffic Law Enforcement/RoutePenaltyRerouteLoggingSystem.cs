@@ -51,12 +51,21 @@ namespace Traffic_Law_Enforcement
         private ComponentLookup<CurrentRoute> m_CurrentRouteData;
         private ComponentLookup<PathOwner> m_PathOwnerData;
         private ComponentLookup<Owner> m_OwnerData;
+        private ComponentLookup<Game.Prefabs.PrefabRef> m_PrefabRefData;
         private ComponentLookup<CarLane> m_CarLaneData;
+        private ComponentLookup<Game.Prefabs.CarData> m_PrefabCarData;
+        private ComponentLookup<CargoTransport> m_CargoTransportData;
+        private ComponentLookup<PublicTransport> m_PublicTransportData;
+        private ComponentLookup<PublicTransportLanePendingExit> m_PendingExitData;
+        private ComponentLookup<SlaveLane> m_SlaveLaneData;
+        private ComponentLookup<RouteLane> m_RouteLaneData;
         private ComponentLookup<VehicleTrafficLawProfile> m_ProfileData;
         private ComponentLookup<EdgeLane> m_EdgeLaneData;
         private ComponentLookup<ParkingLane> m_ParkingLaneData;
         private ComponentLookup<GarageLane> m_GarageLaneData;
         private ComponentLookup<ConnectionLane> m_ConnectionLaneData;
+        private BufferLookup<SubLane> m_SubLaneData;
+        private BufferLookup<PathElement> m_PathElementData;
         private PublicTransportLaneVehicleTypeLookups m_TypeLookups;
         private readonly Dictionary<Entity, RoutePenaltyInspectionResult> m_LastSnapshots = new Dictionary<Entity, RoutePenaltyInspectionResult>();
         private readonly Dictionary<Entity, RouteSelectionChangeSnapshot> m_LastRouteSelectionSnapshots = new Dictionary<Entity, RouteSelectionChangeSnapshot>();
@@ -104,11 +113,20 @@ namespace Traffic_Law_Enforcement
             m_CurrentRouteData = GetComponentLookup<CurrentRoute>(true);
             m_PathOwnerData = GetComponentLookup<PathOwner>(true);
             m_OwnerData = GetComponentLookup<Owner>(true);
+            m_PrefabRefData = GetComponentLookup<Game.Prefabs.PrefabRef>(true);
             m_CarLaneData = GetComponentLookup<CarLane>(true);
+            m_PrefabCarData = GetComponentLookup<Game.Prefabs.CarData>(true);
+            m_CargoTransportData = GetComponentLookup<CargoTransport>(true);
+            m_PublicTransportData = GetComponentLookup<PublicTransport>(true);
+            m_PendingExitData = GetComponentLookup<PublicTransportLanePendingExit>(true);
+            m_SlaveLaneData = GetComponentLookup<SlaveLane>(true);
+            m_RouteLaneData = GetComponentLookup<RouteLane>(true);
             m_EdgeLaneData = GetComponentLookup<EdgeLane>(true);
             m_ParkingLaneData = GetComponentLookup<ParkingLane>(true);
             m_GarageLaneData = GetComponentLookup<GarageLane>(true);
             m_ConnectionLaneData = GetComponentLookup<ConnectionLane>(true);
+            m_SubLaneData = GetBufferLookup<SubLane>(true);
+            m_PathElementData = GetBufferLookup<PathElement>(true);
             m_ProfileData = GetComponentLookup<VehicleTrafficLawProfile>(true);
             m_TypeLookups = PublicTransportLaneVehicleTypeLookups.Create(this);
             m_CachedVehicleQuery = GetEntityQuery(ComponentType.ReadOnly<Car>(), ComponentType.ReadOnly<CarCurrentLane>());
@@ -150,11 +168,20 @@ namespace Traffic_Law_Enforcement
             m_CurrentRouteData.Update(this);
             m_PathOwnerData.Update(this);
             m_OwnerData.Update(this);
+            m_PrefabRefData.Update(this);
             m_CarLaneData.Update(this);
+            m_PrefabCarData.Update(this);
+            m_CargoTransportData.Update(this);
+            m_PublicTransportData.Update(this);
+            m_PendingExitData.Update(this);
+            m_SlaveLaneData.Update(this);
+            m_RouteLaneData.Update(this);
             m_EdgeLaneData.Update(this);
             m_ParkingLaneData.Update(this);
             m_GarageLaneData.Update(this);
             m_ConnectionLaneData.Update(this);
+            m_SubLaneData.Update(this);
+            m_PathElementData.Update(this);
             m_ProfileData.Update(this);
             m_TypeLookups.Update(this);
             FocusedLoggingService.PruneMissingVehicles(EntityManager);
@@ -469,6 +496,17 @@ namespace Traffic_Law_Enforcement
 
             EnforcementTelemetry.RecordEvent(message);
             Mod.log.Info(message);
+
+            if (focusedWatch)
+            {
+                string rebuildContextMessage =
+                    BuildFocusedRouteRebuildContext(
+                        vehicle,
+                        previousSnapshot,
+                        currentSnapshot);
+                EnforcementTelemetry.RecordEvent(rebuildContextMessage);
+                Mod.log.Info(rebuildContextMessage);
+            }
         }
 
         private static string BuildRouteSelectionChangeReasons(
@@ -522,6 +560,283 @@ namespace Traffic_Law_Enforcement
             return snapshot.HasPathOwner
                 ? snapshot.PathFlags.ToString()
                 : "none";
+        }
+
+        private string BuildFocusedRouteRebuildContext(
+            Entity vehicle,
+            RouteSelectionChangeSnapshot previousSnapshot,
+            RouteSelectionChangeSnapshot currentSnapshot)
+        {
+            Entity previousTarget =
+                previousSnapshot.HasCurrentTarget
+                    ? previousSnapshot.CurrentTarget
+                    : Entity.Null;
+            Entity currentTarget =
+                currentSnapshot.HasCurrentTarget
+                    ? currentSnapshot.CurrentTarget
+                    : Entity.Null;
+            Entity currentLane = currentSnapshot.CurrentLane;
+            Entity normalizedCurrentLane = NormalizeLaneForAppendOrigin(currentLane);
+
+            bool targetChanged =
+                previousTarget != Entity.Null &&
+                previousTarget != currentTarget;
+            bool previousTargetEndMatchesCurrent =
+                TryPreviousTargetEndMatchesCurrentLane(
+                    previousTarget,
+                    normalizedCurrentLane,
+                    out Entity previousTargetEndLane);
+
+            string predictedOriginSource =
+                targetChanged && previousTargetEndMatchesCurrent
+                    ? "previousTarget"
+                    : "currentLocation";
+            string targetRouteLane =
+                DescribeRouteLane(currentTarget);
+            string previousTargetRouteLane =
+                DescribeRouteLane(previousTarget);
+            string upcomingPathPreview =
+                BuildUpcomingPathElementPreview(vehicle);
+            string navigationPreview =
+                BuildNavigationPreview(vehicle, currentLane);
+            string pathfindContext =
+                BuildPredictedPathfindContext(vehicle);
+
+            return
+                $"FOCUSED_ROUTE_REBUILD: vehicle={vehicle}, " +
+                $"previousTarget={FormatOptionalEntity(previousSnapshot.HasCurrentTarget, previousTarget)}, " +
+                $"currentTarget={FormatOptionalEntity(currentSnapshot.HasCurrentTarget, currentTarget)}, " +
+                $"currentLane={currentLane}, normalizedCurrentLane={normalizedCurrentLane}, " +
+                $"targetChanged={targetChanged}, " +
+                $"predictedOriginSource={predictedOriginSource}, " +
+                $"previousTargetEndMatchesCurrent={previousTargetEndMatchesCurrent}, " +
+                $"previousTargetEndLane={FormatEntityOrNone(previousTargetEndLane)}, " +
+                $"targetRouteLane={targetRouteLane}, " +
+                $"previousTargetRouteLane={previousTargetRouteLane}, " +
+                $"upcomingPath={upcomingPathPreview}, " +
+                $"navigationPreview={navigationPreview}, " +
+                $"{pathfindContext}";
+        }
+
+        private string BuildNavigationPreview(Entity vehicle, Entity currentLane)
+        {
+            bool hasNavigationLanes =
+                m_NavigationLaneData.TryGetBuffer(vehicle, out DynamicBuffer<CarNavigationLane> navigationLanes);
+            RoutePenaltyInspectionContext context = CreateInspectionContext();
+            return RoutePenaltyInspection.BuildNavigationPreview(
+                currentLane,
+                navigationLanes,
+                hasNavigationLanes,
+                ref context);
+        }
+
+        private string BuildPredictedPathfindContext(Entity vehicle)
+        {
+            bool hasProfile =
+                m_ProfileData.TryGetComponent(vehicle, out VehicleTrafficLawProfile vehicleProfile);
+            bool emergency =
+                EmergencyVehiclePolicy.IsEmergencyVehicle(vehicle, ref m_TypeLookups);
+
+            bool pendingExitActive =
+                m_PendingExitData.TryGetComponent(vehicle, out PublicTransportLanePendingExit pendingExit) &&
+                pendingExit.m_HasLeftPublicTransportLane == 0;
+
+            bool allowOnPublicTransportLane =
+                hasProfile
+                    ? PublicTransportLanePolicy.CanUsePublicTransportLane(vehicleProfile)
+                    : emergency;
+            if (!allowOnPublicTransportLane && pendingExitActive)
+            {
+                allowOnPublicTransportLane = true;
+            }
+
+            bool hasPublicTransport =
+                m_PublicTransportData.TryGetComponent(vehicle, out PublicTransport publicTransport);
+            bool hasCargoTransport =
+                m_CargoTransportData.TryGetComponent(vehicle, out CargoTransport cargoTransport);
+
+            bool evacuating =
+                hasPublicTransport &&
+                (publicTransport.m_State & (PublicTransportFlags.Returning | PublicTransportFlags.Evacuating)) ==
+                PublicTransportFlags.Evacuating;
+
+            PathfindFlags predictedPathfindFlags = default;
+            bool routeSourceEnRoute =
+                (hasCargoTransport &&
+                 (cargoTransport.m_State & (CargoTransportFlags.EnRoute | CargoTransportFlags.RouteSource)) ==
+                 (CargoTransportFlags.EnRoute | CargoTransportFlags.RouteSource)) ||
+                (hasPublicTransport &&
+                 (publicTransport.m_State & (PublicTransportFlags.EnRoute | PublicTransportFlags.RouteSource)) ==
+                 (PublicTransportFlags.EnRoute | PublicTransportFlags.RouteSource));
+            if (routeSourceEnRoute)
+            {
+                predictedPathfindFlags = PathfindFlags.Stable | PathfindFlags.IgnoreFlow;
+            }
+
+            RuleFlags predictedIgnoredRules = default;
+            bool hasPredictedIgnoredRules = false;
+            if (m_PrefabRefData.TryGetComponent(vehicle, out Game.Prefabs.PrefabRef prefabRef) &&
+                prefabRef.m_Prefab != Entity.Null &&
+                m_PrefabCarData.TryGetComponent(prefabRef.m_Prefab, out Game.Prefabs.CarData carData))
+            {
+                predictedIgnoredRules =
+                    RuleFlags.ForbidPrivateTraffic |
+                    VehicleUtils.GetIgnoredPathfindRules(carData);
+
+                if (evacuating)
+                {
+                    predictedIgnoredRules |=
+                        RuleFlags.ForbidCombustionEngines |
+                        RuleFlags.ForbidTransitTraffic |
+                        RuleFlags.ForbidHeavyTraffic;
+                }
+
+                SetRuleFlag(
+                    ref predictedIgnoredRules,
+                    RuleFlags.ForbidPrivateTraffic,
+                    allowOnPublicTransportLane);
+                hasPredictedIgnoredRules = true;
+            }
+
+            string accessBits =
+                hasProfile
+                    ? vehicleProfile.m_PublicTransportLaneAccessBits.ToString()
+                    : "n/a";
+            string predictedWeights =
+                evacuating
+                    ? "time=1,behaviour=0.2,money=0,comfort=0.1"
+                    : "time=1,behaviour=1,money=1,comfort=1";
+
+            return
+                $"predictedPathfindFlags={FormatPathfindFlags(predictedPathfindFlags)}, " +
+                $"predictedIgnoredRules={(hasPredictedIgnoredRules ? FormatRuleFlags(predictedIgnoredRules) : "unavailable")}, " +
+                $"predictedWeights={predictedWeights}, " +
+                $"publicTransportState={(hasPublicTransport ? publicTransport.m_State.ToString() : "none")}, " +
+                $"cargoTransportState={(hasCargoTransport ? cargoTransport.m_State.ToString() : "none")}, " +
+                $"allowOnPTLane={allowOnPublicTransportLane}, pendingExitActive={pendingExitActive}, " +
+                $"hasProfile={hasProfile}, accessBits={accessBits}, emergency={emergency}, " +
+                $"configuredFines=pt:{EnforcementPenaltyService.GetPublicTransportLaneFine()},midBlock:{EnforcementPenaltyService.GetMidBlockCrossingFine()},intersection:{EnforcementPenaltyService.GetIntersectionMovementFine()}";
+        }
+
+        private string BuildUpcomingPathElementPreview(Entity vehicle, int maxPreviewElements = 5)
+        {
+            if (!m_PathOwnerData.TryGetComponent(vehicle, out PathOwner pathOwner) ||
+                !m_PathElementData.TryGetBuffer(vehicle, out DynamicBuffer<PathElement> pathElements) ||
+                pathElements.Length == 0)
+            {
+                return "none";
+            }
+
+            int startIndex = pathOwner.m_ElementIndex;
+            if (startIndex < 0)
+            {
+                startIndex = 0;
+            }
+            else if (startIndex >= pathElements.Length)
+            {
+                startIndex = pathElements.Length - 1;
+            }
+
+            List<string> parts = new List<string>(maxPreviewElements + 1);
+            int emitted = 0;
+            for (int index = startIndex; index < pathElements.Length && emitted < maxPreviewElements; index++, emitted++)
+            {
+                PathElement pathElement = pathElements[index];
+                parts.Add(
+                    $"{index}:{pathElement.m_Target}[{pathElement.m_TargetDelta.x:0.###}->{pathElement.m_TargetDelta.y:0.###}|{pathElement.m_Flags}]");
+            }
+
+            int remaining = pathElements.Length - startIndex - emitted;
+            if (remaining > 0)
+            {
+                parts.Add($"+{remaining} more");
+            }
+
+            return parts.Count == 0
+                ? "none"
+                : string.Join("; ", parts.ToArray());
+        }
+
+        private Entity NormalizeLaneForAppendOrigin(Entity lane)
+        {
+            if (lane == Entity.Null)
+            {
+                return Entity.Null;
+            }
+
+            Entity normalizedLane = lane;
+            if (m_SlaveLaneData.TryGetComponent(lane, out SlaveLane slaveLane) &&
+                m_OwnerData.TryGetComponent(lane, out Owner owner) &&
+                m_SubLaneData.TryGetBuffer(owner.m_Owner, out DynamicBuffer<SubLane> subLanes) &&
+                slaveLane.m_MasterIndex >= 0 &&
+                slaveLane.m_MasterIndex < subLanes.Length)
+            {
+                Entity masterLane = subLanes[slaveLane.m_MasterIndex].m_SubLane;
+                if (masterLane != Entity.Null)
+                {
+                    normalizedLane = masterLane;
+                }
+            }
+
+            return normalizedLane;
+        }
+
+        private bool TryPreviousTargetEndMatchesCurrentLane(
+            Entity previousTarget,
+            Entity normalizedCurrentLane,
+            out Entity previousTargetEndLane)
+        {
+            previousTargetEndLane = Entity.Null;
+
+            if (previousTarget == Entity.Null ||
+                normalizedCurrentLane == Entity.Null ||
+                !m_RouteLaneData.TryGetComponent(previousTarget, out RouteLane previousTargetRouteLane))
+            {
+                return false;
+            }
+
+            previousTargetEndLane = previousTargetRouteLane.m_EndLane;
+            return previousTargetRouteLane.m_EndLane == normalizedCurrentLane;
+        }
+
+        private string DescribeRouteLane(Entity waypoint)
+        {
+            if (waypoint == Entity.Null ||
+                !m_RouteLaneData.TryGetComponent(waypoint, out RouteLane routeLane))
+            {
+                return "none";
+            }
+
+            return
+                $"start={FormatEntityOrNone(routeLane.m_StartLane)}@{routeLane.m_StartCurvePos:0.###}, " +
+                $"end={FormatEntityOrNone(routeLane.m_EndLane)}@{routeLane.m_EndCurvePos:0.###}";
+        }
+
+        private static string FormatEntityOrNone(Entity entity)
+        {
+            return entity == Entity.Null ? "none" : entity.ToString();
+        }
+
+        private static string FormatRuleFlags(RuleFlags flags)
+        {
+            return flags == 0 ? "none" : flags.ToString();
+        }
+
+        private static string FormatPathfindFlags(PathfindFlags flags)
+        {
+            return flags == 0 ? "none" : flags.ToString();
+        }
+
+        private static void SetRuleFlag(ref RuleFlags rules, RuleFlags flag, bool enabled)
+        {
+            if (enabled)
+            {
+                rules |= flag;
+            }
+            else
+            {
+                rules &= ~flag;
+            }
         }
 
         private void LogPublicTransportLaneDecisionDiagnostics(
