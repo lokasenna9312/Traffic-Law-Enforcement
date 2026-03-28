@@ -21,6 +21,9 @@ namespace Traffic_Law_Enforcement
         public static bool EnableAllVehicleRouteSelectionChangeLogging =>
             Mod.Settings?.EnableAllVehicleRouteSelectionChangeLogging ?? false;
 
+        public static bool EnableFocusedVehicleOnlyRouteLogging =>
+            Mod.Settings?.EnableFocusedVehicleOnlyRouteLogging ?? false;
+
         public static bool ShouldLogEstimatedReroutes()
         {
             return Mod.IsEnforcementEnabled && EnableEstimatedRerouteLogging;
@@ -60,6 +63,11 @@ namespace Traffic_Law_Enforcement
         public static bool ShouldLogAllVehicleRouteSelectionChanges()
         {
             return Mod.IsEnforcementEnabled && EnableAllVehicleRouteSelectionChangeLogging;
+        }
+
+        public static bool ShouldRestrictVehicleSpecificRouteDebugLogsToWatchedVehicles()
+        {
+            return EnableFocusedVehicleOnlyRouteLogging;
         }
 
         public static bool EnableSaveIdentificationLogging => Mod.Settings?.EnableSaveIdentificationLogging ?? false;

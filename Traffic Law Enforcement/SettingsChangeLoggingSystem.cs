@@ -58,6 +58,7 @@ namespace Traffic_Law_Enforcement
             LogChange(nameof(Setting.EnableType4PublicTransportLaneUsageLogging), previous.EnableType4PublicTransportLaneUsageLogging, current.EnableType4PublicTransportLaneUsageLogging);
             LogChange(nameof(Setting.EnablePathfindingPenaltyDiagnosticLogging), previous.EnablePathfindingPenaltyDiagnosticLogging, current.EnablePathfindingPenaltyDiagnosticLogging);
             LogChange(nameof(Setting.EnablePathObsoleteSourceLogging), previous.EnablePathObsoleteSourceLogging, current.EnablePathObsoleteSourceLogging);
+            LogChange(nameof(Setting.EnableFocusedVehicleOnlyRouteLogging), previous.EnableFocusedVehicleOnlyRouteLogging, current.EnableFocusedVehicleOnlyRouteLogging);
             LogChange(nameof(Setting.AllowRoadPublicTransportVehicles), previous.Gameplay.AllowRoadPublicTransportVehicles, current.Gameplay.AllowRoadPublicTransportVehicles);
             LogChange(nameof(Setting.AllowTaxis), previous.Gameplay.AllowTaxis, current.Gameplay.AllowTaxis);
             LogChange(nameof(Setting.AllowPoliceCars), previous.Gameplay.AllowPoliceCars, current.Gameplay.AllowPoliceCars);
@@ -150,6 +151,7 @@ namespace Traffic_Law_Enforcement
             public readonly bool EnableType4PublicTransportLaneUsageLogging;
             public readonly bool EnablePathfindingPenaltyDiagnosticLogging;
             public readonly bool EnablePathObsoleteSourceLogging;
+            public readonly bool EnableFocusedVehicleOnlyRouteLogging;
 
             private LoggedSettingsSnapshot(
                 EnforcementGameplaySettingsState gameplay,
@@ -159,7 +161,8 @@ namespace Traffic_Law_Enforcement
                 bool enableType3PublicTransportLaneUsageLogging,
                 bool enableType4PublicTransportLaneUsageLogging,
                 bool enablePathfindingPenaltyDiagnosticLogging,
-                bool enablePathObsoleteSourceLogging)
+                bool enablePathObsoleteSourceLogging,
+                bool enableFocusedVehicleOnlyRouteLogging)
             {
                 Gameplay = gameplay;
                 EnableEstimatedRerouteLogging = enableEstimatedRerouteLogging;
@@ -169,6 +172,7 @@ namespace Traffic_Law_Enforcement
                 EnableType4PublicTransportLaneUsageLogging = enableType4PublicTransportLaneUsageLogging;
                 EnablePathfindingPenaltyDiagnosticLogging = enablePathfindingPenaltyDiagnosticLogging;
                 EnablePathObsoleteSourceLogging = enablePathObsoleteSourceLogging;
+                EnableFocusedVehicleOnlyRouteLogging = enableFocusedVehicleOnlyRouteLogging;
             }
 
             public static LoggedSettingsSnapshot Capture()
@@ -181,7 +185,8 @@ namespace Traffic_Law_Enforcement
                     Mod.Settings?.EnableType3PublicTransportLaneUsageLogging ?? false,
                     Mod.Settings?.EnableType4PublicTransportLaneUsageLogging ?? false,
                     Mod.Settings?.EnablePathfindingPenaltyDiagnosticLogging ?? false,
-                    Mod.Settings?.EnablePathObsoleteSourceLogging ?? false);
+                    Mod.Settings?.EnablePathObsoleteSourceLogging ?? false,
+                    Mod.Settings?.EnableFocusedVehicleOnlyRouteLogging ?? false);
             }
 
             public string ToLogString()
@@ -197,6 +202,7 @@ namespace Traffic_Law_Enforcement
                 Append(builder, nameof(Setting.EnableType4PublicTransportLaneUsageLogging), EnableType4PublicTransportLaneUsageLogging);
                 Append(builder, nameof(Setting.EnablePathfindingPenaltyDiagnosticLogging), EnablePathfindingPenaltyDiagnosticLogging);
                 Append(builder, nameof(Setting.EnablePathObsoleteSourceLogging), EnablePathObsoleteSourceLogging);
+                Append(builder, nameof(Setting.EnableFocusedVehicleOnlyRouteLogging), EnableFocusedVehicleOnlyRouteLogging);
                 Append(builder, nameof(Setting.AllowRoadPublicTransportVehicles), Gameplay.AllowRoadPublicTransportVehicles);
                 Append(builder, nameof(Setting.AllowTaxis), Gameplay.AllowTaxis);
                 Append(builder, nameof(Setting.AllowPoliceCars), Gameplay.AllowPoliceCars);

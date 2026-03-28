@@ -24,6 +24,12 @@ namespace Traffic_Law_Enforcement
                 return;
             }
 
+            if (EnforcementLoggingPolicy.ShouldRestrictVehicleSpecificRouteDebugLogsToWatchedVehicles() &&
+                !FocusedLoggingService.IsWatched(vehicle))
+            {
+                return;
+            }
+
             bool emergency = EmergencyVehiclePolicy.IsEmergencyVehicle(car);
             bool usePublicTransportLanes = (car.m_Flags & CarFlags.UsePublicTransportLanes) != 0;
             string suffix = string.IsNullOrWhiteSpace(extra) ? string.Empty : ", " + extra;

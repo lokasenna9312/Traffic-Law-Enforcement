@@ -123,7 +123,7 @@ namespace Traffic_Law_Enforcement
             AddOption(map, setting, nameof(Setting.EnablePathObsoleteSourceLogging));
             AddOption(map, setting, nameof(Setting.EnableSaveIdentificationLogging));
             AddOption(map, setting, nameof(Setting.EnableAllVehicleRouteSelectionChangeLogging));
-            AddOption(map, setting, nameof(Setting.StartBurstLogging));
+            AddOption(map, setting, nameof(Setting.EnableFocusedVehicleOnlyRouteLogging));
             AddOption(map, setting, nameof(Setting.SelectedObjectPanelToggleBinding));
             AddOption(map, setting, nameof(Setting.FocusedLoggingPanelToggleBinding));
             AddOption(map, setting, nameof(Setting.ModLogPath));

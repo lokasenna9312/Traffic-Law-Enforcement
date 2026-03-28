@@ -617,21 +617,8 @@ namespace Traffic_Law_Enforcement
         public bool EnableAllVehicleRouteSelectionChangeLogging { get; set; }
 
         [Exclude]
-        [SettingsUIButton]
-        [SettingsUIDisableByCondition(typeof(Setting), nameof(IsBurstLoggingButtonDisabled))]
         [SettingsUISection(kDebugTab, kDebugGroup)]
-        public bool StartBurstLogging
-        {
-            set
-            {
-                if (!value)
-                {
-                    return;
-                }
-
-                BurstLoggingService.RequestDefaultBurst();
-            }
-        }
+        public bool EnableFocusedVehicleOnlyRouteLogging { get; set; }
 
         [SettingsUISection(kDebugTab, kDebugGroup)]
         [SettingsUIKeyboardBinding(
@@ -681,6 +668,7 @@ namespace Traffic_Law_Enforcement
             EnablePathObsoleteSourceLogging = false;
             EnableSaveIdentificationLogging = false;
             EnableAllVehicleRouteSelectionChangeLogging = false;
+            EnableFocusedVehicleOnlyRouteLogging = false;
             ResetKeyBindings();
         }
 
@@ -776,10 +764,6 @@ namespace Traffic_Law_Enforcement
         public bool IsNewSavePublicTransportLaneRepeatSettingsDisabled() => !DefaultEnablePublicTransportLaneRepeatPenalty;
         public bool IsNewSaveMidBlockCrossingRepeatSettingsDisabled() => !DefaultEnableMidBlockCrossingRepeatPenalty;
         public bool IsNewSaveIntersectionMovementRepeatSettingsDisabled() => !DefaultEnableIntersectionMovementRepeatPenalty;
-        public bool IsBurstLoggingButtonDisabled() =>
-            !EnableEstimatedRerouteLogging &&
-            !EnablePathfindingPenaltyDiagnosticLogging &&
-            !EnableAllVehicleRouteSelectionChangeLogging;
         public bool IsMonthlyChirperPreviewButtonDisabled() => !IsGameplayContextAvailable() || !EnforcementGameplaySettingsService.Current.HasAnyEnforcementEnabled();
 
         private static void UpdateCurrentSaveSettings(CurrentSaveSettingsMutator mutator)
