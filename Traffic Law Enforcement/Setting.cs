@@ -24,8 +24,8 @@ namespace Traffic_Law_Enforcement
 
     [FileLocation(nameof(Traffic_Law_Enforcement))]
     [SettingsUITabOrder(kCurrentSaveTab, kNewSaveDefaultsTab, kPolicyImpactTab, kDebugTab)]
-    [SettingsUIGroupOrder(kGeneralGroup, kPublicTransportLaneAuthorizedGroup, kPublicTransportLaneAdditionalGroup, kPublicTransportLanePressureGroup, kFineGroup, kRepeatOffenderGroup, kTemplateActionsGroup, kPolicyImpactGroup, kDebugGroup, kLogPathGroup)]
-    [SettingsUIShowGroupName(kGeneralGroup, kPublicTransportLaneAuthorizedGroup, kPublicTransportLaneAdditionalGroup, kPublicTransportLanePressureGroup, kFineGroup, kRepeatOffenderGroup, kTemplateActionsGroup, kPolicyImpactGroup, kDebugGroup, kLogPathGroup)]
+    [SettingsUIGroupOrder(kGeneralGroup, kPublicTransportLaneAuthorizedGroup, kPublicTransportLaneAdditionalGroup, kPublicTransportLanePressureGroup, kFineGroup, kRepeatOffenderGroup, kTemplateActionsGroup, kPolicyImpactGroup, kDebugLoggingGroup, kFocusedLoggingGroup, kDebugBindingsGroup, kChirperGroup, kLogPathGroup)]
+    [SettingsUIShowGroupName(kGeneralGroup, kPublicTransportLaneAuthorizedGroup, kPublicTransportLaneAdditionalGroup, kPublicTransportLanePressureGroup, kFineGroup, kRepeatOffenderGroup, kTemplateActionsGroup, kPolicyImpactGroup, kDebugLoggingGroup, kFocusedLoggingGroup, kDebugBindingsGroup, kChirperGroup, kLogPathGroup)]
     [SettingsUIKeyboardAction(
         KeybindingIds.SelectedObjectPanelToggleActionName,
         canBeEmpty: false)]
@@ -48,7 +48,10 @@ namespace Traffic_Law_Enforcement
         public const string kRepeatOffenderGroup = "RepeatOffenders";
         public const string kTemplateActionsGroup = "TemplateActions";
         public const string kPolicyImpactGroup = "PolicyImpactGroup";
-        public const string kDebugGroup = "DebugGroup";
+        public const string kDebugLoggingGroup = "DebugLoggingGroup";
+        public const string kFocusedLoggingGroup = "FocusedLoggingGroup";
+        public const string kDebugBindingsGroup = "DebugBindingsGroup";
+        public const string kChirperGroup = "ChirperGroup";
         public const string kLogPathGroup = "LogPathGroup";
 
         public Setting(IMod mod) : base(mod)
@@ -580,47 +583,47 @@ namespace Traffic_Law_Enforcement
         }
 
         [Exclude]
-        [SettingsUISection(kDebugTab, kDebugGroup)]
+        [SettingsUISection(kDebugTab, kDebugLoggingGroup)]
         public bool EnableEstimatedRerouteLogging { get; set; }
 
         [Exclude]
-        [SettingsUISection(kDebugTab, kDebugGroup)]
+        [SettingsUISection(kDebugTab, kDebugLoggingGroup)]
         public bool EnableEnforcementEventLogging { get; set; }
 
 
         [Exclude]
-        [SettingsUISection(kDebugTab, kDebugGroup)]
+        [SettingsUISection(kDebugTab, kDebugLoggingGroup)]
         public bool EnablePathfindingPenaltyDiagnosticLogging { get; set; }
 
         [Exclude]
-        [SettingsUISection(kDebugTab, kDebugGroup)]
+        [SettingsUISection(kDebugTab, kDebugLoggingGroup)]
         public bool EnableType2PublicTransportLaneUsageLogging { get; set; }
 
         [Exclude]
-        [SettingsUISection(kDebugTab, kDebugGroup)]
+        [SettingsUISection(kDebugTab, kDebugLoggingGroup)]
         public bool EnableType3PublicTransportLaneUsageLogging { get; set; }
 
         [Exclude]
-        [SettingsUISection(kDebugTab, kDebugGroup)]
+        [SettingsUISection(kDebugTab, kDebugLoggingGroup)]
         public bool EnableType4PublicTransportLaneUsageLogging { get; set; }
 
         [Exclude]
-        [SettingsUISection(kDebugTab, kDebugGroup)]
+        [SettingsUISection(kDebugTab, kDebugLoggingGroup)]
         public bool EnablePathObsoleteSourceLogging { get; set; }
 
         [Exclude]
-        [SettingsUISection(kDebugTab, kDebugGroup)]
+        [SettingsUISection(kDebugTab, kDebugLoggingGroup)]
         public bool EnableSaveIdentificationLogging { get; set; }
 
         [Exclude]
-        [SettingsUISection(kDebugTab, kDebugGroup)]
+        [SettingsUISection(kDebugTab, kDebugLoggingGroup)]
         public bool EnableAllVehicleRouteSelectionChangeLogging { get; set; }
 
         [Exclude]
-        [SettingsUISection(kDebugTab, kDebugGroup)]
+        [SettingsUISection(kDebugTab, kFocusedLoggingGroup)]
         public bool EnableFocusedVehicleOnlyRouteLogging { get; set; }
 
-        [SettingsUISection(kDebugTab, kDebugGroup)]
+        [SettingsUISection(kDebugTab, kDebugBindingsGroup)]
         [SettingsUIKeyboardBinding(
             BindingKeyboard.I,
             KeybindingIds.SelectedObjectPanelToggleActionName,
@@ -628,7 +631,7 @@ namespace Traffic_Law_Enforcement
             shift: true)]
         public ProxyBinding SelectedObjectPanelToggleBinding { get; set; }
 
-        [SettingsUISection(kDebugTab, kDebugGroup)]
+        [SettingsUISection(kDebugTab, kDebugBindingsGroup)]
         [SettingsUIKeyboardBinding(
             BindingKeyboard.L,
             KeybindingIds.FocusedLoggingPanelToggleActionName,
@@ -643,7 +646,7 @@ namespace Traffic_Law_Enforcement
         [Exclude]
         [SettingsUIButton]
         [SettingsUIDisableByCondition(typeof(Setting), nameof(IsMonthlyChirperPreviewButtonDisabled))]
-        [SettingsUISection(kDebugTab, kDebugGroup)]
+        [SettingsUISection(kDebugTab, kChirperGroup)]
         public bool SendMonthlyChirperPreviewNow
         {
             set

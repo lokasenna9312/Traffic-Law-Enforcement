@@ -23,7 +23,10 @@ namespace Traffic_Law_Enforcement
             map["Group.RepeatOffenders"] = setting.GetOptionGroupLocaleID(Setting.kRepeatOffenderGroup);
             map["Group.TemplateActions"] = setting.GetOptionGroupLocaleID(Setting.kTemplateActionsGroup);
             map["Group.PolicyImpact"] = setting.GetOptionGroupLocaleID(Setting.kPolicyImpactGroup);
-            map["Group.Debug"] = setting.GetOptionGroupLocaleID(Setting.kDebugGroup);
+            map["Group.DebugLogging"] = setting.GetOptionGroupLocaleID(Setting.kDebugLoggingGroup);
+            map["Group.FocusedLogging"] = setting.GetOptionGroupLocaleID(Setting.kFocusedLoggingGroup);
+            map["Group.DebugBindings"] = setting.GetOptionGroupLocaleID(Setting.kDebugBindingsGroup);
+            map["Group.Chirper"] = setting.GetOptionGroupLocaleID(Setting.kChirperGroup);
             map["Group.LogPath"] = setting.GetOptionGroupLocaleID(Setting.kLogPathGroup);
 
             AddOption(map, setting, nameof(Setting.EnablePublicTransportLaneEnforcement));
