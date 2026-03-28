@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using Game.Common;
 using Game.Net;
 using Game.Pathfind;
+using Game.Prefabs;
 using Game.Routes;
 using Game.Vehicles;
 using Unity.Entities;
@@ -114,6 +115,8 @@ namespace Traffic_Law_Enforcement
                 context.CurrentRouteData.TryGetComponent(vehicle, out CurrentRoute currentRouteData) &&
                 currentRouteData.m_Route != Entity.Null;
             Entity currentRouteEntity = hasCurrentRoute ? currentRouteData.m_Route : Entity.Null;
+            Entity selectableCurrentRouteEntity =
+                ResolveSelectableCurrentRouteEntity(currentRouteEntity, ref context);
 
             bool hasPathOwner =
                 context.PathOwnerData.TryGetComponent(vehicle, out PathOwner pathOwner);
@@ -138,10 +141,10 @@ namespace Traffic_Law_Enforcement
                 hasPathOwner: hasPathOwner,
                 hasCurrentTarget: hasCurrentTarget,
                 hasCurrentRoute: hasCurrentRoute,
-                currentRouteEntity: currentRouteEntity,
+                currentRouteEntity: selectableCurrentRouteEntity,
                 currentPathFlags: currentPathFlags,
                 currentTargetText: BuildCurrentTargetText(targetEntity, ref context),
-                currentRouteText: BuildCurrentRouteText(currentRouteEntity, ref context),
+                currentRouteText: BuildCurrentRouteText(selectableCurrentRouteEntity, currentRouteEntity, ref context),
                 targetRoadText: BuildTargetRoadText(targetEntity, ref context),
                 startOwnerRoadText: BuildRouteLaneOwnerRoadText(targetEntity, useStartLane: true, ref context),
                 endOwnerRoadText: BuildRouteLaneOwnerRoadText(targetEntity, useStartLane: false, ref context),
@@ -224,20 +227,65 @@ namespace Traffic_Law_Enforcement
             return text;
         }
 
-        private static string BuildCurrentRouteText(Entity currentRouteEntity, ref SelectedObjectRouteDiagnosticsContext context)
+        private static string BuildCurrentRouteText(Entity displayRouteEntity, Entity rawCurrentRouteEntity, ref SelectedObjectRouteDiagnosticsContext context)
         {
-            if (currentRouteEntity == Entity.Null)
+            Entity routeEntity =
+                displayRouteEntity != Entity.Null
+                    ? displayRouteEntity
+                    : rawCurrentRouteEntity;
+            if (routeEntity == Entity.Null)
             {
                 return SelectedObjectDisplayFormatter.FormatEntityOrNone(Entity.Null);
             }
 
             string renderedName =
                 SelectedObjectDisplayFormatter.TryGetRenderedName(
-                    currentRouteEntity,
+                    routeEntity,
                     ref context.Formatter);
             return string.IsNullOrWhiteSpace(renderedName)
-                ? SelectedObjectDisplayFormatter.FormatEntityOrNone(currentRouteEntity)
+                ? SelectedObjectDisplayFormatter.FormatEntityOrNone(routeEntity)
                 : renderedName;
+        }
+
+        private static Entity ResolveSelectableCurrentRouteEntity(Entity currentRouteEntity, ref SelectedObjectRouteDiagnosticsContext context)
+        {
+            if (currentRouteEntity == Entity.Null)
+            {
+                return Entity.Null;
+            }
+
+            EntityManager entityManager = context.Formatter.EntityManager;
+            Entity candidate = currentRouteEntity;
+
+            for (int depth = 0; depth < 16 && candidate != Entity.Null; depth++)
+            {
+                if (IsSelectableLineEntity(candidate, entityManager))
+                {
+                    return candidate;
+                }
+
+                if (!context.Formatter.OwnerData.TryGetComponent(candidate, out Owner owner) ||
+                    owner.m_Owner == Entity.Null ||
+                    owner.m_Owner == candidate)
+                {
+                    break;
+                }
+
+                candidate = owner.m_Owner;
+            }
+
+            return currentRouteEntity;
+        }
+
+        private static bool IsSelectableLineEntity(Entity entity, EntityManager entityManager)
+        {
+            return entity != Entity.Null &&
+                entityManager.Exists(entity) &&
+                entityManager.HasComponent<Route>(entity) &&
+                entityManager.HasComponent<PrefabRef>(entity) &&
+                entityManager.HasBuffer<RouteWaypoint>(entity) &&
+                (entityManager.HasComponent<TransportLine>(entity) ||
+                 entityManager.HasComponent<WorkRoute>(entity));
         }
 
         private static string BuildWaypointRouteLaneText(Entity targetEntity, ref SelectedObjectRouteDiagnosticsContext context)
