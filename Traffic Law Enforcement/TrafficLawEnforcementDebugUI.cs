@@ -995,7 +995,7 @@ namespace Traffic_Law_Enforcement
 
         private static string GetFocusedLoggingNoteText()
         {
-            return "Focused logging only emits log types whose logging options are currently enabled.";
+            return "Focused logging only records log types enabled in Debug options.";
         }
 
         private static void WatchSelectedRoadVehicle()

@@ -252,10 +252,10 @@ namespace Traffic_Law_Enforcement
             m_ToggleBurstLoggingTextBinding.Update(LocalizeText(kToggleBurstLoggingButtonLocaleId, "Toggle burst logging (5s)"));
             m_WarningBinding.Update(LocalizeText(
                 kWarningLocaleId,
-                "Warning: Focused logging only emits log types whose logging options are currently enabled."));
+                "Warning: Focused logging only records log types enabled in Debug options."));
             m_FooterHintBinding.Update(LocalizeText(
                 kFooterHintLocaleId,
-                "Watched vehicles bypass per-update focused-route logging caps and stay in change-driven tracking."));
+                "For enabled vehicle-route debug logs, watched vehicles bypass per-update caps and stay in change-driven tracking."));
         }
 
         private void UpdatePanelToggle()
