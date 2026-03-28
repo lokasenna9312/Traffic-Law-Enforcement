@@ -612,6 +612,7 @@ namespace Traffic_Law_Enforcement
         public bool EnablePathObsoleteSourceLogging { get; set; }
 
         [Exclude]
+        [SettingsUIHidden]
         [SettingsUISection(kDebugTab, kDebugLoggingGroup)]
         public bool EnableSaveIdentificationLogging { get; set; }
 
@@ -669,7 +670,7 @@ namespace Traffic_Law_Enforcement
             EnableType4PublicTransportLaneUsageLogging = false;
             EnablePathfindingPenaltyDiagnosticLogging = false;
             EnablePathObsoleteSourceLogging = false;
-            EnableSaveIdentificationLogging = false;
+            EnableSaveIdentificationLogging = true;
             EnableAllVehicleRouteSelectionChangeLogging = false;
             EnableFocusedVehicleOnlyRouteLogging = false;
             ResetKeyBindings();

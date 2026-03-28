@@ -70,11 +70,11 @@ namespace Traffic_Law_Enforcement
             return EnableFocusedVehicleOnlyRouteLogging;
         }
 
-        public static bool EnableSaveIdentificationLogging => Mod.Settings?.EnableSaveIdentificationLogging ?? false;
+        public static bool EnableSaveIdentificationLogging => true;
 
         public static bool ShouldLogSaveIdentification()
         {
-            return EnableSaveIdentificationLogging;
+            return true;
         }
 
         public static void RecordSaveIdentification(string message)
