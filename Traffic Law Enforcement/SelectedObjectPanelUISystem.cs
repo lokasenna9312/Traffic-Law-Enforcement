@@ -145,6 +145,8 @@ namespace Traffic_Law_Enforcement
         private ValueBinding<bool> m_RouteDiagnosticsCollapsedBinding;
         private ValueBinding<string> m_CurrentTargetBinding;
         private ValueBinding<string> m_CurrentRouteBinding;
+        private ValueBinding<Entity> m_CurrentRouteEntityBinding;
+        private ValueBinding<bool> m_CurrentRouteSelectableBinding;
         private ValueBinding<string> m_TargetRoadBinding;
         private ValueBinding<string> m_StartOwnerRoadBinding;
         private ValueBinding<string> m_EndOwnerRoadBinding;
@@ -276,6 +278,8 @@ namespace Traffic_Law_Enforcement
             AddBinding(m_RouteDiagnosticsCollapsedBinding = new ValueBinding<bool>(kGroup, "routeDiagnosticsCollapsed", true));
             AddBinding(m_CurrentTargetBinding = new ValueBinding<string>(kGroup, "currentTarget", string.Empty));
             AddBinding(m_CurrentRouteBinding = new ValueBinding<string>(kGroup, "currentRoute", string.Empty));
+            AddBinding(m_CurrentRouteEntityBinding = new ValueBinding<Entity>(kGroup, "currentRouteEntity", Entity.Null));
+            AddBinding(m_CurrentRouteSelectableBinding = new ValueBinding<bool>(kGroup, "currentRouteSelectable", false));
             AddBinding(m_TargetRoadBinding = new ValueBinding<string>(kGroup, "targetRoad", string.Empty));
             AddBinding(m_StartOwnerRoadBinding = new ValueBinding<string>(kGroup, "startOwnerRoad", string.Empty));
             AddBinding(m_EndOwnerRoadBinding = new ValueBinding<string>(kGroup, "endOwnerRoad", string.Empty));
@@ -293,7 +297,6 @@ namespace Traffic_Law_Enforcement
             AddBinding(new TriggerBinding(kGroup, "toggleLaneDetailsCollapsed", ToggleLaneDetailsCollapsed));
             AddBinding(new TriggerBinding(kGroup, "toggleRouteDiagnosticsCollapsed", ToggleRouteDiagnosticsCollapsed));
             AddBinding(new TriggerBinding<string>(kGroup, "submitEntitySelection", HandleSubmitEntitySelection));
-            AddBinding(new TriggerBinding(kGroup, "selectCurrentRoute", HandleSelectCurrentRoute));
         }
 
         protected override void OnDestroy()
@@ -323,6 +326,8 @@ namespace Traffic_Law_Enforcement
 
             if (!m_IsPanelEnabled)
             {
+                m_CurrentRouteEntityBinding.Update(Entity.Null);
+                m_CurrentRouteSelectableBinding.Update(false);
                 UpdateBindings(default);
                 return;
             }
@@ -331,6 +336,8 @@ namespace Traffic_Law_Enforcement
             if (m_SelectedObjectBridgeSystem == null || !m_SelectedObjectBridgeSystem.HasSnapshot)
             {
                 m_CurrentRouteSelectionEntity = Entity.Null;
+                m_CurrentRouteEntityBinding.Update(Entity.Null);
+                m_CurrentRouteSelectableBinding.Update(false);
                 RefreshEntitySelectionStatus(currentSuggestedEntitySelectionValue);
                 UpdateBindings(BuildNoSelectionState());
                 return;
@@ -338,6 +345,10 @@ namespace Traffic_Law_Enforcement
 
             m_CurrentRouteSelectionEntity =
                 m_SelectedObjectBridgeSystem.CurrentRouteSelectionEntity;
+            m_CurrentRouteEntityBinding.Update(m_CurrentRouteSelectionEntity);
+            m_CurrentRouteSelectableBinding.Update(
+                m_CurrentRouteSelectionEntity != Entity.Null &&
+                EntityManager.Exists(m_CurrentRouteSelectionEntity));
             currentSuggestedEntitySelectionValue =
                 BuildSuggestedEntitySelectionValue(m_SelectedObjectBridgeSystem.CurrentSnapshot);
             RefreshEntitySelectionStatus(currentSuggestedEntitySelectionValue);
@@ -586,28 +597,6 @@ namespace Traffic_Law_Enforcement
 
             m_SelectedInfoSystem.SetSelection(entity);
             SetEntitySelectionSuccessStatus(entity);
-        }
-
-        private void HandleSelectCurrentRoute()
-        {
-            Entity routeEntity = m_CurrentRouteSelectionEntity;
-            if (routeEntity == Entity.Null || !EntityManager.Exists(routeEntity))
-            {
-                return;
-            }
-
-            if (m_SelectedInfoSystem == null)
-            {
-                m_SelectedInfoSystem =
-                    World.GetExistingSystemManaged<SelectedInfoUISystem>();
-            }
-
-            if (m_SelectedInfoSystem == null)
-            {
-                return;
-            }
-
-            m_SelectedInfoSystem.SetSelection(routeEntity);
         }
 
         private static string NormalizeText(string text)
