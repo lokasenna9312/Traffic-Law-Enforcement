@@ -240,9 +240,9 @@ const styles = {
         flex: 1,
         display: "flex",
         alignItems: "center",
-        flexWrap: "wrap",
-        gap: "0px",
+        gap: "8px",
         minHeight: "30px",
+        minWidth: 0,
         color: "#ffffff",
         fontSize: "14px",
         lineHeight: 1.35,
@@ -283,7 +283,7 @@ const styles = {
         minWidth: 0,
         display: "flex",
         alignItems: "center",
-        gap: "8px",
+        gap: "4px",
     },
     routeColorSwatch: {
         width: "12px",
@@ -379,11 +379,12 @@ function ClassificationRow(props) {
         h(
             "div",
             { style: styles.classificationValue },
-            props.primaryValue
-                ? h("span", { style: styles.classificationPrimary }, props.primaryValue)
-                : null,
-            props.primaryValue && props.secondaryValue ? " " : null,
-            props.secondaryValue
+            h(
+                "span",
+                { style: Object.assign({}, styles.classificationPrimary, styles.valueMain) },
+                props.primaryValue || props.secondaryValue
+            ),
+            props.primaryValue && props.secondaryValue
                 ? h("span", { style: styles.classificationSecondary }, props.secondaryValue)
                 : null
         )
