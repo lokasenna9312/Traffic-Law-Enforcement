@@ -3,6 +3,7 @@ using Game;
 using Game.Input;
 using Game.Pathfind;
 using Game.SceneFlow;
+using Game.Tools;
 using Game.UI;
 using Game.UI.InGame;
 using System.Text.RegularExpressions;
@@ -83,6 +84,7 @@ namespace Traffic_Law_Enforcement
 
         private SelectedObjectBridgeSystem m_SelectedObjectBridgeSystem;
         private SelectedInfoUISystem m_SelectedInfoSystem;
+        private ToolSystem m_ToolSystem;
         private ProxyAction m_PanelToggleAction;
 
         private ValueBinding<bool> m_VisibleBinding;
@@ -617,6 +619,16 @@ namespace Traffic_Law_Enforcement
             if (m_SelectedInfoSystem == null)
             {
                 return;
+            }
+
+            if (m_ToolSystem == null)
+            {
+                m_ToolSystem = World.GetExistingSystemManaged<ToolSystem>();
+            }
+
+            if (m_ToolSystem != null)
+            {
+                m_ToolSystem.selectedIndex = -1;
             }
 
             m_SelectedInfoSystem.selectedRoute = m_CurrentRouteSelectionEntity;
