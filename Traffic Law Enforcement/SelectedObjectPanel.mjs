@@ -496,7 +496,8 @@ function SelectedObjectPanel() {
             return;
         }
 
-        api.trigger(group, "selectCurrentRoute");
+        api.trigger("selectedInfo", "setSelectedRoute", currentRouteEntity);
+        api.trigger("selectedInfo", "selectEntity", currentRouteEntity);
     }, [currentRouteEntity, currentRouteSelectable]);
 
     const onSubmitEntitySelection = React.useCallback(
