@@ -165,6 +165,7 @@ namespace Traffic_Law_Enforcement
         private string m_EntitySelectionStatus = string.Empty;
         private bool m_EntitySelectionStatusIsError;
         private string m_EntitySelectionStatusSelectedEntity = string.Empty;
+        private Entity m_CurrentRouteSelectionEntity = Entity.Null;
 
         public override GameMode gameMode => GameMode.Game;
 
@@ -292,6 +293,7 @@ namespace Traffic_Law_Enforcement
             AddBinding(new TriggerBinding(kGroup, "toggleLaneDetailsCollapsed", ToggleLaneDetailsCollapsed));
             AddBinding(new TriggerBinding(kGroup, "toggleRouteDiagnosticsCollapsed", ToggleRouteDiagnosticsCollapsed));
             AddBinding(new TriggerBinding<string>(kGroup, "submitEntitySelection", HandleSubmitEntitySelection));
+            AddBinding(new TriggerBinding(kGroup, "selectCurrentRoute", HandleSelectCurrentRoute));
         }
 
         protected override void OnDestroy()
@@ -328,11 +330,14 @@ namespace Traffic_Law_Enforcement
             string currentSuggestedEntitySelectionValue = string.Empty;
             if (m_SelectedObjectBridgeSystem == null || !m_SelectedObjectBridgeSystem.HasSnapshot)
             {
+                m_CurrentRouteSelectionEntity = Entity.Null;
                 RefreshEntitySelectionStatus(currentSuggestedEntitySelectionValue);
                 UpdateBindings(BuildNoSelectionState());
                 return;
             }
 
+            m_CurrentRouteSelectionEntity =
+                m_SelectedObjectBridgeSystem.CurrentRouteSelectionEntity;
             currentSuggestedEntitySelectionValue =
                 BuildSuggestedEntitySelectionValue(m_SelectedObjectBridgeSystem.CurrentSnapshot);
             RefreshEntitySelectionStatus(currentSuggestedEntitySelectionValue);
@@ -458,7 +463,7 @@ namespace Traffic_Law_Enforcement
             m_LastReasonLabelBinding.Update(LocalizeText(kLastReasonLabelLocaleId, "Last reason"));
             m_RepeatPenaltyLabelBinding.Update(LocalizeText(kRepeatPenaltyLabelLocaleId, "Repeat penalty"));
             m_PublicTransportLanePolicyLabelBinding.Update(LocalizeText(kPublicTransportLanePolicyLabelLocaleId, "PT lane policy"));
-            m_EntitySelectionLabelBinding.Update(LocalizeText(kEntitySelectionLabelLocaleId, "Vehicle entity"));
+            m_EntitySelectionLabelBinding.Update(LocalizeText(kEntitySelectionLabelLocaleId, "Entity number"));
             m_EntitySelectionPlaceholderBinding.Update(LocalizeText(kEntitySelectionPlaceholderLocaleId, "#154656:v1 or entity://154656/1"));
             m_EntitySelectionSubmitBinding.Update(LocalizeText(kEntitySelectionSubmitLocaleId, "Select"));
             m_FooterTextBinding.Update(LocalizeText(kFooterHintLocaleId, "If Developer Mode is enabled, press Tab for more details."));
@@ -581,6 +586,28 @@ namespace Traffic_Law_Enforcement
 
             m_SelectedInfoSystem.SetSelection(entity);
             SetEntitySelectionSuccessStatus(entity);
+        }
+
+        private void HandleSelectCurrentRoute()
+        {
+            Entity routeEntity = m_CurrentRouteSelectionEntity;
+            if (routeEntity == Entity.Null || !EntityManager.Exists(routeEntity))
+            {
+                return;
+            }
+
+            if (m_SelectedInfoSystem == null)
+            {
+                m_SelectedInfoSystem =
+                    World.GetExistingSystemManaged<SelectedInfoUISystem>();
+            }
+
+            if (m_SelectedInfoSystem == null)
+            {
+                return;
+            }
+
+            m_SelectedInfoSystem.SetSelection(routeEntity);
         }
 
         private static string NormalizeText(string text)
