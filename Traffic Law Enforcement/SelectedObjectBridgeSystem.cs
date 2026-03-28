@@ -1,211 +1,16 @@
 using System.Collections.Generic;
 using Game;
-using Game.Buildings;
 using Game.Common;
 using Game.Net;
 using Game.Pathfind;
 using Game.Routes;
 using Game.SceneFlow;
-using Game.UI;
 using Game.Vehicles;
 using Unity.Entities;
 using Entity = Unity.Entities.Entity;
 
 namespace Traffic_Law_Enforcement
 {
-    public enum SelectedObjectTleApplicability
-    {
-        NotApplicable,
-        ApplicableNoLiveLaneData,
-        ApplicableReady,
-    }
-
-    public readonly struct SelectedObjectDebugSnapshot
-    {
-        public readonly SelectedObjectResolveState ResolveState;
-        public readonly SelectedObjectKind VehicleKind;
-        public readonly SelectedObjectTleApplicability TleApplicability;
-        public readonly Entity SourceSelectedEntity;
-        public readonly Entity ResolvedVehicleEntity;
-        public readonly Entity PrefabEntity;
-        public readonly bool HasPrefabRef;
-        public readonly bool IsTrailerChild;
-        public readonly bool IsVehicle;
-        public readonly bool IsCar;
-        public readonly bool IsTrain;
-        public readonly bool IsParked;
-        public readonly bool HasCarCurrentLane;
-        public readonly bool HasTrainCurrentLane;
-        public readonly bool HasLiveLaneData;
-        public readonly bool HasPublicTransportVehicleData;
-        public readonly bool HasTrainData;
-        public readonly string RuntimeFamilyText;
-        public readonly string RawTransportTypeText;
-        public readonly string RawTrackTypeText;
-        public readonly string RailSubtypeSourceText;
-        public readonly string SummaryClassificationText;
-        public readonly string SummaryTleStatusText;
-        public readonly string CompactLastReasonText;
-        public readonly string CompactRepeatPenaltyText;
-
-        public readonly int VehicleIndex;
-        public readonly string RoleText;
-        public readonly string PublicTransportLanePolicyText;
-        public readonly bool HasTrafficLawProfile;
-
-        public readonly Entity CurrentLaneEntity;
-        public readonly Entity PreviousLaneEntity;
-        public readonly string CurrentLaneText;
-        public readonly string PreviousLaneText;
-        public readonly int LaneChangeCount;
-
-        public readonly bool PublicTransportLaneViolationActive;
-        public readonly bool PendingExitActive;
-        public readonly string PermissionStateSummary;
-
-        public readonly int TotalFines;
-        public readonly int TotalViolations;
-        public readonly string LastReason;
-        public readonly bool HasPathOwner;
-        public readonly bool HasCurrentTarget;
-        public readonly bool HasCurrentRoute;
-        public readonly PathFlags CurrentPathFlags;
-        public readonly bool HasRouteDiagnostics;
-        public readonly string RouteDiagnosticsCurrentTargetText;
-        public readonly string RouteDiagnosticsCurrentRouteText;
-        public readonly string RouteDiagnosticsTargetRoadText;
-        public readonly string RouteDiagnosticsStartOwnerRoadText;
-        public readonly string RouteDiagnosticsEndOwnerRoadText;
-        public readonly string RouteDiagnosticsDirectConnectText;
-        public readonly string RouteDiagnosticsFullPathToTargetStartText;
-        public readonly string RouteDiagnosticsNavigationLanesText;
-        public readonly string RouteDiagnosticsPlannedPenaltiesText;
-        public readonly string RouteDiagnosticsPenaltyTagsText;
-        public readonly string RouteDiagnosticsExplanationText;
-        public readonly string RouteDiagnosticsWaypointRouteLaneText;
-        public readonly string RouteDiagnosticsConnectedStopText;
-
-        public SelectedObjectDebugSnapshot(
-            SelectedObjectResolveState resolveState,
-            SelectedObjectKind vehicleKind,
-            SelectedObjectTleApplicability tleApplicability,
-            Entity sourceSelectedEntity,
-            Entity resolvedVehicleEntity,
-            Entity prefabEntity,
-            bool hasPrefabRef,
-            bool isTrailerChild,
-            bool isVehicle,
-            bool isCar,
-            bool isTrain,
-            bool isParked,
-            bool hasCarCurrentLane,
-            bool hasTrainCurrentLane,
-            bool hasLiveLaneData,
-            bool hasPublicTransportVehicleData,
-            bool hasTrainData,
-            string runtimeFamilyText,
-            string rawTransportTypeText,
-            string rawTrackTypeText,
-            string railSubtypeSourceText,
-            string summaryClassificationText,
-            string summaryTleStatusText,
-            string compactLastReasonText,
-            string compactRepeatPenaltyText,
-            int vehicleIndex,
-            string roleText,
-            string publicTransportLanePolicyText,
-            bool hasTrafficLawProfile,
-            Entity currentLaneEntity,
-            Entity previousLaneEntity,
-            string currentLaneText,
-            string previousLaneText,
-            int laneChangeCount,
-            bool ptLaneViolationActive,
-            bool pendingExitActive,
-            string permissionStateSummary,
-            int totalFines,
-            int totalViolations,
-            string lastReason,
-            bool hasPathOwner,
-            bool hasCurrentTarget,
-            bool hasCurrentRoute,
-            PathFlags currentPathFlags,
-            bool hasRouteDiagnostics,
-            string routeDiagnosticsCurrentTargetText,
-            string routeDiagnosticsCurrentRouteText,
-            string routeDiagnosticsTargetRoadText,
-            string routeDiagnosticsStartOwnerRoadText,
-            string routeDiagnosticsEndOwnerRoadText,
-            string routeDiagnosticsDirectConnectText,
-            string routeDiagnosticsFullPathToTargetStartText,
-            string routeDiagnosticsNavigationLanesText,
-            string routeDiagnosticsPlannedPenaltiesText,
-            string routeDiagnosticsPenaltyTagsText,
-            string routeDiagnosticsExplanationText,
-            string routeDiagnosticsWaypointRouteLaneText,
-            string routeDiagnosticsConnectedStopText)
-        {
-            ResolveState = resolveState;
-            VehicleKind = vehicleKind;
-            TleApplicability = tleApplicability;
-            SourceSelectedEntity = sourceSelectedEntity;
-            ResolvedVehicleEntity = resolvedVehicleEntity;
-            PrefabEntity = prefabEntity;
-            HasPrefabRef = hasPrefabRef;
-            IsTrailerChild = isTrailerChild;
-            IsVehicle = isVehicle;
-            IsCar = isCar;
-            IsTrain = isTrain;
-            IsParked = isParked;
-            HasCarCurrentLane = hasCarCurrentLane;
-            HasTrainCurrentLane = hasTrainCurrentLane;
-            HasLiveLaneData = hasLiveLaneData;
-            HasPublicTransportVehicleData = hasPublicTransportVehicleData;
-            HasTrainData = hasTrainData;
-            RuntimeFamilyText = runtimeFamilyText;
-            RawTransportTypeText = rawTransportTypeText;
-            RawTrackTypeText = rawTrackTypeText;
-            RailSubtypeSourceText = railSubtypeSourceText;
-            SummaryClassificationText = summaryClassificationText;
-            SummaryTleStatusText = summaryTleStatusText;
-            CompactLastReasonText = compactLastReasonText;
-            CompactRepeatPenaltyText = compactRepeatPenaltyText;
-            VehicleIndex = vehicleIndex;
-            RoleText = roleText;
-            PublicTransportLanePolicyText = publicTransportLanePolicyText;
-            HasTrafficLawProfile = hasTrafficLawProfile;
-            CurrentLaneEntity = currentLaneEntity;
-            PreviousLaneEntity = previousLaneEntity;
-            CurrentLaneText = currentLaneText;
-            PreviousLaneText = previousLaneText;
-            LaneChangeCount = laneChangeCount;
-            PublicTransportLaneViolationActive = ptLaneViolationActive;
-            PendingExitActive = pendingExitActive;
-            PermissionStateSummary = permissionStateSummary;
-            TotalFines = totalFines;
-            TotalViolations = totalViolations;
-            LastReason = lastReason;
-            HasPathOwner = hasPathOwner;
-            HasCurrentTarget = hasCurrentTarget;
-            HasCurrentRoute = hasCurrentRoute;
-            CurrentPathFlags = currentPathFlags;
-            HasRouteDiagnostics = hasRouteDiagnostics;
-            RouteDiagnosticsCurrentTargetText = routeDiagnosticsCurrentTargetText;
-            RouteDiagnosticsCurrentRouteText = routeDiagnosticsCurrentRouteText;
-            RouteDiagnosticsTargetRoadText = routeDiagnosticsTargetRoadText;
-            RouteDiagnosticsStartOwnerRoadText = routeDiagnosticsStartOwnerRoadText;
-            RouteDiagnosticsEndOwnerRoadText = routeDiagnosticsEndOwnerRoadText;
-            RouteDiagnosticsDirectConnectText = routeDiagnosticsDirectConnectText;
-            RouteDiagnosticsFullPathToTargetStartText = routeDiagnosticsFullPathToTargetStartText;
-            RouteDiagnosticsNavigationLanesText = routeDiagnosticsNavigationLanesText;
-            RouteDiagnosticsPlannedPenaltiesText = routeDiagnosticsPlannedPenaltiesText;
-            RouteDiagnosticsPenaltyTagsText = routeDiagnosticsPenaltyTagsText;
-            RouteDiagnosticsExplanationText = routeDiagnosticsExplanationText;
-            RouteDiagnosticsWaypointRouteLaneText = routeDiagnosticsWaypointRouteLaneText;
-            RouteDiagnosticsConnectedStopText = routeDiagnosticsConnectedStopText;
-        }
-    }
-
     public partial class SelectedObjectBridgeSystem : GameSystemBase
     {
         internal const string kClassificationRoadCarLocaleId =
@@ -351,7 +156,6 @@ namespace Traffic_Law_Enforcement
 
         private SelectedObjectResolver m_SelectedObjectResolver;
         private PublicTransportLaneVehicleTypeLookups m_TypeLookups;
-        private NameSystem m_NameSystem;
 
         private ComponentLookup<Target> m_TargetData;
         private ComponentLookup<CurrentRoute> m_CurrentRouteData;
@@ -388,7 +192,6 @@ namespace Traffic_Law_Enforcement
 
             m_SelectedObjectResolver = new SelectedObjectResolver(this);
             m_TypeLookups = PublicTransportLaneVehicleTypeLookups.Create(this);
-            m_NameSystem = World.GetOrCreateSystemManaged<NameSystem>();
             m_TargetData = GetComponentLookup<Target>(true);
             m_CurrentRouteData = GetComponentLookup<CurrentRoute>(true);
             m_PathOwnerData = GetComponentLookup<PathOwner>(true);
@@ -504,6 +307,8 @@ namespace Traffic_Law_Enforcement
             int totalFines = 0;
             int totalViolations = 0;
             string lastReason = string.Empty;
+            SelectedObjectDisplayFormatterContext formatterContext =
+                CreateDisplayFormatterContext();
 
             if (tleApplicable && resolveResult.IsVehicle)
             {
@@ -518,12 +323,15 @@ namespace Traffic_Law_Enforcement
                 }
             }
 
-            RouteDiagnosticsData routeDiagnostics =
-                BuildRouteDiagnosticsData(
+            SelectedObjectRouteDiagnosticsContext routeDiagnosticsContext =
+                CreateRouteDiagnosticsContext();
+            SelectedObjectRouteDiagnosticsData routeDiagnostics =
+                SelectedObjectRouteDiagnosticsBuilder.Build(
                     resolveResult,
                     tleReady,
                     vehicle,
-                    currentLaneEntity);
+                    currentLaneEntity,
+                    ref routeDiagnosticsContext);
 
             return new SelectedObjectDebugSnapshot(
                 resolveResult.ResolveState,
@@ -557,8 +365,12 @@ namespace Traffic_Law_Enforcement
                 hasTrafficLawProfile,
                 currentLaneEntity,
                 previousLaneEntity,
-                BuildLaneDisplayText(currentLaneEntity),
-                BuildLaneDisplayText(previousLaneEntity),
+                SelectedObjectDisplayFormatter.BuildLaneDisplayText(
+                    currentLaneEntity,
+                    ref formatterContext),
+                SelectedObjectDisplayFormatter.BuildLaneDisplayText(
+                    previousLaneEntity,
+                    ref formatterContext),
                 laneChangeCount,
                 ptLaneViolationActive,
                 pendingExitActive,
@@ -586,6 +398,22 @@ namespace Traffic_Law_Enforcement
                 routeDiagnostics.ConnectedStopText);
         }
 
+        private SelectedObjectDisplayFormatterContext CreateDisplayFormatterContext()
+        {
+            return new SelectedObjectDisplayFormatterContext
+            {
+                EntityManager = EntityManager,
+                NameSystem = World.GetOrCreateSystemManaged<Game.UI.NameSystem>(),
+                OwnerData = m_OwnerData,
+                AggregatedData = m_AggregatedData,
+                SlaveLaneData = m_SlaveLaneData,
+                CarLaneData = m_CarLaneData,
+                ParkingLaneData = m_ParkingLaneData,
+                GarageLaneData = m_GarageLaneData,
+                ConnectionLaneData = m_ConnectionLaneData,
+            };
+        }
+
         private RoutePenaltyInspectionContext CreateRouteInspectionContext()
         {
             return new RoutePenaltyInspectionContext
@@ -602,756 +430,22 @@ namespace Traffic_Law_Enforcement
             };
         }
 
-        private RouteDiagnosticsData BuildRouteDiagnosticsData(
-            SelectedObjectResolveResult resolveResult,
-            bool tleReady,
-            Entity vehicle,
-            Entity currentLaneEntity)
+        private SelectedObjectRouteDiagnosticsContext CreateRouteDiagnosticsContext()
         {
-            if (!tleReady ||
-                resolveResult.VehicleKind != SelectedObjectKind.RoadCar ||
-                vehicle == Entity.Null)
+            return new SelectedObjectRouteDiagnosticsContext
             {
-                return default;
-            }
-
-            bool hasCurrentTarget =
-                m_TargetData.TryGetComponent(vehicle, out Target targetData) &&
-                targetData.m_Target != Entity.Null;
-            Entity targetEntity =
-                hasCurrentTarget
-                    ? targetData.m_Target
-                    : Entity.Null;
-
-            bool hasCurrentRoute =
-                m_CurrentRouteData.TryGetComponent(vehicle, out CurrentRoute currentRouteData) &&
-                currentRouteData.m_Route != Entity.Null;
-            Entity currentRouteEntity =
-                hasCurrentRoute
-                    ? currentRouteData.m_Route
-                    : Entity.Null;
-
-            bool hasPathOwner =
-                m_PathOwnerData.TryGetComponent(vehicle, out PathOwner pathOwner);
-            PathFlags currentPathFlags =
-                hasPathOwner
-                    ? pathOwner.m_State
-                    : default;
-
-            bool hasNavigationLanes =
-                m_NavigationLaneData.TryGetBuffer(vehicle, out DynamicBuffer<CarNavigationLane> navigationLanes);
-            bool hasPathElements =
-                m_PathElementData.TryGetBuffer(vehicle, out DynamicBuffer<PathElement> pathElements);
-
-            RoutePenaltyInspectionContext inspectionContext =
-                CreateRouteInspectionContext();
-            RoutePenaltyInspectionResult inspection =
-                RoutePenaltyInspection.InspectCurrentRoute(
-                    vehicle,
-                    currentLaneEntity,
-                    navigationLanes,
-                    hasNavigationLanes,
-                    ref inspectionContext,
-                    captureDebugStrings: true);
-
-            return new RouteDiagnosticsData(
-                hasDiagnostics: true,
-                hasPathOwner: hasPathOwner,
-                hasCurrentTarget: hasCurrentTarget,
-                hasCurrentRoute: hasCurrentRoute,
-                currentPathFlags: currentPathFlags,
-                currentTargetText: BuildCurrentTargetText(targetEntity),
-                currentRouteText: BuildCurrentRouteText(currentRouteEntity),
-                targetRoadText: BuildTargetRoadText(targetEntity),
-                startOwnerRoadText: BuildRouteLaneOwnerRoadText(targetEntity, useStartLane: true),
-                endOwnerRoadText: BuildRouteLaneOwnerRoadText(targetEntity, useStartLane: false),
-                directConnectText: BuildCurrentToTargetStartDirectConnectText(
-                    currentLaneEntity,
-                    targetEntity,
-                    navigationLanes,
-                    hasNavigationLanes),
-                fullPathToTargetStartText: BuildFullPathToTargetStartText(
-                    currentLaneEntity,
-                    targetEntity,
-                    navigationLanes,
-                    hasNavigationLanes,
-                    pathElements,
-                    hasPathElements),
-                navigationLanesText: BuildNavigationLanesText(
-                    currentLaneEntity,
-                    navigationLanes,
-                    hasNavigationLanes),
-                plannedPenaltiesText: NormalizeInspectionText(inspection.Breakdown),
-                penaltyTagsText: NormalizeInspectionText(inspection.Tags),
-                explanationText: BuildRouteDecisionExplanation(
-                    vehicle,
-                    currentLaneEntity,
-                    hasCurrentTarget,
-                    targetEntity,
-                    hasCurrentRoute,
-                    inspection),
-                waypointRouteLaneText: BuildWaypointRouteLaneText(targetEntity),
-                connectedStopText: BuildConnectedStopText(targetEntity));
-        }
-
-        private string BuildNavigationLanesText(
-            Entity currentLaneEntity,
-            DynamicBuffer<CarNavigationLane> navigationLanes,
-            bool hasNavigationLanes,
-            int maxPreviewLanes = 4)
-        {
-            if (!hasNavigationLanes || navigationLanes.Length == 0)
-            {
-                return "none";
-            }
-
-            List<string> lines = new List<string>(maxPreviewLanes + 2);
-            int totalUpcoming = 0;
-
-            for (int index = 0; index < navigationLanes.Length; index++)
-            {
-                Entity lane = navigationLanes[index].m_Lane;
-                if (lane == Entity.Null)
-                {
-                    continue;
-                }
-
-                if (index == 0 && lane == currentLaneEntity)
-                {
-                    continue;
-                }
-
-                totalUpcoming += 1;
-                if (lines.Count >= maxPreviewLanes)
-                {
-                    continue;
-                }
-
-                lines.Add($"{lines.Count + 1}. {BuildLaneDisplayText(lane)}");
-            }
-
-            if (totalUpcoming == 0)
-            {
-                return "none";
-            }
-
-            List<string> summary = new List<string>(lines.Count + 2)
-            {
-                $"{totalUpcoming} total"
+                TypeLookups = m_TypeLookups,
+                TargetData = m_TargetData,
+                CurrentRouteData = m_CurrentRouteData,
+                PathOwnerData = m_PathOwnerData,
+                RouteLaneData = m_RouteLaneData,
+                WaypointData = m_WaypointData,
+                ConnectedData = m_ConnectedData,
+                NavigationLaneData = m_NavigationLaneData,
+                PathElementData = m_PathElementData,
+                Formatter = CreateDisplayFormatterContext(),
+                InspectionContext = CreateRouteInspectionContext(),
             };
-            summary.AddRange(lines);
-            if (totalUpcoming > lines.Count)
-            {
-                summary.Add($"(+{totalUpcoming - lines.Count} more)");
-            }
-
-            return string.Join("\n", summary.ToArray());
-        }
-
-        private string BuildCurrentTargetText(Entity targetEntity)
-        {
-            if (targetEntity == Entity.Null)
-            {
-                return FormatEntityOrNone(Entity.Null);
-            }
-
-            string text = FormatEntityOrNone(targetEntity);
-            string targetName = TryGetCurrentTargetName(targetEntity);
-            if (m_WaypointData.TryGetComponent(targetEntity, out Waypoint waypoint))
-            {
-                text += $" [waypoint {waypoint.m_Index}]";
-            }
-
-            if (!string.IsNullOrWhiteSpace(targetName))
-            {
-                text += $" \"{targetName}\"";
-            }
-
-            return text;
-        }
-
-        private string BuildCurrentRouteText(Entity currentRouteEntity)
-        {
-            if (currentRouteEntity == Entity.Null)
-            {
-                return FormatEntityOrNone(Entity.Null);
-            }
-
-            return FormatNamedEntity(currentRouteEntity);
-        }
-
-        private string BuildWaypointRouteLaneText(Entity targetEntity)
-        {
-            if (targetEntity == Entity.Null ||
-                !m_RouteLaneData.TryGetComponent(targetEntity, out RouteLane routeLane))
-            {
-                return string.Empty;
-            }
-
-            return
-                $"start: {BuildLaneDisplayText(routeLane.m_StartLane)}\n" +
-                $"end: {BuildLaneDisplayText(routeLane.m_EndLane)}\n" +
-                $"curve: {routeLane.m_StartCurvePos:0.###} -> {routeLane.m_EndCurvePos:0.###}";
-        }
-
-        private string BuildConnectedStopText(Entity targetEntity)
-        {
-            if (targetEntity == Entity.Null ||
-                !m_ConnectedData.TryGetComponent(targetEntity, out Connected connected))
-            {
-                return string.Empty;
-            }
-
-            return FormatNamedEntity(connected.m_Connected);
-        }
-
-        private string BuildTargetRoadText(Entity targetEntity)
-        {
-            if (targetEntity == Entity.Null)
-            {
-                return string.Empty;
-            }
-
-            if (m_ConnectedData.TryGetComponent(targetEntity, out Connected connected) &&
-                TryGetRoadEntityFromAddressable(connected.m_Connected, out Entity stopRoad))
-            {
-                return FormatRoadName(stopRoad);
-            }
-
-            if (m_RouteLaneData.TryGetComponent(targetEntity, out RouteLane routeLane))
-            {
-                Entity roadEntity = ResolveRoadEntityFromLane(routeLane.m_StartLane);
-                if (roadEntity != Entity.Null)
-                {
-                    return FormatRoadName(roadEntity);
-                }
-            }
-
-            return string.Empty;
-        }
-
-        private string TryGetCurrentTargetName(Entity targetEntity)
-        {
-            string renderedName = TryGetRenderedName(targetEntity);
-            if (!string.IsNullOrWhiteSpace(renderedName))
-            {
-                return renderedName;
-            }
-
-            if (m_ConnectedData.TryGetComponent(targetEntity, out Connected connected))
-            {
-                renderedName = TryGetRenderedName(connected.m_Connected);
-                if (!string.IsNullOrWhiteSpace(renderedName))
-                {
-                    return renderedName;
-                }
-            }
-
-            Entity roadEntity = Entity.Null;
-            if (m_RouteLaneData.TryGetComponent(targetEntity, out RouteLane routeLane))
-            {
-                roadEntity = ResolveRoadEntityFromLane(routeLane.m_StartLane);
-            }
-
-            return roadEntity == Entity.Null
-                ? string.Empty
-                : TryGetRenderedName(roadEntity);
-        }
-
-        private string BuildRouteLaneOwnerRoadText(Entity targetEntity, bool useStartLane)
-        {
-            if (targetEntity == Entity.Null ||
-                !m_RouteLaneData.TryGetComponent(targetEntity, out RouteLane routeLane))
-            {
-                return string.Empty;
-            }
-
-            Entity lane = useStartLane
-                ? routeLane.m_StartLane
-                : routeLane.m_EndLane;
-            if (lane == Entity.Null)
-            {
-                return string.Empty;
-            }
-
-            Entity roadEntity = ResolveRoadEntityFromLane(lane);
-            if (roadEntity != Entity.Null)
-            {
-                return FormatRoadName(roadEntity);
-            }
-
-            string laneOwnerName = TryGetLaneOwnerName(lane);
-            return string.IsNullOrWhiteSpace(laneOwnerName)
-                ? string.Empty
-                : laneOwnerName;
-        }
-
-        private string BuildCurrentToTargetStartDirectConnectText(
-            Entity currentLaneEntity,
-            Entity targetEntity,
-            DynamicBuffer<CarNavigationLane> navigationLanes,
-            bool hasNavigationLanes)
-        {
-            if (targetEntity == Entity.Null ||
-                !m_RouteLaneData.TryGetComponent(targetEntity, out RouteLane routeLane) ||
-                routeLane.m_StartLane == Entity.Null)
-            {
-                return LocalizeText(
-                    kRouteDirectConnectMissingStartLocaleId,
-                    "Target start lane unavailable.");
-            }
-
-            if (currentLaneEntity == routeLane.m_StartLane)
-            {
-                return LocalizeText(
-                    kRouteDirectConnectAlreadyOnStartLocaleId,
-                    "Yes, already on the target start lane.");
-            }
-
-            if (!hasNavigationLanes || navigationLanes.Length == 0)
-            {
-                return LocalizeText(
-                    kRouteDirectConnectNoPreviewLocaleId,
-                    "No, no current navigation preview reaches the target start lane.");
-            }
-
-            List<Entity> upcomingLanes = new List<Entity>(navigationLanes.Length);
-            bool skippedLeadingCurrentLane = false;
-
-            for (int index = 0; index < navigationLanes.Length; index++)
-            {
-                Entity lane = navigationLanes[index].m_Lane;
-                if (lane == Entity.Null)
-                {
-                    continue;
-                }
-
-                if (!skippedLeadingCurrentLane &&
-                    currentLaneEntity != Entity.Null &&
-                    lane == currentLaneEntity)
-                {
-                    skippedLeadingCurrentLane = true;
-                    continue;
-                }
-
-                upcomingLanes.Add(lane);
-            }
-
-            if (upcomingLanes.Count == 0)
-            {
-                return LocalizeText(
-                    kRouteDirectConnectNoPreviewLocaleId,
-                    "No, no current navigation preview reaches the target start lane.");
-            }
-
-            if (upcomingLanes[0] == routeLane.m_StartLane)
-            {
-                return LocalizeText(
-                    kRouteDirectConnectNextHopLocaleId,
-                    "Yes, the next hop reaches the target start lane.");
-            }
-
-            for (int index = 1; index < upcomingLanes.Count; index++)
-            {
-                if (upcomingLanes[index] == routeLane.m_StartLane)
-                {
-                    return string.Format(
-                        LocalizeText(
-                            kRouteDirectConnectViaFormatLocaleId,
-                            "No, reaches the target start lane after {0} intermediate lane(s) via {1}."),
-                        index,
-                        BuildLaneDisplayText(upcomingLanes[0]));
-                }
-            }
-
-            return LocalizeText(
-                kRouteDirectConnectNoPreviewLocaleId,
-                "No, no current navigation preview reaches the target start lane.");
-        }
-
-        private string BuildFullPathToTargetStartText(
-            Entity currentLaneEntity,
-            Entity targetEntity,
-            DynamicBuffer<CarNavigationLane> navigationLanes,
-            bool hasNavigationLanes,
-            DynamicBuffer<PathElement> pathElements,
-            bool hasPathElements)
-        {
-            if (targetEntity == Entity.Null ||
-                !m_RouteLaneData.TryGetComponent(targetEntity, out RouteLane routeLane) ||
-                routeLane.m_StartLane == Entity.Null)
-            {
-                return LocalizeText(
-                    kRouteFullPathMissingStartLocaleId,
-                    "Target start lane unavailable.");
-            }
-
-            if (currentLaneEntity == routeLane.m_StartLane)
-            {
-                return LocalizeText(
-                    kRouteFullPathContainsStartLocaleId,
-                    "Yes, current full path contains the target start lane.");
-            }
-
-            if (hasNavigationLanes)
-            {
-                for (int index = 0; index < navigationLanes.Length; index++)
-                {
-                    if (navigationLanes[index].m_Lane == routeLane.m_StartLane)
-                    {
-                        return LocalizeText(
-                            kRouteFullPathContainsStartLocaleId,
-                            "Yes, current full path contains the target start lane.");
-                    }
-                }
-            }
-
-            if (hasPathElements)
-            {
-                for (int index = 0; index < pathElements.Length; index++)
-                {
-                    if (pathElements[index].m_Target == routeLane.m_StartLane)
-                    {
-                        return LocalizeText(
-                            kRouteFullPathContainsStartLocaleId,
-                            "Yes, current full path contains the target start lane.");
-                    }
-                }
-            }
-
-            return LocalizeText(
-                kRouteFullPathMissingLocaleId,
-                "No, current full path does not contain the target start lane.");
-        }
-
-        private string BuildRouteDecisionExplanation(
-            Entity vehicle,
-            Entity currentLaneEntity,
-            bool hasCurrentTarget,
-            Entity targetEntity,
-            bool hasCurrentRoute,
-            RoutePenaltyInspectionResult inspection)
-        {
-            if (!hasCurrentRoute)
-            {
-                return LocalizeText(
-                    kRouteExplanationNoCurrentRouteLocaleId,
-                    "No current route is attached to this vehicle.");
-            }
-
-            if (!hasCurrentTarget)
-            {
-                return LocalizeText(
-                    kRouteExplanationNoCurrentTargetLocaleId,
-                    "No current target is attached to this vehicle.");
-            }
-
-            List<string> parts = new List<string>(3);
-            bool hasPrimaryExplanation = false;
-
-            if (TryHasWaypointRouteLaneMismatch(targetEntity, currentLaneEntity))
-            {
-                parts.Add(
-                    LocalizeText(
-                        kRouteExplanationWaypointAlignmentLocaleId,
-                        "Vehicle is aligning for the next waypoint / stop approach lane."));
-                hasPrimaryExplanation = true;
-            }
-
-            if (inspection.Profile.HasAnyPenalty)
-            {
-                string tagSummary = NormalizeInspectionText(inspection.Tags);
-                string format =
-                    parts.Count == 0
-                        ? LocalizeText(
-                            kRouteExplanationPenaltyPrimaryFormatLocaleId,
-                            "Current planned route contains deterrence tags: {0}.")
-                        : LocalizeText(
-                            kRouteExplanationPenaltyModifierFormatLocaleId,
-                            "Current planned route also contains deterrence tags: {0}.");
-                parts.Add(string.Format(format, tagSummary));
-                hasPrimaryExplanation = true;
-            }
-
-            if (IsRoadPublicTransportVehicle(vehicle) &&
-                inspection.PublicTransportLanePolicyResolved &&
-                inspection.AllowedOnPublicTransportLane)
-            {
-                parts.Add(
-                    LocalizeText(
-                        kRouteExplanationPtPermissiveLocaleId,
-                        "PT-lane policy is currently permissive for this vehicle."));
-            }
-
-            if (!hasPrimaryExplanation)
-            {
-                parts.Add(
-                    LocalizeText(
-                        kRouteExplanationGenericFallbackLocaleId,
-                        "No route-target mismatch or current TLE penalty tag was identified; current behavior is most likely vanilla lane-group alignment."));
-            }
-
-            return string.Join(" ", parts.ToArray());
-        }
-
-        private bool TryHasWaypointRouteLaneMismatch(
-            Entity targetEntity,
-            Entity currentLaneEntity)
-        {
-            if (targetEntity == Entity.Null ||
-                currentLaneEntity == Entity.Null ||
-                !m_RouteLaneData.TryGetComponent(targetEntity, out RouteLane routeLane) ||
-                routeLane.m_StartLane == Entity.Null)
-            {
-                return false;
-            }
-
-            return routeLane.m_StartLane != currentLaneEntity;
-        }
-
-        private bool IsRoadPublicTransportVehicle(Entity vehicle)
-        {
-            PublicTransportLaneVehicleCategory categories =
-                PublicTransportLanePolicy.GetVanillaAuthorizedCategories(vehicle, ref m_TypeLookups);
-            return (categories & PublicTransportLaneVehicleCategory.RoadPublicTransportVehicle) != 0;
-        }
-
-        private string NormalizeInspectionText(string text)
-        {
-            if (string.IsNullOrWhiteSpace(text) || text == "none")
-            {
-                return FormatEntityOrNone(Entity.Null);
-            }
-
-            return text.Trim();
-        }
-
-        private string BuildLaneDisplayText(Entity lane)
-        {
-            if (lane == Entity.Null)
-            {
-                return FormatEntityOrNone(Entity.Null);
-            }
-
-            string roadName = BuildRoadNameFromLane(lane);
-            string ptSuffix = IsPublicTransportOnlyLane(lane)
-                ? " [PT]"
-                : string.Empty;
-            string prefix = string.IsNullOrWhiteSpace(roadName)
-                ? FormatEntityOrNone(lane)
-                : roadName;
-
-            if (m_ConnectionLaneData.HasComponent(lane))
-            {
-                return $"{prefix}, connection{ptSuffix}";
-            }
-
-            if (m_ParkingLaneData.HasComponent(lane))
-            {
-                return $"{prefix}, parking{ptSuffix}";
-            }
-
-            if (m_GarageLaneData.HasComponent(lane))
-            {
-                return $"{prefix}, garage{ptSuffix}";
-            }
-
-            if (TryBuildLaneOrdinal(lane, out int laneNumber, out int laneCount))
-            {
-                return $"{prefix}, {laneNumber}/{laneCount}{ptSuffix}";
-            }
-
-            return prefix + ptSuffix;
-        }
-
-        private bool TryBuildLaneOrdinal(Entity lane, out int laneNumber, out int laneCount)
-        {
-            if (m_SlaveLaneData.TryGetComponent(lane, out SlaveLane slaveLane) &&
-                slaveLane.m_MaxIndex >= slaveLane.m_MinIndex &&
-                slaveLane.m_SubIndex >= slaveLane.m_MinIndex &&
-                slaveLane.m_SubIndex <= slaveLane.m_MaxIndex)
-            {
-                laneNumber = slaveLane.m_SubIndex - slaveLane.m_MinIndex + 1;
-                laneCount = slaveLane.m_MaxIndex - slaveLane.m_MinIndex + 1;
-                return laneCount > 0;
-            }
-
-            laneNumber = 0;
-            laneCount = 0;
-            return false;
-        }
-
-        private bool IsPublicTransportOnlyLane(Entity lane)
-        {
-            return lane != Entity.Null &&
-                m_CarLaneData.TryGetComponent(lane, out CarLane carLane) &&
-                (carLane.m_Flags & Game.Net.CarLaneFlags.PublicOnly) != 0;
-        }
-
-        private string BuildRoadNameFromLane(Entity lane)
-        {
-            Entity roadEntity = ResolveRoadEntityFromLane(lane);
-            return roadEntity == Entity.Null
-                ? string.Empty
-                : FormatRoadName(roadEntity);
-        }
-
-        private string FormatRoadName(Entity roadEntity)
-        {
-            string renderedName = TryGetRenderedName(roadEntity);
-            return string.IsNullOrWhiteSpace(renderedName)
-                ? FormatEntityOrNone(roadEntity)
-                : renderedName;
-        }
-
-        private string TryGetLaneOwnerName(Entity lane)
-        {
-            if (lane == Entity.Null ||
-                !m_OwnerData.TryGetComponent(lane, out Owner owner) ||
-                owner.m_Owner == Entity.Null)
-            {
-                return string.Empty;
-            }
-
-            string renderedName = TryGetRenderedName(owner.m_Owner);
-            if (!string.IsNullOrWhiteSpace(renderedName))
-            {
-                return renderedName;
-            }
-
-            if (m_AggregatedData.TryGetComponent(owner.m_Owner, out Aggregated aggregated) &&
-                aggregated.m_Aggregate != Entity.Null)
-            {
-                return TryGetRenderedName(aggregated.m_Aggregate);
-            }
-
-            return string.Empty;
-        }
-
-        private string FormatNamedEntity(Entity entity)
-        {
-            string entityText = FormatEntityOrNone(entity);
-            string renderedName = TryGetRenderedName(entity);
-            return string.IsNullOrWhiteSpace(renderedName)
-                ? entityText
-                : $"{entityText} \"{renderedName}\"";
-        }
-
-        private string FormatEntityOrNone(Entity entity)
-        {
-            return entity == Entity.Null
-                ? LocalizeText(SelectedObjectPanelUISystem.kNoneLocaleId, "None")
-                : $"#{entity.Index}:v{entity.Version}";
-        }
-
-        private string TryGetRenderedName(Entity entity)
-        {
-            if (entity == Entity.Null || m_NameSystem == null)
-            {
-                return string.Empty;
-            }
-
-            string renderedName = m_NameSystem.GetRenderedLabelName(entity);
-            return string.IsNullOrWhiteSpace(renderedName)
-                ? string.Empty
-                : renderedName.Trim();
-        }
-
-        private bool TryGetRoadEntityFromAddressable(Entity entity, out Entity road)
-        {
-            if (entity != Entity.Null &&
-                BuildingUtils.GetAddress(EntityManager, entity, out road, out _))
-            {
-                return true;
-            }
-
-            road = Entity.Null;
-            return false;
-        }
-
-        private Entity ResolveRoadEntityFromLane(Entity lane)
-        {
-            if (lane == Entity.Null ||
-                !m_OwnerData.TryGetComponent(lane, out Owner owner))
-            {
-                return Entity.Null;
-            }
-
-            Entity laneOwner = owner.m_Owner;
-            if (laneOwner == Entity.Null)
-            {
-                return Entity.Null;
-            }
-
-            if (m_AggregatedData.TryGetComponent(laneOwner, out Aggregated aggregated) &&
-                aggregated.m_Aggregate != Entity.Null)
-            {
-                return aggregated.m_Aggregate;
-            }
-
-            return laneOwner;
-        }
-
-        private readonly struct RouteDiagnosticsData
-        {
-            public readonly bool HasDiagnostics;
-            public readonly bool HasPathOwner;
-            public readonly bool HasCurrentTarget;
-            public readonly bool HasCurrentRoute;
-            public readonly PathFlags CurrentPathFlags;
-            public readonly string CurrentTargetText;
-            public readonly string CurrentRouteText;
-            public readonly string TargetRoadText;
-            public readonly string StartOwnerRoadText;
-            public readonly string EndOwnerRoadText;
-            public readonly string DirectConnectText;
-            public readonly string FullPathToTargetStartText;
-            public readonly string NavigationLanesText;
-            public readonly string PlannedPenaltiesText;
-            public readonly string PenaltyTagsText;
-            public readonly string ExplanationText;
-            public readonly string WaypointRouteLaneText;
-            public readonly string ConnectedStopText;
-
-            public RouteDiagnosticsData(
-                bool hasDiagnostics,
-                bool hasPathOwner,
-                bool hasCurrentTarget,
-                bool hasCurrentRoute,
-                PathFlags currentPathFlags,
-                string currentTargetText,
-                string currentRouteText,
-                string targetRoadText,
-                string startOwnerRoadText,
-                string endOwnerRoadText,
-                string directConnectText,
-                string fullPathToTargetStartText,
-                string navigationLanesText,
-                string plannedPenaltiesText,
-                string penaltyTagsText,
-                string explanationText,
-                string waypointRouteLaneText,
-                string connectedStopText)
-            {
-                HasDiagnostics = hasDiagnostics;
-                HasPathOwner = hasPathOwner;
-                HasCurrentTarget = hasCurrentTarget;
-                HasCurrentRoute = hasCurrentRoute;
-                CurrentPathFlags = currentPathFlags;
-                CurrentTargetText = currentTargetText;
-                CurrentRouteText = currentRouteText;
-                TargetRoadText = targetRoadText;
-                StartOwnerRoadText = startOwnerRoadText;
-                EndOwnerRoadText = endOwnerRoadText;
-                DirectConnectText = directConnectText;
-                FullPathToTargetStartText = fullPathToTargetStartText;
-                NavigationLanesText = navigationLanesText;
-                PlannedPenaltiesText = plannedPenaltiesText;
-                PenaltyTagsText = penaltyTagsText;
-                ExplanationText = explanationText;
-                WaypointRouteLaneText = waypointRouteLaneText;
-                ConnectedStopText = connectedStopText;
-            }
         }
 
         private static string BuildRuntimeFamilyText(
@@ -1689,7 +783,7 @@ namespace Traffic_Law_Enforcement
                 : $"{meaning} [{string.Join(", ", qualifiers)}]";
         }
 
-        private static string LocalizeText(string localeId, string fallback)
+        internal static string LocalizeText(string localeId, string fallback)
         {
             if (GameManager.instance?.localizationManager?.activeDictionary != null &&
                 GameManager.instance.localizationManager.activeDictionary.TryGetValue(localeId, out string value) &&
