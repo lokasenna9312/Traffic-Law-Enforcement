@@ -296,24 +296,13 @@ namespace Traffic_Law_Enforcement
                 !entityManager.HasComponent<Route>(entity) ||
                 !entityManager.HasComponent<PrefabRef>(entity) ||
                 !entityManager.HasBuffer<RouteWaypoint>(entity) ||
-                !entityManager.HasBuffer<RouteSegment>(entity) ||
-                !entityManager.HasBuffer<RouteVehicle>(entity) ||
                 (!entityManager.HasComponent<TransportLine>(entity) &&
                  !entityManager.HasComponent<WorkRoute>(entity)))
             {
                 return false;
             }
 
-            int elementIndex = 0;
-            return SelectedInfoUISystem.TryGetPosition(
-                entity,
-                entityManager,
-                ref elementIndex,
-                out _,
-                out _,
-                out _,
-                out _,
-                reinterpolate: true);
+            return true;
         }
 
         private static string TryGetCurrentRouteCustomName(Entity displayRouteEntity, Entity rawCurrentRouteEntity, ref SelectedObjectRouteDiagnosticsContext context)
