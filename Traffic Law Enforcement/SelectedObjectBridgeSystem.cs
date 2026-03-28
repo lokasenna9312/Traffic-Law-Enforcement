@@ -182,9 +182,11 @@ namespace Traffic_Law_Enforcement
 
         private SelectedObjectDebugSnapshot m_CurrentSnapshot;
         private bool m_HasSnapshot;
+        private Entity m_CurrentRouteSelectionEntity;
 
         public SelectedObjectDebugSnapshot CurrentSnapshot => m_CurrentSnapshot;
         public bool HasSnapshot => m_HasSnapshot;
+        public Entity CurrentRouteSelectionEntity => m_CurrentRouteSelectionEntity;
 
         protected override void OnCreate()
         {
@@ -325,6 +327,7 @@ namespace Traffic_Law_Enforcement
                     vehicle,
                     currentLaneEntity,
                     ref routeDiagnosticsContext);
+            m_CurrentRouteSelectionEntity = routeDiagnostics.CurrentRouteEntity;
             SelectedObjectEnforcementSummaryContext enforcementSummaryContext =
                 CreateEnforcementSummaryContext();
             SelectedObjectEnforcementSummaryData enforcementSummary =

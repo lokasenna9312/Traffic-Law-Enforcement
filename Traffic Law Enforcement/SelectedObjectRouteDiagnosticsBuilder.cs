@@ -30,6 +30,7 @@ namespace Traffic_Law_Enforcement
         public readonly bool HasPathOwner;
         public readonly bool HasCurrentTarget;
         public readonly bool HasCurrentRoute;
+        public readonly Entity CurrentRouteEntity;
         public readonly PathFlags CurrentPathFlags;
         public readonly string CurrentTargetText;
         public readonly string CurrentRouteText;
@@ -50,6 +51,7 @@ namespace Traffic_Law_Enforcement
             bool hasPathOwner,
             bool hasCurrentTarget,
             bool hasCurrentRoute,
+            Entity currentRouteEntity,
             PathFlags currentPathFlags,
             string currentTargetText,
             string currentRouteText,
@@ -69,6 +71,7 @@ namespace Traffic_Law_Enforcement
             HasPathOwner = hasPathOwner;
             HasCurrentTarget = hasCurrentTarget;
             HasCurrentRoute = hasCurrentRoute;
+            CurrentRouteEntity = currentRouteEntity;
             CurrentPathFlags = currentPathFlags;
             CurrentTargetText = currentTargetText;
             CurrentRouteText = currentRouteText;
@@ -135,6 +138,7 @@ namespace Traffic_Law_Enforcement
                 hasPathOwner: hasPathOwner,
                 hasCurrentTarget: hasCurrentTarget,
                 hasCurrentRoute: hasCurrentRoute,
+                currentRouteEntity: currentRouteEntity,
                 currentPathFlags: currentPathFlags,
                 currentTargetText: BuildCurrentTargetText(targetEntity, ref context),
                 currentRouteText: BuildCurrentRouteText(currentRouteEntity, ref context),
@@ -227,7 +231,13 @@ namespace Traffic_Law_Enforcement
                 return SelectedObjectDisplayFormatter.FormatEntityOrNone(Entity.Null);
             }
 
-            return SelectedObjectDisplayFormatter.FormatNamedEntity(currentRouteEntity, ref context.Formatter);
+            string renderedName =
+                SelectedObjectDisplayFormatter.TryGetRenderedName(
+                    currentRouteEntity,
+                    ref context.Formatter);
+            return string.IsNullOrWhiteSpace(renderedName)
+                ? SelectedObjectDisplayFormatter.FormatEntityOrNone(currentRouteEntity)
+                : renderedName;
         }
 
         private static string BuildWaypointRouteLaneText(Entity targetEntity, ref SelectedObjectRouteDiagnosticsContext context)

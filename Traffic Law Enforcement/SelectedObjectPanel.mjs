@@ -217,6 +217,20 @@ const styles = {
         whiteSpace: "pre-line",
         wordBreak: "break-word",
     },
+    valueLinkButton: {
+        flex: 1,
+        padding: "0",
+        margin: "0",
+        border: "none",
+        background: "transparent",
+        color: "#8fd0ff",
+        fontSize: "14px",
+        lineHeight: 1.35,
+        textAlign: "left",
+        cursor: "pointer",
+        whiteSpace: "pre-line",
+        wordBreak: "break-word",
+    },
     valueMultiline: {
         display: "flex",
         flexDirection: "column",
@@ -309,7 +323,21 @@ function Row(props) {
                     ? Object.assign({}, styles.value, styles.valueMultiline)
                     : styles.value,
             },
-            isMultiline
+            props.onClick && !isMultiline
+                ? h(
+                      "button",
+                      {
+                          type: "button",
+                          style: styles.valueLinkButton,
+                          onMouseDown: stopEvent,
+                          onClick: function (event) {
+                              stopEvent(event);
+                              props.onClick();
+                          },
+                      },
+                      props.value
+                  )
+                : isMultiline
                 ? valueLines.map(function (line, index) {
                       return h("div", { key: index }, line);
                   })
@@ -454,6 +482,10 @@ function SelectedObjectPanel() {
 
     const onToggleRouteDiagnostics = React.useCallback(function () {
         api.trigger(group, "toggleRouteDiagnosticsCollapsed");
+    }, []);
+
+    const onSelectCurrentRoute = React.useCallback(function () {
+        api.trigger(group, "selectCurrentRoute");
     }, []);
 
     const onSubmitEntitySelection = React.useCallback(
@@ -633,7 +665,11 @@ function SelectedObjectPanel() {
                              "div",
                              { style: styles.subsectionBody },
                              h(Row, { label: currentTargetLabelText, value: currentTarget }),
-                             h(Row, { label: currentRouteLabelText, value: currentRoute }),
+                             h(Row, {
+                                 label: currentRouteLabelText,
+                                 value: currentRoute,
+                                 onClick: onSelectCurrentRoute,
+                             }),
                              h(Row, { label: targetRoadLabelText, value: targetRoad }),
                              h(Row, { label: startOwnerRoadLabelText, value: startOwnerRoad }),
                              h(Row, { label: endOwnerRoadLabelText, value: endOwnerRoad }),
