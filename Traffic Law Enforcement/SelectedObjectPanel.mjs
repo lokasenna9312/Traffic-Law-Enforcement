@@ -220,16 +220,7 @@ const styles = {
         wordBreak: "break-word",
     },
     valueLinkButton: {
-        display: "block",
-        width: "100%",
-        padding: "0",
-        margin: "0",
-        border: "none",
-        background: "transparent",
         color: "#8fd0ff",
-        fontFamily: "inherit",
-        fontWeight: "inherit",
-        textAlign: "left",
         cursor: "pointer",
     },
     valueMultiline: {
@@ -318,19 +309,23 @@ function Row(props) {
         },
         h("div", { style: styles.label }, props.label),
         props.onClick && !isMultiline
-            ? h(
-                  "button",
-                  {
-                      type: "button",
-                      style: Object.assign({}, styles.value, styles.valueLinkButton),
-                      onMouseDown: stopEvent,
-                      onClick: function (event) {
-                          stopEvent(event);
-                          props.onClick();
-                      },
-                  },
-                  props.value
-              )
+            ? h("div", {
+                    style: Object.assign({}, styles.value, styles.valueLinkButton),
+                    role: "button",
+                    tabIndex: 0,
+                    onMouseDown: stopEvent,
+                    onClick: function (event) {
+                        stopEvent(event);
+                        props.onClick();
+                    },
+                    onKeyDown: function (event) {
+                        stopPropagationOnly(event);
+                        if (event.key === "Enter" || event.key === " ") {
+                            stopEvent(event);
+                            props.onClick();
+                        }
+                    },
+                }, props.value)
             : h(
                   "div",
                   {
@@ -492,7 +487,7 @@ function SelectedObjectPanel() {
             return;
         }
 
-        api.trigger("selectedInfo", "selectEntity", currentRouteEntity);
+        api.trigger(group, "selectCurrentRoute");
     }, [currentRouteEntity, currentRouteSelectable]);
 
     const onSubmitEntitySelection = React.useCallback(

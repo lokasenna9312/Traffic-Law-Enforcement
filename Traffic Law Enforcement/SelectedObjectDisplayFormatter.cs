@@ -1,6 +1,7 @@
 using Game.Buildings;
 using Game.Common;
 using Game.Net;
+using Game.Routes;
 using Game.UI;
 using Unity.Entities;
 using Entity = Unity.Entities.Entity;
@@ -11,6 +12,7 @@ namespace Traffic_Law_Enforcement
     {
         public EntityManager EntityManager;
         public NameSystem NameSystem;
+        public Game.Prefabs.PrefabSystem PrefabSystem;
         public ComponentLookup<Owner> OwnerData;
         public ComponentLookup<Aggregated> AggregatedData;
         public ComponentLookup<SlaveLane> SlaveLaneData;
@@ -151,6 +153,49 @@ namespace Traffic_Law_Enforcement
             return string.IsNullOrWhiteSpace(renderedName)
                 ? string.Empty
                 : renderedName.Trim();
+        }
+
+        internal static string TryGetCustomName(Entity entity, ref SelectedObjectDisplayFormatterContext context)
+        {
+            if (entity == Entity.Null || context.NameSystem == null)
+            {
+                return string.Empty;
+            }
+
+            return context.NameSystem.TryGetCustomName(entity, out string customName) &&
+                !string.IsNullOrWhiteSpace(customName)
+                    ? customName.Trim()
+                    : string.Empty;
+        }
+
+        internal static string TryBuildRouteName(Entity routeEntity, ref SelectedObjectDisplayFormatterContext context)
+        {
+            if (routeEntity == Entity.Null ||
+                context.PrefabSystem == null ||
+                !context.EntityManager.HasComponent<Game.Prefabs.PrefabRef>(routeEntity))
+            {
+                return string.Empty;
+            }
+
+            Game.Prefabs.PrefabRef prefabRef = context.EntityManager.GetComponentData<Game.Prefabs.PrefabRef>(routeEntity);
+            if (!context.PrefabSystem.TryGetPrefab<Game.Prefabs.RoutePrefab>(prefabRef.m_Prefab, out Game.Prefabs.RoutePrefab routePrefab))
+            {
+                return string.Empty;
+            }
+
+            string routeNumberText =
+                context.EntityManager.HasComponent<RouteNumber>(routeEntity)
+                    ? context.EntityManager.GetComponentData<RouteNumber>(routeEntity).m_Number.ToString()
+                    : string.Empty;
+
+            if (routeNumberText == "0")
+            {
+                routeNumberText = string.Empty;
+            }
+
+            return string.IsNullOrWhiteSpace(routeNumberText)
+                ? routePrefab.name
+                : $"{routePrefab.name} {routeNumberText}";
         }
 
         internal static bool TryGetRoadEntityFromAddressable(Entity entity, out Entity road, ref SelectedObjectDisplayFormatterContext context)

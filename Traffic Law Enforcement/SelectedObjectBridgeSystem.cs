@@ -410,6 +410,7 @@ namespace Traffic_Law_Enforcement
             {
                 EntityManager = EntityManager,
                 NameSystem = World.GetOrCreateSystemManaged<Game.UI.NameSystem>(),
+                PrefabSystem = World.GetOrCreateSystemManaged<Game.Prefabs.PrefabSystem>(),
                 OwnerData = m_OwnerData,
                 AggregatedData = m_AggregatedData,
                 SlaveLaneData = m_SlaveLaneData,

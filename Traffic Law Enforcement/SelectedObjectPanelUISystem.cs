@@ -296,6 +296,7 @@ namespace Traffic_Law_Enforcement
             AddBinding(new TriggerBinding(kGroup, "toggleCollapsed", ToggleCollapsed));
             AddBinding(new TriggerBinding(kGroup, "toggleLaneDetailsCollapsed", ToggleLaneDetailsCollapsed));
             AddBinding(new TriggerBinding(kGroup, "toggleRouteDiagnosticsCollapsed", ToggleRouteDiagnosticsCollapsed));
+            AddBinding(new TriggerBinding(kGroup, "selectCurrentRoute", HandleSelectCurrentRoute));
             AddBinding(new TriggerBinding<string>(kGroup, "submitEntitySelection", HandleSubmitEntitySelection));
         }
 
@@ -597,6 +598,30 @@ namespace Traffic_Law_Enforcement
 
             m_SelectedInfoSystem.SetSelection(entity);
             SetEntitySelectionSuccessStatus(entity);
+        }
+
+        private void HandleSelectCurrentRoute()
+        {
+            if (m_CurrentRouteSelectionEntity == Entity.Null ||
+                !EntityManager.Exists(m_CurrentRouteSelectionEntity))
+            {
+                return;
+            }
+
+            if (m_SelectedInfoSystem == null)
+            {
+                m_SelectedInfoSystem =
+                    World.GetExistingSystemManaged<SelectedInfoUISystem>();
+            }
+
+            if (m_SelectedInfoSystem == null)
+            {
+                return;
+            }
+
+            m_SelectedInfoSystem.selectedRoute = m_CurrentRouteSelectionEntity;
+            m_SelectedInfoSystem.SetSelection(m_CurrentRouteSelectionEntity);
+            m_SelectedInfoSystem.RequestUpdate();
         }
 
         private static string NormalizeText(string text)
