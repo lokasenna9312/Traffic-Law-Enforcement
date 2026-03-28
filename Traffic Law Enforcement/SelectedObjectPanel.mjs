@@ -591,6 +591,11 @@ function SelectedObjectPanel() {
                       h(Row, { label: repeatPenaltyLabelText, value: repeatPenalty }),
                       h(Row, { label: publicTransportLanePolicyLabelText, value: publicTransportLanePolicy })
                   ),
+                  h(
+                      "div",
+                      { style: styles.footer },
+                      footerText
+                  ),
                   laneDetailsVisible
                       ? h(FoldoutRow, {
                             title: laneDetailsTitleText,
@@ -611,12 +616,7 @@ function SelectedObjectPanel() {
                                 h(Row, { label: currentLaneLabelText, value: currentLane }),
                                 h(Row, { label: previousLaneLabelText, value: previousLane }),
                                 h(Row, { label: laneChangesLabelText, value: laneChanges }),
-                                h(Row, { label: liveLaneStateLabelText, value: liveLaneState }),
-                                h(
-                                    "div",
-                                    { style: styles.footer },
-                                     footerText
-                                 )
+                                h(Row, { label: liveLaneStateLabelText, value: liveLaneState })
                             ),
                    routeDiagnosticsVisible
                        ? h(FoldoutRow, {
