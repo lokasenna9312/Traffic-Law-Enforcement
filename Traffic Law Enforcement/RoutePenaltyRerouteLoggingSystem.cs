@@ -506,6 +506,13 @@ namespace Traffic_Law_Enforcement
                         currentSnapshot);
                 EnforcementTelemetry.RecordEvent(rebuildContextMessage);
                 Mod.log.Info(rebuildContextMessage);
+
+                string transitionPreviewMessage =
+                    BuildFocusedRouteTransitionPreview(
+                        vehicle,
+                        currentSnapshot);
+                EnforcementTelemetry.RecordEvent(transitionPreviewMessage);
+                Mod.log.Info(transitionPreviewMessage);
             }
         }
 
@@ -616,6 +623,147 @@ namespace Traffic_Law_Enforcement
                 $"upcomingPath={upcomingPathPreview}, " +
                 $"navigationPreview={navigationPreview}, " +
                 $"{pathfindContext}";
+        }
+
+        private string BuildFocusedRouteTransitionPreview(
+            Entity vehicle,
+            RouteSelectionChangeSnapshot currentSnapshot,
+            int maxTransitions = 4)
+        {
+            Entity currentLane = currentSnapshot.CurrentLane;
+            Entity currentTarget =
+                currentSnapshot.HasCurrentTarget
+                    ? currentSnapshot.CurrentTarget
+                    : Entity.Null;
+
+            Entity targetStartLane = Entity.Null;
+            Entity targetEndLane = Entity.Null;
+            if (currentTarget != Entity.Null &&
+                m_RouteLaneData.TryGetComponent(currentTarget, out RouteLane targetRouteLane))
+            {
+                targetStartLane = targetRouteLane.m_StartLane;
+                targetEndLane = targetRouteLane.m_EndLane;
+            }
+
+            bool hasNavigationLanes =
+                m_NavigationLaneData.TryGetBuffer(vehicle, out DynamicBuffer<CarNavigationLane> navigationLanes);
+
+            bool hasResolvedPolicy =
+                TryResolveAllowedOnPublicTransportLaneForLogging(
+                    vehicle,
+                    out bool allowedOnPublicTransportLane);
+
+            RoutePenaltyInspectionContext context = CreateInspectionContext();
+            bool previousUnauthorizedPublicTransportLane =
+                hasResolvedPolicy &&
+                IsUnauthorizedPublicTransportLane(currentLane, allowedOnPublicTransportLane);
+
+            List<string> transitions = new List<string>(maxTransitions);
+            Entity sourceLane = currentLane;
+            if (hasNavigationLanes)
+            {
+                for (int index = 0; index < navigationLanes.Length && transitions.Count < maxTransitions; index += 1)
+                {
+                    Entity targetLane = navigationLanes[index].m_Lane;
+                    if (targetLane == Entity.Null || targetLane == sourceLane)
+                    {
+                        continue;
+                    }
+
+                    transitions.Add(
+                        DescribeFocusedChosenTransition(
+                            sourceLane,
+                            targetLane,
+                            targetStartLane,
+                            targetEndLane,
+                            hasResolvedPolicy,
+                            allowedOnPublicTransportLane,
+                            ref previousUnauthorizedPublicTransportLane,
+                            ref context));
+                    sourceLane = targetLane;
+                }
+            }
+
+            string transitionSummary =
+                transitions.Count == 0
+                    ? "none"
+                    : string.Join("; ", transitions.ToArray());
+
+            return
+                $"FOCUSED_ROUTE_TRANSITIONS: vehicle={vehicle}, " +
+                $"targetStartLane={FormatEntityOrNone(targetStartLane)}, " +
+                $"targetEndLane={FormatEntityOrNone(targetEndLane)}, " +
+                $"chosenTransitions={transitionSummary}";
+        }
+
+        private string DescribeFocusedChosenTransition(
+            Entity sourceLane,
+            Entity targetLane,
+            Entity targetStartLane,
+            Entity targetEndLane,
+            bool hasResolvedPolicy,
+            bool allowedOnPublicTransportLane,
+            ref bool previousUnauthorizedPublicTransportLane,
+            ref RoutePenaltyInspectionContext context)
+        {
+            string sourceKind =
+                RoutePenaltyInspection.DescribeLaneKind(sourceLane, ref context);
+            string targetKind =
+                RoutePenaltyInspection.DescribeLaneKind(targetLane, ref context);
+
+            bool unauthorizedTargetLane =
+                hasResolvedPolicy &&
+                IsUnauthorizedPublicTransportLane(targetLane, allowedOnPublicTransportLane);
+
+            List<string> penaltyParts = new List<string>(3);
+            if (unauthorizedTargetLane && !previousUnauthorizedPublicTransportLane)
+            {
+                penaltyParts.Add(
+                    $"pt=+{EnforcementPenaltyService.GetPublicTransportLaneFine()}");
+            }
+
+            if (TryGetMidBlockPenaltyTag(
+                    sourceLane,
+                    Entity.Null,
+                    targetLane,
+                    Entity.Null,
+                    out string midBlockTag))
+            {
+                penaltyParts.Add(
+                    $"mid=+{EnforcementPenaltyService.GetMidBlockCrossingFine()}({midBlockTag})");
+            }
+
+            if (TryGetIntersectionPenaltyTag(
+                    sourceLane,
+                    targetLane,
+                    out string intersectionTag))
+            {
+                penaltyParts.Add(
+                    $"int=+{EnforcementPenaltyService.GetIntersectionMovementFine()}({intersectionTag})");
+            }
+
+            if (TryGetOutboundAccessPenaltyTag(
+                    sourceLane,
+                    targetLane,
+                    out string outboundAccessTag))
+            {
+                penaltyParts.Add(
+                    $"rule={outboundAccessTag}");
+            }
+
+            previousUnauthorizedPublicTransportLane = unauthorizedTargetLane;
+
+            string penaltySummary =
+                penaltyParts.Count == 0
+                    ? "none"
+                    : string.Join("|", penaltyParts.ToArray());
+
+            return
+                $"{FormatEntityOrNone(sourceLane)}->{FormatEntityOrNone(targetLane)}" +
+                $"[{sourceKind}->{targetKind}, " +
+                $"targetStart={targetLane == targetStartLane}, " +
+                $"targetEnd={targetLane == targetEndLane}, " +
+                $"penalties={penaltySummary}]";
         }
 
         private string BuildNavigationPreview(Entity vehicle, Entity currentLane)
