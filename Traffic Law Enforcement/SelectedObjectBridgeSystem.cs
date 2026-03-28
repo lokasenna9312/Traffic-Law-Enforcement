@@ -252,6 +252,7 @@ namespace Traffic_Law_Enforcement
 
             m_CurrentSnapshot = BuildSnapshot(resolveResult);
             m_HasSnapshot = true;
+            LogCurrentRouteBridgeTraceIfNeeded(resolveResult, m_CurrentSnapshot);
         }
 
         private SelectedObjectDebugSnapshot BuildSnapshot(
@@ -817,6 +818,54 @@ namespace Traffic_Law_Enforcement
 
                 default:
                     return SelectedObjectTleApplicability.NotApplicable;
+            }
+        }
+
+        private void LogCurrentRouteBridgeTraceIfNeeded(
+            SelectedObjectResolveResult resolveResult,
+            SelectedObjectDebugSnapshot snapshot)
+        {
+            if (!CurrentRouteClickTraceLogging.TryConsumePostClickBridgeUpdate(out int traceId))
+            {
+                return;
+            }
+
+            Entity clickedRoute = CurrentRouteClickTraceLogging.ActiveClickedRoute;
+            string snapshotBranch =
+                resolveResult.ResolveState == SelectedObjectResolveState.None
+                    ? "noSelectionSnapshot"
+                    : resolveResult.ResolveState == SelectedObjectResolveState.NotVehicle
+                        ? "nonVehicleSnapshot"
+                        : "vehicleSnapshot";
+
+            CurrentRouteClickTraceLogging.LogBridge(
+                traceId,
+                $"sourceSelectedEntity={CurrentRouteClickTraceLogging.FormatEntity(resolveResult.SourceSelectedEntity)}, clickedRoute={CurrentRouteClickTraceLogging.FormatEntity(clickedRoute)}, sourceMatchesClickedRoute={resolveResult.SourceSelectedEntity == clickedRoute}, resolvedVehicleEntity={CurrentRouteClickTraceLogging.FormatEntity(resolveResult.ResolvedVehicleEntity)}, resolvedVehicleMatchesClickedRoute={resolveResult.ResolvedVehicleEntity == clickedRoute}, resolveState={resolveResult.ResolveState}, vehicleKind={resolveResult.VehicleKind}, tleApplicability={snapshot.TleApplicability}, hasSelection={resolveResult.HasSelection}, isVehicle={resolveResult.IsVehicle}, isCar={resolveResult.IsCar}, isTrain={resolveResult.IsTrain}, isParked={resolveResult.IsParked}, hasCarCurrentLane={resolveResult.HasCarCurrentLane}, hasTrainCurrentLane={resolveResult.HasTrainCurrentLane}, hasLiveLaneData={resolveResult.HasLiveLaneData}, hasSnapshot={m_HasSnapshot}, snapshotBranch={snapshotBranch}, currentRouteSelectionEntity={CurrentRouteClickTraceLogging.FormatEntity(m_CurrentRouteSelectionEntity)}, reason={BuildBridgeResolveTraceReason(resolveResult)}");
+        }
+
+        private static string BuildBridgeResolveTraceReason(
+            SelectedObjectResolveResult resolveResult)
+        {
+            switch (resolveResult.ResolveState)
+            {
+                case SelectedObjectResolveState.None:
+                    return "resolver returned no selection";
+
+                case SelectedObjectResolveState.NotVehicle:
+                    return resolveResult.HasSelection
+                        ? "selected entity resolved as non-vehicle"
+                        : "resolver produced no selected entity";
+
+                case SelectedObjectResolveState.Vehicle:
+                    if (resolveResult.ResolvedVehicleEntity == Entity.Null)
+                    {
+                        return "vehicle resolve state with null resolved vehicle";
+                    }
+
+                    return $"resolved vehicle snapshot ({resolveResult.VehicleKind})";
+
+                default:
+                    return "unknown resolve branch";
             }
         }
     }

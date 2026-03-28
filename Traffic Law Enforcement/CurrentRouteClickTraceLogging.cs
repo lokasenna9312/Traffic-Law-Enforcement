@@ -7,35 +7,62 @@ namespace Traffic_Law_Enforcement
     {
         private static int s_NextTraceId;
         private static int s_ActiveTraceId;
-        private static int s_PostClickUiUpdatesRemaining;
+        private static int s_PostClickPanelUpdatesRemaining;
+        private static int s_PostClickBridgeUpdatesRemaining;
         private static Entity s_ActiveVehicle;
+        private static Entity s_ActiveClickedRoute;
         private static string s_LastBuilderSignature = string.Empty;
 
-        internal static int BeginClickTrace(Entity vehicle)
+        internal static int BeginClickTrace(Entity vehicle, Entity clickedRoute)
         {
             s_ActiveTraceId = ++s_NextTraceId;
-            s_PostClickUiUpdatesRemaining = 2;
+            s_PostClickPanelUpdatesRemaining = 2;
+            s_PostClickBridgeUpdatesRemaining = 2;
             s_ActiveVehicle = vehicle;
+            s_ActiveClickedRoute = clickedRoute;
             s_LastBuilderSignature = string.Empty;
             return s_ActiveTraceId;
         }
 
-        internal static bool TryConsumePostClickUiUpdate(out int traceId)
+        internal static bool TryConsumePostClickPanelUpdate(out int traceId)
         {
-            if (s_PostClickUiUpdatesRemaining <= 0)
+            if (s_PostClickPanelUpdatesRemaining <= 0)
             {
                 traceId = 0;
                 return false;
             }
 
             traceId = s_ActiveTraceId;
-            s_PostClickUiUpdatesRemaining -= 1;
+            s_PostClickPanelUpdatesRemaining -= 1;
+            return true;
+        }
+
+        internal static bool TryConsumePostClickBridgeUpdate(out int traceId)
+        {
+            if (s_PostClickBridgeUpdatesRemaining <= 0)
+            {
+                traceId = 0;
+                return false;
+            }
+
+            traceId = s_ActiveTraceId;
+            s_PostClickBridgeUpdatesRemaining -= 1;
             return true;
         }
 
         internal static void LogUi(int traceId, string stage, string message)
         {
             Mod.log.Info($"[CurrentRouteClickTrace #{traceId}] {stage}: {message}");
+        }
+
+        internal static void LogPanel(int traceId, string message)
+        {
+            Mod.log.Info($"[CurrentRouteClickTrace #{traceId}][Panel] {message}");
+        }
+
+        internal static void LogBridge(int traceId, string message)
+        {
+            Mod.log.Info($"[CurrentRouteClickTrace #{traceId}][Bridge] {message}");
         }
 
         internal static void LogBuilderStateIfChanged(
@@ -68,5 +95,7 @@ namespace Traffic_Law_Enforcement
         {
             return FocusedLoggingService.FormatEntity(entity);
         }
+
+        internal static Entity ActiveClickedRoute => s_ActiveClickedRoute;
     }
 }

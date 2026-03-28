@@ -334,7 +334,12 @@ namespace Traffic_Law_Enforcement
                 m_CurrentRouteEntityBinding.Update(Entity.Null);
                 m_CurrentRouteSelectableBinding.Update(false);
                 UpdateBindings(default);
-                LogCurrentRoutePostClickUpdateIfNeeded();
+                LogCurrentRoutePostClickUpdateIfNeeded(
+                    "panelDisabled",
+                    default,
+                    m_SelectedObjectBridgeSystem != null,
+                    bridgeHasSnapshot: false,
+                    snapshot: null);
                 return;
             }
 
@@ -345,8 +350,14 @@ namespace Traffic_Law_Enforcement
                 m_CurrentRouteEntityBinding.Update(Entity.Null);
                 m_CurrentRouteSelectableBinding.Update(false);
                 RefreshEntitySelectionStatus(currentSuggestedEntitySelectionValue);
-                UpdateBindings(BuildNoSelectionState());
-                LogCurrentRoutePostClickUpdateIfNeeded();
+                PanelState noSnapshotState = BuildNoSelectionState();
+                UpdateBindings(noSnapshotState);
+                LogCurrentRoutePostClickUpdateIfNeeded(
+                    "noSnapshotFallbackToNoSelection",
+                    noSnapshotState,
+                    m_SelectedObjectBridgeSystem != null,
+                    bridgeHasSnapshot: false,
+                    snapshot: null);
                 return;
             }
 
@@ -359,8 +370,21 @@ namespace Traffic_Law_Enforcement
             currentSuggestedEntitySelectionValue =
                 BuildSuggestedEntitySelectionValue(m_SelectedObjectBridgeSystem.CurrentSnapshot);
             RefreshEntitySelectionStatus(currentSuggestedEntitySelectionValue);
-            UpdateBindings(BuildState(m_SelectedObjectBridgeSystem.CurrentSnapshot));
-            LogCurrentRoutePostClickUpdateIfNeeded();
+            SelectedObjectDebugSnapshot snapshot = m_SelectedObjectBridgeSystem.CurrentSnapshot;
+            PanelState state = BuildState(snapshot);
+            UpdateBindings(state);
+            string panelBranch =
+                snapshot.ResolveState == SelectedObjectResolveState.None
+                    ? "noSelectionState"
+                    : snapshot.ResolveState == SelectedObjectResolveState.NotVehicle
+                        ? "notVehicleState"
+                        : "vehicleState";
+            LogCurrentRoutePostClickUpdateIfNeeded(
+                panelBranch,
+                state,
+                bridgeExists: true,
+                bridgeHasSnapshot: true,
+                snapshot);
         }
 
         private PanelState BuildState(SelectedObjectDebugSnapshot snapshot)
@@ -644,7 +668,8 @@ namespace Traffic_Law_Enforcement
             int traceId = CurrentRouteClickTraceLogging.BeginClickTrace(
                 m_SelectedObjectBridgeSystem != null && m_SelectedObjectBridgeSystem.HasSnapshot
                     ? m_SelectedObjectBridgeSystem.CurrentSnapshot.ResolvedVehicleEntity
-                    : Entity.Null);
+                    : Entity.Null,
+                m_CurrentRouteSelectionEntity);
 
             CurrentRouteClickTraceLogging.LogUi(
                 traceId,
@@ -935,9 +960,14 @@ namespace Traffic_Law_Enforcement
                 : $"#{entity.Index}:v{entity.Version}";
         }
 
-        private void LogCurrentRoutePostClickUpdateIfNeeded()
+        private void LogCurrentRoutePostClickUpdateIfNeeded(
+            string panelBranch,
+            PanelState panelState,
+            bool bridgeExists,
+            bool bridgeHasSnapshot,
+            SelectedObjectDebugSnapshot? snapshot)
         {
-            if (!CurrentRouteClickTraceLogging.TryConsumePostClickUiUpdate(out int traceId))
+            if (!CurrentRouteClickTraceLogging.TryConsumePostClickPanelUpdate(out int traceId))
             {
                 return;
             }
@@ -966,6 +996,14 @@ namespace Traffic_Law_Enforcement
                 traceId,
                 "postClickUpdate",
                 $"selectedEntity={CurrentRouteClickTraceLogging.FormatEntity(selectedEntity)}, selectedRoute={CurrentRouteClickTraceLogging.FormatEntity(selectedRoute)}, selectedIndex={selectedIndex}, toolSelected={CurrentRouteClickTraceLogging.FormatEntity(toolSelected)}, selectedEntityBecameNull={selectedEntity == Entity.Null}, selectedRouteCleared={selectedRoute == Entity.Null}");
+
+            string snapshotText = snapshot.HasValue
+                ? $"resolveState={snapshot.Value.ResolveState}, sourceSelectedEntity={CurrentRouteClickTraceLogging.FormatEntity(snapshot.Value.SourceSelectedEntity)}, resolvedVehicleEntity={CurrentRouteClickTraceLogging.FormatEntity(snapshot.Value.ResolvedVehicleEntity)}, vehicleKind={snapshot.Value.VehicleKind}, tleApplicability={snapshot.Value.TleApplicability}"
+                : "snapshot=None";
+
+            CurrentRouteClickTraceLogging.LogPanel(
+                traceId,
+                $"panelEnabled={m_IsPanelEnabled}, panelVisible={panelState.Visible}, bridgeExists={bridgeExists}, bridgeHasSnapshot={bridgeHasSnapshot}, branch={panelBranch}, {snapshotText}");
         }
 
         private Entity TryGetRawCurrentRouteForTrace()
