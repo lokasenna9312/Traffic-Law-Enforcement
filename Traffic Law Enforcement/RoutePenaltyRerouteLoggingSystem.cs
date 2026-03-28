@@ -196,7 +196,8 @@ namespace Traffic_Law_Enforcement
             FocusedLoggingService.PruneMissingVehicles(EntityManager);
             bool hasWatchedVehicles = FocusedLoggingService.HasWatchedVehicles;
             bool trackRouteSelectionChanges =
-                routeSelectionSummaryLoggingEnabled ||
+                (routeSelectionSummaryLoggingEnabled &&
+                 (!restrictVehicleSpecificRouteLogsToWatchedVehicles || hasWatchedVehicles)) ||
                 (focusedRouteRebuildDiagnosticsLoggingEnabled && hasWatchedVehicles);
 
             m_CandidateVehicles.Clear();
@@ -217,7 +218,8 @@ namespace Traffic_Law_Enforcement
                 }
 
                 bool requireAllCandidateVehicles =
-                    routeSelectionSummaryLoggingEnabled ||
+                    (routeSelectionSummaryLoggingEnabled &&
+                     !restrictVehicleSpecificRouteLogsToWatchedVehicles) ||
                     (estimatedRerouteLoggingEnabled &&
                      !restrictVehicleSpecificRouteLogsToWatchedVehicles) ||
                     (pathfindingPenaltyDiagnosticLoggingEnabled &&
@@ -315,7 +317,7 @@ namespace Traffic_Law_Enforcement
                             focusedRouteRebuildDiagnosticsLoggingEnabled &&
                             watchedVehicle;
                         bool emitSummary =
-                            routeSelectionSummaryLoggingEnabled ||
+                            EnforcementLoggingPolicy.ShouldLogRouteSelectionChangeSummary(vehicle) ||
                             emitFocusedDiagnostics;
 
                         if (!emitSummary)

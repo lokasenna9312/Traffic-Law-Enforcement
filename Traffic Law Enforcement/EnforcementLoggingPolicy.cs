@@ -70,6 +70,13 @@ namespace Traffic_Law_Enforcement
             return Mod.IsEnforcementEnabled && EnableAllVehicleRouteSelectionChangeLogging;
         }
 
+        public static bool ShouldLogRouteSelectionChangeSummary(Entity vehicle)
+        {
+            return ShouldLogVehicleSpecificVisibleLog(
+                ShouldLogAllVehicleRouteSelectionChanges(),
+                vehicle);
+        }
+
         public static bool ShouldLogFocusedRouteRebuildDiagnostics()
         {
             return Mod.IsEnforcementEnabled && EnableFocusedRouteRebuildDiagnosticsLogging;
