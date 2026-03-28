@@ -4,7 +4,6 @@ using Game.Net;
 using Game.Pathfind;
 using Game.Prefabs;
 using Game.Routes;
-using Game.UI.InGame;
 using Game.Vehicles;
 using Unity.Entities;
 using Entity = Unity.Entities.Entity;
@@ -32,7 +31,6 @@ namespace Traffic_Law_Enforcement
         public readonly bool HasPathOwner;
         public readonly bool HasCurrentTarget;
         public readonly bool HasCurrentRoute;
-        public readonly Entity CurrentRouteEntity;
         public readonly PathFlags CurrentPathFlags;
         public readonly string CurrentTargetText;
         public readonly string CurrentRouteText;
@@ -53,7 +51,6 @@ namespace Traffic_Law_Enforcement
             bool hasPathOwner,
             bool hasCurrentTarget,
             bool hasCurrentRoute,
-            Entity currentRouteEntity,
             PathFlags currentPathFlags,
             string currentTargetText,
             string currentRouteText,
@@ -73,7 +70,6 @@ namespace Traffic_Law_Enforcement
             HasPathOwner = hasPathOwner;
             HasCurrentTarget = hasCurrentTarget;
             HasCurrentRoute = hasCurrentRoute;
-            CurrentRouteEntity = currentRouteEntity;
             CurrentPathFlags = currentPathFlags;
             CurrentTargetText = currentTargetText;
             CurrentRouteText = currentRouteText;
@@ -116,20 +112,6 @@ namespace Traffic_Law_Enforcement
                 context.CurrentRouteData.TryGetComponent(vehicle, out CurrentRoute currentRouteData) &&
                 currentRouteData.m_Route != Entity.Null;
             Entity currentRouteEntity = hasCurrentRoute ? currentRouteData.m_Route : Entity.Null;
-            string currentRouteResolutionReason = string.Empty;
-            Entity selectableCurrentRouteEntity =
-                ResolveCurrentRouteSelectionEntity(
-                    currentRouteEntity,
-                    ref context,
-                    out currentRouteResolutionReason);
-
-            CurrentRouteClickTraceLogging.LogBuilderStateIfChanged(
-                vehicle,
-                hasCurrentRoute,
-                currentRouteEntity,
-                selectableCurrentRouteEntity,
-                currentRouteResolutionReason);
-
             bool hasPathOwner =
                 context.PathOwnerData.TryGetComponent(vehicle, out PathOwner pathOwner);
             PathFlags currentPathFlags = hasPathOwner ? pathOwner.m_State : default;
@@ -153,10 +135,9 @@ namespace Traffic_Law_Enforcement
                 hasPathOwner: hasPathOwner,
                 hasCurrentTarget: hasCurrentTarget,
                 hasCurrentRoute: hasCurrentRoute,
-                currentRouteEntity: selectableCurrentRouteEntity,
                 currentPathFlags: currentPathFlags,
                 currentTargetText: BuildCurrentTargetText(targetEntity, ref context),
-                currentRouteText: BuildCurrentRouteText(selectableCurrentRouteEntity, currentRouteEntity, ref context),
+                currentRouteText: BuildCurrentRouteText(currentRouteEntity, ref context),
                 targetRoadText: BuildTargetRoadText(targetEntity, ref context),
                 startOwnerRoadText: BuildRouteLaneOwnerRoadText(targetEntity, useStartLane: true, ref context),
                 endOwnerRoadText: BuildRouteLaneOwnerRoadText(targetEntity, useStartLane: false, ref context),
@@ -239,213 +220,58 @@ namespace Traffic_Law_Enforcement
             return text;
         }
 
-        private static string BuildCurrentRouteText(Entity displayRouteEntity, Entity rawCurrentRouteEntity, ref SelectedObjectRouteDiagnosticsContext context)
+        private static string BuildCurrentRouteText(Entity currentRouteEntity, ref SelectedObjectRouteDiagnosticsContext context)
         {
-            string customName = TryGetCurrentRouteCustomName(rawCurrentRouteEntity, displayRouteEntity, ref context);
+            string customName = TryGetCurrentRouteCustomName(currentRouteEntity, ref context);
             if (!string.IsNullOrWhiteSpace(customName))
             {
                 return customName;
             }
 
-            string renderedName = TryGetCurrentRouteRenderedName(rawCurrentRouteEntity, displayRouteEntity, ref context);
+            string renderedName = TryGetCurrentRouteRenderedName(currentRouteEntity, ref context);
             if (!string.IsNullOrWhiteSpace(renderedName))
             {
                 return renderedName;
             }
 
-            string builtName = TryGetCurrentRouteBuiltName(rawCurrentRouteEntity, displayRouteEntity, ref context);
+            string builtName = TryGetCurrentRouteBuiltName(currentRouteEntity, ref context);
             if (!string.IsNullOrWhiteSpace(builtName))
             {
                 return builtName;
             }
 
-            Entity routeEntity =
-                rawCurrentRouteEntity != Entity.Null
-                    ? rawCurrentRouteEntity
-                    : displayRouteEntity;
-            if (routeEntity == Entity.Null)
+            if (currentRouteEntity == Entity.Null)
             {
                 return SelectedObjectDisplayFormatter.FormatEntityOrNone(Entity.Null);
             }
-            return SelectedObjectDisplayFormatter.FormatEntityOrNone(routeEntity);
+            return SelectedObjectDisplayFormatter.FormatEntityOrNone(currentRouteEntity);
         }
 
-        private static Entity ResolveCurrentRouteSelectionEntity(
-            Entity currentRouteEntity,
-            ref SelectedObjectRouteDiagnosticsContext context,
-            out string resolutionReason)
+        private static string TryGetCurrentRouteCustomName(Entity currentRouteEntity, ref SelectedObjectRouteDiagnosticsContext context)
         {
-            if (currentRouteEntity == Entity.Null)
+            if (currentRouteEntity != Entity.Null)
             {
-                resolutionReason = "no raw current route";
-                return Entity.Null;
-            }
-
-            EntityManager entityManager = context.Formatter.EntityManager;
-            if (IsLineSelectionCandidate(
-                    currentRouteEntity,
-                    entityManager,
-                    out string rawCandidateReason))
-            {
-                resolutionReason = $"accepted raw current route ({rawCandidateReason})";
-                return currentRouteEntity;
-            }
-
-            string lastFailureReason = rawCandidateReason;
-            Entity candidate = currentRouteEntity;
-
-            for (int depth = 1; depth <= 16 && candidate != Entity.Null; depth++)
-            {
-                if (!context.Formatter.OwnerData.TryGetComponent(candidate, out Owner owner) ||
-                    owner.m_Owner == Entity.Null ||
-                    owner.m_Owner == candidate)
-                {
-                    resolutionReason =
-                        $"rejected route candidate {CurrentRouteClickTraceLogging.FormatEntity(candidate)} ({lastFailureReason}); owner chain terminated";
-                    return Entity.Null;
-                }
-
-                candidate = owner.m_Owner;
-
-                if (IsLineSelectionCandidate(
-                        candidate,
-                        entityManager,
-                        out string candidateReason))
-                {
-                    resolutionReason =
-                        $"accepted owner-chain candidate depth={depth} candidate={CurrentRouteClickTraceLogging.FormatEntity(candidate)} ({candidateReason})";
-                    return candidate;
-                }
-
-                lastFailureReason = candidateReason;
-            }
-
-            resolutionReason =
-                $"no selectable route candidate; rawCurrentRoute={CurrentRouteClickTraceLogging.FormatEntity(currentRouteEntity)}, lastFailure={lastFailureReason}";
-            return Entity.Null;
-        }
-
-        private static bool IsLineSelectionCandidate(
-            Entity entity,
-            EntityManager entityManager,
-            out string reason)
-        {
-            if (entity == Entity.Null)
-            {
-                reason = "entity is None";
-                return false;
-            }
-
-            if (!entityManager.Exists(entity))
-            {
-                reason = "entity does not exist";
-                return false;
-            }
-
-            if (!entityManager.HasComponent<Route>(entity))
-            {
-                reason = "missing Route";
-                return false;
-            }
-
-            if (!entityManager.HasComponent<PrefabRef>(entity))
-            {
-                reason = "missing PrefabRef";
-                return false;
-            }
-
-            if (!entityManager.HasBuffer<RouteWaypoint>(entity))
-            {
-                reason = "missing RouteWaypoint buffer";
-                return false;
-            }
-
-            if (!entityManager.HasBuffer<RouteSegment>(entity))
-            {
-                reason = "missing RouteSegment buffer";
-                return false;
-            }
-
-            if (!entityManager.HasBuffer<RouteVehicle>(entity))
-            {
-                reason = "missing RouteVehicle buffer";
-                return false;
-            }
-
-            if (!entityManager.HasComponent<TransportLine>(entity) &&
-                !entityManager.HasComponent<WorkRoute>(entity))
-            {
-                reason = "missing TransportLine/WorkRoute";
-                return false;
-            }
-
-            int elementIndex = -1;
-            bool canResolvePosition = SelectedInfoUISystem.TryGetPosition(
-                entity,
-                entityManager,
-                ref elementIndex,
-                out _,
-                out _,
-                out _,
-                out _,
-                reinterpolate: true);
-
-            if (!canResolvePosition)
-            {
-                reason = "TryGetPosition failed";
-                return false;
-            }
-
-            reason = $"passed line selection checks; elementIndex={elementIndex}";
-            return true;
-        }
-
-        private static string TryGetCurrentRouteCustomName(Entity displayRouteEntity, Entity rawCurrentRouteEntity, ref SelectedObjectRouteDiagnosticsContext context)
-        {
-            string displayName = SelectedObjectDisplayFormatter.TryGetCustomName(displayRouteEntity, ref context.Formatter);
-            if (!string.IsNullOrWhiteSpace(displayName))
-            {
-                return displayName;
-            }
-
-            if (rawCurrentRouteEntity != Entity.Null &&
-                rawCurrentRouteEntity != displayRouteEntity)
-            {
-                return SelectedObjectDisplayFormatter.TryGetCustomName(rawCurrentRouteEntity, ref context.Formatter);
+                return SelectedObjectDisplayFormatter.TryGetCustomName(currentRouteEntity, ref context.Formatter);
             }
 
             return string.Empty;
         }
 
-        private static string TryGetCurrentRouteBuiltName(Entity displayRouteEntity, Entity rawCurrentRouteEntity, ref SelectedObjectRouteDiagnosticsContext context)
+        private static string TryGetCurrentRouteBuiltName(Entity currentRouteEntity, ref SelectedObjectRouteDiagnosticsContext context)
         {
-            string displayName = SelectedObjectDisplayFormatter.TryBuildRouteName(displayRouteEntity, ref context.Formatter);
-            if (!string.IsNullOrWhiteSpace(displayName))
+            if (currentRouteEntity != Entity.Null)
             {
-                return displayName;
-            }
-
-            if (rawCurrentRouteEntity != Entity.Null &&
-                rawCurrentRouteEntity != displayRouteEntity)
-            {
-                return SelectedObjectDisplayFormatter.TryBuildRouteName(rawCurrentRouteEntity, ref context.Formatter);
+                return SelectedObjectDisplayFormatter.TryBuildRouteName(currentRouteEntity, ref context.Formatter);
             }
 
             return string.Empty;
         }
 
-        private static string TryGetCurrentRouteRenderedName(Entity displayRouteEntity, Entity rawCurrentRouteEntity, ref SelectedObjectRouteDiagnosticsContext context)
+        private static string TryGetCurrentRouteRenderedName(Entity currentRouteEntity, ref SelectedObjectRouteDiagnosticsContext context)
         {
-            string displayName = SelectedObjectDisplayFormatter.TryGetRenderedName(displayRouteEntity, ref context.Formatter);
-            if (!string.IsNullOrWhiteSpace(displayName))
+            if (currentRouteEntity != Entity.Null)
             {
-                return displayName;
-            }
-
-            if (rawCurrentRouteEntity != Entity.Null &&
-                rawCurrentRouteEntity != displayRouteEntity)
-            {
-                return SelectedObjectDisplayFormatter.TryGetRenderedName(rawCurrentRouteEntity, ref context.Formatter);
+                return SelectedObjectDisplayFormatter.TryGetRenderedName(currentRouteEntity, ref context.Formatter);
             }
 
             return string.Empty;

@@ -75,8 +75,6 @@ const routeDiagnosticsVisibleBinding = api.bindValue(group, "routeDiagnosticsVis
 const routeDiagnosticsCollapsedBinding = api.bindValue(group, "routeDiagnosticsCollapsed", true);
 const currentTargetBinding = api.bindValue(group, "currentTarget", "");
 const currentRouteBinding = api.bindValue(group, "currentRoute", "");
-const currentRouteEntityBinding = api.bindValue(group, "currentRouteEntity", null);
-const currentRouteSelectableBinding = api.bindValue(group, "currentRouteSelectable", false);
 const targetRoadBinding = api.bindValue(group, "targetRoad", "");
 const startOwnerRoadBinding = api.bindValue(group, "startOwnerRoad", "");
 const endOwnerRoadBinding = api.bindValue(group, "endOwnerRoad", "");
@@ -220,19 +218,6 @@ const styles = {
         whiteSpace: "pre-line",
         wordBreak: "break-word",
     },
-    valueLinkButton: {
-        display: "block",
-        width: "100%",
-        padding: "0",
-        margin: "0",
-        border: "0",
-        background: "transparent",
-        textAlign: "left",
-        fontFamily: "inherit",
-        fontWeight: "inherit",
-        color: "#8fd0ff",
-        cursor: "pointer",
-    },
     valueMultiline: {
         display: "flex",
         flexDirection: "column",
@@ -327,37 +312,19 @@ function Row(props) {
                 : styles.row,
         },
         h("div", { style: styles.label }, props.label),
-        props.onClick && !isMultiline
-            ? h("button", {
-                    type: "button",
-                     style: Object.assign({}, styles.value, styles.valueLinkButton),
-                     onMouseDown: stopEvent,
-                     onMouseUp: stopEvent,
-                     onClick: function (event) {
-                         stopEvent(event);
-                         props.onClick();
-                     },
-                     onKeyDown: function (event) {
-                        if (event.key === "Enter" || event.key === " ") {
-                             stopEvent(event);
-                             props.onClick();
-                         }
-                     },
-                     onFocus: stopPropagationOnly,
-                 }, props.value)
-            : h(
-                  "div",
-                  {
-                      style: isMultiline
-                          ? Object.assign({}, styles.value, styles.valueMultiline)
-                          : styles.value,
-                  },
-                  isMultiline
-                      ? valueLines.map(function (line, index) {
-                            return h("div", { key: index }, line);
-                        })
-                      : props.value
-              )
+        h(
+            "div",
+            {
+                style: isMultiline
+                    ? Object.assign({}, styles.value, styles.valueMultiline)
+                    : styles.value,
+            },
+            isMultiline
+                ? valueLines.map(function (line, index) {
+                      return h("div", { key: index }, line);
+                  })
+                : props.value
+        )
     );
 }
 
@@ -462,8 +429,6 @@ function SelectedObjectPanel() {
     const routeDiagnosticsCollapsed = api.useValue(routeDiagnosticsCollapsedBinding);
     const currentTarget = api.useValue(currentTargetBinding);
     const currentRoute = api.useValue(currentRouteBinding);
-    const currentRouteEntity = api.useValue(currentRouteEntityBinding);
-    const currentRouteSelectable = api.useValue(currentRouteSelectableBinding);
     const targetRoad = api.useValue(targetRoadBinding);
     const startOwnerRoad = api.useValue(startOwnerRoadBinding);
     const endOwnerRoad = api.useValue(endOwnerRoadBinding);
@@ -508,14 +473,6 @@ function SelectedObjectPanel() {
     const onToggleRouteDiagnostics = React.useCallback(function () {
         api.trigger(group, "toggleRouteDiagnosticsCollapsed");
     }, []);
-
-    const onSelectCurrentRoute = React.useCallback(function () {
-        if (!currentRouteSelectable || !currentRouteEntity) {
-            return;
-        }
-
-        api.trigger(group, "selectCurrentRoute");
-    }, [currentRouteEntity, currentRouteSelectable]);
 
     const onSubmitEntitySelection = React.useCallback(
         function (event) {
@@ -693,15 +650,11 @@ function SelectedObjectPanel() {
                        : null,
                    routeDiagnosticsVisible && !routeDiagnosticsCollapsed
                        ? h(
-                             "div",
-                             { style: styles.subsectionBody },
-                             h(Row, { label: currentTargetLabelText, value: currentTarget }),
-                             h(Row, {
-                                 label: currentRouteLabelText,
-                                 value: currentRoute,
-                                 onClick: currentRouteSelectable ? onSelectCurrentRoute : null,
-                             }),
-                             h(Row, { label: targetRoadLabelText, value: targetRoad }),
+                              "div",
+                              { style: styles.subsectionBody },
+                              h(Row, { label: currentTargetLabelText, value: currentTarget }),
+                              h(Row, { label: currentRouteLabelText, value: currentRoute }),
+                              h(Row, { label: targetRoadLabelText, value: targetRoad }),
                              h(Row, { label: startOwnerRoadLabelText, value: startOwnerRoad }),
                              h(Row, { label: endOwnerRoadLabelText, value: endOwnerRoad }),
                              h(Row, { label: currentToTargetStartLabelText, value: currentToTargetStart }),

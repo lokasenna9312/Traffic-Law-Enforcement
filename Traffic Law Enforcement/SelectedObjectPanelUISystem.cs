@@ -5,7 +5,6 @@ using Game.Pathfind;
 using Game.Prefabs;
 using Game.Routes;
 using Game.SceneFlow;
-using Game.Tools;
 using Game.UI;
 using Game.UI.InGame;
 using System.Text.RegularExpressions;
@@ -87,7 +86,6 @@ namespace Traffic_Law_Enforcement
 
         private SelectedObjectBridgeSystem m_SelectedObjectBridgeSystem;
         private SelectedInfoUISystem m_SelectedInfoSystem;
-        private ToolSystem m_ToolSystem;
         private ProxyAction m_PanelToggleAction;
 
         private ValueBinding<bool> m_VisibleBinding;
@@ -151,8 +149,6 @@ namespace Traffic_Law_Enforcement
         private ValueBinding<bool> m_RouteDiagnosticsCollapsedBinding;
         private ValueBinding<string> m_CurrentTargetBinding;
         private ValueBinding<string> m_CurrentRouteBinding;
-        private ValueBinding<Entity> m_CurrentRouteEntityBinding;
-        private ValueBinding<bool> m_CurrentRouteSelectableBinding;
         private ValueBinding<string> m_TargetRoadBinding;
         private ValueBinding<string> m_StartOwnerRoadBinding;
         private ValueBinding<string> m_EndOwnerRoadBinding;
@@ -173,7 +169,6 @@ namespace Traffic_Law_Enforcement
         private string m_EntitySelectionStatus = string.Empty;
         private bool m_EntitySelectionStatusIsError;
         private string m_EntitySelectionStatusSelectedEntity = string.Empty;
-        private Entity m_CurrentRouteSelectionEntity = Entity.Null;
 
         public override GameMode gameMode => GameMode.Game;
 
@@ -285,8 +280,6 @@ namespace Traffic_Law_Enforcement
             AddBinding(m_RouteDiagnosticsCollapsedBinding = new ValueBinding<bool>(kGroup, "routeDiagnosticsCollapsed", true));
             AddBinding(m_CurrentTargetBinding = new ValueBinding<string>(kGroup, "currentTarget", string.Empty));
             AddBinding(m_CurrentRouteBinding = new ValueBinding<string>(kGroup, "currentRoute", string.Empty));
-            AddBinding(m_CurrentRouteEntityBinding = new ValueBinding<Entity>(kGroup, "currentRouteEntity", Entity.Null));
-            AddBinding(m_CurrentRouteSelectableBinding = new ValueBinding<bool>(kGroup, "currentRouteSelectable", false));
             AddBinding(m_TargetRoadBinding = new ValueBinding<string>(kGroup, "targetRoad", string.Empty));
             AddBinding(m_StartOwnerRoadBinding = new ValueBinding<string>(kGroup, "startOwnerRoad", string.Empty));
             AddBinding(m_EndOwnerRoadBinding = new ValueBinding<string>(kGroup, "endOwnerRoad", string.Empty));
@@ -303,7 +296,6 @@ namespace Traffic_Law_Enforcement
             AddBinding(new TriggerBinding(kGroup, "toggleCollapsed", ToggleCollapsed));
             AddBinding(new TriggerBinding(kGroup, "toggleLaneDetailsCollapsed", ToggleLaneDetailsCollapsed));
             AddBinding(new TriggerBinding(kGroup, "toggleRouteDiagnosticsCollapsed", ToggleRouteDiagnosticsCollapsed));
-            AddBinding(new TriggerBinding(kGroup, "selectCurrentRoute", HandleSelectCurrentRoute));
             AddBinding(new TriggerBinding<string>(kGroup, "submitEntitySelection", HandleSubmitEntitySelection));
         }
 
@@ -334,60 +326,25 @@ namespace Traffic_Law_Enforcement
 
             if (!m_IsPanelEnabled)
             {
-                m_CurrentRouteEntityBinding.Update(Entity.Null);
-                m_CurrentRouteSelectableBinding.Update(false);
                 UpdateBindings(default);
-                LogCurrentRoutePostClickUpdateIfNeeded(
-                    "panelDisabled",
-                    default,
-                    m_SelectedObjectBridgeSystem != null,
-                    bridgeHasSnapshot: false,
-                    snapshot: null);
                 return;
             }
 
             string currentSuggestedEntitySelectionValue = string.Empty;
             if (m_SelectedObjectBridgeSystem == null || !m_SelectedObjectBridgeSystem.HasSnapshot)
             {
-                m_CurrentRouteSelectionEntity = Entity.Null;
-                m_CurrentRouteEntityBinding.Update(Entity.Null);
-                m_CurrentRouteSelectableBinding.Update(false);
                 RefreshEntitySelectionStatus(currentSuggestedEntitySelectionValue);
                 PanelState noSnapshotState = BuildNoSelectionState();
                 UpdateBindings(noSnapshotState);
-                LogCurrentRoutePostClickUpdateIfNeeded(
-                    "noSnapshotFallbackToNoSelection",
-                    noSnapshotState,
-                    m_SelectedObjectBridgeSystem != null,
-                    bridgeHasSnapshot: false,
-                    snapshot: null);
                 return;
             }
 
-            m_CurrentRouteSelectionEntity =
-                m_SelectedObjectBridgeSystem.CurrentRouteSelectionEntity;
-            m_CurrentRouteEntityBinding.Update(m_CurrentRouteSelectionEntity);
-            m_CurrentRouteSelectableBinding.Update(
-                m_CurrentRouteSelectionEntity != Entity.Null &&
-                EntityManager.Exists(m_CurrentRouteSelectionEntity));
             currentSuggestedEntitySelectionValue =
                 BuildSuggestedEntitySelectionValue(m_SelectedObjectBridgeSystem.CurrentSnapshot);
             RefreshEntitySelectionStatus(currentSuggestedEntitySelectionValue);
             SelectedObjectDebugSnapshot snapshot = m_SelectedObjectBridgeSystem.CurrentSnapshot;
             PanelState state = BuildState(snapshot);
             UpdateBindings(state);
-            string panelBranch =
-                snapshot.ResolveState == SelectedObjectResolveState.None
-                    ? "noSelectionState"
-                    : snapshot.ResolveState == SelectedObjectResolveState.NotVehicle
-                        ? "notVehicleState"
-                        : "vehicleState";
-            LogCurrentRoutePostClickUpdateIfNeeded(
-                panelBranch,
-                state,
-                bridgeExists: true,
-                bridgeHasSnapshot: true,
-                snapshot);
         }
 
         private PanelState BuildState(SelectedObjectDebugSnapshot snapshot)
@@ -633,68 +590,6 @@ namespace Traffic_Law_Enforcement
 
             m_SelectedInfoSystem.SetSelection(entity);
             SetEntitySelectionSuccessStatus(entity);
-        }
-
-        private void HandleSelectCurrentRoute()
-        {
-            if (m_CurrentRouteSelectionEntity == Entity.Null ||
-                !EntityManager.Exists(m_CurrentRouteSelectionEntity))
-            {
-                return;
-            }
-
-            if (m_SelectedInfoSystem == null)
-            {
-                m_SelectedInfoSystem =
-                    World.GetExistingSystemManaged<SelectedInfoUISystem>();
-            }
-
-            if (m_SelectedInfoSystem == null)
-            {
-                return;
-            }
-
-            if (m_ToolSystem == null)
-            {
-                m_ToolSystem = World.GetExistingSystemManaged<ToolSystem>();
-            }
-
-            if (m_ToolSystem != null)
-            {
-                m_ToolSystem.selectedIndex = -1;
-            }
-
-            Entity selectedEntityBefore = m_SelectedInfoSystem.selectedEntity;
-            Entity selectedRouteBefore = m_SelectedInfoSystem.selectedRoute;
-            int selectedIndexBefore = m_ToolSystem != null ? m_ToolSystem.selectedIndex : int.MinValue;
-            Entity toolSelectedBefore = m_ToolSystem != null ? m_ToolSystem.selected : Entity.Null;
-            Entity rawCurrentRoute = TryGetRawCurrentRouteForTrace();
-            int traceId = CurrentRouteClickTraceLogging.BeginClickTrace(
-                m_SelectedObjectBridgeSystem != null && m_SelectedObjectBridgeSystem.HasSnapshot
-                    ? m_SelectedObjectBridgeSystem.CurrentSnapshot.ResolvedVehicleEntity
-                    : Entity.Null,
-                m_CurrentRouteSelectionEntity);
-
-            CurrentRouteClickTraceLogging.LogUi(
-                traceId,
-                "before",
-                $"rawCurrentRoute={CurrentRouteClickTraceLogging.FormatEntity(rawCurrentRoute)}, resolvedClickableCandidate={CurrentRouteClickTraceLogging.FormatEntity(m_CurrentRouteSelectionEntity)}, exists={EntityManager.Exists(m_CurrentRouteSelectionEntity)}, selectedEntity={CurrentRouteClickTraceLogging.FormatEntity(selectedEntityBefore)}, selectedRoute={CurrentRouteClickTraceLogging.FormatEntity(selectedRouteBefore)}, selectedIndex={selectedIndexBefore}, toolSelected={CurrentRouteClickTraceLogging.FormatEntity(toolSelectedBefore)}, selectionChecks={BuildVanillaSelectionCheckSummary(m_CurrentRouteSelectionEntity)}");
-
-            m_SelectedInfoSystem.selectedRoute = m_CurrentRouteSelectionEntity;
-            CurrentRouteClickTraceLogging.LogUi(
-                traceId,
-                "afterAssignSelectedRoute",
-                $"selectedEntity={CurrentRouteClickTraceLogging.FormatEntity(m_SelectedInfoSystem.selectedEntity)}, selectedRoute={CurrentRouteClickTraceLogging.FormatEntity(m_SelectedInfoSystem.selectedRoute)}, selectedIndex={(m_ToolSystem != null ? m_ToolSystem.selectedIndex : int.MinValue)}, toolSelected={CurrentRouteClickTraceLogging.FormatEntity(m_ToolSystem != null ? m_ToolSystem.selected : Entity.Null)}");
-            m_SelectedInfoSystem.SetSelection(m_CurrentRouteSelectionEntity);
-            CurrentRouteClickTraceLogging.LogUi(
-                traceId,
-                "afterSetSelection",
-                $"selectedEntity={CurrentRouteClickTraceLogging.FormatEntity(m_SelectedInfoSystem.selectedEntity)}, selectedRoute={CurrentRouteClickTraceLogging.FormatEntity(m_SelectedInfoSystem.selectedRoute)}, selectedIndex={(m_ToolSystem != null ? m_ToolSystem.selectedIndex : int.MinValue)}, toolSelected={CurrentRouteClickTraceLogging.FormatEntity(m_ToolSystem != null ? m_ToolSystem.selected : Entity.Null)}");
-            m_SelectedInfoSystem.RequestUpdate();
-            CurrentRouteClickTraceLogging.LogUi(
-                traceId,
-                "afterRequestUpdate",
-                $"selectedEntity={CurrentRouteClickTraceLogging.FormatEntity(m_SelectedInfoSystem.selectedEntity)}, selectedRoute={CurrentRouteClickTraceLogging.FormatEntity(m_SelectedInfoSystem.selectedRoute)}, selectedIndex={(m_ToolSystem != null ? m_ToolSystem.selectedIndex : int.MinValue)}, toolSelected={CurrentRouteClickTraceLogging.FormatEntity(m_ToolSystem != null ? m_ToolSystem.selected : Entity.Null)}");
         }
 
         private static string NormalizeText(string text)
@@ -962,99 +857,6 @@ namespace Traffic_Law_Enforcement
             return entity == Entity.Null
                 ? LocalizeText(kNoneLocaleId, "None")
                 : $"#{entity.Index}:v{entity.Version}";
-        }
-
-        private void LogCurrentRoutePostClickUpdateIfNeeded(
-            string panelBranch,
-            PanelState panelState,
-            bool bridgeExists,
-            bool bridgeHasSnapshot,
-            SelectedObjectDebugSnapshot? snapshot)
-        {
-            if (!CurrentRouteClickTraceLogging.TryConsumePostClickPanelUpdate(out int traceId))
-            {
-                return;
-            }
-
-            if (m_SelectedInfoSystem == null)
-            {
-                m_SelectedInfoSystem =
-                    World.GetExistingSystemManaged<SelectedInfoUISystem>();
-            }
-
-            if (m_ToolSystem == null)
-            {
-                m_ToolSystem = World.GetExistingSystemManaged<ToolSystem>();
-            }
-
-            Entity selectedEntity = m_SelectedInfoSystem != null
-                ? m_SelectedInfoSystem.selectedEntity
-                : Entity.Null;
-            Entity selectedRoute = m_SelectedInfoSystem != null
-                ? m_SelectedInfoSystem.selectedRoute
-                : Entity.Null;
-            int selectedIndex = m_ToolSystem != null ? m_ToolSystem.selectedIndex : int.MinValue;
-            Entity toolSelected = m_ToolSystem != null ? m_ToolSystem.selected : Entity.Null;
-
-            CurrentRouteClickTraceLogging.LogUi(
-                traceId,
-                "postClickUpdate",
-                $"selectedEntity={CurrentRouteClickTraceLogging.FormatEntity(selectedEntity)}, selectedRoute={CurrentRouteClickTraceLogging.FormatEntity(selectedRoute)}, selectedIndex={selectedIndex}, toolSelected={CurrentRouteClickTraceLogging.FormatEntity(toolSelected)}, selectedEntityBecameNull={selectedEntity == Entity.Null}, selectedRouteCleared={selectedRoute == Entity.Null}");
-
-            string snapshotText = snapshot.HasValue
-                ? $"resolveState={snapshot.Value.ResolveState}, sourceSelectedEntity={CurrentRouteClickTraceLogging.FormatEntity(snapshot.Value.SourceSelectedEntity)}, resolvedVehicleEntity={CurrentRouteClickTraceLogging.FormatEntity(snapshot.Value.ResolvedVehicleEntity)}, vehicleKind={snapshot.Value.VehicleKind}, tleApplicability={snapshot.Value.TleApplicability}"
-                : "snapshot=None";
-
-            CurrentRouteClickTraceLogging.LogPanel(
-                traceId,
-                $"panelEnabled={m_IsPanelEnabled}, panelVisible={panelState.Visible}, bridgeExists={bridgeExists}, bridgeHasSnapshot={bridgeHasSnapshot}, branch={panelBranch}, {snapshotText}");
-        }
-
-        private Entity TryGetRawCurrentRouteForTrace()
-        {
-            if (m_SelectedObjectBridgeSystem == null ||
-                !m_SelectedObjectBridgeSystem.HasSnapshot)
-            {
-                return Entity.Null;
-            }
-
-            Entity vehicle = m_SelectedObjectBridgeSystem.CurrentSnapshot.ResolvedVehicleEntity;
-            if (vehicle == Entity.Null ||
-                !EntityManager.Exists(vehicle) ||
-                !EntityManager.HasComponent<CurrentRoute>(vehicle))
-            {
-                return Entity.Null;
-            }
-
-            CurrentRoute currentRoute = EntityManager.GetComponentData<CurrentRoute>(vehicle);
-            return currentRoute.m_Route;
-        }
-
-        private string BuildVanillaSelectionCheckSummary(Entity entity)
-        {
-            if (entity == Entity.Null)
-            {
-                return "entity=None";
-            }
-
-            if (!EntityManager.Exists(entity))
-            {
-                return "entity does not exist";
-            }
-
-            int elementIndex = -1;
-            bool tryGetPosition = SelectedInfoUISystem.TryGetPosition(
-                entity,
-                EntityManager,
-                ref elementIndex,
-                out _,
-                out _,
-                out _,
-                out _,
-                reinterpolate: true);
-
-            return
-                $"hasPrefabRef={EntityManager.HasComponent<PrefabRef>(entity)}, hasRoute={EntityManager.HasComponent<Route>(entity)}, hasRouteWaypointBuffer={EntityManager.HasBuffer<RouteWaypoint>(entity)}, hasRouteSegmentBuffer={EntityManager.HasBuffer<RouteSegment>(entity)}, hasRouteVehicleBuffer={EntityManager.HasBuffer<RouteVehicle>(entity)}, hasTransportLine={EntityManager.HasComponent<TransportLine>(entity)}, hasWorkRoute={EntityManager.HasComponent<WorkRoute>(entity)}, tryGetPosition={tryGetPosition}, tryGetPositionElementIndex={elementIndex}";
         }
 
         private static string LocalizeText(string localeId, string fallback)
