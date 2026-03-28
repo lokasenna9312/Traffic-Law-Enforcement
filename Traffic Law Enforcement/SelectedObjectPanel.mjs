@@ -283,7 +283,6 @@ const styles = {
         minWidth: 0,
         display: "flex",
         alignItems: "center",
-        gap: "4px",
     },
     routeColorSwatch: {
         width: "12px",
@@ -291,6 +290,7 @@ const styles = {
         borderRadius: "2px",
         border: "1px solid rgba(255, 255, 255, 0.24)",
         flexShrink: 0,
+        marginRight: "6px",
     },
     footer: {
         marginTop: "10px",
