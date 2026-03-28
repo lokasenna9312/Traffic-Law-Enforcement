@@ -296,6 +296,8 @@ namespace Traffic_Law_Enforcement
                 !entityManager.HasComponent<Route>(entity) ||
                 !entityManager.HasComponent<PrefabRef>(entity) ||
                 !entityManager.HasBuffer<RouteWaypoint>(entity) ||
+                !entityManager.HasBuffer<RouteSegment>(entity) ||
+                !entityManager.HasBuffer<RouteVehicle>(entity) ||
                 (!entityManager.HasComponent<TransportLine>(entity) &&
                  !entityManager.HasComponent<WorkRoute>(entity)))
             {

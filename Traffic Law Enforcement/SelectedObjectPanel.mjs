@@ -220,6 +220,15 @@ const styles = {
         wordBreak: "break-word",
     },
     valueLinkButton: {
+        display: "block",
+        width: "100%",
+        padding: "0",
+        margin: "0",
+        border: "0",
+        background: "transparent",
+        textAlign: "left",
+        fontFamily: "inherit",
+        fontWeight: "inherit",
         color: "#8fd0ff",
         cursor: "pointer",
     },
@@ -309,23 +318,23 @@ function Row(props) {
         },
         h("div", { style: styles.label }, props.label),
         props.onClick && !isMultiline
-            ? h("div", {
-                    style: Object.assign({}, styles.value, styles.valueLinkButton),
-                    role: "button",
-                    tabIndex: 0,
-                    onMouseDown: stopEvent,
-                    onClick: function (event) {
-                        stopEvent(event);
-                        props.onClick();
-                    },
-                    onKeyDown: function (event) {
-                        stopPropagationOnly(event);
+            ? h("button", {
+                    type: "button",
+                     style: Object.assign({}, styles.value, styles.valueLinkButton),
+                     onMouseDown: stopEvent,
+                     onMouseUp: stopEvent,
+                     onClick: function (event) {
+                         stopEvent(event);
+                         props.onClick();
+                     },
+                     onKeyDown: function (event) {
                         if (event.key === "Enter" || event.key === " ") {
-                            stopEvent(event);
-                            props.onClick();
-                        }
-                    },
-                }, props.value)
+                             stopEvent(event);
+                             props.onClick();
+                         }
+                     },
+                     onFocus: stopPropagationOnly,
+                 }, props.value)
             : h(
                   "div",
                   {
