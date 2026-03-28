@@ -51,6 +51,7 @@ namespace Traffic_Law_Enforcement
         private ComponentLookup<CurrentRoute> m_CurrentRouteData;
         private ComponentLookup<PathOwner> m_PathOwnerData;
         private ComponentLookup<Owner> m_OwnerData;
+        private ComponentLookup<Aggregated> m_AggregatedData;
         private ComponentLookup<Game.Prefabs.PrefabRef> m_PrefabRefData;
         private ComponentLookup<CarLane> m_CarLaneData;
         private ComponentLookup<Game.Prefabs.CarData> m_PrefabCarData;
@@ -70,6 +71,8 @@ namespace Traffic_Law_Enforcement
         private readonly Dictionary<Entity, RoutePenaltyInspectionResult> m_LastSnapshots = new Dictionary<Entity, RoutePenaltyInspectionResult>();
         private readonly Dictionary<Entity, RouteSelectionChangeSnapshot> m_LastRouteSelectionSnapshots = new Dictionary<Entity, RouteSelectionChangeSnapshot>();
         private readonly HashSet<Entity> m_CandidateVehicles = new HashSet<Entity>();
+        private Game.UI.NameSystem m_NameSystem;
+        private Game.Prefabs.PrefabSystem m_PrefabSystem;
         private int m_UpdateCount;
         private int m_LastObservedRuntimeWorldGeneration = -1;
 
@@ -113,6 +116,7 @@ namespace Traffic_Law_Enforcement
             m_CurrentRouteData = GetComponentLookup<CurrentRoute>(true);
             m_PathOwnerData = GetComponentLookup<PathOwner>(true);
             m_OwnerData = GetComponentLookup<Owner>(true);
+            m_AggregatedData = GetComponentLookup<Aggregated>(true);
             m_PrefabRefData = GetComponentLookup<Game.Prefabs.PrefabRef>(true);
             m_CarLaneData = GetComponentLookup<CarLane>(true);
             m_PrefabCarData = GetComponentLookup<Game.Prefabs.CarData>(true);
@@ -129,6 +133,8 @@ namespace Traffic_Law_Enforcement
             m_PathElementData = GetBufferLookup<PathElement>(true);
             m_ProfileData = GetComponentLookup<VehicleTrafficLawProfile>(true);
             m_TypeLookups = PublicTransportLaneVehicleTypeLookups.Create(this);
+            m_NameSystem = World.GetOrCreateSystemManaged<Game.UI.NameSystem>();
+            m_PrefabSystem = World.GetOrCreateSystemManaged<Game.Prefabs.PrefabSystem>();
             m_CachedVehicleQuery = GetEntityQuery(ComponentType.ReadOnly<Car>(), ComponentType.ReadOnly<CarCurrentLane>());
             RequireForUpdate(m_CarQuery);
         }
@@ -168,6 +174,7 @@ namespace Traffic_Law_Enforcement
             m_CurrentRouteData.Update(this);
             m_PathOwnerData.Update(this);
             m_OwnerData.Update(this);
+            m_AggregatedData.Update(this);
             m_PrefabRefData.Update(this);
             m_CarLaneData.Update(this);
             m_PrefabCarData.Update(this);
@@ -454,6 +461,23 @@ namespace Traffic_Law_Enforcement
             };
         }
 
+        private SelectedObjectDisplayFormatterContext CreateDisplayFormatterContext()
+        {
+            return new SelectedObjectDisplayFormatterContext
+            {
+                EntityManager = EntityManager,
+                NameSystem = m_NameSystem,
+                PrefabSystem = m_PrefabSystem,
+                OwnerData = m_OwnerData,
+                AggregatedData = m_AggregatedData,
+                SlaveLaneData = m_SlaveLaneData,
+                CarLaneData = m_CarLaneData,
+                ParkingLaneData = m_ParkingLaneData,
+                GarageLaneData = m_GarageLaneData,
+                ConnectionLaneData = m_ConnectionLaneData,
+            };
+        }
+
         private static bool ShouldLogRouteSelectionChange(
             RouteSelectionChangeSnapshot previousSnapshot,
             RouteSelectionChangeSnapshot currentSnapshot,
@@ -513,6 +537,13 @@ namespace Traffic_Law_Enforcement
                         currentSnapshot);
                 EnforcementTelemetry.RecordEvent(transitionPreviewMessage);
                 Mod.log.Info(transitionPreviewMessage);
+
+                string nameResolutionMessage =
+                    BuildFocusedLaneNameResolutionPreview(
+                        vehicle,
+                        currentSnapshot);
+                EnforcementTelemetry.RecordEvent(nameResolutionMessage);
+                Mod.log.Info(nameResolutionMessage);
             }
         }
 
@@ -696,6 +727,68 @@ namespace Traffic_Law_Enforcement
                 $"chosenTransitions={transitionSummary}";
         }
 
+        private string BuildFocusedLaneNameResolutionPreview(
+            Entity vehicle,
+            RouteSelectionChangeSnapshot currentSnapshot,
+            int maxNavigationLanes = 4)
+        {
+            Entity currentLane = currentSnapshot.CurrentLane;
+            Entity currentTarget =
+                currentSnapshot.HasCurrentTarget
+                    ? currentSnapshot.CurrentTarget
+                    : Entity.Null;
+
+            Entity targetStartLane = Entity.Null;
+            Entity targetEndLane = Entity.Null;
+            if (currentTarget != Entity.Null &&
+                m_RouteLaneData.TryGetComponent(currentTarget, out RouteLane targetRouteLane))
+            {
+                targetStartLane = targetRouteLane.m_StartLane;
+                targetEndLane = targetRouteLane.m_EndLane;
+            }
+
+            SelectedObjectDisplayFormatterContext formatterContext =
+                CreateDisplayFormatterContext();
+            string currentLaneResolution =
+                DescribeFocusedLaneNameResolution(currentLane, ref formatterContext);
+            string targetStartResolution =
+                DescribeFocusedLaneNameResolution(targetStartLane, ref formatterContext);
+            string targetEndResolution =
+                DescribeFocusedLaneNameResolution(targetEndLane, ref formatterContext);
+
+            List<string> navigationLaneResolutions = new List<string>(maxNavigationLanes);
+            if (m_NavigationLaneData.TryGetBuffer(vehicle, out DynamicBuffer<CarNavigationLane> navigationLanes))
+            {
+                for (int index = 0; index < navigationLanes.Length && navigationLaneResolutions.Count < maxNavigationLanes; index += 1)
+                {
+                    Entity lane = navigationLanes[index].m_Lane;
+                    if (lane == Entity.Null ||
+                        lane == currentLane ||
+                        lane == targetStartLane ||
+                        lane == targetEndLane)
+                    {
+                        continue;
+                    }
+
+                    navigationLaneResolutions.Add(
+                        $"n{navigationLaneResolutions.Count}=" +
+                        DescribeFocusedLaneNameResolution(lane, ref formatterContext));
+                }
+            }
+
+            string navigationSummary =
+                navigationLaneResolutions.Count == 0
+                    ? "none"
+                    : string.Join("; ", navigationLaneResolutions.ToArray());
+
+            return
+                $"FOCUSED_ROUTE_NAME_RESOLUTION: vehicle={vehicle}, " +
+                $"current={currentLaneResolution}, " +
+                $"targetStart={targetStartResolution}, " +
+                $"targetEnd={targetEndResolution}, " +
+                $"navigation={navigationSummary}";
+        }
+
         private string DescribeFocusedChosenTransition(
             Entity sourceLane,
             Entity targetLane,
@@ -764,6 +857,67 @@ namespace Traffic_Law_Enforcement
                 $"targetStart={targetLane == targetStartLane}, " +
                 $"targetEnd={targetLane == targetEndLane}, " +
                 $"penalties={penaltySummary}]";
+        }
+
+        private string DescribeFocusedLaneNameResolution(
+            Entity lane,
+            ref SelectedObjectDisplayFormatterContext formatterContext)
+        {
+            if (lane == Entity.Null)
+            {
+                return "none";
+            }
+
+            Entity ownerEntity = Entity.Null;
+            Entity aggregateEntity = Entity.Null;
+            if (m_OwnerData.TryGetComponent(lane, out Owner owner) &&
+                owner.m_Owner != Entity.Null)
+            {
+                ownerEntity = owner.m_Owner;
+                if (m_AggregatedData.TryGetComponent(ownerEntity, out Aggregated aggregated) &&
+                    aggregated.m_Aggregate != Entity.Null)
+                {
+                    aggregateEntity = aggregated.m_Aggregate;
+                }
+            }
+
+            Entity resolvedRoadEntity =
+                SelectedObjectDisplayFormatter.ResolveRoadEntityFromLane(
+                    lane,
+                    ref formatterContext);
+            string displayText =
+                SelectedObjectDisplayFormatter.BuildLaneDisplayText(
+                    lane,
+                    ref formatterContext);
+            string ownerText =
+                FormatNamedEntityOrNone(ownerEntity, ref formatterContext);
+            string aggregateText =
+                FormatNamedEntityOrNone(aggregateEntity, ref formatterContext);
+            string resolvedRoadText =
+                FormatNamedEntityOrNone(resolvedRoadEntity, ref formatterContext);
+
+            string nameSource;
+            if (resolvedRoadEntity == Entity.Null)
+            {
+                nameSource = "entity-fallback";
+            }
+            else if (aggregateEntity != Entity.Null && resolvedRoadEntity == aggregateEntity)
+            {
+                nameSource = "aggregate-road";
+            }
+            else if (ownerEntity != Entity.Null && resolvedRoadEntity == ownerEntity)
+            {
+                nameSource = "owner-road";
+            }
+            else
+            {
+                nameSource = "resolved-road";
+            }
+
+            return
+                $"{FormatEntityOrNone(lane)}" +
+                $"{{display=\"{displayText}\", owner={ownerText}, aggregate={aggregateText}, " +
+                $"resolvedRoad={resolvedRoadText}, nameSource={nameSource}}}";
         }
 
         private string BuildNavigationPreview(Entity vehicle, Entity currentLane)
@@ -875,6 +1029,9 @@ namespace Traffic_Law_Enforcement
                 return "none";
             }
 
+            SelectedObjectDisplayFormatterContext formatterContext =
+                CreateDisplayFormatterContext();
+
             int startIndex = pathOwner.m_ElementIndex;
             if (startIndex < 0)
             {
@@ -890,8 +1047,12 @@ namespace Traffic_Law_Enforcement
             for (int index = startIndex; index < pathElements.Length && emitted < maxPreviewElements; index++, emitted++)
             {
                 PathElement pathElement = pathElements[index];
+                string laneText =
+                    SelectedObjectDisplayFormatter.BuildLaneDisplayText(
+                        pathElement.m_Target,
+                        ref formatterContext);
                 parts.Add(
-                    $"{index}:{pathElement.m_Target}[{pathElement.m_TargetDelta.x:0.###}->{pathElement.m_TargetDelta.y:0.###}|{pathElement.m_Flags}]");
+                    $"{index}:{pathElement.m_Target} \"{laneText}\"[{pathElement.m_TargetDelta.x:0.###}->{pathElement.m_TargetDelta.y:0.###}|{pathElement.m_Flags}]");
             }
 
             int remaining = pathElements.Length - startIndex - emitted;
@@ -903,6 +1064,15 @@ namespace Traffic_Law_Enforcement
             return parts.Count == 0
                 ? "none"
                 : string.Join("; ", parts.ToArray());
+        }
+
+        private static string FormatNamedEntityOrNone(
+            Entity entity,
+            ref SelectedObjectDisplayFormatterContext formatterContext)
+        {
+            return entity == Entity.Null
+                ? "none"
+                : SelectedObjectDisplayFormatter.FormatNamedEntity(entity, ref formatterContext);
         }
 
         private Entity NormalizeLaneForAppendOrigin(Entity lane)
