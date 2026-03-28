@@ -23,6 +23,9 @@ namespace Traffic_Law_Enforcement
         public static bool EnableAllVehicleRouteSelectionChangeLogging =>
             Mod.Settings?.EnableAllVehicleRouteSelectionChangeLogging ?? false;
 
+        public static bool EnableFocusedRouteRebuildDiagnosticsLogging =>
+            Mod.Settings?.EnableFocusedRouteRebuildDiagnosticsLogging ?? false;
+
         public static bool EnableFocusedVehicleOnlyRouteLogging =>
             Mod.Settings?.EnableFocusedVehicleOnlyRouteLogging ?? false;
 
@@ -67,9 +70,21 @@ namespace Traffic_Law_Enforcement
             return Mod.IsEnforcementEnabled && EnableAllVehicleRouteSelectionChangeLogging;
         }
 
+        public static bool ShouldLogFocusedRouteRebuildDiagnostics()
+        {
+            return Mod.IsEnforcementEnabled && EnableFocusedRouteRebuildDiagnosticsLogging;
+        }
+
         public static bool ShouldRestrictVehicleSpecificRouteDebugLogsToWatchedVehicles()
         {
             return EnableFocusedVehicleOnlyRouteLogging;
+        }
+
+        public static bool ShouldLogVehicleSpecificPathfindingPenaltyDiagnostics(Entity vehicle)
+        {
+            return ShouldLogVehicleSpecificVisibleLog(
+                ShouldLogPathfindingPenaltyDiagnostics(),
+                vehicle);
         }
 
         public static bool ShouldLogVehicleSpecificVisibleLog(bool baseEnabled, Entity vehicle)

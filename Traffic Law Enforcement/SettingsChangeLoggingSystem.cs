@@ -58,6 +58,8 @@ namespace Traffic_Law_Enforcement
             LogChange(nameof(Setting.EnableType4PublicTransportLaneUsageLogging), previous.EnableType4PublicTransportLaneUsageLogging, current.EnableType4PublicTransportLaneUsageLogging);
             LogChange(nameof(Setting.EnablePathfindingPenaltyDiagnosticLogging), previous.EnablePathfindingPenaltyDiagnosticLogging, current.EnablePathfindingPenaltyDiagnosticLogging);
             LogChange(nameof(Setting.EnablePathObsoleteSourceLogging), previous.EnablePathObsoleteSourceLogging, current.EnablePathObsoleteSourceLogging);
+            LogChange(nameof(Setting.EnableAllVehicleRouteSelectionChangeLogging), previous.EnableAllVehicleRouteSelectionChangeLogging, current.EnableAllVehicleRouteSelectionChangeLogging);
+            LogChange(nameof(Setting.EnableFocusedRouteRebuildDiagnosticsLogging), previous.EnableFocusedRouteRebuildDiagnosticsLogging, current.EnableFocusedRouteRebuildDiagnosticsLogging);
             LogChange(nameof(Setting.EnableFocusedVehicleOnlyRouteLogging), previous.EnableFocusedVehicleOnlyRouteLogging, current.EnableFocusedVehicleOnlyRouteLogging);
             LogChange(nameof(Setting.AllowRoadPublicTransportVehicles), previous.Gameplay.AllowRoadPublicTransportVehicles, current.Gameplay.AllowRoadPublicTransportVehicles);
             LogChange(nameof(Setting.AllowTaxis), previous.Gameplay.AllowTaxis, current.Gameplay.AllowTaxis);
@@ -151,6 +153,8 @@ namespace Traffic_Law_Enforcement
             public readonly bool EnableType4PublicTransportLaneUsageLogging;
             public readonly bool EnablePathfindingPenaltyDiagnosticLogging;
             public readonly bool EnablePathObsoleteSourceLogging;
+            public readonly bool EnableAllVehicleRouteSelectionChangeLogging;
+            public readonly bool EnableFocusedRouteRebuildDiagnosticsLogging;
             public readonly bool EnableFocusedVehicleOnlyRouteLogging;
 
             private LoggedSettingsSnapshot(
@@ -162,6 +166,8 @@ namespace Traffic_Law_Enforcement
                 bool enableType4PublicTransportLaneUsageLogging,
                 bool enablePathfindingPenaltyDiagnosticLogging,
                 bool enablePathObsoleteSourceLogging,
+                bool enableAllVehicleRouteSelectionChangeLogging,
+                bool enableFocusedRouteRebuildDiagnosticsLogging,
                 bool enableFocusedVehicleOnlyRouteLogging)
             {
                 Gameplay = gameplay;
@@ -172,6 +178,8 @@ namespace Traffic_Law_Enforcement
                 EnableType4PublicTransportLaneUsageLogging = enableType4PublicTransportLaneUsageLogging;
                 EnablePathfindingPenaltyDiagnosticLogging = enablePathfindingPenaltyDiagnosticLogging;
                 EnablePathObsoleteSourceLogging = enablePathObsoleteSourceLogging;
+                EnableAllVehicleRouteSelectionChangeLogging = enableAllVehicleRouteSelectionChangeLogging;
+                EnableFocusedRouteRebuildDiagnosticsLogging = enableFocusedRouteRebuildDiagnosticsLogging;
                 EnableFocusedVehicleOnlyRouteLogging = enableFocusedVehicleOnlyRouteLogging;
             }
 
@@ -186,6 +194,8 @@ namespace Traffic_Law_Enforcement
                     Mod.Settings?.EnableType4PublicTransportLaneUsageLogging ?? false,
                     Mod.Settings?.EnablePathfindingPenaltyDiagnosticLogging ?? false,
                     Mod.Settings?.EnablePathObsoleteSourceLogging ?? false,
+                    Mod.Settings?.EnableAllVehicleRouteSelectionChangeLogging ?? false,
+                    Mod.Settings?.EnableFocusedRouteRebuildDiagnosticsLogging ?? false,
                     Mod.Settings?.EnableFocusedVehicleOnlyRouteLogging ?? false);
             }
 
@@ -202,6 +212,8 @@ namespace Traffic_Law_Enforcement
                 Append(builder, nameof(Setting.EnableType4PublicTransportLaneUsageLogging), EnableType4PublicTransportLaneUsageLogging);
                 Append(builder, nameof(Setting.EnablePathfindingPenaltyDiagnosticLogging), EnablePathfindingPenaltyDiagnosticLogging);
                 Append(builder, nameof(Setting.EnablePathObsoleteSourceLogging), EnablePathObsoleteSourceLogging);
+                Append(builder, nameof(Setting.EnableAllVehicleRouteSelectionChangeLogging), EnableAllVehicleRouteSelectionChangeLogging);
+                Append(builder, nameof(Setting.EnableFocusedRouteRebuildDiagnosticsLogging), EnableFocusedRouteRebuildDiagnosticsLogging);
                 Append(builder, nameof(Setting.EnableFocusedVehicleOnlyRouteLogging), EnableFocusedVehicleOnlyRouteLogging);
                 Append(builder, nameof(Setting.AllowRoadPublicTransportVehicles), Gameplay.AllowRoadPublicTransportVehicles);
                 Append(builder, nameof(Setting.AllowTaxis), Gameplay.AllowTaxis);

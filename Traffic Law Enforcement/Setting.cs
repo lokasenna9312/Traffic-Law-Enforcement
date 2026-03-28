@@ -622,6 +622,10 @@ namespace Traffic_Law_Enforcement
 
         [Exclude]
         [SettingsUISection(kDebugTab, kFocusedLoggingGroup)]
+        public bool EnableFocusedRouteRebuildDiagnosticsLogging { get; set; }
+
+        [Exclude]
+        [SettingsUISection(kDebugTab, kFocusedLoggingGroup)]
         public bool EnableFocusedVehicleOnlyRouteLogging { get; set; }
 
         [SettingsUISection(kDebugTab, kDebugBindingsGroup)]
@@ -672,6 +676,7 @@ namespace Traffic_Law_Enforcement
             EnablePathObsoleteSourceLogging = false;
             EnableSaveIdentificationLogging = true;
             EnableAllVehicleRouteSelectionChangeLogging = false;
+            EnableFocusedRouteRebuildDiagnosticsLogging = false;
             EnableFocusedVehicleOnlyRouteLogging = false;
             ResetKeyBindings();
         }
