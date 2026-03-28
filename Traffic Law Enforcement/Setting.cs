@@ -632,16 +632,14 @@ namespace Traffic_Law_Enforcement
         [SettingsUIKeyboardBinding(
             BindingKeyboard.I,
             KeybindingIds.SelectedObjectPanelToggleActionName,
-            ctrl: true,
-            shift: true)]
+            ctrl: true)]
         public ProxyBinding SelectedObjectPanelToggleBinding { get; set; }
 
         [SettingsUISection(kDebugTab, kDebugBindingsGroup)]
         [SettingsUIKeyboardBinding(
             BindingKeyboard.L,
             KeybindingIds.FocusedLoggingPanelToggleActionName,
-            ctrl: true,
-            shift: true)]
+            ctrl: true)]
         public ProxyBinding FocusedLoggingPanelToggleBinding { get; set; }
 
         [Exclude]
