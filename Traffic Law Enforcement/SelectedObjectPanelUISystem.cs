@@ -18,6 +18,7 @@ namespace Traffic_Law_Enforcement
         private const string kGroup = "selectedObjectPanel";
         internal const string kHeaderTextLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Text.Header";
         internal const string kSummaryTitleLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Text.SummaryTitle";
+        internal const string kClassificationLabelLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Label.Classification";
         internal const string kTleStatusLabelLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Label.TleStatus";
         internal const string kRoleLabelLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Label.RoleOrType";
         internal const string kActiveFlagsLabelLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Label.ActiveFlags";
@@ -93,6 +94,7 @@ namespace Traffic_Law_Enforcement
         private ValueBinding<bool> m_CompactBinding;
         private ValueBinding<bool> m_CollapsedBinding;
         private ValueBinding<string> m_ClassificationBinding;
+        private ValueBinding<string> m_ClassificationLabelBinding;
         private ValueBinding<string> m_MessageBinding;
         private ValueBinding<string> m_TleStatusBinding;
         private ValueBinding<string> m_RoleBinding;
@@ -226,6 +228,7 @@ namespace Traffic_Law_Enforcement
             AddBinding(m_CompactBinding = new ValueBinding<bool>(kGroup, "compact", false));
             AddBinding(m_CollapsedBinding = new ValueBinding<bool>(kGroup, "collapsed", false));
             AddBinding(m_ClassificationBinding = new ValueBinding<string>(kGroup, "classification", string.Empty));
+            AddBinding(m_ClassificationLabelBinding = new ValueBinding<string>(kGroup, "classificationLabelText", string.Empty));
             AddBinding(m_MessageBinding = new ValueBinding<string>(kGroup, "message", string.Empty));
             AddBinding(m_TleStatusBinding = new ValueBinding<string>(kGroup, "tleStatus", string.Empty));
             AddBinding(m_RoleBinding = new ValueBinding<string>(kGroup, "role", string.Empty));
@@ -499,6 +502,7 @@ namespace Traffic_Law_Enforcement
         {
             m_HeaderTextBinding.Update(LocalizeText(kHeaderTextLocaleId, "Selected Object"));
             m_SummaryTitleBinding.Update(LocalizeText(kSummaryTitleLocaleId, "Summary"));
+            m_ClassificationLabelBinding.Update(LocalizeText(kClassificationLabelLocaleId, "Classification"));
             m_TleStatusLabelBinding.Update(LocalizeText(kTleStatusLabelLocaleId, "TLE status"));
             m_RoleLabelBinding.Update(LocalizeText(kRoleLabelLocaleId, "Role / type"));
             m_ActiveFlagsLabelBinding.Update(LocalizeText(kActiveFlagsLabelLocaleId, "Active flags"));

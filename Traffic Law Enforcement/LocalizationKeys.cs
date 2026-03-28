@@ -147,6 +147,7 @@ namespace Traffic_Law_Enforcement
                 setting.GetBindingKeyHintLocaleID(KeybindingIds.FocusedLoggingPanelToggleActionName);
             map["SelectedObjectPanel.HeaderText"] = SelectedObjectPanelUISystem.kHeaderTextLocaleId;
             map["SelectedObjectPanel.SummaryTitle"] = SelectedObjectPanelUISystem.kSummaryTitleLocaleId;
+            map["SelectedObjectPanel.ClassificationLabel"] = SelectedObjectPanelUISystem.kClassificationLabelLocaleId;
             map["SelectedObjectPanel.TleStatusLabel"] = SelectedObjectPanelUISystem.kTleStatusLabelLocaleId;
             map["SelectedObjectPanel.RoleLabel"] = SelectedObjectPanelUISystem.kRoleLabelLocaleId;
             map["SelectedObjectPanel.ActiveFlagsLabel"] = SelectedObjectPanelUISystem.kActiveFlagsLabelLocaleId;

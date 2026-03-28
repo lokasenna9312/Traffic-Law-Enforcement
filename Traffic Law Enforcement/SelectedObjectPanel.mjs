@@ -18,6 +18,7 @@ const visibleBinding = api.bindValue(group, "visible", false);
 const compactBinding = api.bindValue(group, "compact", false);
 const collapsedBinding = api.bindValue(group, "collapsed", false);
 const classificationBinding = api.bindValue(group, "classification", "");
+const classificationLabelTextBinding = api.bindValue(group, "classificationLabelText", "");
 const messageBinding = api.bindValue(group, "message", "");
 const tleStatusBinding = api.bindValue(group, "tleStatus", "");
 const roleBinding = api.bindValue(group, "role", "");
@@ -243,7 +244,7 @@ const styles = {
         alignItems: "center",
         color: "#b0defc",
         fontWeight: 700,
-        fontSize: "18px",
+        fontSize: "14px",
         lineHeight: 1.35,
         flexShrink: 0,
     },
@@ -251,12 +252,21 @@ const styles = {
         flex: 1,
         display: "flex",
         alignItems: "center",
+        flexWrap: "wrap",
+        gap: "8px",
         minHeight: "30px",
-        color: "#d7ebfd",
+        color: "#ffffff",
         fontSize: "14px",
-        fontWeight: 700,
         lineHeight: 1.35,
         wordBreak: "break-word",
+    },
+    classificationPrimary: {
+        color: "#d7ebfd",
+        fontWeight: 700,
+    },
+    classificationSecondary: {
+        color: "#c2cfdf",
+        fontWeight: 600,
     },
     footer: {
         marginTop: "10px",
@@ -352,17 +362,24 @@ function Row(props) {
 }
 
 function ClassificationRow(props) {
-    if (!props.label && !props.value) {
+    if (!props.primaryValue && !props.secondaryValue) {
         return null;
     }
 
     return h(
         "div",
         { style: styles.classificationRow },
-        h("div", { style: styles.classificationLabel }, props.label),
-        props.value
-            ? h("div", { style: styles.classificationValue }, props.value)
-            : null
+        h("div", { style: styles.label }, props.label),
+        h(
+            "div",
+            { style: styles.classificationValue },
+            props.primaryValue
+                ? h("span", { style: styles.classificationPrimary }, props.primaryValue)
+                : null,
+            props.secondaryValue
+                ? h("span", { style: styles.classificationSecondary }, props.secondaryValue)
+                : null
+        )
     );
 }
 
@@ -388,6 +405,7 @@ function SelectedObjectPanel() {
     const compact = api.useValue(compactBinding);
     const collapsed = api.useValue(collapsedBinding);
     const classification = api.useValue(classificationBinding);
+    const classificationLabelText = api.useValue(classificationLabelTextBinding);
     const message = api.useValue(messageBinding);
     const tleStatus = api.useValue(tleStatusBinding);
     const role = api.useValue(roleBinding);
@@ -598,8 +616,9 @@ function SelectedObjectPanel() {
                       ? h("div", { style: styles.compactMessage, key: "message" }, message)
                       : [
                         h(ClassificationRow, {
-                            label: classification,
-                            value: vehicleIndex,
+                            label: classificationLabelText,
+                            primaryValue: classification,
+                            secondaryValue: vehicleIndex,
                             key: "classification",
                         }),
                         h(
@@ -620,8 +639,9 @@ function SelectedObjectPanel() {
                       ? h("div", { style: styles.compactMessage }, message)
                       : null,
                   h(ClassificationRow, {
-                      label: classification,
-                      value: vehicleIndex,
+                      label: classificationLabelText,
+                      primaryValue: classification,
+                      secondaryValue: vehicleIndex,
                   }),
                   h(
                       "div",
