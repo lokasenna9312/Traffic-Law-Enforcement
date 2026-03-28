@@ -1,4 +1,3 @@
-using System.Text;
 using Unity.Entities;
 
 namespace Traffic_Law_Enforcement
@@ -8,8 +7,6 @@ namespace Traffic_Law_Enforcement
         public const int DefaultPublicTransportLaneFine = 250;
         public const int DefaultMidBlockCrossingFine = 250;
         public const int DefaultIntersectionMovementFine = 250;
-        private static string s_LastLoggedRepeatPolicySummary;
-
         public static void RecordPublicTransportLaneViolation(Entity vehicle, Entity lane, string reason)
         {
             RecordViolation(EnforcementKinds.PublicTransportLane, vehicle, lane, GetPublicTransportLaneFine(), reason);
@@ -94,17 +91,6 @@ namespace Traffic_Law_Enforcement
             }
         }
 
-        public static void LogRepeatPolicySummaryIfChanged()
-        {
-            string summary = BuildRepeatPolicyLogSummary();
-            if (string.IsNullOrWhiteSpace(summary) || summary == s_LastLoggedRepeatPolicySummary)
-            {
-                return;
-            }
-
-            s_LastLoggedRepeatPolicySummary = summary;
-        }
-
         private static void RecordViolation(string kind, Entity vehicle, Entity lane, int fineAmount, string reason)
         {
             if (!IsEnforcementKindEnabled(kind))
@@ -169,38 +155,6 @@ namespace Traffic_Law_Enforcement
         private static string BuildRepeatPolicyDebugSummary(bool enabled, int windowMonths, int threshold, int multiplierPercent)
         {
             return $"enabled={enabled}, window={FormatMonthCount(windowMonths)}, threshold={threshold}, multiplier={multiplierPercent}%";
-        }
-
-        private static string BuildRepeatPolicyLogSummary()
-        {
-            EnforcementGameplaySettingsState settings = EnforcementGameplaySettingsService.Current;
-            if (!EnforcementGameTime.IsInitialized)
-            {
-                return null;
-            }
-
-            StringBuilder builder = new StringBuilder("Repeat-offender policy summary: ");
-            AppendPolicySummary(builder, "PT-lane", settings.EnablePublicTransportLaneRepeatPenalty, settings.PublicTransportLaneRepeatWindowMonths, settings.PublicTransportLaneRepeatThreshold, settings.PublicTransportLaneRepeatMultiplierPercent);
-            builder.Append("; ");
-            AppendPolicySummary(builder, "mid-block", settings.EnableMidBlockCrossingRepeatPenalty, settings.MidBlockCrossingRepeatWindowMonths, settings.MidBlockCrossingRepeatThreshold, settings.MidBlockCrossingRepeatMultiplierPercent);
-            builder.Append("; ");
-            AppendPolicySummary(builder, "intersection", settings.EnableIntersectionMovementRepeatPenalty, settings.IntersectionMovementRepeatWindowMonths, settings.IntersectionMovementRepeatThreshold, settings.IntersectionMovementRepeatMultiplierPercent);
-            builder.Append($"; timing basis: daysPerYear={EnforcementGameTime.CurrentDaysPerYear}, 12 in-game months = 1 in-game year, vanilla/default: 1 in-game month = 1 in-game day; mods changing day/month flow can break that equivalence.");
-            return builder.ToString();
-        }
-
-        private static void AppendPolicySummary(StringBuilder builder, string label, bool enabled, int windowMonths, int threshold, int multiplierPercent)
-        {
-            builder.Append(label);
-            builder.Append(" enabled=");
-            builder.Append(enabled);
-            builder.Append(", window=");
-            builder.Append(FormatMonthCount(windowMonths));
-            builder.Append(", threshold=");
-            builder.Append(threshold);
-            builder.Append(", multiplier=");
-            builder.Append(multiplierPercent);
-            builder.Append('%');
         }
 
         private static string FormatMonthCount(int months)

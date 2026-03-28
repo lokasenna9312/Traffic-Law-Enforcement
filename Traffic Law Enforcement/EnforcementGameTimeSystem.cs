@@ -140,7 +140,6 @@ namespace Traffic_Law_Enforcement
             }
 
             EnforcementPolicyImpactService.UpdateTrackingForCurrentMonth();
-            EnforcementPenaltyService.LogRepeatPolicySummaryIfChanged();
             EnforcementTelemetry.PruneExpiredViolationTimestamps();
         }
 
