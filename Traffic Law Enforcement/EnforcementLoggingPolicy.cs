@@ -1,3 +1,5 @@
+using Unity.Entities;
+
 namespace Traffic_Law_Enforcement
 {
     public static class EnforcementLoggingPolicy
@@ -70,6 +72,37 @@ namespace Traffic_Law_Enforcement
             return EnableFocusedVehicleOnlyRouteLogging;
         }
 
+        public static bool ShouldLogVehicleSpecificVisibleLog(bool baseEnabled, Entity vehicle)
+        {
+            if (!baseEnabled || vehicle == Entity.Null)
+            {
+                return false;
+            }
+
+            return !ShouldRestrictVehicleSpecificRouteDebugLogsToWatchedVehicles() ||
+                FocusedLoggingService.IsWatched(vehicle);
+        }
+
+        public static bool ShouldLogVehicleSpecificEnforcementEvent(Entity vehicle)
+        {
+            return ShouldLogVehicleSpecificVisibleLog(ShouldLogEnforcementEvents(), vehicle);
+        }
+
+        public static bool ShouldLogVehicleSpecificType2Usage(Entity vehicle)
+        {
+            return ShouldLogVehicleSpecificVisibleLog(ShouldLogType2Usage(), vehicle);
+        }
+
+        public static bool ShouldLogVehicleSpecificType3Usage(Entity vehicle)
+        {
+            return ShouldLogVehicleSpecificVisibleLog(ShouldLogType3Usage(), vehicle);
+        }
+
+        public static bool ShouldLogVehicleSpecificType4Usage(Entity vehicle)
+        {
+            return ShouldLogVehicleSpecificVisibleLog(ShouldLogType4Usage(), vehicle);
+        }
+
         public static bool EnableSaveIdentificationLogging => true;
 
         public static bool ShouldLogSaveIdentification()
@@ -97,9 +130,9 @@ namespace Traffic_Law_Enforcement
             Mod.log.Info(message);
         }
 
-        public static void RecordEnforcementEvent(string message)
+        public static void RecordEnforcementEvent(string message, Entity vehicle)
         {
-            if (!ShouldLogEnforcementEvents() || string.IsNullOrWhiteSpace(message))
+            if (!ShouldLogVehicleSpecificEnforcementEvent(vehicle) || string.IsNullOrWhiteSpace(message))
             {
                 return;
             }
@@ -108,19 +141,9 @@ namespace Traffic_Law_Enforcement
             Mod.log.Info(message);
         }
 
-        public static void RecordType2Usage(string message)
+        public static void RecordType2Usage(string message, Entity vehicle)
         {
-            if (!ShouldLogType2Usage() || string.IsNullOrWhiteSpace(message))
-            {
-                return;
-            }
-            EnforcementTelemetry.RecordEvent(message);
-            Mod.log.Info(message);
-        }
-
-        public static void RecordType3Usage(string message)
-        {
-            if (!ShouldLogType3Usage() || string.IsNullOrWhiteSpace(message))
+            if (!ShouldLogVehicleSpecificType2Usage(vehicle) || string.IsNullOrWhiteSpace(message))
             {
                 return;
             }
@@ -129,12 +152,24 @@ namespace Traffic_Law_Enforcement
             Mod.log.Info(message);
         }
 
-        public static void RecordType4Usage(string message)
+        public static void RecordType3Usage(string message, Entity vehicle)
         {
-            if (!ShouldLogType4Usage() || string.IsNullOrWhiteSpace(message))
+            if (!ShouldLogVehicleSpecificType3Usage(vehicle) || string.IsNullOrWhiteSpace(message))
             {
                 return;
             }
+
+            EnforcementTelemetry.RecordEvent(message);
+            Mod.log.Info(message);
+        }
+
+        public static void RecordType4Usage(string message, Entity vehicle)
+        {
+            if (!ShouldLogVehicleSpecificType4Usage(vehicle) || string.IsNullOrWhiteSpace(message))
+            {
+                return;
+            }
+
             EnforcementTelemetry.RecordEvent(message);
             Mod.log.Info(message);
         }

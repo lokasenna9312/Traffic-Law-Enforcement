@@ -255,7 +255,7 @@ namespace Traffic_Law_Enforcement
                 "Warning: Focused logging only records log types enabled in Debug options."));
             m_FooterHintBinding.Update(LocalizeText(
                 kFooterHintLocaleId,
-                "For enabled vehicle-route debug logs, watched vehicles bypass per-update caps and stay in change-driven tracking."));
+                "For enabled vehicle-specific debug logs, watched vehicles stay filtered while global/state logs remain unchanged."));
         }
 
         private void UpdatePanelToggle()

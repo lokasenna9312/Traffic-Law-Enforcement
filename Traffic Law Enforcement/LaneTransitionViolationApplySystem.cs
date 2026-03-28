@@ -92,7 +92,7 @@ namespace Traffic_Law_Enforcement
                             evt.Lane,
                             reason);
 
-                        EnforcementLoggingPolicy.RecordEnforcementEvent(message);
+                        EnforcementLoggingPolicy.RecordEnforcementEvent(message, evt.Vehicle);
                         break;
                     }
 
@@ -111,7 +111,7 @@ namespace Traffic_Law_Enforcement
                             evt.Lane,
                             reason);
 
-                        EnforcementLoggingPolicy.RecordEnforcementEvent(message);
+                        EnforcementLoggingPolicy.RecordEnforcementEvent(message, evt.Vehicle);
                         break;
                     }
                 }
