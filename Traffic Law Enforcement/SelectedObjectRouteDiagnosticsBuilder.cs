@@ -116,8 +116,19 @@ namespace Traffic_Law_Enforcement
                 context.CurrentRouteData.TryGetComponent(vehicle, out CurrentRoute currentRouteData) &&
                 currentRouteData.m_Route != Entity.Null;
             Entity currentRouteEntity = hasCurrentRoute ? currentRouteData.m_Route : Entity.Null;
+            string currentRouteResolutionReason = string.Empty;
             Entity selectableCurrentRouteEntity =
-                ResolveCurrentRouteSelectionEntity(currentRouteEntity, ref context);
+                ResolveCurrentRouteSelectionEntity(
+                    currentRouteEntity,
+                    ref context,
+                    out currentRouteResolutionReason);
+
+            CurrentRouteClickTraceLogging.LogBuilderStateIfChanged(
+                vehicle,
+                hasCurrentRoute,
+                currentRouteEntity,
+                selectableCurrentRouteEntity,
+                currentRouteResolutionReason);
 
             bool hasPathOwner =
                 context.PathOwnerData.TryGetComponent(vehicle, out PathOwner pathOwner);
@@ -259,58 +270,117 @@ namespace Traffic_Law_Enforcement
             return SelectedObjectDisplayFormatter.FormatEntityOrNone(routeEntity);
         }
 
-        private static Entity ResolveCurrentRouteSelectionEntity(Entity currentRouteEntity, ref SelectedObjectRouteDiagnosticsContext context)
+        private static Entity ResolveCurrentRouteSelectionEntity(
+            Entity currentRouteEntity,
+            ref SelectedObjectRouteDiagnosticsContext context,
+            out string resolutionReason)
         {
             if (currentRouteEntity == Entity.Null)
             {
+                resolutionReason = "no raw current route";
                 return Entity.Null;
             }
 
             EntityManager entityManager = context.Formatter.EntityManager;
-            if (IsLineSelectionCandidate(currentRouteEntity, entityManager))
+            if (IsLineSelectionCandidate(
+                    currentRouteEntity,
+                    entityManager,
+                    out string rawCandidateReason))
             {
+                resolutionReason = $"accepted raw current route ({rawCandidateReason})";
                 return currentRouteEntity;
             }
 
+            string lastFailureReason = rawCandidateReason;
             Entity candidate = currentRouteEntity;
 
-            for (int depth = 0; depth < 16 && candidate != Entity.Null; depth++)
+            for (int depth = 1; depth <= 16 && candidate != Entity.Null; depth++)
             {
-                if (IsLineSelectionCandidate(candidate, entityManager))
-                {
-                    return candidate;
-                }
-
                 if (!context.Formatter.OwnerData.TryGetComponent(candidate, out Owner owner) ||
                     owner.m_Owner == Entity.Null ||
                     owner.m_Owner == candidate)
                 {
-                    break;
+                    resolutionReason =
+                        $"rejected route candidate {CurrentRouteClickTraceLogging.FormatEntity(candidate)} ({lastFailureReason}); owner chain terminated";
+                    return Entity.Null;
                 }
 
                 candidate = owner.m_Owner;
+
+                if (IsLineSelectionCandidate(
+                        candidate,
+                        entityManager,
+                        out string candidateReason))
+                {
+                    resolutionReason =
+                        $"accepted owner-chain candidate depth={depth} candidate={CurrentRouteClickTraceLogging.FormatEntity(candidate)} ({candidateReason})";
+                    return candidate;
+                }
+
+                lastFailureReason = candidateReason;
             }
 
+            resolutionReason =
+                $"no selectable route candidate; rawCurrentRoute={CurrentRouteClickTraceLogging.FormatEntity(currentRouteEntity)}, lastFailure={lastFailureReason}";
             return Entity.Null;
         }
 
-        private static bool IsLineSelectionCandidate(Entity entity, EntityManager entityManager)
+        private static bool IsLineSelectionCandidate(
+            Entity entity,
+            EntityManager entityManager,
+            out string reason)
         {
-            if (entity == Entity.Null ||
-                !entityManager.Exists(entity) ||
-                !entityManager.HasComponent<Route>(entity) ||
-                !entityManager.HasComponent<PrefabRef>(entity) ||
-                !entityManager.HasBuffer<RouteWaypoint>(entity) ||
-                !entityManager.HasBuffer<RouteSegment>(entity) ||
-                !entityManager.HasBuffer<RouteVehicle>(entity) ||
-                (!entityManager.HasComponent<TransportLine>(entity) &&
-                 !entityManager.HasComponent<WorkRoute>(entity)))
+            if (entity == Entity.Null)
             {
+                reason = "entity is None";
+                return false;
+            }
+
+            if (!entityManager.Exists(entity))
+            {
+                reason = "entity does not exist";
+                return false;
+            }
+
+            if (!entityManager.HasComponent<Route>(entity))
+            {
+                reason = "missing Route";
+                return false;
+            }
+
+            if (!entityManager.HasComponent<PrefabRef>(entity))
+            {
+                reason = "missing PrefabRef";
+                return false;
+            }
+
+            if (!entityManager.HasBuffer<RouteWaypoint>(entity))
+            {
+                reason = "missing RouteWaypoint buffer";
+                return false;
+            }
+
+            if (!entityManager.HasBuffer<RouteSegment>(entity))
+            {
+                reason = "missing RouteSegment buffer";
+                return false;
+            }
+
+            if (!entityManager.HasBuffer<RouteVehicle>(entity))
+            {
+                reason = "missing RouteVehicle buffer";
+                return false;
+            }
+
+            if (!entityManager.HasComponent<TransportLine>(entity) &&
+                !entityManager.HasComponent<WorkRoute>(entity))
+            {
+                reason = "missing TransportLine/WorkRoute";
                 return false;
             }
 
             int elementIndex = -1;
-            return SelectedInfoUISystem.TryGetPosition(
+            bool canResolvePosition = SelectedInfoUISystem.TryGetPosition(
                 entity,
                 entityManager,
                 ref elementIndex,
@@ -319,6 +389,15 @@ namespace Traffic_Law_Enforcement
                 out _,
                 out _,
                 reinterpolate: true);
+
+            if (!canResolvePosition)
+            {
+                reason = "TryGetPosition failed";
+                return false;
+            }
+
+            reason = $"passed line selection checks; elementIndex={elementIndex}";
+            return true;
         }
 
         private static string TryGetCurrentRouteCustomName(Entity displayRouteEntity, Entity rawCurrentRouteEntity, ref SelectedObjectRouteDiagnosticsContext context)
