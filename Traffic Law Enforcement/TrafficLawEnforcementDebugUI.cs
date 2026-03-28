@@ -205,6 +205,11 @@ namespace Traffic_Law_Enforcement
                 displayName = "Selected watch status",
                 getter = GetFocusedLoggingSelectedWatchStatusText
             });
+            focusedLogging.children.Add(new DebugUI.Value
+            {
+                displayName = "Note",
+                getter = GetFocusedLoggingNoteText
+            });
             focusedLogging.children.Add(new DebugUI.Button
             {
                 displayName = "Toggle focused logging window",
@@ -986,6 +991,11 @@ namespace Traffic_Law_Enforcement
                     ? "Watched"
                     : "Not watched"
                 : "Unavailable";
+        }
+
+        private static string GetFocusedLoggingNoteText()
+        {
+            return "Focused logging only emits log types whose logging options are currently enabled.";
         }
 
         private static void WatchSelectedRoadVehicle()

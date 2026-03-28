@@ -48,6 +48,8 @@ namespace Traffic_Law_Enforcement
             "TrafficLawEnforcement.FocusedLoggingPanel.Text.NoEligibleSelection";
         internal const string kFooterHintLocaleId =
             "TrafficLawEnforcement.FocusedLoggingPanel.Text.FooterHint";
+        internal const string kWarningLocaleId =
+            "TrafficLawEnforcement.FocusedLoggingPanel.Text.Warning";
         internal const string kNoneLocaleId =
             "TrafficLawEnforcement.FocusedLoggingPanel.Text.None";
 
@@ -67,6 +69,7 @@ namespace Traffic_Law_Enforcement
         private ValueBinding<string> m_ClearWatchedTextBinding;
         private ValueBinding<string> m_ToggleBurstLoggingTextBinding;
         private ValueBinding<string> m_FooterHintBinding;
+        private ValueBinding<string> m_WarningBinding;
         private ValueBinding<string> m_SelectedVehicleBinding;
         private ValueBinding<string> m_SelectedRoleBinding;
         private ValueBinding<string> m_SelectedWatchStatusBinding;
@@ -119,6 +122,7 @@ namespace Traffic_Law_Enforcement
             AddBinding(m_ClearWatchedTextBinding = new ValueBinding<string>(kGroup, "clearWatchedText", string.Empty));
             AddBinding(m_ToggleBurstLoggingTextBinding = new ValueBinding<string>(kGroup, "toggleBurstLoggingText", string.Empty));
             AddBinding(m_FooterHintBinding = new ValueBinding<string>(kGroup, "footerHintText", string.Empty));
+            AddBinding(m_WarningBinding = new ValueBinding<string>(kGroup, "warningText", string.Empty));
             AddBinding(m_SelectedVehicleBinding = new ValueBinding<string>(kGroup, "selectedVehicle", string.Empty));
             AddBinding(m_SelectedRoleBinding = new ValueBinding<string>(kGroup, "selectedRole", string.Empty));
             AddBinding(m_SelectedWatchStatusBinding = new ValueBinding<string>(kGroup, "selectedWatchStatus", string.Empty));
@@ -246,6 +250,9 @@ namespace Traffic_Law_Enforcement
             m_UnwatchSelectedTextBinding.Update(LocalizeText(kUnwatchSelectedButtonLocaleId, "Unwatch selected"));
             m_ClearWatchedTextBinding.Update(LocalizeText(kClearWatchedButtonLocaleId, "Clear watched"));
             m_ToggleBurstLoggingTextBinding.Update(LocalizeText(kToggleBurstLoggingButtonLocaleId, "Toggle burst logging (5s)"));
+            m_WarningBinding.Update(LocalizeText(
+                kWarningLocaleId,
+                "Warning: Focused logging only emits log types whose logging options are currently enabled."));
             m_FooterHintBinding.Update(LocalizeText(
                 kFooterHintLocaleId,
                 "Watched vehicles bypass per-update focused-route logging caps and stay in change-driven tracking."));

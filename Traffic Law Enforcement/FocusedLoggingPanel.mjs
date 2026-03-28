@@ -27,6 +27,7 @@ const unwatchSelectedTextBinding = api.bindValue(group, "unwatchSelectedText", "
 const clearWatchedTextBinding = api.bindValue(group, "clearWatchedText", "");
 const toggleBurstLoggingTextBinding = api.bindValue(group, "toggleBurstLoggingText", "");
 const footerHintTextBinding = api.bindValue(group, "footerHintText", "");
+const warningTextBinding = api.bindValue(group, "warningText", "");
 const selectedVehicleBinding = api.bindValue(group, "selectedVehicle", "");
 const selectedRoleBinding = api.bindValue(group, "selectedRole", "");
 const selectedWatchStatusBinding = api.bindValue(group, "selectedWatchStatus", "");
@@ -106,6 +107,13 @@ const styles = {
         color: "rgba(220, 229, 238, 0.95)",
         fontSize: "12px",
         lineHeight: 1.35,
+    },
+    warning: {
+        marginTop: "12px",
+        color: "#ffd2a8",
+        fontSize: "12px",
+        lineHeight: 1.35,
+        fontWeight: 700,
     },
     switchRow: {
         display: "flex",
@@ -242,6 +250,7 @@ function FocusedLoggingPanel() {
     const clearWatchedText = api.useValue(clearWatchedTextBinding);
     const toggleBurstLoggingText = api.useValue(toggleBurstLoggingTextBinding);
     const footerHintText = api.useValue(footerHintTextBinding);
+    const warningText = api.useValue(warningTextBinding);
     const selectedVehicle = api.useValue(selectedVehicleBinding);
     const selectedRole = api.useValue(selectedRoleBinding);
     const selectedWatchStatus = api.useValue(selectedWatchStatusBinding);
@@ -343,6 +352,9 @@ function FocusedLoggingPanel() {
                         onClick: onClearWatched,
                     })
                 ),
+                warningText
+                    ? h("div", { style: styles.warning }, warningText)
+                    : null,
                 footerHintText
                     ? h("div", { style: styles.footer }, footerHintText)
                     : null

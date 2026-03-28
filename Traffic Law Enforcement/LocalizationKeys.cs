@@ -334,6 +334,8 @@ namespace Traffic_Law_Enforcement
                 FocusedLoggingPanelUISystem.kNoEligibleSelectionLocaleId;
             map["FocusedLoggingPanel.FooterHint"] =
                 FocusedLoggingPanelUISystem.kFooterHintLocaleId;
+            map["FocusedLoggingPanel.Warning"] =
+                FocusedLoggingPanelUISystem.kWarningLocaleId;
             map["FocusedLoggingPanel.None"] =
                 FocusedLoggingPanelUISystem.kNoneLocaleId;
 
