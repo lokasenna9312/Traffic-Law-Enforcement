@@ -514,19 +514,10 @@ function SelectedObjectPanel() {
     const routeExplanation = api.useValue(routeExplanationBinding);
     const connectedStop = api.useValue(connectedStopBinding);
     const [entitySelectionInput, setEntitySelectionInput] = React.useState(entitySelectionSuggestedValue);
-    const previousSuggestedValueRef = React.useRef(entitySelectionSuggestedValue);
 
     React.useEffect(
         function () {
-            const suggestedValue = entitySelectionSuggestedValue || "";
-            if (
-                entitySelectionInput === "" ||
-                entitySelectionInput === previousSuggestedValueRef.current
-            ) {
-                setEntitySelectionInput(suggestedValue);
-            }
-
-            previousSuggestedValueRef.current = suggestedValue;
+            setEntitySelectionInput(entitySelectionSuggestedValue || "");
         },
         [entitySelectionSuggestedValue]
     );
