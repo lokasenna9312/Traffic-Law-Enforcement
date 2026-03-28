@@ -400,6 +400,11 @@ namespace Traffic_Law_Enforcement
             });
             routeDiagnostics.children.Add(new DebugUI.Value
             {
+                displayName = "Full path -> target start",
+                getter = GetRouteDiagnosticsFullPathToTargetStartText
+            });
+            routeDiagnostics.children.Add(new DebugUI.Value
+            {
                 displayName = "Navigation lanes",
                 getter = GetRouteDiagnosticsNavigationLanesText
             });
@@ -821,6 +826,12 @@ namespace Traffic_Law_Enforcement
         {
             return GetRouteDiagnosticsOptionalText(
                 snapshot => snapshot.RouteDiagnosticsDirectConnectText);
+        }
+
+        private static string GetRouteDiagnosticsFullPathToTargetStartText()
+        {
+            return GetRouteDiagnosticsOptionalText(
+                snapshot => snapshot.RouteDiagnosticsFullPathToTargetStartText);
         }
 
         private static string GetRouteDiagnosticsNavigationLanesText()

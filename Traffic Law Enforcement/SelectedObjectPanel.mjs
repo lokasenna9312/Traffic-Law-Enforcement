@@ -57,6 +57,7 @@ const targetRoadLabelTextBinding = api.bindValue(group, "targetRoadLabelText", "
 const startOwnerRoadLabelTextBinding = api.bindValue(group, "startOwnerRoadLabelText", "");
 const endOwnerRoadLabelTextBinding = api.bindValue(group, "endOwnerRoadLabelText", "");
 const currentToTargetStartLabelTextBinding = api.bindValue(group, "currentToTargetStartLabelText", "");
+const fullPathToTargetStartLabelTextBinding = api.bindValue(group, "fullPathToTargetStartLabelText", "");
 const navigationLanesLabelTextBinding = api.bindValue(group, "navigationLanesLabelText", "");
 const plannedPenaltiesLabelTextBinding = api.bindValue(group, "plannedPenaltiesLabelText", "");
 const penaltyTagsLabelTextBinding = api.bindValue(group, "penaltyTagsLabelText", "");
@@ -77,6 +78,7 @@ const targetRoadBinding = api.bindValue(group, "targetRoad", "");
 const startOwnerRoadBinding = api.bindValue(group, "startOwnerRoad", "");
 const endOwnerRoadBinding = api.bindValue(group, "endOwnerRoad", "");
 const currentToTargetStartBinding = api.bindValue(group, "currentToTargetStart", "");
+const fullPathToTargetStartBinding = api.bindValue(group, "fullPathToTargetStart", "");
 const navigationLanesBinding = api.bindValue(group, "navigationLanes", "");
 const plannedPenaltiesBinding = api.bindValue(group, "plannedPenalties", "");
 const penaltyTagsBinding = api.bindValue(group, "penaltyTags", "");
@@ -392,6 +394,7 @@ function SelectedObjectPanel() {
     const startOwnerRoadLabelText = api.useValue(startOwnerRoadLabelTextBinding);
     const endOwnerRoadLabelText = api.useValue(endOwnerRoadLabelTextBinding);
     const currentToTargetStartLabelText = api.useValue(currentToTargetStartLabelTextBinding);
+    const fullPathToTargetStartLabelText = api.useValue(fullPathToTargetStartLabelTextBinding);
     const navigationLanesLabelText = api.useValue(navigationLanesLabelTextBinding);
     const plannedPenaltiesLabelText = api.useValue(plannedPenaltiesLabelTextBinding);
     const penaltyTagsLabelText = api.useValue(penaltyTagsLabelTextBinding);
@@ -412,6 +415,7 @@ function SelectedObjectPanel() {
     const startOwnerRoad = api.useValue(startOwnerRoadBinding);
     const endOwnerRoad = api.useValue(endOwnerRoadBinding);
     const currentToTargetStart = api.useValue(currentToTargetStartBinding);
+    const fullPathToTargetStart = api.useValue(fullPathToTargetStartBinding);
     const navigationLanes = api.useValue(navigationLanesBinding);
     const plannedPenalties = api.useValue(plannedPenaltiesBinding);
     const penaltyTags = api.useValue(penaltyTagsBinding);
@@ -634,6 +638,7 @@ function SelectedObjectPanel() {
                              h(Row, { label: startOwnerRoadLabelText, value: startOwnerRoad }),
                              h(Row, { label: endOwnerRoadLabelText, value: endOwnerRoad }),
                              h(Row, { label: currentToTargetStartLabelText, value: currentToTargetStart }),
+                             h(Row, { label: fullPathToTargetStartLabelText, value: fullPathToTargetStart }),
                              h(Row, { label: navigationLanesLabelText, value: navigationLanes }),
                              h(Row, { label: plannedPenaltiesLabelText, value: plannedPenalties }),
                              h(Row, { label: penaltyTagsLabelText, value: penaltyTags }),

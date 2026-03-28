@@ -77,6 +77,7 @@ namespace Traffic_Law_Enforcement
         public readonly string RouteDiagnosticsStartOwnerRoadText;
         public readonly string RouteDiagnosticsEndOwnerRoadText;
         public readonly string RouteDiagnosticsDirectConnectText;
+        public readonly string RouteDiagnosticsFullPathToTargetStartText;
         public readonly string RouteDiagnosticsNavigationLanesText;
         public readonly string RouteDiagnosticsPlannedPenaltiesText;
         public readonly string RouteDiagnosticsPenaltyTagsText;
@@ -136,6 +137,7 @@ namespace Traffic_Law_Enforcement
             string routeDiagnosticsStartOwnerRoadText,
             string routeDiagnosticsEndOwnerRoadText,
             string routeDiagnosticsDirectConnectText,
+            string routeDiagnosticsFullPathToTargetStartText,
             string routeDiagnosticsNavigationLanesText,
             string routeDiagnosticsPlannedPenaltiesText,
             string routeDiagnosticsPenaltyTagsText,
@@ -194,6 +196,7 @@ namespace Traffic_Law_Enforcement
             RouteDiagnosticsStartOwnerRoadText = routeDiagnosticsStartOwnerRoadText;
             RouteDiagnosticsEndOwnerRoadText = routeDiagnosticsEndOwnerRoadText;
             RouteDiagnosticsDirectConnectText = routeDiagnosticsDirectConnectText;
+            RouteDiagnosticsFullPathToTargetStartText = routeDiagnosticsFullPathToTargetStartText;
             RouteDiagnosticsNavigationLanesText = routeDiagnosticsNavigationLanesText;
             RouteDiagnosticsPlannedPenaltiesText = routeDiagnosticsPlannedPenaltiesText;
             RouteDiagnosticsPenaltyTagsText = routeDiagnosticsPenaltyTagsText;
@@ -339,6 +342,12 @@ namespace Traffic_Law_Enforcement
             "TrafficLawEnforcement.SelectedObjectPanel.Text.RouteDirectConnect.NoPreview";
         internal const string kRouteDirectConnectMissingStartLocaleId =
             "TrafficLawEnforcement.SelectedObjectPanel.Text.RouteDirectConnect.MissingStart";
+        internal const string kRouteFullPathContainsStartLocaleId =
+            "TrafficLawEnforcement.SelectedObjectPanel.Text.RouteFullPath.ContainsStart";
+        internal const string kRouteFullPathMissingStartLocaleId =
+            "TrafficLawEnforcement.SelectedObjectPanel.Text.RouteFullPath.MissingStart";
+        internal const string kRouteFullPathMissingLocaleId =
+            "TrafficLawEnforcement.SelectedObjectPanel.Text.RouteFullPath.Missing";
 
         private SelectedObjectResolver m_SelectedObjectResolver;
         private PublicTransportLaneVehicleTypeLookups m_TypeLookups;
@@ -351,6 +360,7 @@ namespace Traffic_Law_Enforcement
         private ComponentLookup<Waypoint> m_WaypointData;
         private ComponentLookup<Connected> m_ConnectedData;
         private BufferLookup<CarNavigationLane> m_NavigationLaneData;
+        private BufferLookup<PathElement> m_PathElementData;
         private ComponentLookup<CarCurrentLane> m_CurrentLaneData;
         private ComponentLookup<VehicleLaneHistory> m_HistoryData;
         private ComponentLookup<VehicleTrafficLawProfile> m_ProfileData;
@@ -386,6 +396,7 @@ namespace Traffic_Law_Enforcement
             m_WaypointData = GetComponentLookup<Waypoint>(true);
             m_ConnectedData = GetComponentLookup<Connected>(true);
             m_NavigationLaneData = GetBufferLookup<CarNavigationLane>(true);
+            m_PathElementData = GetBufferLookup<PathElement>(true);
             m_CurrentLaneData = GetComponentLookup<CarCurrentLane>(true);
             m_HistoryData = GetComponentLookup<VehicleLaneHistory>(true);
             m_ProfileData = GetComponentLookup<VehicleTrafficLawProfile>(true);
@@ -415,6 +426,7 @@ namespace Traffic_Law_Enforcement
             m_WaypointData.Update(this);
             m_ConnectedData.Update(this);
             m_NavigationLaneData.Update(this);
+            m_PathElementData.Update(this);
             m_CurrentLaneData.Update(this);
             m_HistoryData.Update(this);
             m_ProfileData.Update(this);
@@ -565,6 +577,7 @@ namespace Traffic_Law_Enforcement
                 routeDiagnostics.StartOwnerRoadText,
                 routeDiagnostics.EndOwnerRoadText,
                 routeDiagnostics.DirectConnectText,
+                routeDiagnostics.FullPathToTargetStartText,
                 routeDiagnostics.NavigationLanesText,
                 routeDiagnostics.PlannedPenaltiesText,
                 routeDiagnostics.PenaltyTagsText,
@@ -627,6 +640,8 @@ namespace Traffic_Law_Enforcement
 
             bool hasNavigationLanes =
                 m_NavigationLaneData.TryGetBuffer(vehicle, out DynamicBuffer<CarNavigationLane> navigationLanes);
+            bool hasPathElements =
+                m_PathElementData.TryGetBuffer(vehicle, out DynamicBuffer<PathElement> pathElements);
 
             RoutePenaltyInspectionContext inspectionContext =
                 CreateRouteInspectionContext();
@@ -655,6 +670,13 @@ namespace Traffic_Law_Enforcement
                     targetEntity,
                     navigationLanes,
                     hasNavigationLanes),
+                fullPathToTargetStartText: BuildFullPathToTargetStartText(
+                    currentLaneEntity,
+                    targetEntity,
+                    navigationLanes,
+                    hasNavigationLanes,
+                    pathElements,
+                    hasPathElements),
                 navigationLanesText: BuildNavigationLanesText(
                     currentLaneEntity,
                     navigationLanes,
@@ -947,6 +969,61 @@ namespace Traffic_Law_Enforcement
                 "No, no current navigation preview reaches the target start lane.");
         }
 
+        private string BuildFullPathToTargetStartText(
+            Entity currentLaneEntity,
+            Entity targetEntity,
+            DynamicBuffer<CarNavigationLane> navigationLanes,
+            bool hasNavigationLanes,
+            DynamicBuffer<PathElement> pathElements,
+            bool hasPathElements)
+        {
+            if (targetEntity == Entity.Null ||
+                !m_RouteLaneData.TryGetComponent(targetEntity, out RouteLane routeLane) ||
+                routeLane.m_StartLane == Entity.Null)
+            {
+                return LocalizeText(
+                    kRouteFullPathMissingStartLocaleId,
+                    "Target start lane unavailable.");
+            }
+
+            if (currentLaneEntity == routeLane.m_StartLane)
+            {
+                return LocalizeText(
+                    kRouteFullPathContainsStartLocaleId,
+                    "Yes, current full path contains the target start lane.");
+            }
+
+            if (hasNavigationLanes)
+            {
+                for (int index = 0; index < navigationLanes.Length; index++)
+                {
+                    if (navigationLanes[index].m_Lane == routeLane.m_StartLane)
+                    {
+                        return LocalizeText(
+                            kRouteFullPathContainsStartLocaleId,
+                            "Yes, current full path contains the target start lane.");
+                    }
+                }
+            }
+
+            if (hasPathElements)
+            {
+                for (int index = 0; index < pathElements.Length; index++)
+                {
+                    if (pathElements[index].m_Target == routeLane.m_StartLane)
+                    {
+                        return LocalizeText(
+                            kRouteFullPathContainsStartLocaleId,
+                            "Yes, current full path contains the target start lane.");
+                    }
+                }
+            }
+
+            return LocalizeText(
+                kRouteFullPathMissingLocaleId,
+                "No, current full path does not contain the target start lane.");
+        }
+
         private string BuildRouteDecisionExplanation(
             Entity vehicle,
             Entity currentLaneEntity,
@@ -1228,6 +1305,7 @@ namespace Traffic_Law_Enforcement
             public readonly string StartOwnerRoadText;
             public readonly string EndOwnerRoadText;
             public readonly string DirectConnectText;
+            public readonly string FullPathToTargetStartText;
             public readonly string NavigationLanesText;
             public readonly string PlannedPenaltiesText;
             public readonly string PenaltyTagsText;
@@ -1247,6 +1325,7 @@ namespace Traffic_Law_Enforcement
                 string startOwnerRoadText,
                 string endOwnerRoadText,
                 string directConnectText,
+                string fullPathToTargetStartText,
                 string navigationLanesText,
                 string plannedPenaltiesText,
                 string penaltyTagsText,
@@ -1265,6 +1344,7 @@ namespace Traffic_Law_Enforcement
                 StartOwnerRoadText = startOwnerRoadText;
                 EndOwnerRoadText = endOwnerRoadText;
                 DirectConnectText = directConnectText;
+                FullPathToTargetStartText = fullPathToTargetStartText;
                 NavigationLanesText = navigationLanesText;
                 PlannedPenaltiesText = plannedPenaltiesText;
                 PenaltyTagsText = penaltyTagsText;

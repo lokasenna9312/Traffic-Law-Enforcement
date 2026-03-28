@@ -185,6 +185,7 @@ namespace Traffic_Law_Enforcement
             map["SelectedObjectPanel.StartOwnerRoadLabel"] = SelectedObjectPanelUISystem.kStartOwnerRoadLabelLocaleId;
             map["SelectedObjectPanel.EndOwnerRoadLabel"] = SelectedObjectPanelUISystem.kEndOwnerRoadLabelLocaleId;
             map["SelectedObjectPanel.CurrentToTargetStartLabel"] = SelectedObjectPanelUISystem.kCurrentToTargetStartLabelLocaleId;
+            map["SelectedObjectPanel.FullPathToTargetStartLabel"] = SelectedObjectPanelUISystem.kFullPathToTargetStartLabelLocaleId;
             map["SelectedObjectPanel.NavigationLanesLabel"] = SelectedObjectPanelUISystem.kNavigationLanesLabelLocaleId;
             map["SelectedObjectPanel.PlannedPenaltiesLabel"] = SelectedObjectPanelUISystem.kPlannedPenaltiesLabelLocaleId;
             map["SelectedObjectPanel.PenaltyTagsLabel"] = SelectedObjectPanelUISystem.kPenaltyTagsLabelLocaleId;
@@ -291,6 +292,12 @@ namespace Traffic_Law_Enforcement
                 SelectedObjectBridgeSystem.kRouteDirectConnectNoPreviewLocaleId;
             map["SelectedObjectPanel.RouteDirectConnect.MissingStart"] =
                 SelectedObjectBridgeSystem.kRouteDirectConnectMissingStartLocaleId;
+            map["SelectedObjectPanel.RouteFullPath.ContainsStart"] =
+                SelectedObjectBridgeSystem.kRouteFullPathContainsStartLocaleId;
+            map["SelectedObjectPanel.RouteFullPath.MissingStart"] =
+                SelectedObjectBridgeSystem.kRouteFullPathMissingStartLocaleId;
+            map["SelectedObjectPanel.RouteFullPath.Missing"] =
+                SelectedObjectBridgeSystem.kRouteFullPathMissingLocaleId;
             map["FocusedLoggingPanel.HeaderText"] =
                 FocusedLoggingPanelUISystem.kHeaderTextLocaleId;
             map["FocusedLoggingPanel.SelectedVehicleLabel"] =

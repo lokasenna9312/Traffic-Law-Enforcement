@@ -48,6 +48,7 @@ namespace Traffic_Law_Enforcement
         internal const string kStartOwnerRoadLabelLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Label.StartOwnerRoad";
         internal const string kEndOwnerRoadLabelLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Label.EndOwnerRoad";
         internal const string kCurrentToTargetStartLabelLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Label.CurrentToTargetStart";
+        internal const string kFullPathToTargetStartLabelLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Label.FullPathToTargetStart";
         internal const string kNavigationLanesLabelLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Label.NavigationLanes";
         internal const string kPlannedPenaltiesLabelLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Label.PlannedPenalties";
         internal const string kPenaltyTagsLabelLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Label.PenaltyTags";
@@ -127,6 +128,7 @@ namespace Traffic_Law_Enforcement
         private ValueBinding<string> m_StartOwnerRoadLabelBinding;
         private ValueBinding<string> m_EndOwnerRoadLabelBinding;
         private ValueBinding<string> m_CurrentToTargetStartLabelBinding;
+        private ValueBinding<string> m_FullPathToTargetStartLabelBinding;
         private ValueBinding<string> m_NavigationLanesLabelBinding;
         private ValueBinding<string> m_PlannedPenaltiesLabelBinding;
         private ValueBinding<string> m_PenaltyTagsLabelBinding;
@@ -147,6 +149,7 @@ namespace Traffic_Law_Enforcement
         private ValueBinding<string> m_StartOwnerRoadBinding;
         private ValueBinding<string> m_EndOwnerRoadBinding;
         private ValueBinding<string> m_CurrentToTargetStartBinding;
+        private ValueBinding<string> m_FullPathToTargetStartBinding;
         private ValueBinding<string> m_NavigationLanesBinding;
         private ValueBinding<string> m_PlannedPenaltiesBinding;
         private ValueBinding<string> m_PenaltyTagsBinding;
@@ -194,6 +197,7 @@ namespace Traffic_Law_Enforcement
             public string StartOwnerRoad;
             public string EndOwnerRoad;
             public string CurrentToTargetStart;
+            public string FullPathToTargetStart;
             public string NavigationLanes;
             public string PlannedPenalties;
             public string PenaltyTags;
@@ -254,6 +258,7 @@ namespace Traffic_Law_Enforcement
             AddBinding(m_StartOwnerRoadLabelBinding = new ValueBinding<string>(kGroup, "startOwnerRoadLabelText", string.Empty));
             AddBinding(m_EndOwnerRoadLabelBinding = new ValueBinding<string>(kGroup, "endOwnerRoadLabelText", string.Empty));
             AddBinding(m_CurrentToTargetStartLabelBinding = new ValueBinding<string>(kGroup, "currentToTargetStartLabelText", string.Empty));
+            AddBinding(m_FullPathToTargetStartLabelBinding = new ValueBinding<string>(kGroup, "fullPathToTargetStartLabelText", string.Empty));
             AddBinding(m_NavigationLanesLabelBinding = new ValueBinding<string>(kGroup, "navigationLanesLabelText", string.Empty));
             AddBinding(m_PlannedPenaltiesLabelBinding = new ValueBinding<string>(kGroup, "plannedPenaltiesLabelText", string.Empty));
             AddBinding(m_PenaltyTagsLabelBinding = new ValueBinding<string>(kGroup, "penaltyTagsLabelText", string.Empty));
@@ -274,6 +279,7 @@ namespace Traffic_Law_Enforcement
             AddBinding(m_StartOwnerRoadBinding = new ValueBinding<string>(kGroup, "startOwnerRoad", string.Empty));
             AddBinding(m_EndOwnerRoadBinding = new ValueBinding<string>(kGroup, "endOwnerRoad", string.Empty));
             AddBinding(m_CurrentToTargetStartBinding = new ValueBinding<string>(kGroup, "currentToTargetStart", string.Empty));
+            AddBinding(m_FullPathToTargetStartBinding = new ValueBinding<string>(kGroup, "fullPathToTargetStart", string.Empty));
             AddBinding(m_NavigationLanesBinding = new ValueBinding<string>(kGroup, "navigationLanes", string.Empty));
             AddBinding(m_PlannedPenaltiesBinding = new ValueBinding<string>(kGroup, "plannedPenalties", string.Empty));
             AddBinding(m_PenaltyTagsBinding = new ValueBinding<string>(kGroup, "penaltyTags", string.Empty));
@@ -390,6 +396,7 @@ namespace Traffic_Law_Enforcement
                 StartOwnerRoad = NormalizeText(snapshot.RouteDiagnosticsStartOwnerRoadText),
                 EndOwnerRoad = NormalizeText(snapshot.RouteDiagnosticsEndOwnerRoadText),
                 CurrentToTargetStart = NormalizeText(snapshot.RouteDiagnosticsDirectConnectText),
+                FullPathToTargetStart = NormalizeText(snapshot.RouteDiagnosticsFullPathToTargetStartText),
                 NavigationLanes = NormalizeText(snapshot.RouteDiagnosticsNavigationLanesText),
                 PlannedPenalties = NormalizeText(snapshot.RouteDiagnosticsPlannedPenaltiesText),
                 PenaltyTags = NormalizeText(snapshot.RouteDiagnosticsPenaltyTagsText),
@@ -431,6 +438,7 @@ namespace Traffic_Law_Enforcement
             m_StartOwnerRoadBinding.Update(state.StartOwnerRoad ?? string.Empty);
             m_EndOwnerRoadBinding.Update(state.EndOwnerRoad ?? string.Empty);
             m_CurrentToTargetStartBinding.Update(state.CurrentToTargetStart ?? string.Empty);
+            m_FullPathToTargetStartBinding.Update(state.FullPathToTargetStart ?? string.Empty);
             m_NavigationLanesBinding.Update(state.NavigationLanes ?? string.Empty);
             m_PlannedPenaltiesBinding.Update(state.PlannedPenalties ?? string.Empty);
             m_PenaltyTagsBinding.Update(state.PenaltyTags ?? string.Empty);
@@ -468,6 +476,7 @@ namespace Traffic_Law_Enforcement
             m_StartOwnerRoadLabelBinding.Update(LocalizeText(kStartOwnerRoadLabelLocaleId, "Route start road"));
             m_EndOwnerRoadLabelBinding.Update(LocalizeText(kEndOwnerRoadLabelLocaleId, "Route end road"));
             m_CurrentToTargetStartLabelBinding.Update(LocalizeText(kCurrentToTargetStartLabelLocaleId, "Current -> target start"));
+            m_FullPathToTargetStartLabelBinding.Update(LocalizeText(kFullPathToTargetStartLabelLocaleId, "Full path -> target start"));
             m_NavigationLanesLabelBinding.Update(LocalizeText(kNavigationLanesLabelLocaleId, "Navigation lanes"));
             m_PlannedPenaltiesLabelBinding.Update(LocalizeText(kPlannedPenaltiesLabelLocaleId, "Planned penalties"));
             m_PenaltyTagsLabelBinding.Update(LocalizeText(kPenaltyTagsLabelLocaleId, "Penalty tags"));
