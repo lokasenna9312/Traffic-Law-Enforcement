@@ -55,15 +55,7 @@ const routeDiagnosticsTitleTextBinding = api.bindValue(group, "routeDiagnosticsT
 const currentTargetLabelTextBinding = api.bindValue(group, "currentTargetLabelText", "");
 const currentRouteLabelTextBinding = api.bindValue(group, "currentRouteLabelText", "");
 const targetRoadLabelTextBinding = api.bindValue(group, "targetRoadLabelText", "");
-const startOwnerRoadLabelTextBinding = api.bindValue(group, "startOwnerRoadLabelText", "");
-const endOwnerRoadLabelTextBinding = api.bindValue(group, "endOwnerRoadLabelText", "");
-const currentToTargetStartLabelTextBinding = api.bindValue(group, "currentToTargetStartLabelText", "");
-const fullPathToTargetStartLabelTextBinding = api.bindValue(group, "fullPathToTargetStartLabelText", "");
-const navigationLanesLabelTextBinding = api.bindValue(group, "navigationLanesLabelText", "");
-const plannedPenaltiesLabelTextBinding = api.bindValue(group, "plannedPenaltiesLabelText", "");
-const penaltyTagsLabelTextBinding = api.bindValue(group, "penaltyTagsLabelText", "");
 const routeExplanationLabelTextBinding = api.bindValue(group, "routeExplanationLabelText", "");
-const waypointRouteLaneLabelTextBinding = api.bindValue(group, "waypointRouteLaneLabelText", "");
 const connectedStopLabelTextBinding = api.bindValue(group, "connectedStopLabelText", "");
 const currentLaneBinding = api.bindValue(group, "currentLane", "");
 const previousLaneBinding = api.bindValue(group, "previousLane", "");
@@ -79,15 +71,7 @@ const currentRouteBinding = api.bindValue(group, "currentRoute", "");
 const currentRouteEntityTextBinding = api.bindValue(group, "currentRouteEntityText", "");
 const currentRouteColorBinding = api.bindValue(group, "currentRouteColor", "");
 const targetRoadBinding = api.bindValue(group, "targetRoad", "");
-const startOwnerRoadBinding = api.bindValue(group, "startOwnerRoad", "");
-const endOwnerRoadBinding = api.bindValue(group, "endOwnerRoad", "");
-const currentToTargetStartBinding = api.bindValue(group, "currentToTargetStart", "");
-const fullPathToTargetStartBinding = api.bindValue(group, "fullPathToTargetStart", "");
-const navigationLanesBinding = api.bindValue(group, "navigationLanes", "");
-const plannedPenaltiesBinding = api.bindValue(group, "plannedPenalties", "");
-const penaltyTagsBinding = api.bindValue(group, "penaltyTags", "");
 const routeExplanationBinding = api.bindValue(group, "routeExplanation", "");
-const waypointRouteLaneBinding = api.bindValue(group, "waypointRouteLane", "");
 const connectedStopBinding = api.bindValue(group, "connectedStop", "");
 
 const initialPosition = { x: 0.76, y: 0.1 };
@@ -511,15 +495,7 @@ function SelectedObjectPanel() {
     const currentTargetLabelText = api.useValue(currentTargetLabelTextBinding);
     const currentRouteLabelText = api.useValue(currentRouteLabelTextBinding);
     const targetRoadLabelText = api.useValue(targetRoadLabelTextBinding);
-    const startOwnerRoadLabelText = api.useValue(startOwnerRoadLabelTextBinding);
-    const endOwnerRoadLabelText = api.useValue(endOwnerRoadLabelTextBinding);
-    const currentToTargetStartLabelText = api.useValue(currentToTargetStartLabelTextBinding);
-    const fullPathToTargetStartLabelText = api.useValue(fullPathToTargetStartLabelTextBinding);
-    const navigationLanesLabelText = api.useValue(navigationLanesLabelTextBinding);
-    const plannedPenaltiesLabelText = api.useValue(plannedPenaltiesLabelTextBinding);
-    const penaltyTagsLabelText = api.useValue(penaltyTagsLabelTextBinding);
     const routeExplanationLabelText = api.useValue(routeExplanationLabelTextBinding);
-    const waypointRouteLaneLabelText = api.useValue(waypointRouteLaneLabelTextBinding);
     const connectedStopLabelText = api.useValue(connectedStopLabelTextBinding);
     const currentLane = api.useValue(currentLaneBinding);
     const previousLane = api.useValue(previousLaneBinding);
@@ -535,15 +511,7 @@ function SelectedObjectPanel() {
     const currentRouteEntityText = api.useValue(currentRouteEntityTextBinding);
     const currentRouteColor = api.useValue(currentRouteColorBinding);
     const targetRoad = api.useValue(targetRoadBinding);
-    const startOwnerRoad = api.useValue(startOwnerRoadBinding);
-    const endOwnerRoad = api.useValue(endOwnerRoadBinding);
-    const currentToTargetStart = api.useValue(currentToTargetStartBinding);
-    const fullPathToTargetStart = api.useValue(fullPathToTargetStartBinding);
-    const navigationLanes = api.useValue(navigationLanesBinding);
-    const plannedPenalties = api.useValue(plannedPenaltiesBinding);
-    const penaltyTags = api.useValue(penaltyTagsBinding);
     const routeExplanation = api.useValue(routeExplanationBinding);
-    const waypointRouteLane = api.useValue(waypointRouteLaneBinding);
     const connectedStop = api.useValue(connectedStopBinding);
     const [entitySelectionInput, setEntitySelectionInput] = React.useState(entitySelectionSuggestedValue);
     const previousSuggestedValueRef = React.useRef(entitySelectionSuggestedValue);
@@ -769,16 +737,8 @@ function SelectedObjectPanel() {
                                   routeEntityText: currentRouteEntityText,
                               }),
                               h(Row, { label: targetRoadLabelText, value: targetRoad }),
-                             h(Row, { label: startOwnerRoadLabelText, value: startOwnerRoad }),
-                             h(Row, { label: endOwnerRoadLabelText, value: endOwnerRoad }),
-                             h(Row, { label: currentToTargetStartLabelText, value: currentToTargetStart }),
-                             h(Row, { label: fullPathToTargetStartLabelText, value: fullPathToTargetStart }),
-                             h(Row, { label: navigationLanesLabelText, value: navigationLanes }),
-                             h(Row, { label: plannedPenaltiesLabelText, value: plannedPenalties }),
-                             h(Row, { label: penaltyTagsLabelText, value: penaltyTags }),
-                             h(Row, { label: routeExplanationLabelText, value: routeExplanation }),
-                             h(Row, { label: waypointRouteLaneLabelText, value: waypointRouteLane }),
-                             h(Row, { label: connectedStopLabelText, value: connectedStop })
+                              h(Row, { label: connectedStopLabelText, value: connectedStop }),
+                              h(Row, { label: routeExplanationLabelText, value: routeExplanation })
                          )
                        : null,
                    null

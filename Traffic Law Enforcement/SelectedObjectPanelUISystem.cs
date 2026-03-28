@@ -48,15 +48,7 @@ namespace Traffic_Law_Enforcement
         internal const string kCurrentTargetLabelLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Label.CurrentTarget";
         internal const string kCurrentRouteLabelLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Label.CurrentRoute";
         internal const string kTargetRoadLabelLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Label.TargetRoad";
-        internal const string kStartOwnerRoadLabelLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Label.StartOwnerRoad";
-        internal const string kEndOwnerRoadLabelLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Label.EndOwnerRoad";
-        internal const string kCurrentToTargetStartLabelLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Label.CurrentToTargetStart";
-        internal const string kFullPathToTargetStartLabelLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Label.FullPathToTargetStart";
-        internal const string kNavigationLanesLabelLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Label.NavigationLanes";
-        internal const string kPlannedPenaltiesLabelLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Label.PlannedPenalties";
-        internal const string kPenaltyTagsLabelLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Label.PenaltyTags";
         internal const string kRouteExplanationLabelLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Label.RouteExplanation";
-        internal const string kWaypointRouteLaneLabelLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Label.WaypointRouteLane";
         internal const string kConnectedStopLabelLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Label.ConnectedStop";
         internal const string kEntitySelectionLabelLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Label.EntitySelection";
         internal const string kEntitySelectionPlaceholderLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Text.EntitySelectionPlaceholder";
@@ -129,15 +121,7 @@ namespace Traffic_Law_Enforcement
         private ValueBinding<string> m_CurrentTargetLabelBinding;
         private ValueBinding<string> m_CurrentRouteLabelBinding;
         private ValueBinding<string> m_TargetRoadLabelBinding;
-        private ValueBinding<string> m_StartOwnerRoadLabelBinding;
-        private ValueBinding<string> m_EndOwnerRoadLabelBinding;
-        private ValueBinding<string> m_CurrentToTargetStartLabelBinding;
-        private ValueBinding<string> m_FullPathToTargetStartLabelBinding;
-        private ValueBinding<string> m_NavigationLanesLabelBinding;
-        private ValueBinding<string> m_PlannedPenaltiesLabelBinding;
-        private ValueBinding<string> m_PenaltyTagsLabelBinding;
         private ValueBinding<string> m_RouteExplanationLabelBinding;
-        private ValueBinding<string> m_WaypointRouteLaneLabelBinding;
         private ValueBinding<string> m_ConnectedStopLabelBinding;
         private ValueBinding<string> m_CurrentLaneBinding;
         private ValueBinding<string> m_PreviousLaneBinding;
@@ -153,15 +137,7 @@ namespace Traffic_Law_Enforcement
         private ValueBinding<string> m_CurrentRouteEntityTextBinding;
         private ValueBinding<string> m_CurrentRouteColorBinding;
         private ValueBinding<string> m_TargetRoadBinding;
-        private ValueBinding<string> m_StartOwnerRoadBinding;
-        private ValueBinding<string> m_EndOwnerRoadBinding;
-        private ValueBinding<string> m_CurrentToTargetStartBinding;
-        private ValueBinding<string> m_FullPathToTargetStartBinding;
-        private ValueBinding<string> m_NavigationLanesBinding;
-        private ValueBinding<string> m_PlannedPenaltiesBinding;
-        private ValueBinding<string> m_PenaltyTagsBinding;
         private ValueBinding<string> m_RouteExplanationBinding;
-        private ValueBinding<string> m_WaypointRouteLaneBinding;
         private ValueBinding<string> m_ConnectedStopBinding;
 
         private bool m_IsPanelEnabled;
@@ -204,15 +180,7 @@ namespace Traffic_Law_Enforcement
             public string CurrentRouteEntityText;
             public string CurrentRouteColor;
             public string TargetRoad;
-            public string StartOwnerRoad;
-            public string EndOwnerRoad;
-            public string CurrentToTargetStart;
-            public string FullPathToTargetStart;
-            public string NavigationLanes;
-            public string PlannedPenalties;
-            public string PenaltyTags;
             public string RouteExplanation;
-            public string WaypointRouteLane;
             public string ConnectedStop;
         }
 
@@ -266,15 +234,7 @@ namespace Traffic_Law_Enforcement
             AddBinding(m_CurrentTargetLabelBinding = new ValueBinding<string>(kGroup, "currentTargetLabelText", string.Empty));
             AddBinding(m_CurrentRouteLabelBinding = new ValueBinding<string>(kGroup, "currentRouteLabelText", string.Empty));
             AddBinding(m_TargetRoadLabelBinding = new ValueBinding<string>(kGroup, "targetRoadLabelText", string.Empty));
-            AddBinding(m_StartOwnerRoadLabelBinding = new ValueBinding<string>(kGroup, "startOwnerRoadLabelText", string.Empty));
-            AddBinding(m_EndOwnerRoadLabelBinding = new ValueBinding<string>(kGroup, "endOwnerRoadLabelText", string.Empty));
-            AddBinding(m_CurrentToTargetStartLabelBinding = new ValueBinding<string>(kGroup, "currentToTargetStartLabelText", string.Empty));
-            AddBinding(m_FullPathToTargetStartLabelBinding = new ValueBinding<string>(kGroup, "fullPathToTargetStartLabelText", string.Empty));
-            AddBinding(m_NavigationLanesLabelBinding = new ValueBinding<string>(kGroup, "navigationLanesLabelText", string.Empty));
-            AddBinding(m_PlannedPenaltiesLabelBinding = new ValueBinding<string>(kGroup, "plannedPenaltiesLabelText", string.Empty));
-            AddBinding(m_PenaltyTagsLabelBinding = new ValueBinding<string>(kGroup, "penaltyTagsLabelText", string.Empty));
             AddBinding(m_RouteExplanationLabelBinding = new ValueBinding<string>(kGroup, "routeExplanationLabelText", string.Empty));
-            AddBinding(m_WaypointRouteLaneLabelBinding = new ValueBinding<string>(kGroup, "waypointRouteLaneLabelText", string.Empty));
             AddBinding(m_ConnectedStopLabelBinding = new ValueBinding<string>(kGroup, "connectedStopLabelText", string.Empty));
             AddBinding(m_CurrentLaneBinding = new ValueBinding<string>(kGroup, "currentLane", string.Empty));
             AddBinding(m_PreviousLaneBinding = new ValueBinding<string>(kGroup, "previousLane", string.Empty));
@@ -290,15 +250,7 @@ namespace Traffic_Law_Enforcement
             AddBinding(m_CurrentRouteEntityTextBinding = new ValueBinding<string>(kGroup, "currentRouteEntityText", string.Empty));
             AddBinding(m_CurrentRouteColorBinding = new ValueBinding<string>(kGroup, "currentRouteColor", string.Empty));
             AddBinding(m_TargetRoadBinding = new ValueBinding<string>(kGroup, "targetRoad", string.Empty));
-            AddBinding(m_StartOwnerRoadBinding = new ValueBinding<string>(kGroup, "startOwnerRoad", string.Empty));
-            AddBinding(m_EndOwnerRoadBinding = new ValueBinding<string>(kGroup, "endOwnerRoad", string.Empty));
-            AddBinding(m_CurrentToTargetStartBinding = new ValueBinding<string>(kGroup, "currentToTargetStart", string.Empty));
-            AddBinding(m_FullPathToTargetStartBinding = new ValueBinding<string>(kGroup, "fullPathToTargetStart", string.Empty));
-            AddBinding(m_NavigationLanesBinding = new ValueBinding<string>(kGroup, "navigationLanes", string.Empty));
-            AddBinding(m_PlannedPenaltiesBinding = new ValueBinding<string>(kGroup, "plannedPenalties", string.Empty));
-            AddBinding(m_PenaltyTagsBinding = new ValueBinding<string>(kGroup, "penaltyTags", string.Empty));
             AddBinding(m_RouteExplanationBinding = new ValueBinding<string>(kGroup, "routeExplanation", string.Empty));
-            AddBinding(m_WaypointRouteLaneBinding = new ValueBinding<string>(kGroup, "waypointRouteLane", string.Empty));
             AddBinding(m_ConnectedStopBinding = new ValueBinding<string>(kGroup, "connectedStop", string.Empty));
 
             AddBinding(new TriggerBinding(kGroup, "close", HandleCloseRequested));
@@ -413,15 +365,7 @@ namespace Traffic_Law_Enforcement
                 CurrentRouteEntityText = BuildCurrentRouteEntityText(snapshot),
                 CurrentRouteColor = BuildCurrentRouteColorText(snapshot),
                 TargetRoad = NormalizeText(snapshot.RouteDiagnosticsTargetRoadText),
-                StartOwnerRoad = NormalizeText(snapshot.RouteDiagnosticsStartOwnerRoadText),
-                EndOwnerRoad = NormalizeText(snapshot.RouteDiagnosticsEndOwnerRoadText),
-                CurrentToTargetStart = NormalizeText(snapshot.RouteDiagnosticsDirectConnectText),
-                FullPathToTargetStart = NormalizeText(snapshot.RouteDiagnosticsFullPathToTargetStartText),
-                NavigationLanes = NormalizeText(snapshot.RouteDiagnosticsNavigationLanesText),
-                PlannedPenalties = NormalizeText(snapshot.RouteDiagnosticsPlannedPenaltiesText),
-                PenaltyTags = NormalizeText(snapshot.RouteDiagnosticsPenaltyTagsText),
                 RouteExplanation = NormalizeText(snapshot.RouteDiagnosticsExplanationText),
-                WaypointRouteLane = NormalizeText(snapshot.RouteDiagnosticsWaypointRouteLaneText),
                 ConnectedStop = NormalizeText(snapshot.RouteDiagnosticsConnectedStopText)
             };
         }
@@ -458,15 +402,7 @@ namespace Traffic_Law_Enforcement
             m_CurrentRouteEntityTextBinding.Update(state.CurrentRouteEntityText ?? string.Empty);
             m_CurrentRouteColorBinding.Update(state.CurrentRouteColor ?? string.Empty);
             m_TargetRoadBinding.Update(state.TargetRoad ?? string.Empty);
-            m_StartOwnerRoadBinding.Update(state.StartOwnerRoad ?? string.Empty);
-            m_EndOwnerRoadBinding.Update(state.EndOwnerRoad ?? string.Empty);
-            m_CurrentToTargetStartBinding.Update(state.CurrentToTargetStart ?? string.Empty);
-            m_FullPathToTargetStartBinding.Update(state.FullPathToTargetStart ?? string.Empty);
-            m_NavigationLanesBinding.Update(state.NavigationLanes ?? string.Empty);
-            m_PlannedPenaltiesBinding.Update(state.PlannedPenalties ?? string.Empty);
-            m_PenaltyTagsBinding.Update(state.PenaltyTags ?? string.Empty);
             m_RouteExplanationBinding.Update(state.RouteExplanation ?? string.Empty);
-            m_WaypointRouteLaneBinding.Update(state.WaypointRouteLane ?? string.Empty);
             m_ConnectedStopBinding.Update(state.ConnectedStop ?? string.Empty);
         }
 
@@ -497,15 +433,7 @@ namespace Traffic_Law_Enforcement
             m_CurrentTargetLabelBinding.Update(LocalizeText(kCurrentTargetLabelLocaleId, "Current target"));
             m_CurrentRouteLabelBinding.Update(LocalizeText(kCurrentRouteLabelLocaleId, "Current route"));
             m_TargetRoadLabelBinding.Update(LocalizeText(kTargetRoadLabelLocaleId, "Target road"));
-            m_StartOwnerRoadLabelBinding.Update(LocalizeText(kStartOwnerRoadLabelLocaleId, "Route start road"));
-            m_EndOwnerRoadLabelBinding.Update(LocalizeText(kEndOwnerRoadLabelLocaleId, "Route end road"));
-            m_CurrentToTargetStartLabelBinding.Update(LocalizeText(kCurrentToTargetStartLabelLocaleId, "Current -> target start"));
-            m_FullPathToTargetStartLabelBinding.Update(LocalizeText(kFullPathToTargetStartLabelLocaleId, "Full path -> target start"));
-            m_NavigationLanesLabelBinding.Update(LocalizeText(kNavigationLanesLabelLocaleId, "Navigation lanes"));
-            m_PlannedPenaltiesLabelBinding.Update(LocalizeText(kPlannedPenaltiesLabelLocaleId, "Planned penalties"));
-            m_PenaltyTagsLabelBinding.Update(LocalizeText(kPenaltyTagsLabelLocaleId, "Penalty tags"));
             m_RouteExplanationLabelBinding.Update(LocalizeText(kRouteExplanationLabelLocaleId, "Route context"));
-            m_WaypointRouteLaneLabelBinding.Update(LocalizeText(kWaypointRouteLaneLabelLocaleId, "Waypoint route lane"));
             m_ConnectedStopLabelBinding.Update(LocalizeText(kConnectedStopLabelLocaleId, "Connected stop"));
         }
 

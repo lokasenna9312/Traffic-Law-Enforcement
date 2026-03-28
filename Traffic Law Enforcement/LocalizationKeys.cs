@@ -185,15 +185,7 @@ namespace Traffic_Law_Enforcement
             map["SelectedObjectPanel.CurrentTargetLabel"] = SelectedObjectPanelUISystem.kCurrentTargetLabelLocaleId;
             map["SelectedObjectPanel.CurrentRouteLabel"] = SelectedObjectPanelUISystem.kCurrentRouteLabelLocaleId;
             map["SelectedObjectPanel.TargetRoadLabel"] = SelectedObjectPanelUISystem.kTargetRoadLabelLocaleId;
-            map["SelectedObjectPanel.StartOwnerRoadLabel"] = SelectedObjectPanelUISystem.kStartOwnerRoadLabelLocaleId;
-            map["SelectedObjectPanel.EndOwnerRoadLabel"] = SelectedObjectPanelUISystem.kEndOwnerRoadLabelLocaleId;
-            map["SelectedObjectPanel.CurrentToTargetStartLabel"] = SelectedObjectPanelUISystem.kCurrentToTargetStartLabelLocaleId;
-            map["SelectedObjectPanel.FullPathToTargetStartLabel"] = SelectedObjectPanelUISystem.kFullPathToTargetStartLabelLocaleId;
-            map["SelectedObjectPanel.NavigationLanesLabel"] = SelectedObjectPanelUISystem.kNavigationLanesLabelLocaleId;
-            map["SelectedObjectPanel.PlannedPenaltiesLabel"] = SelectedObjectPanelUISystem.kPlannedPenaltiesLabelLocaleId;
-            map["SelectedObjectPanel.PenaltyTagsLabel"] = SelectedObjectPanelUISystem.kPenaltyTagsLabelLocaleId;
             map["SelectedObjectPanel.RouteExplanationLabel"] = SelectedObjectPanelUISystem.kRouteExplanationLabelLocaleId;
-            map["SelectedObjectPanel.WaypointRouteLaneLabel"] = SelectedObjectPanelUISystem.kWaypointRouteLaneLabelLocaleId;
             map["SelectedObjectPanel.ConnectedStopLabel"] = SelectedObjectPanelUISystem.kConnectedStopLabelLocaleId;
             map["SelectedObjectPanel.LiveLaneStateReady"] = SelectedObjectPanelUISystem.kLiveLaneStateReadyLocaleId;
             map["SelectedObjectPanel.LiveLaneStateNoLiveLane"] = SelectedObjectPanelUISystem.kLiveLaneStateNoLiveLaneLocaleId;
