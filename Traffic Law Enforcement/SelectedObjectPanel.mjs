@@ -74,7 +74,10 @@ const laneDetailsCollapsedBinding = api.bindValue(group, "laneDetailsCollapsed",
 const routeDiagnosticsVisibleBinding = api.bindValue(group, "routeDiagnosticsVisible", false);
 const routeDiagnosticsCollapsedBinding = api.bindValue(group, "routeDiagnosticsCollapsed", true);
 const currentTargetBinding = api.bindValue(group, "currentTarget", "");
+const currentTargetEntityBinding = api.bindValue(group, "currentTargetEntity", "");
 const currentRouteBinding = api.bindValue(group, "currentRoute", "");
+const currentRouteEntityTextBinding = api.bindValue(group, "currentRouteEntityText", "");
+const currentRouteColorBinding = api.bindValue(group, "currentRouteColor", "");
 const targetRoadBinding = api.bindValue(group, "targetRoad", "");
 const startOwnerRoadBinding = api.bindValue(group, "startOwnerRoad", "");
 const endOwnerRoadBinding = api.bindValue(group, "endOwnerRoad", "");
@@ -238,7 +241,7 @@ const styles = {
         display: "flex",
         alignItems: "center",
         flexWrap: "wrap",
-        gap: "8px",
+        gap: "0px",
         minHeight: "30px",
         color: "#ffffff",
         fontSize: "14px",
@@ -252,6 +255,42 @@ const styles = {
     classificationSecondary: {
         color: "#c2cfdf",
         fontWeight: 600,
+    },
+    valueWithTail: {
+        flex: 1,
+        display: "flex",
+        alignItems: "center",
+        gap: "8px",
+        minWidth: 0,
+    },
+    valueMain: {
+        flex: 1,
+        minWidth: 0,
+        color: "#ffffff",
+        fontSize: "14px",
+        lineHeight: 1.35,
+        wordBreak: "break-word",
+    },
+    valueTail: {
+        flexShrink: 0,
+        color: "#c2cfdf",
+        fontSize: "14px",
+        lineHeight: 1.35,
+        fontWeight: 600,
+    },
+    routeValueMain: {
+        flex: 1,
+        minWidth: 0,
+        display: "flex",
+        alignItems: "center",
+        gap: "8px",
+    },
+    routeColorSwatch: {
+        width: "12px",
+        height: "12px",
+        borderRadius: "2px",
+        border: "1px solid rgba(255, 255, 255, 0.24)",
+        flexShrink: 0,
     },
     footer: {
         marginTop: "10px",
@@ -343,8 +382,70 @@ function ClassificationRow(props) {
             props.primaryValue
                 ? h("span", { style: styles.classificationPrimary }, props.primaryValue)
                 : null,
+            props.primaryValue && props.secondaryValue ? " " : null,
             props.secondaryValue
                 ? h("span", { style: styles.classificationSecondary }, props.secondaryValue)
+                : null
+        )
+    );
+}
+
+function TailValueRow(props) {
+    if (!props.mainValue && !props.tailValue) {
+        return null;
+    }
+
+    return h(
+        "div",
+        { style: styles.row },
+        h("div", { style: styles.label }, props.label),
+        h(
+            "div",
+            { style: styles.valueWithTail },
+            h(
+                "div",
+                { style: styles.valueMain },
+                props.mainValue || props.tailValue
+            ),
+            props.mainValue && props.tailValue
+                ? h("span", { style: styles.valueTail }, props.tailValue)
+                : null
+        )
+    );
+}
+
+function CurrentRouteRow(props) {
+    if (!props.routeName && !props.routeEntityText) {
+        return null;
+    }
+
+    return h(
+        "div",
+        { style: styles.row },
+        h("div", { style: styles.label }, props.label),
+        h(
+            "div",
+            { style: styles.valueWithTail },
+            h(
+                "div",
+                { style: styles.routeValueMain },
+                props.routeColor
+                    ? h("span", {
+                          style: Object.assign(
+                              {},
+                              styles.routeColorSwatch,
+                              { background: props.routeColor }
+                          ),
+                      })
+                    : null,
+                h(
+                    "div",
+                    { style: styles.valueMain },
+                    props.routeName || props.routeEntityText
+                )
+            ),
+            props.routeName && props.routeEntityText
+                ? h("span", { style: styles.valueTail }, props.routeEntityText)
                 : null
         )
     );
@@ -428,7 +529,10 @@ function SelectedObjectPanel() {
     const routeDiagnosticsVisible = api.useValue(routeDiagnosticsVisibleBinding);
     const routeDiagnosticsCollapsed = api.useValue(routeDiagnosticsCollapsedBinding);
     const currentTarget = api.useValue(currentTargetBinding);
+    const currentTargetEntity = api.useValue(currentTargetEntityBinding);
     const currentRoute = api.useValue(currentRouteBinding);
+    const currentRouteEntityText = api.useValue(currentRouteEntityTextBinding);
+    const currentRouteColor = api.useValue(currentRouteColorBinding);
     const targetRoad = api.useValue(targetRoadBinding);
     const startOwnerRoad = api.useValue(startOwnerRoadBinding);
     const endOwnerRoad = api.useValue(endOwnerRoadBinding);
@@ -652,8 +756,17 @@ function SelectedObjectPanel() {
                        ? h(
                               "div",
                               { style: styles.subsectionBody },
-                              h(Row, { label: currentTargetLabelText, value: currentTarget }),
-                              h(Row, { label: currentRouteLabelText, value: currentRoute }),
+                              h(TailValueRow, {
+                                  label: currentTargetLabelText,
+                                  mainValue: currentTarget,
+                                  tailValue: currentTargetEntity,
+                              }),
+                              h(CurrentRouteRow, {
+                                  label: currentRouteLabelText,
+                                  routeName: currentRoute,
+                                  routeColor: currentRouteColor,
+                                  routeEntityText: currentRouteEntityText,
+                              }),
                               h(Row, { label: targetRoadLabelText, value: targetRoad }),
                              h(Row, { label: startOwnerRoadLabelText, value: startOwnerRoad }),
                              h(Row, { label: endOwnerRoadLabelText, value: endOwnerRoad }),

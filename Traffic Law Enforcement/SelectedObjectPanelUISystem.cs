@@ -148,7 +148,10 @@ namespace Traffic_Law_Enforcement
         private ValueBinding<bool> m_RouteDiagnosticsVisibleBinding;
         private ValueBinding<bool> m_RouteDiagnosticsCollapsedBinding;
         private ValueBinding<string> m_CurrentTargetBinding;
+        private ValueBinding<string> m_CurrentTargetEntityBinding;
         private ValueBinding<string> m_CurrentRouteBinding;
+        private ValueBinding<string> m_CurrentRouteEntityTextBinding;
+        private ValueBinding<string> m_CurrentRouteColorBinding;
         private ValueBinding<string> m_TargetRoadBinding;
         private ValueBinding<string> m_StartOwnerRoadBinding;
         private ValueBinding<string> m_EndOwnerRoadBinding;
@@ -196,7 +199,10 @@ namespace Traffic_Law_Enforcement
             public string LiveLaneState;
             public bool RouteDiagnosticsVisible;
             public string CurrentTarget;
+            public string CurrentTargetEntity;
             public string CurrentRoute;
+            public string CurrentRouteEntityText;
+            public string CurrentRouteColor;
             public string TargetRoad;
             public string StartOwnerRoad;
             public string EndOwnerRoad;
@@ -279,7 +285,10 @@ namespace Traffic_Law_Enforcement
             AddBinding(m_RouteDiagnosticsVisibleBinding = new ValueBinding<bool>(kGroup, "routeDiagnosticsVisible", false));
             AddBinding(m_RouteDiagnosticsCollapsedBinding = new ValueBinding<bool>(kGroup, "routeDiagnosticsCollapsed", true));
             AddBinding(m_CurrentTargetBinding = new ValueBinding<string>(kGroup, "currentTarget", string.Empty));
+            AddBinding(m_CurrentTargetEntityBinding = new ValueBinding<string>(kGroup, "currentTargetEntity", string.Empty));
             AddBinding(m_CurrentRouteBinding = new ValueBinding<string>(kGroup, "currentRoute", string.Empty));
+            AddBinding(m_CurrentRouteEntityTextBinding = new ValueBinding<string>(kGroup, "currentRouteEntityText", string.Empty));
+            AddBinding(m_CurrentRouteColorBinding = new ValueBinding<string>(kGroup, "currentRouteColor", string.Empty));
             AddBinding(m_TargetRoadBinding = new ValueBinding<string>(kGroup, "targetRoad", string.Empty));
             AddBinding(m_StartOwnerRoadBinding = new ValueBinding<string>(kGroup, "startOwnerRoad", string.Empty));
             AddBinding(m_EndOwnerRoadBinding = new ValueBinding<string>(kGroup, "endOwnerRoad", string.Empty));
@@ -398,8 +407,11 @@ namespace Traffic_Law_Enforcement
                 LaneChanges = snapshot.LaneChangeCount.ToString(),
                 LiveLaneState = BuildLiveLaneStateText(snapshot),
                 RouteDiagnosticsVisible = snapshot.HasRouteDiagnostics,
-                CurrentTarget = NormalizeText(snapshot.RouteDiagnosticsCurrentTargetText),
+                CurrentTarget = BuildCurrentTargetDisplayText(snapshot),
+                CurrentTargetEntity = BuildCurrentTargetEntityText(snapshot),
                 CurrentRoute = NormalizeText(snapshot.RouteDiagnosticsCurrentRouteText),
+                CurrentRouteEntityText = BuildCurrentRouteEntityText(snapshot),
+                CurrentRouteColor = BuildCurrentRouteColorText(snapshot),
                 TargetRoad = NormalizeText(snapshot.RouteDiagnosticsTargetRoadText),
                 StartOwnerRoad = NormalizeText(snapshot.RouteDiagnosticsStartOwnerRoadText),
                 EndOwnerRoad = NormalizeText(snapshot.RouteDiagnosticsEndOwnerRoadText),
@@ -441,7 +453,10 @@ namespace Traffic_Law_Enforcement
             m_RouteDiagnosticsVisibleBinding.Update(state.RouteDiagnosticsVisible);
             m_RouteDiagnosticsCollapsedBinding.Update(m_IsRouteDiagnosticsCollapsed);
             m_CurrentTargetBinding.Update(state.CurrentTarget ?? string.Empty);
+            m_CurrentTargetEntityBinding.Update(state.CurrentTargetEntity ?? string.Empty);
             m_CurrentRouteBinding.Update(state.CurrentRoute ?? string.Empty);
+            m_CurrentRouteEntityTextBinding.Update(state.CurrentRouteEntityText ?? string.Empty);
+            m_CurrentRouteColorBinding.Update(state.CurrentRouteColor ?? string.Empty);
             m_TargetRoadBinding.Update(state.TargetRoad ?? string.Empty);
             m_StartOwnerRoadBinding.Update(state.StartOwnerRoad ?? string.Empty);
             m_EndOwnerRoadBinding.Update(state.EndOwnerRoad ?? string.Empty);
@@ -773,6 +788,111 @@ namespace Traffic_Law_Enforcement
             return entity == Entity.Null
                 ? string.Empty
                 : FormatEntity(entity);
+        }
+
+        private string BuildCurrentTargetDisplayText(SelectedObjectDebugSnapshot snapshot)
+        {
+            string fullText = NormalizeText(snapshot.RouteDiagnosticsCurrentTargetText);
+            if (string.IsNullOrEmpty(fullText))
+            {
+                return string.Empty;
+            }
+
+            string entityText = BuildCurrentTargetEntityText(snapshot, fullText);
+            if (string.IsNullOrEmpty(entityText) ||
+                !fullText.StartsWith(entityText, System.StringComparison.Ordinal))
+            {
+                return fullText;
+            }
+
+            string remainder = fullText.Substring(entityText.Length).TrimStart();
+            return string.IsNullOrEmpty(remainder) ? fullText : remainder;
+        }
+
+        private string BuildCurrentTargetEntityText(SelectedObjectDebugSnapshot snapshot)
+        {
+            return BuildCurrentTargetEntityText(
+                snapshot,
+                NormalizeText(snapshot.RouteDiagnosticsCurrentTargetText));
+        }
+
+        private string BuildCurrentTargetEntityText(
+            SelectedObjectDebugSnapshot snapshot,
+            string fullText)
+        {
+            if (!TryGetCurrentTargetEntity(snapshot, out Entity targetEntity))
+            {
+                return string.Empty;
+            }
+
+            string entityText = FormatEntity(targetEntity);
+            return string.Equals(fullText, entityText, System.StringComparison.Ordinal)
+                ? string.Empty
+                : entityText;
+        }
+
+        private bool TryGetCurrentTargetEntity(
+            SelectedObjectDebugSnapshot snapshot,
+            out Entity targetEntity)
+        {
+            targetEntity = Entity.Null;
+
+            Entity vehicle = snapshot.ResolvedVehicleEntity;
+            if (vehicle == Entity.Null ||
+                !EntityManager.Exists(vehicle) ||
+                !EntityManager.HasComponent<Game.Common.Target>(vehicle))
+            {
+                return false;
+            }
+
+            targetEntity = EntityManager.GetComponentData<Game.Common.Target>(vehicle).m_Target;
+            return targetEntity != Entity.Null;
+        }
+
+        private string BuildCurrentRouteEntityText(SelectedObjectDebugSnapshot snapshot)
+        {
+            if (!TryGetCurrentRouteEntity(snapshot, out Entity routeEntity))
+            {
+                return string.Empty;
+            }
+
+            string entityText = FormatEntity(routeEntity);
+            string routeText = NormalizeText(snapshot.RouteDiagnosticsCurrentRouteText);
+            return string.Equals(routeText, entityText, System.StringComparison.Ordinal)
+                ? string.Empty
+                : entityText;
+        }
+
+        private string BuildCurrentRouteColorText(SelectedObjectDebugSnapshot snapshot)
+        {
+            if (!TryGetCurrentRouteEntity(snapshot, out Entity routeEntity) ||
+                !EntityManager.Exists(routeEntity) ||
+                !EntityManager.HasComponent<Game.Routes.Color>(routeEntity))
+            {
+                return string.Empty;
+            }
+
+            UnityEngine.Color32 color =
+                EntityManager.GetComponentData<Game.Routes.Color>(routeEntity).m_Color;
+            return $"#{color.r:X2}{color.g:X2}{color.b:X2}";
+        }
+
+        private bool TryGetCurrentRouteEntity(
+            SelectedObjectDebugSnapshot snapshot,
+            out Entity routeEntity)
+        {
+            routeEntity = Entity.Null;
+
+            Entity vehicle = snapshot.ResolvedVehicleEntity;
+            if (vehicle == Entity.Null ||
+                !EntityManager.Exists(vehicle) ||
+                !EntityManager.HasComponent<CurrentRoute>(vehicle))
+            {
+                return false;
+            }
+
+            routeEntity = EntityManager.GetComponentData<CurrentRoute>(vehicle).m_Route;
+            return routeEntity != Entity.Null;
         }
 
         private bool TryParseEntitySelectionInput(string input, out Entity entity)
