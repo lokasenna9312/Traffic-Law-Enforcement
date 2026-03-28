@@ -136,7 +136,7 @@ namespace Traffic_Law_Enforcement
         internal static string FormatEntityOrNone(Entity entity)
         {
             return entity == Entity.Null
-                ? SelectedObjectBridgeSystem.LocalizeText(SelectedObjectPanelUISystem.kNoneLocaleId, "None")
+                ? SelectedObjectLocalization.LocalizeText(SelectedObjectPanelUISystem.kNoneLocaleId, "None")
                 : $"#{entity.Index}:v{entity.Version}";
         }
 
