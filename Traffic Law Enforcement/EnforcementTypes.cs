@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace Traffic_Law_Enforcement
 {
@@ -86,6 +87,77 @@ namespace Traffic_Law_Enforcement
         public override string ToString()
         {
             return $"{Kind} | vehicle {VehicleId} | lane {LaneId} | fine {FineAmount} | {Reason}";
+        }
+    }
+
+    public sealed class VehicleEnforcementRecord
+    {
+        public int TotalViolations;
+        public int TotalFines;
+        public string LastReason = string.Empty;
+        public string LastKind = string.Empty;
+        public int LastLaneId = -1;
+        public int LastFineAmount;
+        public long LastTimestampMonthTicks;
+        public readonly List<long> PublicTransportLaneTimestamps = new List<long>();
+        public readonly List<long> MidBlockCrossingTimestamps = new List<long>();
+        public readonly List<long> IntersectionMovementTimestamps = new List<long>();
+
+        public List<long> GetTimestampHistory(string kind)
+        {
+            switch (kind)
+            {
+                case EnforcementKinds.PublicTransportLane:
+                    return PublicTransportLaneTimestamps;
+
+                case EnforcementKinds.MidBlockCrossing:
+                    return MidBlockCrossingTimestamps;
+
+                case EnforcementKinds.IntersectionMovement:
+                    return IntersectionMovementTimestamps;
+
+                default:
+                    return null;
+            }
+        }
+
+        public long GetLatestKnownTimestampMonthTicks()
+        {
+            long latest = LastTimestampMonthTicks;
+            latest = Max(latest, PublicTransportLaneTimestamps);
+            latest = Max(latest, MidBlockCrossingTimestamps);
+            latest = Max(latest, IntersectionMovementTimestamps);
+            return latest;
+        }
+
+        public VehicleEnforcementRecord Clone()
+        {
+            VehicleEnforcementRecord clone = new VehicleEnforcementRecord
+            {
+                TotalViolations = TotalViolations,
+                TotalFines = TotalFines,
+                LastReason = LastReason ?? string.Empty,
+                LastKind = LastKind ?? string.Empty,
+                LastLaneId = LastLaneId,
+                LastFineAmount = LastFineAmount,
+                LastTimestampMonthTicks = LastTimestampMonthTicks
+            };
+
+            clone.PublicTransportLaneTimestamps.AddRange(PublicTransportLaneTimestamps);
+            clone.MidBlockCrossingTimestamps.AddRange(MidBlockCrossingTimestamps);
+            clone.IntersectionMovementTimestamps.AddRange(IntersectionMovementTimestamps);
+            return clone;
+        }
+
+        private static long Max(long current, List<long> values)
+        {
+            if (values == null || values.Count == 0)
+            {
+                return current;
+            }
+
+            long candidate = values[values.Count - 1];
+            return candidate > current ? candidate : current;
         }
     }
 }

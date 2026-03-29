@@ -7,11 +7,11 @@ namespace Traffic_Law_Enforcement
     {
         private const int MaxEvents = 8;
         private const int MaxRecords = 24;
+
         private static readonly List<string> s_RecentEvents = new List<string>(MaxEvents);
         private static readonly List<EnforcementRecord> s_RecentRecords = new List<EnforcementRecord>(MaxRecords);
-        private static readonly Dictionary<int, int> s_VehicleFineTotals = new Dictionary<int, int>();
-        private static readonly Dictionary<int, int> s_VehicleViolationCounts = new Dictionary<int, int>();
-        private static readonly Dictionary<string, Dictionary<int, List<long>>> s_ViolationTimestamps = new Dictionary<string, Dictionary<int, List<long>>>();
+        private static readonly Dictionary<int, VehicleEnforcementRecord> s_VehicleRecords =
+            new Dictionary<int, VehicleEnforcementRecord>();
 
         public static int ActivePublicTransportLaneViolators { get; private set; }
         public static int PublicTransportLaneViolationCount { get; private set; }
@@ -49,12 +49,18 @@ namespace Traffic_Law_Enforcement
         {
             get
             {
-                if (s_VehicleFineTotals.Count == 0)
+                if (s_VehicleRecords.Count == 0)
                 {
                     return "No fined vehicles yet.";
                 }
 
-                return string.Join("\n", s_VehicleFineTotals.OrderByDescending(pair => pair.Value).Take(10).Select(pair => $"vehicle {pair.Key}: {pair.Value}").ToArray());
+                return string.Join(
+                    "\n",
+                    s_VehicleRecords
+                        .OrderByDescending(pair => pair.Value.TotalFines)
+                        .Take(10)
+                        .Select(pair => $"vehicle {pair.Key}: {pair.Value.TotalFines}")
+                        .ToArray());
             }
         }
 
@@ -62,12 +68,18 @@ namespace Traffic_Law_Enforcement
         {
             get
             {
-                if (s_VehicleViolationCounts.Count == 0)
+                if (s_VehicleRecords.Count == 0)
                 {
                     return "No repeat offenders yet.";
                 }
 
-                return string.Join("\n", s_VehicleViolationCounts.OrderByDescending(pair => pair.Value).Take(10).Select(pair => $"vehicle {pair.Key}: {pair.Value} violations").ToArray());
+                return string.Join(
+                    "\n",
+                    s_VehicleRecords
+                        .OrderByDescending(pair => pair.Value.TotalViolations)
+                        .Take(10)
+                        .Select(pair => $"vehicle {pair.Key}: {pair.Value.TotalViolations} violations")
+                        .ToArray());
             }
         }
 
@@ -97,7 +109,8 @@ namespace Traffic_Law_Enforcement
         public static void RecordFine(string kind, int vehicleId, int laneId, int fineAmount, string reason)
         {
             long nowMonthTicks = EnforcementGameTime.CurrentTimestampMonthTicks;
-            RegisterViolationTimestamp(kind, vehicleId, nowMonthTicks);
+            VehicleEnforcementRecord vehicleRecord = GetOrCreateVehicleRecord(vehicleId);
+            RegisterViolationTimestamp(vehicleRecord, kind, nowMonthTicks);
 
             EnforcementRecord record = new EnforcementRecord(kind, vehicleId, laneId, fineAmount, reason);
 
@@ -109,39 +122,31 @@ namespace Traffic_Law_Enforcement
             s_RecentRecords.Add(record);
             TotalFineAmount += fineAmount;
 
-            if (s_VehicleFineTotals.TryGetValue(vehicleId, out int currentTotal))
-            {
-                s_VehicleFineTotals[vehicleId] = currentTotal + fineAmount;
-            }
-            else
-            {
-                s_VehicleFineTotals[vehicleId] = fineAmount;
-            }
-
-            if (s_VehicleViolationCounts.TryGetValue(vehicleId, out int violationCount))
-            {
-                s_VehicleViolationCounts[vehicleId] = violationCount + 1;
-            }
-            else
-            {
-                s_VehicleViolationCounts[vehicleId] = 1;
-            }
-
+            vehicleRecord.TotalViolations += 1;
+            vehicleRecord.TotalFines += fineAmount;
+            vehicleRecord.LastReason = reason ?? string.Empty;
+            vehicleRecord.LastKind = kind ?? string.Empty;
+            vehicleRecord.LastLaneId = laneId;
+            vehicleRecord.LastFineAmount = fineAmount;
+            vehicleRecord.LastTimestampMonthTicks = nowMonthTicks;
         }
 
         public static int GetVehicleViolationCount(int vehicleId)
         {
-            return s_VehicleViolationCounts.TryGetValue(vehicleId, out int count) ? count : 0;
+            return s_VehicleRecords.TryGetValue(vehicleId, out VehicleEnforcementRecord record)
+                ? record.TotalViolations
+                : 0;
         }
 
         public static int GetRecentViolationCount(string kind, int vehicleId, long windowMonthTicks, bool includeCurrentEvent)
         {
-            if (!s_ViolationTimestamps.TryGetValue(kind, out Dictionary<int, List<long>> vehicleMap))
+            if (!s_VehicleRecords.TryGetValue(vehicleId, out VehicleEnforcementRecord record))
             {
                 return includeCurrentEvent ? 1 : 0;
             }
 
-            if (!vehicleMap.TryGetValue(vehicleId, out List<long> timestamps))
+            List<long> timestamps = record.GetTimestampHistory(kind);
+            if (timestamps == null || timestamps.Count == 0)
             {
                 return includeCurrentEvent ? 1 : 0;
             }
@@ -153,25 +158,35 @@ namespace Traffic_Law_Enforcement
 
             long cutoff = EnforcementGameTime.CurrentTimestampMonthTicks - windowMonthTicks;
             TrimQueue(timestamps, cutoff);
-            if (timestamps.Count == 0)
-            {
-                vehicleMap.Remove(vehicleId);
-                if (vehicleMap.Count == 0)
-                {
-                    s_ViolationTimestamps.Remove(kind);
-                }
-            }
-
             return timestamps.Count + (includeCurrentEvent ? 1 : 0);
         }
 
         public static IReadOnlyDictionary<int, (int violationCount, int fineTotal)> GetVehiclePenaltySnapshot()
         {
-            Dictionary<int, (int violationCount, int fineTotal)> snapshot = new Dictionary<int, (int violationCount, int fineTotal)>();
-            foreach (KeyValuePair<int, int> pair in s_VehicleViolationCounts)
+            Dictionary<int, (int violationCount, int fineTotal)> snapshot =
+                new Dictionary<int, (int violationCount, int fineTotal)>();
+
+            foreach (KeyValuePair<int, VehicleEnforcementRecord> pair in s_VehicleRecords)
             {
-                s_VehicleFineTotals.TryGetValue(pair.Key, out int fineTotal);
-                snapshot[pair.Key] = (pair.Value, fineTotal);
+                snapshot[pair.Key] = (pair.Value.TotalViolations, pair.Value.TotalFines);
+            }
+
+            return snapshot;
+        }
+
+        public static bool TryGetVehicleEnforcementRecord(int vehicleId, out VehicleEnforcementRecord record)
+        {
+            return s_VehicleRecords.TryGetValue(vehicleId, out record);
+        }
+
+        public static IReadOnlyDictionary<int, VehicleEnforcementRecord> GetVehicleRecordSnapshot()
+        {
+            Dictionary<int, VehicleEnforcementRecord> snapshot =
+                new Dictionary<int, VehicleEnforcementRecord>(s_VehicleRecords.Count);
+
+            foreach (KeyValuePair<int, VehicleEnforcementRecord> pair in s_VehicleRecords)
+            {
+                snapshot[pair.Key] = pair.Value.Clone();
             }
 
             return snapshot;
@@ -195,16 +210,14 @@ namespace Traffic_Law_Enforcement
 
         public static IReadOnlyCollection<(string kind, int vehicleId, long timestampMonthTicks)> GetViolationTimestampSnapshot()
         {
-            List<(string kind, int vehicleId, long timestampMonthTicks)> snapshot = new List<(string kind, int vehicleId, long timestampMonthTicks)>();
-            foreach (KeyValuePair<string, Dictionary<int, List<long>>> kindEntry in s_ViolationTimestamps)
+            List<(string kind, int vehicleId, long timestampMonthTicks)> snapshot =
+                new List<(string kind, int vehicleId, long timestampMonthTicks)>();
+
+            foreach (KeyValuePair<int, VehicleEnforcementRecord> pair in s_VehicleRecords)
             {
-                foreach (KeyValuePair<int, List<long>> vehicleEntry in kindEntry.Value)
-                {
-                    foreach (long timestamp in vehicleEntry.Value)
-                    {
-                        snapshot.Add((kindEntry.Key, vehicleEntry.Key, timestamp));
-                    }
-                }
+                AppendTimestampSnapshot(snapshot, EnforcementKinds.PublicTransportLane, pair.Key, pair.Value.PublicTransportLaneTimestamps);
+                AppendTimestampSnapshot(snapshot, EnforcementKinds.MidBlockCrossing, pair.Key, pair.Value.MidBlockCrossingTimestamps);
+                AppendTimestampSnapshot(snapshot, EnforcementKinds.IntersectionMovement, pair.Key, pair.Value.IntersectionMovementTimestamps);
             }
 
             return snapshot;
@@ -214,9 +227,7 @@ namespace Traffic_Law_Enforcement
         {
             s_RecentEvents.Clear();
             s_RecentRecords.Clear();
-            s_VehicleFineTotals.Clear();
-            s_VehicleViolationCounts.Clear();
-            s_ViolationTimestamps.Clear();
+            s_VehicleRecords.Clear();
             ActivePublicTransportLaneViolators = 0;
             PublicTransportLaneViolationCount = 0;
             MidBlockCrossingViolationCount = 0;
@@ -224,30 +235,35 @@ namespace Traffic_Law_Enforcement
             TotalFineAmount = 0;
         }
 
-        public static void LoadPersistentData(TrafficLawEnforcementStatistics statistics, int totalFineAmount, IDictionary<int, int> vehicleFineTotals, IDictionary<int, int> vehicleViolationCounts, IEnumerable<EnforcementRecord> records, IEnumerable<(string kind, int vehicleId, long timestampMonthTicks)> timestamps)
+        public static void LoadPersistentData(
+            TrafficLawEnforcementStatistics statistics,
+            int totalFineAmount,
+            IDictionary<int, VehicleEnforcementRecord> vehicleRecords,
+            IEnumerable<EnforcementRecord> records)
         {
+            ResetPersistentData();
             SetStatistics(statistics);
             TotalFineAmount = totalFineAmount;
 
-            foreach (KeyValuePair<int, int> pair in vehicleFineTotals)
+            if (vehicleRecords != null)
             {
-                s_VehicleFineTotals[pair.Key] = pair.Value;
+                foreach (KeyValuePair<int, VehicleEnforcementRecord> pair in vehicleRecords)
+                {
+                    s_VehicleRecords[pair.Key] = pair.Value?.Clone() ?? new VehicleEnforcementRecord();
+                }
             }
 
-            foreach (KeyValuePair<int, int> pair in vehicleViolationCounts)
+            if (records != null)
             {
-                s_VehicleViolationCounts[pair.Key] = pair.Value;
-            }
+                foreach (EnforcementRecord record in records)
+                {
+                    if (s_RecentRecords.Count >= MaxRecords)
+                    {
+                        s_RecentRecords.RemoveAt(0);
+                    }
 
-            int skipCount = System.Math.Max(0, records.Count() - MaxRecords);
-            foreach (EnforcementRecord record in records.Skip(skipCount))
-            {
-                s_RecentRecords.Add(record);
-            }
-
-            foreach ((string kind, int vehicleId, long timestampMonthTicks) entry in timestamps)
-            {
-                RegisterViolationTimestamp(entry.kind, entry.vehicleId, entry.timestampMonthTicks);
+                    s_RecentRecords.Add(record);
+                }
             }
 
             PruneExpiredViolationTimestamps();
@@ -262,57 +278,61 @@ namespace Traffic_Law_Enforcement
 
             long maxWindowMonthTicks = EnforcementPenaltyService.GetMaximumRepeatWindowMonthTicks();
             long cutoff = EnforcementGameTime.CurrentTimestampMonthTicks - maxWindowMonthTicks;
-            List<string> emptyKinds = new List<string>();
 
-            foreach (KeyValuePair<string, Dictionary<int, List<long>>> kindEntry in s_ViolationTimestamps)
+            foreach (VehicleEnforcementRecord record in s_VehicleRecords.Values)
             {
-                List<int> emptyVehicles = new List<int>();
-                foreach (KeyValuePair<int, List<long>> vehicleEntry in kindEntry.Value)
-                {
-                    TrimQueue(vehicleEntry.Value, cutoff);
-                    if (vehicleEntry.Value.Count == 0)
-                    {
-                        emptyVehicles.Add(vehicleEntry.Key);
-                    }
-                }
-
-                foreach (int vehicleId in emptyVehicles)
-                {
-                    kindEntry.Value.Remove(vehicleId);
-                }
-
-                if (kindEntry.Value.Count == 0)
-                {
-                    emptyKinds.Add(kindEntry.Key);
-                }
-            }
-
-            foreach (string kind in emptyKinds)
-            {
-                s_ViolationTimestamps.Remove(kind);
+                TrimQueue(record.PublicTransportLaneTimestamps, cutoff);
+                TrimQueue(record.MidBlockCrossingTimestamps, cutoff);
+                TrimQueue(record.IntersectionMovementTimestamps, cutoff);
             }
         }
 
-        private static void RegisterViolationTimestamp(string kind, int vehicleId, long timestampMonthTicks)
+        private static VehicleEnforcementRecord GetOrCreateVehicleRecord(int vehicleId)
         {
-            if (!s_ViolationTimestamps.TryGetValue(kind, out Dictionary<int, List<long>> vehicleMap))
+            if (!s_VehicleRecords.TryGetValue(vehicleId, out VehicleEnforcementRecord record))
             {
-                vehicleMap = new Dictionary<int, List<long>>();
-                s_ViolationTimestamps[kind] = vehicleMap;
+                record = new VehicleEnforcementRecord();
+                s_VehicleRecords[vehicleId] = record;
             }
 
-            if (!vehicleMap.TryGetValue(vehicleId, out List<long> timestamps))
+            return record;
+        }
+
+        private static void RegisterViolationTimestamp(VehicleEnforcementRecord record, string kind, long timestampMonthTicks)
+        {
+            List<long> timestamps = record.GetTimestampHistory(kind);
+            if (timestamps == null)
             {
-                timestamps = new List<long>();
-                vehicleMap[vehicleId] = timestamps;
+                return;
             }
 
             timestamps.Add(timestampMonthTicks);
-            PruneExpiredViolationTimestamps();
+        }
+
+        private static void AppendTimestampSnapshot(
+            List<(string kind, int vehicleId, long timestampMonthTicks)> snapshot,
+            string kind,
+            int vehicleId,
+            List<long> timestamps)
+        {
+            if (timestamps == null || timestamps.Count == 0)
+            {
+                return;
+            }
+
+            foreach (long timestamp in timestamps)
+            {
+                snapshot.Add((kind, vehicleId, timestamp));
+            }
         }
 
         private static void TrimQueue(List<long> timestamps, long cutoffTicks)
         {
+            if (timestamps == null || timestamps.Count == 0)
+            {
+                return;
+            }
+
             int removeCount = 0;
             while (removeCount < timestamps.Count && timestamps[removeCount] < cutoffTicks)
             {

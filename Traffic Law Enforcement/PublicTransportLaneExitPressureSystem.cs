@@ -117,7 +117,7 @@ namespace Traffic_Law_Enforcement
                             role,
                             extra);
 
-                        if (EnforcementLoggingPolicy.ShouldLogEnforcementEvents())
+                        if (EnforcementLoggingPolicy.ShouldLogVehicleSpecificEnforcementEvent(vehicle))
                         {
                             Mod.log.Info($"Applied PT-lane exit pressure: vehicle={vehicle}, lane={violation.m_Lane}, elapsedDayTicks={elapsedDayTicks}, thresholdDayTicks={thresholdDayTicks}");
                         }

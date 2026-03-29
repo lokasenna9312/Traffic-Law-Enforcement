@@ -17,9 +17,17 @@ namespace Traffic_Law_Enforcement
             string reason,
             Car car,
             string role,
-            string extra = null)
+            string extra = null,
+            bool force = false)
         {
-            if (!EnforcementLoggingPolicy.ShouldLogPathObsoleteSources())
+            if (!force && !EnforcementLoggingPolicy.ShouldLogPathObsoleteSources())
+            {
+                return;
+            }
+
+            if (!force &&
+                EnforcementLoggingPolicy.ShouldRestrictVehicleSpecificRouteDebugLogsToWatchedVehicles() &&
+                !FocusedLoggingService.IsWatched(vehicle))
             {
                 return;
             }

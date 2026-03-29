@@ -272,10 +272,10 @@ namespace Traffic_Law_Enforcement
 
                     PublicTransportLaneAccessBits bits = profile.m_PublicTransportLaneAccessBits;
 
-                    bool modAllowsAccess = PublicTransportLanePolicy.ModAllowsAccess(bits);
-                    bool vanillaAllowsAccess = PublicTransportLanePolicy.VanillaAllowsAccess(bits);
+                    bool configuredModAllowsAccess =
+                        PublicTransportLanePolicy.ModAllowsAccess(bits);
 
-                    isViolation = !modAllowsAccess;
+                    isViolation = !configuredModAllowsAccess;
 
                     bool isType2 = PublicTransportLanePolicy.IsType2(bits);
                     bool isType3 = PublicTransportLanePolicy.IsType3(bits);

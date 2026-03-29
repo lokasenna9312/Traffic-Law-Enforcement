@@ -31,6 +31,8 @@ As of version 0.2.*, this mod discourages drivers from committing the following 
 ### 2. Interface
 - Fine revenue can be viewed in the **Budget panel**.
 - Once per in-game month, and also when the corresponding button is pressed in the mod options, a **Chirper message** reports the traffic enforcement results from the past month.
+- **Selected Object Window** to inspect selected object's entity ID and information. Default shortcut is Left Ctrl + I.
+- **Focused Logging** option to log the selected vehicle's information. Default shortcut to log selected vehicle's information is Left Ctrl + L. Focused Log can be added to the normal logging, or be done exclusively. This option can be configured in the mod settings window.
 
 ### 3. Mod Option Settings
 The following options can be configured either for the currently loaded save file or for all future save files to which this mod will be applied.
@@ -73,6 +75,8 @@ The following options can be configured either for the currently loaded save fil
 ### 2. 인터페이스
 - **예산 창**에서 벌금 수익을 볼 수 있습니다.
 - 게임 시간 1달에 1번씩, 그리고 모드 옵션에서 해당 버튼을 눌렀을 때 **Chirper 메시지**로 최근 1달간의 교통 단속 실적을 알려줍니다.
+- 선택된 객체의 엔티티 ID와 정보를 보여주는 **Selected Object Window**. 기본 단축키는 Left Ctrl + I입니다.
+- 선택된 차량의 정보를 로그로 남기는 **Focused Logging** 옵션. 기본 단축키는 Left Ctrl + L입니다. Focused Log는 일반 로깅에 추가하거나, 또는 단독으로 할 수 있습니다. 이 옵션은 모드 설정 창에서 설정할 수 있습니다.
 
 ### 3. 모드 옵션 설정
 다음의 옵션을 현재 로드한 세이브파일에 대해, 또는 앞으로 새로 이 모드를 적용할 모든 세이브파일에 대해 설정할 수 있습니다.
@@ -119,7 +123,7 @@ The following options can be configured either for the currently loaded save fil
 	<!--Link to the forum post where the mod can be discussed-->
 	<ForumLink Value="https://forum.paradoxplaza.com/forum/threads/traffic-law-enforcement.1909882/" />
 	<!--Version of the mod-->
-	<ModVersion Value="0.2.9" />
+	<ModVersion Value="0.2.10" />
 	<!--Recommended version of the base game to use the mod-->
 	<GameVersion Value="1.5.6f1" />
 	<!--Dependency for the mod, can be set multiple times-->
@@ -128,8 +132,10 @@ The following options can be configured either for the currently loaded save fil
 	<RequiredDLC Value="" />
 	<!--Change log for new version. Single line or multi line. Supports minimal markdown subset-->
 	<ChangeLog>
-- Reworked mid-block enforcement logic. Service vehicles should no longer freeze or repeatedly recalculate meaningless routes when mid-block enforcement is enabled.
-- Split Settings.coc protection into the standalone Settings File Guard utility mod.
+- Added Selected Object Window to inspect selected object's entity ID and information.
+- Added Focused Logging option to log the selected vehicle's information, which can be used together with the Selected Object Window. Focused Log can be added to the normal logging, or be done exclusively.
+- Added new Logging policy "Route-selection change summary logging" and "Focused route rebuild diagnostics".
+- Added experimental debug option "Skip policy-tracked ignored-rule sync in pathfind setup".
 	</ChangeLog>
 	<!--External link, can be set multiple times. supported types are "discord", "github", "youtube", "twitch", "x", "paypal", "patreon", "buymeacoffee", "kofi", "crowdin", "gitlab", "gofundme"-->
 	<ExternalLink Type="github" Url="https://github.com/lokasenna9312/Traffic-Law-Enforcement/" />

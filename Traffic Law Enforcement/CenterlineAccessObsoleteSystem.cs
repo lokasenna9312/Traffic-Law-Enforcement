@@ -132,7 +132,12 @@ namespace Traffic_Law_Enforcement
 
             bool shouldLogEnforcementEvents = EnforcementLoggingPolicy.ShouldLogEnforcementEvents();
             bool shouldLogPathObsoleteSources = EnforcementLoggingPolicy.ShouldLogPathObsoleteSources();
-            bool shouldCollectPrefabLoggingContext = shouldLogEnforcementEvents || shouldLogPathObsoleteSources;
+            bool hasPotentialVehicleSpecificLogDemand =
+                !EnforcementLoggingPolicy.ShouldRestrictVehicleSpecificRouteDebugLogsToWatchedVehicles() ||
+                FocusedLoggingService.HasWatchedVehicles;
+            bool shouldCollectPrefabLoggingContext =
+                (shouldLogEnforcementEvents || shouldLogPathObsoleteSources) &&
+                hasPotentialVehicleSpecificLogDemand;
 
             if (shouldCollectPrefabLoggingContext)
             {
@@ -222,13 +227,15 @@ namespace Traffic_Law_Enforcement
                 pathOwner.m_State |= PathFlags.Obsolete;
                 EntityManager.SetComponentData(vehicle, pathOwner);
 
+                bool shouldLogVehicleSpecificEnforcementEvents =
+                    EnforcementLoggingPolicy.ShouldLogVehicleSpecificEnforcementEvent(vehicle);
                 string role = null;
-                if (shouldLogEnforcementEvents || shouldLogPathObsoleteSources)
+                if (shouldLogVehicleSpecificEnforcementEvents || shouldLogPathObsoleteSources)
                 {
                     role = PublicTransportLanePolicy.DescribeVehicleRole(vehicle, ref m_TypeLookups);
                 }
 
-                if (repeatCount >= 3 && shouldLogEnforcementEvents)
+                if (repeatCount >= 3 && shouldLogVehicleSpecificEnforcementEvents)
                 {
                     Mod.log.Info(
                         $"Repeated identical CENTERLINE invalidation: vehicle={vehicle}, role={role}, repeatCount={repeatCount}, " +
@@ -259,7 +266,7 @@ namespace Traffic_Law_Enforcement
 
                 RecordObservedSnapshot(vehicle, currentLane.m_Lane, sourceLane, targetLane, transitionIndex, evaluationResult, transitionFamily);
 
-                if (shouldLogEnforcementEvents)
+                if (shouldLogVehicleSpecificEnforcementEvents)
                 {
                     Mod.log.Info($"Planned center-line access route invalidated: vehicle={vehicle}, fromLane={sourceLane}, toLane={targetLane}, accessIndex={transitionIndex}, transition={transitionKind}, reason={reason}");
                     LogStructureSample(currentLane.m_Lane, sourceLane, targetLane, transitionKind);
