@@ -127,6 +127,7 @@ namespace Traffic_Law_Enforcement
             AddOption(map, setting, nameof(Setting.EnableAllVehicleRouteSelectionChangeLogging));
             AddOption(map, setting, nameof(Setting.EnableFocusedRouteRebuildDiagnosticsLogging));
             AddOption(map, setting, nameof(Setting.EnableFocusedVehicleOnlyRouteLogging));
+            AddOption(map, setting, nameof(Setting.EnablePolicyTrackedVehicleVanillaPathfindRulesExperiment));
             AddOption(map, setting, nameof(Setting.SelectedObjectPanelToggleBinding));
             AddOption(map, setting, nameof(Setting.FocusedLoggingPanelToggleBinding));
             AddOption(map, setting, nameof(Setting.ModLogPath));

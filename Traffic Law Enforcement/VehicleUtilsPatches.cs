@@ -161,6 +161,11 @@ namespace Traffic_Law_Enforcement
 
             VehicleTrafficLawProfile profile = entityManager.GetComponentData<VehicleTrafficLawProfile>(owner);
 
+            if (ShouldUseVanillaPathfindRulesForTrackedVehicle(profile))
+            {
+                return;
+            }
+
             bool allowOnPublicTransportLane = PublicTransportLanePolicy.CanUsePublicTransportLane(profile);
 
             if (!allowOnPublicTransportLane && entityManager.HasComponent<PublicTransportLanePendingExit>(owner))
@@ -172,6 +177,12 @@ namespace Traffic_Law_Enforcement
             SetRuleFlag(ref item.m_Parameters.m_IgnoredRules, RuleFlags.ForbidPrivateTraffic, allowOnPublicTransportLane);
 
             SetRuleFlag(ref item.m_Parameters.m_TaxiIgnoredRules, RuleFlags.ForbidPrivateTraffic, allowOnPublicTransportLane);
+        }
+
+        private static bool ShouldUseVanillaPathfindRulesForTrackedVehicle(VehicleTrafficLawProfile profile)
+        {
+            return Mod.Settings?.EnablePolicyTrackedVehicleVanillaPathfindRulesExperiment == true &&
+                   profile.m_ShouldTrack != 0;
         }
 
         private static void SetRuleFlag(ref RuleFlags rules, RuleFlags flag, bool enabled)

@@ -628,6 +628,10 @@ namespace Traffic_Law_Enforcement
         [SettingsUISection(kDebugTab, kFocusedLoggingGroup)]
         public bool EnableFocusedVehicleOnlyRouteLogging { get; set; }
 
+        [Exclude]
+        [SettingsUISection(kDebugTab, kDebugLoggingGroup)]
+        public bool EnablePolicyTrackedVehicleVanillaPathfindRulesExperiment { get; set; }
+
         [SettingsUISection(kDebugTab, kDebugBindingsGroup)]
         [SettingsUIKeyboardBinding(
             BindingKeyboard.I,
@@ -676,6 +680,7 @@ namespace Traffic_Law_Enforcement
             EnableAllVehicleRouteSelectionChangeLogging = false;
             EnableFocusedRouteRebuildDiagnosticsLogging = false;
             EnableFocusedVehicleOnlyRouteLogging = false;
+            EnablePolicyTrackedVehicleVanillaPathfindRulesExperiment = false;
             ResetKeyBindings();
         }
 
