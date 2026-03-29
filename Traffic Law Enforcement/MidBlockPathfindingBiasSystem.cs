@@ -114,6 +114,7 @@ namespace Traffic_Law_Enforcement
         }
 
         private void ApplyOverrides(int midBlockPenalty)
+        
         {
             NativeArray<Entity> prefabs = m_PathfindCarDataQuery.ToEntityArray(Allocator.Temp);
 
