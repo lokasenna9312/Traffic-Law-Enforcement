@@ -107,9 +107,7 @@ namespace Traffic_Law_Enforcement
                 midBlockPenalty);
             if (EnforcementLoggingPolicy.ShouldLogPathfindingPenaltyDiagnostics())
             {
-                Mod.log.Info(
-                    $"Applied mid-block pathfinding bias overrides: prefabs={prefabCount}, enabled={enforcementEnabled}, {MidBlockPathfindingBiasTelemetry.OverrideSummary}");
-                LogSharedPathfindPrefabDiagnostics();
+                Mod.log.Info($"Applied mid-block pathfinding bias overrides: prefabs={prefabCount}, enabled={enforcementEnabled}, {MidBlockPathfindingBiasTelemetry.OverrideSummary}");
             }
         }
 
