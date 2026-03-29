@@ -105,6 +105,8 @@ namespace Traffic_Law_Enforcement
                 midBlockPenalty);
             Mod.log.Info($"Applied mid-block pathfinding bias overrides: prefabs={prefabCount}, enabled={enforcementEnabled}, {MidBlockPathfindingBiasTelemetry.OverrideSummary}");
         }
+        
+        private void ApplyOverrides(int midBlockPenalty)
         {
             NativeArray<Entity> prefabs = m_PathfindCarDataQuery.ToEntityArray(Allocator.Temp);
 
