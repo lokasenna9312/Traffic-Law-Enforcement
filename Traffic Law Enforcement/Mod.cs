@@ -57,6 +57,7 @@ namespace Traffic_Law_Enforcement
             RegisterTextLocales();
             BudgetUIPatches.Apply();
             VehicleUtilsPatches.Apply();
+            PathfindSetupSystemPatches.Apply();
             IntersectionMovementPathfindingPenaltyPatches.Apply();
             IntersectionMovementPathfindingPenaltyReflectionPatches.Apply();
             updateSystem.UpdateAfter<EnforcementSaveDataSystem, EnforcementGameTimeSystem>(SystemUpdatePhase.GameSimulation);
@@ -100,6 +101,7 @@ namespace Traffic_Law_Enforcement
             SaveLoadTraceService.Reset();
             BudgetUIPatches.Remove();
             VehicleUtilsPatches.Remove();
+            PathfindSetupSystemPatches.Remove();
             IntersectionMovementPathfindingPenaltyPatches.Remove();
             IntersectionMovementPathfindingPenaltyReflectionPatches.Remove();
             if (m_Setting != null)

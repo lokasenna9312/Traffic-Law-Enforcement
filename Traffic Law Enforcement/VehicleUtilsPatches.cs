@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Reflection;
 using Game;
 using Game.Pathfind;
@@ -26,16 +27,10 @@ namespace Traffic_Law_Enforcement
         private static readonly Type s_PathfindExecutorType =
             AccessTools.Inner(typeof(PathfindJobs), "PathfindExecutor");
 
-        private static readonly MethodInfo s_SetupPathfindMethod = AccessTools.Method(
-            typeof(VehicleUtils),
-            nameof(VehicleUtils.SetupPathfind),
-            new[]
-            {
-                typeof(CarCurrentLane).MakeByRefType(),
-                typeof(PathOwner).MakeByRefType(),
-                typeof(NativeQueue<SetupQueueItem>.ParallelWriter),
-                typeof(SetupQueueItem)
-            });
+        private static readonly MethodInfo[] s_SetupPathfindMethods = AccessTools
+            .GetDeclaredMethods(typeof(VehicleUtils))
+            .Where(IsSetupPathfindCandidate)
+            .ToArray();
 
         private static readonly MethodInfo s_CalculateCostMethod = AccessTools.FirstMethod(
             s_PathfindExecutorType,
@@ -46,6 +41,7 @@ namespace Traffic_Law_Enforcement
         private static bool s_HasCachedPenaltyValues;
         private static bool s_CachedPublicTransportLaneEnforcementEnabled;
         private static int s_CachedConfiguredPublicTransportLaneFine;
+        private static bool s_LoggedFirstSetupPathfindInvocation;
 
         public static void Apply()
         {
@@ -61,7 +57,21 @@ namespace Traffic_Law_Enforcement
                 InvalidateCachedPenaltyValues();
 
                 HarmonyMethod prefix = new HarmonyMethod(typeof(VehicleUtilsPatches), nameof(SetupPathfindPrefix));
-                s_Harmony.Patch(s_SetupPathfindMethod, prefix: prefix);
+                if (s_SetupPathfindMethods.Length == 0)
+                {
+                    Mod.log.Warn("VehicleUtils.SetupPathfind patch skipped: no matching overloads found.");
+                }
+                else
+                {
+                    foreach (MethodInfo setupPathfindMethod in s_SetupPathfindMethods)
+                    {
+                        s_Harmony.Patch(setupPathfindMethod, prefix: prefix);
+                    }
+
+                    Mod.log.Info(
+                        $"VehicleUtils.SetupPathfind patch applied to {s_SetupPathfindMethods.Length} overload(s): " +
+                        string.Join("; ", s_SetupPathfindMethods.Select(FormatMethodSignature)));
+                }
 
                 HarmonyMethod calculateCostPostfix = new HarmonyMethod(typeof(VehicleUtilsPatches), nameof(CalculateCostPostfix));
                 s_Harmony.Patch(s_CalculateCostMethod, postfix: calculateCostPostfix);
@@ -86,6 +96,7 @@ namespace Traffic_Law_Enforcement
             s_HasCachedPenaltyValues = false;
             s_CachedPublicTransportLaneEnforcementEnabled = false;
             s_CachedConfiguredPublicTransportLaneFine = 0;
+            s_LoggedFirstSetupPathfindInvocation = false;
         }
 
         internal static void InvalidateCachedPenaltyValues()
@@ -106,6 +117,15 @@ namespace Traffic_Law_Enforcement
             if (owner == Entity.Null || !entityManager.HasComponent<Car>(owner))
             {
                 return;
+            }
+
+            if (!s_LoggedFirstSetupPathfindInvocation)
+            {
+                s_LoggedFirstSetupPathfindInvocation = true;
+                Mod.log.Info(
+                    $"VehicleUtils.SetupPathfind prefix invoked: vehicle={owner}, " +
+                    $"watched={FocusedLoggingService.IsWatched(owner)}, " +
+                    $"focusedDiagnostics={EnforcementLoggingPolicy.EnableFocusedRouteRebuildDiagnosticsLogging}");
             }
 
             if (!s_HasCachedPenaltyValues)
@@ -273,6 +293,28 @@ namespace Traffic_Law_Enforcement
         private static string FormatAccessBits(PublicTransportLaneAccessBits bits)
         {
             return bits == 0 ? "none" : bits.ToString();
+        }
+
+        private static bool IsSetupPathfindCandidate(MethodInfo method)
+        {
+            if (method == null || method.Name != nameof(VehicleUtils.SetupPathfind) || method.ReturnType != typeof(void))
+            {
+                return false;
+            }
+
+            ParameterInfo[] parameters = method.GetParameters();
+            return parameters.Length == 4 &&
+                   parameters[1].ParameterType == typeof(PathOwner).MakeByRefType() &&
+                   parameters[2].ParameterType == typeof(NativeQueue<SetupQueueItem>.ParallelWriter) &&
+                   parameters[3].ParameterType == typeof(SetupQueueItem);
+        }
+
+        private static string FormatMethodSignature(MethodInfo method)
+        {
+            ParameterInfo[] parameters = method.GetParameters();
+            return $"{method.DeclaringType?.Name}.{method.Name}(" +
+                   string.Join(", ", parameters.Select(parameter => parameter.ParameterType.Name)) +
+                   ")";
         }
     }
 }
