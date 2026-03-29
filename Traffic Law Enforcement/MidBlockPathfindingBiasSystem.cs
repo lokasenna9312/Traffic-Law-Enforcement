@@ -81,7 +81,6 @@ namespace Traffic_Law_Enforcement
             int midBlockPenalty = enforcementEnabled
                 ? EnforcementPenaltyService.GetMidBlockCrossingFine()
                 : 0;
-
             bool needsApply =
                 !m_HasApplied ||
                 prefabCount != m_LastPrefabCount ||
@@ -100,15 +99,12 @@ namespace Traffic_Law_Enforcement
             m_HasApplied = true;
 
             ApplyOverrides(midBlockPenalty);
-
             MidBlockPathfindingBiasTelemetry.SetState(
                 prefabCount,
                 enforcementEnabled,
                 midBlockPenalty);
             Mod.log.Info($"Applied mid-block pathfinding bias overrides: prefabs={prefabCount}, enabled={enforcementEnabled}, {MidBlockPathfindingBiasTelemetry.OverrideSummary}");
         }
-
-        private void ApplyOverrides(int midBlockPenalty)
         {
             NativeArray<Entity> prefabs = m_PathfindCarDataQuery.ToEntityArray(Allocator.Temp);
 
