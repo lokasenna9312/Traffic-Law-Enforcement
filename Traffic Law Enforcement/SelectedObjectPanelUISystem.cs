@@ -659,7 +659,8 @@ namespace Traffic_Law_Enforcement
                 "manual-panel-action",
                 car,
                 NormalizeText(snapshot.RoleText),
-                $"selectionEntity={FormatEntity(snapshot.SourceSelectedEntity)}");
+                $"selectionEntity={FormatEntity(snapshot.SourceSelectedEntity)}",
+                force: true);
 
             SetPathObsoleteStatus(
                 string.Format(
