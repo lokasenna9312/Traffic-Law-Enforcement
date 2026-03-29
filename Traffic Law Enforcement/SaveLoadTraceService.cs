@@ -9,6 +9,7 @@ namespace Traffic_Law_Enforcement
         public static string LastRequestedSavePath { get; private set; } = "unknown";
         public static string LastRequestedSaveId { get; private set; } = "unknown";
         public static string LastRequestSource { get; private set; } = "unknown";
+        public static int PendingLoadSequence { get; private set; }
 
         public static void Reset()
         {
@@ -17,6 +18,7 @@ namespace Traffic_Law_Enforcement
             LastRequestedSavePath = "unknown";
             LastRequestedSaveId = "unknown";
             LastRequestSource = "unknown";
+            PendingLoadSequence = 0;
         }
 
         public static void CaptureFromSaveMetadata(
@@ -57,6 +59,7 @@ namespace Traffic_Law_Enforcement
             LastRequestSource = FirstNonBlank(
                 source,
                 "unknown");
+            PendingLoadSequence += 1;
 
             EnforcementLoggingPolicy.RecordSaveIdentification(
                 $"[SAVELOAD] Pending load captured: " +
@@ -64,7 +67,8 @@ namespace Traffic_Law_Enforcement
                 $"name={LastRequestedSaveName}, " +
                 $"city={LastRequestedCityName}, " +
                 $"path={LastRequestedSavePath}, " +
-                $"id={LastRequestedSaveId}");
+                $"id={LastRequestedSaveId}, " +
+                $"sequence={PendingLoadSequence}");
         }
 
         public static string DescribePendingLoad()

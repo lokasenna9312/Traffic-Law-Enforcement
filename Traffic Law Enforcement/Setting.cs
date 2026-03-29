@@ -6,6 +6,7 @@ using Colossal.IO.AssetDatabase;
 using Colossal.Json;
 using Colossal.Localization;
 using Game;
+using Game.Input;
 using Game.Modding;
 using Game.SceneFlow;
 using Game.Settings;
@@ -13,10 +14,24 @@ using Game.UI;
 
 namespace Traffic_Law_Enforcement
 {
+    internal static class KeybindingIds
+    {
+        public const string SelectedObjectPanelToggleActionName =
+            "SelectedObjectPanelToggle";
+        public const string FocusedLoggingPanelToggleActionName =
+            "FocusedLoggingPanelToggle";
+    }
+
     [FileLocation(nameof(Traffic_Law_Enforcement))]
     [SettingsUITabOrder(kCurrentSaveTab, kNewSaveDefaultsTab, kPolicyImpactTab, kDebugTab)]
-    [SettingsUIGroupOrder(kGeneralGroup, kPublicTransportLaneAuthorizedGroup, kPublicTransportLaneAdditionalGroup, kPublicTransportLanePressureGroup, kFineGroup, kRepeatOffenderGroup, kTemplateActionsGroup, kPolicyImpactGroup, kDebugGroup, kLogPathGroup)]
-    [SettingsUIShowGroupName(kGeneralGroup, kPublicTransportLaneAuthorizedGroup, kPublicTransportLaneAdditionalGroup, kPublicTransportLanePressureGroup, kFineGroup, kRepeatOffenderGroup, kTemplateActionsGroup, kPolicyImpactGroup, kDebugGroup, kLogPathGroup)]
+    [SettingsUIGroupOrder(kGeneralGroup, kPublicTransportLaneAuthorizedGroup, kPublicTransportLaneAdditionalGroup, kPublicTransportLanePressureGroup, kFineGroup, kRepeatOffenderGroup, kTemplateActionsGroup, kPolicyImpactGroup, kDebugLoggingGroup, kFocusedLoggingGroup, kDebugBindingsGroup, kChirperGroup, kLogPathGroup)]
+    [SettingsUIShowGroupName(kGeneralGroup, kPublicTransportLaneAuthorizedGroup, kPublicTransportLaneAdditionalGroup, kPublicTransportLanePressureGroup, kFineGroup, kRepeatOffenderGroup, kTemplateActionsGroup, kPolicyImpactGroup, kDebugLoggingGroup, kFocusedLoggingGroup, kDebugBindingsGroup, kChirperGroup, kLogPathGroup)]
+    [SettingsUIKeyboardAction(
+        KeybindingIds.SelectedObjectPanelToggleActionName,
+        canBeEmpty: false)]
+    [SettingsUIKeyboardAction(
+        KeybindingIds.FocusedLoggingPanelToggleActionName,
+        canBeEmpty: false)]
     public class Setting : ModSetting
     {
         // --- Debug logging toggles for save/load ---
@@ -33,7 +48,10 @@ namespace Traffic_Law_Enforcement
         public const string kRepeatOffenderGroup = "RepeatOffenders";
         public const string kTemplateActionsGroup = "TemplateActions";
         public const string kPolicyImpactGroup = "PolicyImpactGroup";
-        public const string kDebugGroup = "DebugGroup";
+        public const string kDebugLoggingGroup = "DebugLoggingGroup";
+        public const string kFocusedLoggingGroup = "FocusedLoggingGroup";
+        public const string kDebugBindingsGroup = "DebugBindingsGroup";
+        public const string kChirperGroup = "ChirperGroup";
         public const string kLogPathGroup = "LogPathGroup";
 
         public Setting(IMod mod) : base(mod)
@@ -565,37 +583,68 @@ namespace Traffic_Law_Enforcement
         }
 
         [Exclude]
-        [SettingsUISection(kDebugTab, kDebugGroup)]
+        [SettingsUISection(kDebugTab, kDebugLoggingGroup)]
         public bool EnableEstimatedRerouteLogging { get; set; }
 
         [Exclude]
-        [SettingsUISection(kDebugTab, kDebugGroup)]
+        [SettingsUISection(kDebugTab, kDebugLoggingGroup)]
         public bool EnableEnforcementEventLogging { get; set; }
 
 
         [Exclude]
-        [SettingsUISection(kDebugTab, kDebugGroup)]
+        [SettingsUISection(kDebugTab, kDebugLoggingGroup)]
         public bool EnablePathfindingPenaltyDiagnosticLogging { get; set; }
 
         [Exclude]
-        [SettingsUISection(kDebugTab, kDebugGroup)]
+        [SettingsUISection(kDebugTab, kDebugLoggingGroup)]
         public bool EnableType2PublicTransportLaneUsageLogging { get; set; }
 
         [Exclude]
-        [SettingsUISection(kDebugTab, kDebugGroup)]
+        [SettingsUISection(kDebugTab, kDebugLoggingGroup)]
         public bool EnableType3PublicTransportLaneUsageLogging { get; set; }
 
         [Exclude]
-        [SettingsUISection(kDebugTab, kDebugGroup)]
+        [SettingsUISection(kDebugTab, kDebugLoggingGroup)]
         public bool EnableType4PublicTransportLaneUsageLogging { get; set; }
 
         [Exclude]
-        [SettingsUISection(kDebugTab, kDebugGroup)]
+        [SettingsUISection(kDebugTab, kDebugLoggingGroup)]
         public bool EnablePathObsoleteSourceLogging { get; set; }
 
         [Exclude]
-        [SettingsUISection(kDebugTab, kDebugGroup)]
+        [SettingsUIHidden]
+        [SettingsUISection(kDebugTab, kDebugLoggingGroup)]
         public bool EnableSaveIdentificationLogging { get; set; }
+
+        [Exclude]
+        [SettingsUISection(kDebugTab, kDebugLoggingGroup)]
+        public bool EnableAllVehicleRouteSelectionChangeLogging { get; set; }
+
+        [Exclude]
+        [SettingsUISection(kDebugTab, kFocusedLoggingGroup)]
+        public bool EnableFocusedRouteRebuildDiagnosticsLogging { get; set; }
+
+        [Exclude]
+        [SettingsUISection(kDebugTab, kFocusedLoggingGroup)]
+        public bool EnableFocusedVehicleOnlyRouteLogging { get; set; }
+
+        [Exclude]
+        [SettingsUISection(kDebugTab, kDebugLoggingGroup)]
+        public bool EnablePolicyTrackedVehicleVanillaPathfindRulesExperiment { get; set; }
+
+        [SettingsUISection(kDebugTab, kDebugBindingsGroup)]
+        [SettingsUIKeyboardBinding(
+            BindingKeyboard.I,
+            KeybindingIds.SelectedObjectPanelToggleActionName,
+            ctrl: true)]
+        public ProxyBinding SelectedObjectPanelToggleBinding { get; set; }
+
+        [SettingsUISection(kDebugTab, kDebugBindingsGroup)]
+        [SettingsUIKeyboardBinding(
+            BindingKeyboard.L,
+            KeybindingIds.FocusedLoggingPanelToggleActionName,
+            ctrl: true)]
+        public ProxyBinding FocusedLoggingPanelToggleBinding { get; set; }
 
         [Exclude]
         [SettingsUISection(kDebugTab, kLogPathGroup)]
@@ -604,7 +653,7 @@ namespace Traffic_Law_Enforcement
         [Exclude]
         [SettingsUIButton]
         [SettingsUIDisableByCondition(typeof(Setting), nameof(IsMonthlyChirperPreviewButtonDisabled))]
-        [SettingsUISection(kDebugTab, kDebugGroup)]
+        [SettingsUISection(kDebugTab, kChirperGroup)]
         public bool SendMonthlyChirperPreviewNow
         {
             set
@@ -627,7 +676,12 @@ namespace Traffic_Law_Enforcement
             EnableType4PublicTransportLaneUsageLogging = false;
             EnablePathfindingPenaltyDiagnosticLogging = false;
             EnablePathObsoleteSourceLogging = false;
-            EnableSaveIdentificationLogging = false;
+            EnableSaveIdentificationLogging = true;
+            EnableAllVehicleRouteSelectionChangeLogging = false;
+            EnableFocusedRouteRebuildDiagnosticsLogging = false;
+            EnableFocusedVehicleOnlyRouteLogging = false;
+            EnablePolicyTrackedVehicleVanillaPathfindRulesExperiment = false;
+            ResetKeyBindings();
         }
 
         public EnforcementGameplaySettingsState GetNewSaveDefaultSettings()

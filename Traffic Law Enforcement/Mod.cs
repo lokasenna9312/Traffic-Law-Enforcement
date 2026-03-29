@@ -41,11 +41,14 @@ namespace Traffic_Law_Enforcement
             }
 
             EnforcementGameTime.Reset();
+            BurstLoggingService.Reset();
+            FocusedLoggingService.Reset();
             SaveLoadTraceService.Reset();
             SaveLoadTracePatches.Apply();
             m_Setting = new Setting(this);
             Settings = m_Setting;
             AssetDatabase.global.LoadSettings(nameof(Traffic_Law_Enforcement), m_Setting, new Setting(this));
+            m_Setting.RegisterKeyBindings();
 
             ResolveAndCacheModMetadata(modAssetPath);
             LogModVersionInfo(modAssetPath);
@@ -81,11 +84,18 @@ namespace Traffic_Law_Enforcement
             updateSystem.UpdateAfter<LaneTransitionViolationApplySystem, LaneTransitionViolationSystem>(SystemUpdatePhase.GameSimulation);
             updateSystem.UpdateAfter<EnforcementFineMoneySystem, PublicTransportLaneViolationApplySystem>(SystemUpdatePhase.GameSimulation);
             updateSystem.UpdateAfter<EnforcementFineMoneySystem, LaneTransitionViolationApplySystem>(SystemUpdatePhase.GameSimulation);
+            updateSystem.UpdateAfter<SelectedObjectBridgeSystem, VehicleLaneHistorySystem>(SystemUpdatePhase.GameSimulation);
+            updateSystem.UpdateAfter<SelectedObjectBridgeSystem, PublicTransportLaneViolationApplySystem>(SystemUpdatePhase.GameSimulation);
+            updateSystem.UpdateAfter<SelectedObjectBridgeSystem, LaneTransitionViolationApplySystem>(SystemUpdatePhase.GameSimulation);
+            updateSystem.UpdateAt<SelectedObjectPanelUISystem>(SystemUpdatePhase.UIUpdate);
+            updateSystem.UpdateAt<FocusedLoggingPanelUISystem>(SystemUpdatePhase.UIUpdate);
         }
 
         public void OnDispose()
         {
             log.Info(nameof(OnDispose));
+            BurstLoggingService.Reset();
+            FocusedLoggingService.Reset();
             SaveLoadTracePatches.Remove();
             SaveLoadTraceService.Reset();
             BudgetUIPatches.Remove();
@@ -406,3 +416,4 @@ namespace Traffic_Law_Enforcement
         }
     }
 }
+

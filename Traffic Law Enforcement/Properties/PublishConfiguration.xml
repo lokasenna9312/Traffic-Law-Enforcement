@@ -31,6 +31,8 @@ As of version 0.2.*, this mod discourages drivers from committing the following 
 ### 2. Interface
 - Fine revenue can be viewed in the **Budget panel**.
 - Once per in-game month, and also when the corresponding button is pressed in the mod options, a **Chirper message** reports the traffic enforcement results from the past month.
+- **Selected Object Window** to inspect selected object's entity ID and information. Default shortcut is Left Ctrl + I.
+- **Focused Logging** option to log the selected vehicle's information. Default shortcut to log selected vehicle's information is Left Ctrl + L. Focused Log can be added to the normal logging, or be done exclusively. This option can be configured in the mod settings window.
 
 ### 3. Mod Option Settings
 The following options can be configured either for the currently loaded save file or for all future save files to which this mod will be applied.
@@ -48,7 +50,6 @@ The following options can be configured either for the currently loaded save fil
 - Log files are saved to the following path: C:\Users\USERNAME\AppData\LocalLow\Colossal Order\Cities Skylines II\Logs\Traffic_Law_Enforcement.Mod.log
 
 ### 5. The things that are being developed
-- DEBUG PANEL which shows selected vehicle's entity ID and information.
 - Considering that the enforcement and amount of fine affects more axes of path cost than money axis. There are 4 axes of path cost: time, behaviour, money, comfort.
 
 ### 6. Desired Improvements and Additional Features
@@ -57,7 +58,7 @@ The following options can be configured either for the currently loaded save fil
 - I would like serious habitual traffic offenders to face harsher penalties, such as having their driver's licenses suspended or revoked, or having them sent to jail, but I could not implement that either because of my limited coding skills.
 
 ### 7. Known Issues : Investigation and Fixing in Progress
-- There are no known issues at the moment.
+- CRITICAL ISSUE : This mod churns vehicles' paths. I'm investigating the cause of this issue from 2026.03.26, maybe after 0.2.9 patch.
 - If you find bugs or issues, please be free to report them here or at GitHub.
 
 ## 한국어 설명
@@ -73,6 +74,8 @@ The following options can be configured either for the currently loaded save fil
 ### 2. 인터페이스
 - **예산 창**에서 벌금 수익을 볼 수 있습니다.
 - 게임 시간 1달에 1번씩, 그리고 모드 옵션에서 해당 버튼을 눌렀을 때 **Chirper 메시지**로 최근 1달간의 교통 단속 실적을 알려줍니다.
+- 선택된 객체의 엔티티 ID와 정보를 보여주는 **Selected Object Window**. 기본 단축키는 Left Ctrl + I입니다.
+- 선택된 차량의 정보를 로그로 남기는 **Focused Logging** 옵션. 기본 단축키는 Left Ctrl + L입니다. Focused Log는 일반 로깅에 추가하거나, 또는 단독으로 할 수 있습니다. 이 옵션은 모드 설정 창에서 설정할 수 있습니다.
 
 ### 3. 모드 옵션 설정
 다음의 옵션을 현재 로드한 세이브파일에 대해, 또는 앞으로 새로 이 모드를 적용할 모든 세이브파일에 대해 설정할 수 있습니다.
@@ -90,7 +93,6 @@ The following options can be configured either for the currently loaded save fil
 - 로그 파일은 다음 경로에 저장됩니다. C:\Users\USERNAME\AppData\LocalLow\Colossal Order\Cities Skylines II\Logs\Traffic_Law_Enforcement.Mod.log
 
 ### 5. 개발중인 것들
-- 선택된 차량의 엔티티 ID와 정보를 보여주는 DEBUG PANEL.
 - 교통법규 단속과 벌금 액수가 경로 비용 계산식에서 금전 축뿐만 아니라 다른 축에도 보정을 넣게 하는 것을 고려중입니다. 경로 비용 계산식에는 시간, 행동, 금전, 쾌적성의 4가지 축이 있습니다.
 
 ### 6. 추가적으로 개선하거나 구현하고 싶은 사항
@@ -99,7 +101,7 @@ The following options can be configured either for the currently loaded save fil
 - 심각한 상습 교통법규 위반자들에게는 더욱 강한 처벌(예: 운전면허 정지 또는 취소, 교도소 수감)을 적용하고 싶었지만, 그 기능 역시 제 코딩 실력이 부족해서 구현하지 못했습니다.
 
 ### 7. 알려진 문제점 : 조사 및 수정 진행 중
-- 현재 개발자가 파악하고 있는 문제점은 없습니다.
+- 심각한 문제 : 이 모드는 차량들의 경로를 심각하게 왜곡합니다. 2023.03.26부터 (아마도 0.2.9 패치 이후부터) 이 문제의 원인을 조사하고 있습니다.
 - 버그나 문제점을 발견하시면, 이 글이나 GitHub에 자유롭게 제보해주세요.
 	</LongDescription>
 	<!--Thumbnail-->
@@ -119,7 +121,7 @@ The following options can be configured either for the currently loaded save fil
 	<!--Link to the forum post where the mod can be discussed-->
 	<ForumLink Value="https://forum.paradoxplaza.com/forum/threads/traffic-law-enforcement.1909882/" />
 	<!--Version of the mod-->
-	<ModVersion Value="0.2.9" />
+	<ModVersion Value="0.2.10" />
 	<!--Recommended version of the base game to use the mod-->
 	<GameVersion Value="1.5.6f1" />
 	<!--Dependency for the mod, can be set multiple times-->
@@ -128,8 +130,10 @@ The following options can be configured either for the currently loaded save fil
 	<RequiredDLC Value="" />
 	<!--Change log for new version. Single line or multi line. Supports minimal markdown subset-->
 	<ChangeLog>
-- Reworked mid-block enforcement logic. Service vehicles should no longer freeze or repeatedly recalculate meaningless routes when mid-block enforcement is enabled.
-- Split Settings.coc protection into the standalone Settings File Guard utility mod.
+- Added Selected Object Window to inspect selected object's entity ID and information.
+- Added Focused Logging option to log the selected vehicle's information, which can be used together with the Selected Object Window. Focused Log can be added to the normal logging, or be done exclusively.
+- Added new Logging policy "Route-selection change summary logging" and "Focused route rebuild diagnostics".
+- Added experimental debug option "Skip policy-tracked ignored-rule sync in pathfind setup".
 	</ChangeLog>
 	<!--External link, can be set multiple times. supported types are "discord", "github", "youtube", "twitch", "x", "paypal", "patreon", "buymeacoffee", "kofi", "crowdin", "gitlab", "gofundme"-->
 	<ExternalLink Type="github" Url="https://github.com/lokasenna9312/Traffic-Law-Enforcement/" />

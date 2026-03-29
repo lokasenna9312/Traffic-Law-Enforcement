@@ -188,7 +188,7 @@ namespace Traffic_Law_Enforcement
             }
 
             bool logIntersectionCandidate =
-                EnforcementLoggingPolicy.ShouldLogEnforcementEvents() &&
+                EnforcementLoggingPolicy.ShouldLogVehicleSpecificEnforcementEvent(vehicle) &&
                 Mod.IsIntersectionMovementEnforcementEnabled &&
                 (currentLane.m_LaneFlags & Game.Vehicles.CarLaneFlags.Connection) != 0 &&
                 m_IntersectionTransitionDiagnosticCount < MaxIntersectionTransitionDiagnostics;

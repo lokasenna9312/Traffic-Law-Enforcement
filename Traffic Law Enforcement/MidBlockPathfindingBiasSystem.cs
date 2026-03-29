@@ -17,8 +17,7 @@ namespace Traffic_Law_Enforcement
         public static void SetState(
             int modifiedPrefabCount,
             bool enabled,
-            int midBlockMoneyPenalty,
-            float midBlockBehaviourPenalty)
+            int midBlockMoneyPenalty)
         {
             ModifiedPrefabCount = modifiedPrefabCount;
 
@@ -35,9 +34,9 @@ namespace Traffic_Law_Enforcement
             }
 
             OverrideSummary =
-                $"UTurn money +{midBlockMoneyPenalty:0}, behaviour +{midBlockBehaviourPenalty:0.###}; " +
-                $"UnsafeUTurn money +{midBlockMoneyPenalty:0}, behaviour +{midBlockBehaviourPenalty:0.###}; " +
-                $"LaneCross money +{midBlockMoneyPenalty:0}, behaviour +{midBlockBehaviourPenalty:0.###}; " +
+                $"UTurn money +{midBlockMoneyPenalty:0}; " +
+                $"UnsafeUTurn money +{midBlockMoneyPenalty:0}; " +
+                $"LaneCross money +{midBlockMoneyPenalty:0}; " +
                 "PT-lane route penalties are still handled per route rather than through shared PathfindCarData prefabs";
         }
     }
@@ -52,17 +51,6 @@ namespace Traffic_Law_Enforcement
         private int m_LastPrefabCount = -1;
         private bool m_LastEnforcementEnabled;
         private bool m_HasApplied;
-        private const float MidBlockBehaviourBaseline = 2f;
-        private const float MidBlockBehaviourFineDivisor = 15f;
-        private static float CalculateMidBlockBehaviourPenalty(int midBlockMoneyPenalty, bool enforcementEnabled)
-        {
-            if (!enforcementEnabled || midBlockMoneyPenalty <= 0)
-            {
-                return 0f;
-            }
-
-            return MidBlockBehaviourBaseline + math.sqrt(midBlockMoneyPenalty) / MidBlockBehaviourFineDivisor;
-        }
 
         protected override void OnCreate()
         {
@@ -93,8 +81,6 @@ namespace Traffic_Law_Enforcement
             int midBlockPenalty = enforcementEnabled
                 ? EnforcementPenaltyService.GetMidBlockCrossingFine()
                 : 0;
-            float midBlockBehaviourPenalty = CalculateMidBlockBehaviourPenalty(midBlockPenalty, enforcementEnabled);
-
             bool needsApply =
                 !m_HasApplied ||
                 prefabCount != m_LastPrefabCount ||
@@ -112,22 +98,13 @@ namespace Traffic_Law_Enforcement
             m_LastEnforcementEnabled = enforcementEnabled;
             m_HasApplied = true;
 
-            ApplyOverrides(midBlockPenalty, midBlockBehaviourPenalty);
-
+            ApplyOverrides(midBlockPenalty);
             MidBlockPathfindingBiasTelemetry.SetState(
                 prefabCount,
                 enforcementEnabled,
-                midBlockPenalty,
-                midBlockBehaviourPenalty);
-            if (EnforcementLoggingPolicy.ShouldLogPathfindingPenaltyDiagnostics())
-            {
-                Mod.log.Info(
-                    $"Applied mid-block pathfinding bias overrides: prefabs={prefabCount}, enabled={enforcementEnabled}, {MidBlockPathfindingBiasTelemetry.OverrideSummary}");
-                LogSharedPathfindPrefabDiagnostics();
-            }
+                midBlockPenalty);
+            Mod.log.Info($"Applied mid-block pathfinding bias overrides: prefabs={prefabCount}, enabled={enforcementEnabled}, {MidBlockPathfindingBiasTelemetry.OverrideSummary}");
         }
-
-        private void ApplyOverrides(int midBlockPenalty, float midBlockBehaviourPenalty)
         {
             NativeArray<Entity> prefabs = m_PathfindCarDataQuery.ToEntityArray(Allocator.Temp);
 
@@ -135,7 +112,7 @@ namespace Traffic_Law_Enforcement
             {
                 for (int index = 0; index < prefabs.Length; index++)
                 {
-                    ApplyOverrides(prefabs[index], midBlockPenalty, midBlockBehaviourPenalty);
+                    ApplyOverrides(prefabs[index], midBlockPenalty);
                 }
             }
             finally
@@ -144,7 +121,7 @@ namespace Traffic_Law_Enforcement
             }
         }
 
-        private void ApplyOverrides(Entity prefab, int midBlockMoneyPenalty, float midBlockBehaviourPenalty)
+        private void ApplyOverrides(Entity prefab, int midBlockMoneyPenalty)
         {
             PathfindCarData currentData = EntityManager.GetComponentData<PathfindCarData>(prefab);
             PathfindCarData originalData = GetOriginalData(prefab, currentData);
@@ -154,19 +131,10 @@ namespace Traffic_Law_Enforcement
             AddMoneyPenalty(ref updatedData.m_UnsafeUTurnCost, midBlockMoneyPenalty);
             AddMoneyPenalty(ref updatedData.m_LaneCrossCost, midBlockMoneyPenalty);
 
-            AddBehaviourPenalty(ref updatedData.m_UTurnCost, midBlockBehaviourPenalty);
-            AddBehaviourPenalty(ref updatedData.m_UnsafeUTurnCost, midBlockBehaviourPenalty);
-            AddBehaviourPenalty(ref updatedData.m_LaneCrossCost, midBlockBehaviourPenalty);
-
             if (!PathfindCarDataEquals(currentData, updatedData))
             {
                 EntityManager.SetComponentData(prefab, updatedData);
             }
-        }
-
-        private static void AddBehaviourPenalty(ref PathfindCosts cost, float penalty)
-        {
-            cost.m_Value.y += penalty;
         }
 
         private PathfindCarData GetOriginalData(Entity prefab, PathfindCarData currentData)
@@ -182,29 +150,6 @@ namespace Traffic_Law_Enforcement
             });
 
             return currentData;
-        }
-
-        private void LogSharedPathfindPrefabDiagnostics()
-        {
-            NativeArray<Entity> prefabs = m_PathfindCarDataQuery.ToEntityArray(Allocator.Temp);
-
-            try
-            {
-                for (int index = 0; index < prefabs.Length; index++)
-                {
-                    Entity prefab = prefabs[index];
-                    PathfindCarData currentData = EntityManager.GetComponentData<PathfindCarData>(prefab);
-                    PathfindCarData originalData = m_OriginalPathfindCarDataLookup.TryGetComponent(prefab, out OriginalPathfindCarData originalComponent)
-                        ? originalComponent.m_Value
-                        : currentData;
-
-                    string prefabName = m_PrefabSystem != null ? m_PrefabSystem.GetPrefabName(prefab) : prefab.ToString();
-                }
-            }
-            finally
-            {
-                prefabs.Dispose();
-            }
         }
 
         private static void AddMoneyPenalty(ref PathfindCosts cost, float penalty)

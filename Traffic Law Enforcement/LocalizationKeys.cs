@@ -23,7 +23,10 @@ namespace Traffic_Law_Enforcement
             map["Group.RepeatOffenders"] = setting.GetOptionGroupLocaleID(Setting.kRepeatOffenderGroup);
             map["Group.TemplateActions"] = setting.GetOptionGroupLocaleID(Setting.kTemplateActionsGroup);
             map["Group.PolicyImpact"] = setting.GetOptionGroupLocaleID(Setting.kPolicyImpactGroup);
-            map["Group.Debug"] = setting.GetOptionGroupLocaleID(Setting.kDebugGroup);
+            map["Group.DebugLogging"] = setting.GetOptionGroupLocaleID(Setting.kDebugLoggingGroup);
+            map["Group.FocusedLogging"] = setting.GetOptionGroupLocaleID(Setting.kFocusedLoggingGroup);
+            map["Group.DebugBindings"] = setting.GetOptionGroupLocaleID(Setting.kDebugBindingsGroup);
+            map["Group.Chirper"] = setting.GetOptionGroupLocaleID(Setting.kChirperGroup);
             map["Group.LogPath"] = setting.GetOptionGroupLocaleID(Setting.kLogPathGroup);
 
             AddOption(map, setting, nameof(Setting.EnablePublicTransportLaneEnforcement));
@@ -121,7 +124,12 @@ namespace Traffic_Law_Enforcement
             AddOption(map, setting, nameof(Setting.EnableType3PublicTransportLaneUsageLogging));
             AddOption(map, setting, nameof(Setting.EnableType4PublicTransportLaneUsageLogging));
             AddOption(map, setting, nameof(Setting.EnablePathObsoleteSourceLogging));
-            AddOption(map, setting, nameof(Setting.EnableSaveIdentificationLogging));
+            AddOption(map, setting, nameof(Setting.EnableAllVehicleRouteSelectionChangeLogging));
+            AddOption(map, setting, nameof(Setting.EnableFocusedRouteRebuildDiagnosticsLogging));
+            AddOption(map, setting, nameof(Setting.EnableFocusedVehicleOnlyRouteLogging));
+            AddOption(map, setting, nameof(Setting.EnablePolicyTrackedVehicleVanillaPathfindRulesExperiment));
+            AddOption(map, setting, nameof(Setting.SelectedObjectPanelToggleBinding));
+            AddOption(map, setting, nameof(Setting.FocusedLoggingPanelToggleBinding));
             AddOption(map, setting, nameof(Setting.ModLogPath));
 
             AddOption(map, setting, nameof(Setting.PolicyImpactTotalStatistics));
@@ -130,6 +138,210 @@ namespace Traffic_Law_Enforcement
             AddOption(map, setting, nameof(Setting.PolicyImpactIntersectionStatistics));
 
             AddOption(map, setting, nameof(Setting.SendMonthlyChirperPreviewNow));
+
+            map["BindingLabel.SelectedObjectPanelToggle"] =
+                setting.GetBindingKeyLocaleID(KeybindingIds.SelectedObjectPanelToggleActionName);
+            map["BindingHint.SelectedObjectPanelToggle"] =
+                setting.GetBindingKeyHintLocaleID(KeybindingIds.SelectedObjectPanelToggleActionName);
+            map["BindingLabel.FocusedLoggingPanelToggle"] =
+                setting.GetBindingKeyLocaleID(KeybindingIds.FocusedLoggingPanelToggleActionName);
+            map["BindingHint.FocusedLoggingPanelToggle"] =
+                setting.GetBindingKeyHintLocaleID(KeybindingIds.FocusedLoggingPanelToggleActionName);
+            map["SelectedObjectPanel.HeaderText"] = SelectedObjectPanelUISystem.kHeaderTextLocaleId;
+            map["SelectedObjectPanel.SummaryTitle"] = SelectedObjectPanelUISystem.kSummaryTitleLocaleId;
+            map["SelectedObjectPanel.ClassificationLabel"] = SelectedObjectPanelUISystem.kClassificationLabelLocaleId;
+            map["SelectedObjectPanel.TleStatusLabel"] = SelectedObjectPanelUISystem.kTleStatusLabelLocaleId;
+            map["SelectedObjectPanel.RoleLabel"] = SelectedObjectPanelUISystem.kRoleLabelLocaleId;
+            map["SelectedObjectPanel.ActiveFlagsLabel"] = SelectedObjectPanelUISystem.kActiveFlagsLabelLocaleId;
+            map["SelectedObjectPanel.ViolationsFinesLabel"] = SelectedObjectPanelUISystem.kViolationsFinesLabelLocaleId;
+            map["SelectedObjectPanel.LastReasonLabel"] = SelectedObjectPanelUISystem.kLastReasonLabelLocaleId;
+            map["SelectedObjectPanel.RepeatPenaltyLabel"] = SelectedObjectPanelUISystem.kRepeatPenaltyLabelLocaleId;
+            map["SelectedObjectPanel.PublicTransportLanePolicyLabel"] = SelectedObjectPanelUISystem.kPublicTransportLanePolicyLabelLocaleId;
+            map["SelectedObjectPanel.EntitySelectionLabel"] = SelectedObjectPanelUISystem.kEntitySelectionLabelLocaleId;
+            map["SelectedObjectPanel.EntitySelectionPlaceholder"] = SelectedObjectPanelUISystem.kEntitySelectionPlaceholderLocaleId;
+            map["SelectedObjectPanel.EntitySelectionSubmit"] = SelectedObjectPanelUISystem.kEntitySelectionSubmitLocaleId;
+            map["SelectedObjectPanel.EntitySelectionStatusInvalidFormat"] = SelectedObjectPanelUISystem.kEntitySelectionStatusInvalidFormatLocaleId;
+            map["SelectedObjectPanel.EntitySelectionStatusEntityNotFoundFormat"] = SelectedObjectPanelUISystem.kEntitySelectionStatusEntityNotFoundFormatLocaleId;
+            map["SelectedObjectPanel.EntitySelectionStatusSelectedFormat"] = SelectedObjectPanelUISystem.kEntitySelectionStatusSelectedFormatLocaleId;
+            map["SelectedObjectPanel.EntitySelectionStatusUnavailable"] = SelectedObjectPanelUISystem.kEntitySelectionStatusUnavailableLocaleId;
+            map["SelectedObjectPanel.PathActionLabel"] = SelectedObjectPanelUISystem.kPathActionLabelLocaleId;
+            map["SelectedObjectPanel.PathObsoleteButton"] = SelectedObjectPanelUISystem.kPathObsoleteButtonLocaleId;
+            map["SelectedObjectPanel.PathObsoleteStatusUnavailable"] = SelectedObjectPanelUISystem.kPathObsoleteStatusUnavailableLocaleId;
+            map["SelectedObjectPanel.PathObsoleteStatusNoPathOwner"] = SelectedObjectPanelUISystem.kPathObsoleteStatusNoPathOwnerLocaleId;
+            map["SelectedObjectPanel.PathObsoleteStatusPending"] = SelectedObjectPanelUISystem.kPathObsoleteStatusPendingLocaleId;
+            map["SelectedObjectPanel.PathObsoleteStatusAlreadyObsolete"] = SelectedObjectPanelUISystem.kPathObsoleteStatusAlreadyObsoleteLocaleId;
+            map["SelectedObjectPanel.PathObsoleteStatusMarkedFormat"] = SelectedObjectPanelUISystem.kPathObsoleteStatusMarkedFormatLocaleId;
+            map["SelectedObjectPanel.ActiveFlagsFormat"] = SelectedObjectPanelUISystem.kActiveFlagsValueFormatLocaleId;
+            map["SelectedObjectPanel.ActiveFlagsViolationName"] = SelectedObjectPanelUISystem.kActiveFlagsViolationNameLocaleId;
+            map["SelectedObjectPanel.ActiveFlagsPendingName"] = SelectedObjectPanelUISystem.kActiveFlagsPendingNameLocaleId;
+            map["SelectedObjectPanel.FlagOn"] = SelectedObjectPanelUISystem.kFlagOnLocaleId;
+            map["SelectedObjectPanel.FlagOff"] = SelectedObjectPanelUISystem.kFlagOffLocaleId;
+            map["SelectedObjectPanel.TotalsFormat"] = SelectedObjectPanelUISystem.kTotalsValueFormatLocaleId;
+            map["SelectedObjectPanel.NoSelection"] = SelectedObjectPanelUISystem.kNoSelectionLocaleId;
+            map["SelectedObjectPanel.NotVehicle"] = SelectedObjectPanelUISystem.kNotVehicleLocaleId;
+            map["SelectedObjectPanel.NotApplicable"] = SelectedObjectPanelUISystem.kNotApplicableLocaleId;
+            map["SelectedObjectPanel.NoLiveLane"] = SelectedObjectPanelUISystem.kNoLiveLaneLocaleId;
+            map["SelectedObjectPanel.Tracking"] = SelectedObjectPanelUISystem.kTrackingLocaleId;
+            map["SelectedObjectPanel.FooterHint"] = SelectedObjectPanelUISystem.kFooterHintLocaleId;
+            map["SelectedObjectPanel.ExpandSection"] = SelectedObjectPanelUISystem.kExpandSectionLocaleId;
+            map["SelectedObjectPanel.CollapseSection"] = SelectedObjectPanelUISystem.kCollapseSectionLocaleId;
+            map["SelectedObjectPanel.LaneDetailsTitle"] = SelectedObjectPanelUISystem.kLaneDetailsTitleLocaleId;
+            map["SelectedObjectPanel.CurrentLaneLabel"] = SelectedObjectPanelUISystem.kCurrentLaneLabelLocaleId;
+            map["SelectedObjectPanel.PreviousLaneLabel"] = SelectedObjectPanelUISystem.kPreviousLaneLabelLocaleId;
+            map["SelectedObjectPanel.LaneChangesLabel"] = SelectedObjectPanelUISystem.kLaneChangesLabelLocaleId;
+            map["SelectedObjectPanel.LiveLaneStateLabel"] = SelectedObjectPanelUISystem.kLiveLaneStateLabelLocaleId;
+            map["SelectedObjectPanel.RouteDiagnosticsTitle"] = SelectedObjectPanelUISystem.kRouteDiagnosticsTitleLocaleId;
+            map["SelectedObjectPanel.CurrentTargetLabel"] = SelectedObjectPanelUISystem.kCurrentTargetLabelLocaleId;
+            map["SelectedObjectPanel.CurrentRouteLabel"] = SelectedObjectPanelUISystem.kCurrentRouteLabelLocaleId;
+            map["SelectedObjectPanel.TargetRoadLabel"] = SelectedObjectPanelUISystem.kTargetRoadLabelLocaleId;
+            map["SelectedObjectPanel.RouteExplanationLabel"] = SelectedObjectPanelUISystem.kRouteExplanationLabelLocaleId;
+            map["SelectedObjectPanel.ConnectedStopLabel"] = SelectedObjectPanelUISystem.kConnectedStopLabelLocaleId;
+            map["SelectedObjectPanel.LiveLaneStateReady"] = SelectedObjectPanelUISystem.kLiveLaneStateReadyLocaleId;
+            map["SelectedObjectPanel.LiveLaneStateNoLiveLane"] = SelectedObjectPanelUISystem.kLiveLaneStateNoLiveLaneLocaleId;
+            map["SelectedObjectPanel.LiveLaneStateNotApplicable"] = SelectedObjectPanelUISystem.kLiveLaneStateNotApplicableLocaleId;
+            map["SelectedObjectPanel.LiveLaneStateParkedRoadCar"] = SelectedObjectPanelUISystem.kLiveLaneStateParkedRoadCarLocaleId;
+            map["SelectedObjectPanel.LiveLaneStateNoPathOwner"] = SelectedObjectPanelUISystem.kLiveLaneStateNoPathOwnerLocaleId;
+            map["SelectedObjectPanel.LiveLaneStateNoCurrentRoute"] = SelectedObjectPanelUISystem.kLiveLaneStateNoCurrentRouteLocaleId;
+            map["SelectedObjectPanel.LiveLaneStateNoCurrentTarget"] = SelectedObjectPanelUISystem.kLiveLaneStateNoCurrentTargetLocaleId;
+            map["SelectedObjectPanel.LiveLaneStatePathPending"] = SelectedObjectPanelUISystem.kLiveLaneStatePathPendingLocaleId;
+            map["SelectedObjectPanel.LiveLaneStatePathScheduled"] = SelectedObjectPanelUISystem.kLiveLaneStatePathScheduledLocaleId;
+            map["SelectedObjectPanel.LiveLaneStatePathObsolete"] = SelectedObjectPanelUISystem.kLiveLaneStatePathObsoleteLocaleId;
+            map["SelectedObjectPanel.LiveLaneStatePathFailed"] = SelectedObjectPanelUISystem.kLiveLaneStatePathFailedLocaleId;
+            map["SelectedObjectPanel.LiveLaneStatePathStuck"] = SelectedObjectPanelUISystem.kLiveLaneStatePathStuckLocaleId;
+            map["SelectedObjectPanel.LiveLaneStatePathUpdated"] = SelectedObjectPanelUISystem.kLiveLaneStatePathUpdatedLocaleId;
+            map["SelectedObjectPanel.None"] = SelectedObjectPanelUISystem.kNoneLocaleId;
+            map["SelectedObjectPanel.Classification.RoadCar"] = SelectedObjectBridgeSystem.kClassificationRoadCarLocaleId;
+            map["SelectedObjectPanel.Classification.ParkedRoadCar"] = SelectedObjectBridgeSystem.kClassificationParkedRoadCarLocaleId;
+            map["SelectedObjectPanel.Classification.RailVehicle"] = SelectedObjectBridgeSystem.kClassificationRailVehicleLocaleId;
+            map["SelectedObjectPanel.Classification.ParkedRailVehicle"] = SelectedObjectBridgeSystem.kClassificationParkedRailVehicleLocaleId;
+            map["SelectedObjectPanel.Classification.Tram"] = SelectedObjectBridgeSystem.kClassificationTramLocaleId;
+            map["SelectedObjectPanel.Classification.ParkedTram"] = SelectedObjectBridgeSystem.kClassificationParkedTramLocaleId;
+            map["SelectedObjectPanel.Classification.Train"] = SelectedObjectBridgeSystem.kClassificationTrainLocaleId;
+            map["SelectedObjectPanel.Classification.ParkedTrain"] = SelectedObjectBridgeSystem.kClassificationParkedTrainLocaleId;
+            map["SelectedObjectPanel.Classification.Subway"] = SelectedObjectBridgeSystem.kClassificationSubwayLocaleId;
+            map["SelectedObjectPanel.Classification.ParkedSubway"] = SelectedObjectBridgeSystem.kClassificationParkedSubwayLocaleId;
+            map["SelectedObjectPanel.Classification.OtherVehicle"] = SelectedObjectBridgeSystem.kClassificationOtherVehicleLocaleId;
+            map["SelectedObjectPanel.Role.RoadPublicTransportVehicle"] = SelectedObjectBridgeSystem.kRoleRoadPublicTransportLocaleId;
+            map["SelectedObjectPanel.Role.Taxi"] = SelectedObjectBridgeSystem.kRoleTaxiLocaleId;
+            map["SelectedObjectPanel.Role.PoliceCar"] = SelectedObjectBridgeSystem.kRolePoliceCarLocaleId;
+            map["SelectedObjectPanel.Role.FireEngine"] = SelectedObjectBridgeSystem.kRoleFireEngineLocaleId;
+            map["SelectedObjectPanel.Role.Ambulance"] = SelectedObjectBridgeSystem.kRoleAmbulanceLocaleId;
+            map["SelectedObjectPanel.Role.GarbageTruck"] = SelectedObjectBridgeSystem.kRoleGarbageTruckLocaleId;
+            map["SelectedObjectPanel.Role.PostVan"] = SelectedObjectBridgeSystem.kRolePostVanLocaleId;
+            map["SelectedObjectPanel.Role.RoadMaintenanceVehicle"] = SelectedObjectBridgeSystem.kRoleRoadMaintenanceVehicleLocaleId;
+            map["SelectedObjectPanel.Role.Snowplow"] = SelectedObjectBridgeSystem.kRoleSnowplowLocaleId;
+            map["SelectedObjectPanel.Role.VehicleMaintenanceVehicle"] = SelectedObjectBridgeSystem.kRoleVehicleMaintenanceVehicleLocaleId;
+            map["SelectedObjectPanel.Role.PersonalCar"] = SelectedObjectBridgeSystem.kRolePersonalCarLocaleId;
+            map["SelectedObjectPanel.Role.DeliveryTruck"] = SelectedObjectBridgeSystem.kRoleDeliveryTruckLocaleId;
+            map["SelectedObjectPanel.Role.CargoTransport"] = SelectedObjectBridgeSystem.kRoleCargoTransportLocaleId;
+            map["SelectedObjectPanel.Role.Hearse"] = SelectedObjectBridgeSystem.kRoleHearseLocaleId;
+            map["SelectedObjectPanel.Role.PrisonerTransport"] = SelectedObjectBridgeSystem.kRolePrisonerTransportLocaleId;
+            map["SelectedObjectPanel.Role.ParkMaintenanceVehicle"] = SelectedObjectBridgeSystem.kRoleParkMaintenanceVehicleLocaleId;
+            map["SelectedObjectPanel.Role.UnclassifiedRoadVehicle"] = SelectedObjectBridgeSystem.kRoleUnclassifiedRoadVehicleLocaleId;
+            map["SelectedObjectPanel.Role.EmergencyQualifier"] = SelectedObjectBridgeSystem.kRoleEmergencyQualifierLocaleId;
+            map["SelectedObjectPanel.Reason.NoneRecorded"] = SelectedObjectBridgeSystem.kReasonNoneRecordedLocaleId;
+            map["SelectedObjectPanel.Reason.PublicTransportLaneRevokedByModFormat"] = SelectedObjectBridgeSystem.kReasonPublicTransportLaneRevokedByModFormatLocaleId;
+            map["SelectedObjectPanel.Reason.PublicTransportLaneMissingVanillaCategoriesFormat"] = SelectedObjectBridgeSystem.kReasonPublicTransportLaneMissingVanillaCategoriesFormatLocaleId;
+            map["SelectedObjectPanel.Reason.PublicTransportLaneMissingGrantedRoleFormat"] = SelectedObjectBridgeSystem.kReasonPublicTransportLaneMissingGrantedRoleFormatLocaleId;
+            map["SelectedObjectPanel.Reason.PublicTransportLaneNotGrantedRoleFormat"] = SelectedObjectBridgeSystem.kReasonPublicTransportLaneNotGrantedRoleFormatLocaleId;
+            map["SelectedObjectPanel.Reason.NoPublicTransportLanePermissionFlags"] = SelectedObjectBridgeSystem.kReasonNoPublicTransportLanePermissionFlagsLocaleId;
+            map["SelectedObjectPanel.Reason.OppositeFlowSameSegment"] = SelectedObjectBridgeSystem.kReasonOppositeFlowSameSegmentLocaleId;
+            map["SelectedObjectPanel.Reason.EnteredGarageAccessNoSideAccess"] = SelectedObjectBridgeSystem.kReasonEnteredGarageAccessNoSideAccessLocaleId;
+            map["SelectedObjectPanel.Reason.EnteredParkingAccessNoSideAccess"] = SelectedObjectBridgeSystem.kReasonEnteredParkingAccessNoSideAccessLocaleId;
+            map["SelectedObjectPanel.Reason.EnteredParkingConnectionNoSideAccess"] = SelectedObjectBridgeSystem.kReasonEnteredParkingConnectionNoSideAccessLocaleId;
+            map["SelectedObjectPanel.Reason.EnteredBuildingAccessNoSideAccess"] = SelectedObjectBridgeSystem.kReasonEnteredBuildingAccessNoSideAccessLocaleId;
+            map["SelectedObjectPanel.Reason.ExitedParkingAccessNoSideAccess"] = SelectedObjectBridgeSystem.kReasonExitedParkingAccessNoSideAccessLocaleId;
+            map["SelectedObjectPanel.Reason.ExitedGarageAccessNoSideAccess"] = SelectedObjectBridgeSystem.kReasonExitedGarageAccessNoSideAccessLocaleId;
+            map["SelectedObjectPanel.Reason.ExitedParkingConnectionNoSideAccess"] = SelectedObjectBridgeSystem.kReasonExitedParkingConnectionNoSideAccessLocaleId;
+            map["SelectedObjectPanel.Reason.ExitedBuildingAccessNoSideAccess"] = SelectedObjectBridgeSystem.kReasonExitedBuildingAccessNoSideAccessLocaleId;
+            map["SelectedObjectPanel.Reason.IntersectionMovementFormat"] = SelectedObjectBridgeSystem.kReasonIntersectionMovementFormatLocaleId;
+            map["SelectedObjectPanel.Reason.RepeatPenaltyAppliedFormat"] = SelectedObjectBridgeSystem.kReasonRepeatPenaltyAppliedFormatLocaleId;
+            map["SelectedObjectPanel.Reason.RepeatPenaltyApplied"] = SelectedObjectBridgeSystem.kReasonRepeatPenaltyAppliedLocaleId;
+            map["SelectedObjectPanel.Reason.RepeatPenaltyNotApplied"] = SelectedObjectBridgeSystem.kReasonRepeatPenaltyNotAppliedLocaleId;
+            map["SelectedObjectPanel.PublicTransportLanePolicyMeaningFormat"] =
+                SelectedObjectBridgeSystem.kPublicTransportLanePolicyMeaningFormatLocaleId;
+            map["SelectedObjectPanel.PublicTransportLanePolicyQualifierPublicTransport"] =
+                SelectedObjectBridgeSystem.kPublicTransportLanePolicyQualifierPublicTransportLocaleId;
+            map["SelectedObjectPanel.PublicTransportLanePolicyQualifierEmergency"] =
+                SelectedObjectBridgeSystem.kPublicTransportLanePolicyQualifierEmergencyLocaleId;
+            map["SelectedObjectPanel.PublicTransportLanePolicyVanillaAllow"] =
+                SelectedObjectBridgeSystem.kPublicTransportLanePolicyVanillaAllowLocaleId;
+            map["SelectedObjectPanel.PublicTransportLanePolicyVanillaDeny"] =
+                SelectedObjectBridgeSystem.kPublicTransportLanePolicyVanillaDenyLocaleId;
+            map["SelectedObjectPanel.PublicTransportLanePolicyTleAllow"] =
+                SelectedObjectBridgeSystem.kPublicTransportLanePolicyTleAllowLocaleId;
+            map["SelectedObjectPanel.PublicTransportLanePolicyTleDeny"] =
+                SelectedObjectBridgeSystem.kPublicTransportLanePolicyTleDenyLocaleId;
+            map["SelectedObjectPanel.RouteExplanation.NoCurrentRoute"] =
+                SelectedObjectBridgeSystem.kRouteExplanationNoCurrentRouteLocaleId;
+            map["SelectedObjectPanel.RouteExplanation.NoCurrentTarget"] =
+                SelectedObjectBridgeSystem.kRouteExplanationNoCurrentTargetLocaleId;
+            map["SelectedObjectPanel.RouteExplanation.WaypointAlignment"] =
+                SelectedObjectBridgeSystem.kRouteExplanationWaypointAlignmentLocaleId;
+            map["SelectedObjectPanel.RouteExplanation.PenaltyPrimaryFormat"] =
+                SelectedObjectBridgeSystem.kRouteExplanationPenaltyPrimaryFormatLocaleId;
+            map["SelectedObjectPanel.RouteExplanation.PenaltyModifierFormat"] =
+                SelectedObjectBridgeSystem.kRouteExplanationPenaltyModifierFormatLocaleId;
+            map["SelectedObjectPanel.RouteExplanation.PtPermissive"] =
+                SelectedObjectBridgeSystem.kRouteExplanationPtPermissiveLocaleId;
+            map["SelectedObjectPanel.RouteExplanation.GenericFallback"] =
+                SelectedObjectBridgeSystem.kRouteExplanationGenericFallbackLocaleId;
+            map["SelectedObjectPanel.RouteDirectConnect.AlreadyOnStart"] =
+                SelectedObjectBridgeSystem.kRouteDirectConnectAlreadyOnStartLocaleId;
+            map["SelectedObjectPanel.RouteDirectConnect.NextHop"] =
+                SelectedObjectBridgeSystem.kRouteDirectConnectNextHopLocaleId;
+            map["SelectedObjectPanel.RouteDirectConnect.ViaFormat"] =
+                SelectedObjectBridgeSystem.kRouteDirectConnectViaFormatLocaleId;
+            map["SelectedObjectPanel.RouteDirectConnect.NoPreview"] =
+                SelectedObjectBridgeSystem.kRouteDirectConnectNoPreviewLocaleId;
+            map["SelectedObjectPanel.RouteDirectConnect.MissingStart"] =
+                SelectedObjectBridgeSystem.kRouteDirectConnectMissingStartLocaleId;
+            map["SelectedObjectPanel.RouteFullPath.ContainsStart"] =
+                SelectedObjectBridgeSystem.kRouteFullPathContainsStartLocaleId;
+            map["SelectedObjectPanel.RouteFullPath.MissingStart"] =
+                SelectedObjectBridgeSystem.kRouteFullPathMissingStartLocaleId;
+            map["SelectedObjectPanel.RouteFullPath.Missing"] =
+                SelectedObjectBridgeSystem.kRouteFullPathMissingLocaleId;
+            map["FocusedLoggingPanel.HeaderText"] =
+                FocusedLoggingPanelUISystem.kHeaderTextLocaleId;
+            map["FocusedLoggingPanel.SelectedVehicleLabel"] =
+                FocusedLoggingPanelUISystem.kSelectedVehicleLabelLocaleId;
+            map["FocusedLoggingPanel.SelectedRoleLabel"] =
+                FocusedLoggingPanelUISystem.kSelectedRoleLabelLocaleId;
+            map["FocusedLoggingPanel.SelectedWatchStatusLabel"] =
+                FocusedLoggingPanelUISystem.kSelectedWatchStatusLabelLocaleId;
+            map["FocusedLoggingPanel.WatchedCountLabel"] =
+                FocusedLoggingPanelUISystem.kWatchedCountLabelLocaleId;
+            map["FocusedLoggingPanel.WatchedVehiclesLabel"] =
+                FocusedLoggingPanelUISystem.kWatchedVehiclesLabelLocaleId;
+            map["FocusedLoggingPanel.BurstLoggingLabel"] =
+                FocusedLoggingPanelUISystem.kBurstLoggingLabelLocaleId;
+            map["FocusedLoggingPanel.WatchSelected"] =
+                FocusedLoggingPanelUISystem.kWatchSelectedButtonLocaleId;
+            map["FocusedLoggingPanel.UnwatchSelected"] =
+                FocusedLoggingPanelUISystem.kUnwatchSelectedButtonLocaleId;
+            map["FocusedLoggingPanel.ClearWatched"] =
+                FocusedLoggingPanelUISystem.kClearWatchedButtonLocaleId;
+            map["FocusedLoggingPanel.ToggleBurstLogging"] =
+                FocusedLoggingPanelUISystem.kToggleBurstLoggingButtonLocaleId;
+            map["FocusedLoggingPanel.BurstLoggingActiveFormat"] =
+                FocusedLoggingPanelUISystem.kBurstLoggingActiveFormatLocaleId;
+            map["FocusedLoggingPanel.BurstLoggingInactive"] =
+                FocusedLoggingPanelUISystem.kBurstLoggingInactiveLocaleId;
+            map["FocusedLoggingPanel.WatchedCountFormat"] =
+                FocusedLoggingPanelUISystem.kWatchedCountFormatLocaleId;
+            map["FocusedLoggingPanel.WatchedStatus"] =
+                FocusedLoggingPanelUISystem.kWatchedStatusLocaleId;
+            map["FocusedLoggingPanel.NotWatchedStatus"] =
+                FocusedLoggingPanelUISystem.kNotWatchedStatusLocaleId;
+            map["FocusedLoggingPanel.NoEligibleSelection"] =
+                FocusedLoggingPanelUISystem.kNoEligibleSelectionLocaleId;
+            map["FocusedLoggingPanel.FooterHint"] =
+                FocusedLoggingPanelUISystem.kFooterHintLocaleId;
+            map["FocusedLoggingPanel.Warning"] =
+                FocusedLoggingPanelUISystem.kWarningLocaleId;
+            map["FocusedLoggingPanel.None"] =
+                FocusedLoggingPanelUISystem.kNoneLocaleId;
 
             map["MonthlyChirper.SenderText"] = MonthlyEnforcementChirperSystem.kSenderTextLocaleId;
             map["MonthlyChirper.PeriodPointFormat"] = MonthlyEnforcementChirperSystem.kPeriodPointFormatLocaleId;

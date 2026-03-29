@@ -136,7 +136,7 @@ namespace Traffic_Law_Enforcement
                                 evt.Lane,
                                 reason);
 
-                            EnforcementLoggingPolicy.RecordEnforcementEvent(message);
+                            EnforcementLoggingPolicy.RecordEnforcementEvent(message, evt.Vehicle);
                             break;
                         }
 
@@ -144,7 +144,7 @@ namespace Traffic_Law_Enforcement
                         {
                             string message =
                                 $"PT-lane usage by vanilla-allowed but mod-denied vehicle (Type 2): vehicle={evt.Vehicle}, lane={evt.Lane}";
-                            EnforcementLoggingPolicy.RecordType2Usage(message);
+                            EnforcementLoggingPolicy.RecordType2Usage(message, evt.Vehicle);
                             break;
                         }
 
@@ -152,7 +152,7 @@ namespace Traffic_Law_Enforcement
                         {
                             string message =
                                 $"PT-lane usage by vanilla-denied but mod-allowed vehicle (Type 3): vehicle={evt.Vehicle}, lane={evt.Lane}";
-                            EnforcementLoggingPolicy.RecordType3Usage(message);
+                            EnforcementLoggingPolicy.RecordType3Usage(message, evt.Vehicle);
                             break;
                         }
 
@@ -160,7 +160,7 @@ namespace Traffic_Law_Enforcement
                         {
                             string message =
                                 $"PT-lane usage by vanilla-denied and mod-denied vehicle (Type 4): vehicle={evt.Vehicle}, lane={evt.Lane}";
-                            EnforcementLoggingPolicy.RecordType4Usage(message);
+                            EnforcementLoggingPolicy.RecordType4Usage(message, evt.Vehicle);
                             break;
                         }
                     }
