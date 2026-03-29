@@ -82,6 +82,12 @@ namespace Traffic_Law_Enforcement
             return Mod.IsEnforcementEnabled && EnableFocusedRouteRebuildDiagnosticsLogging;
         }
 
+        public static bool ShouldLogFocusedPathfindSetup(Entity vehicle)
+        {
+            return ShouldLogFocusedRouteRebuildDiagnostics() &&
+                   FocusedLoggingService.IsWatched(vehicle);
+        }
+
         public static bool ShouldRestrictVehicleSpecificRouteDebugLogsToWatchedVehicles()
         {
             return EnableFocusedVehicleOnlyRouteLogging;

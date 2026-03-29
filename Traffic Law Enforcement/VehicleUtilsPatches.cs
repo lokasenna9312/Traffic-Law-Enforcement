@@ -14,6 +14,15 @@ namespace Traffic_Law_Enforcement
     {
         private const string HarmonyId = "Traffic_Law_Enforcement.VehicleUtilsPatches";
 
+        private struct PathfindRuleSyncResult
+        {
+            public bool HasProfile;
+            public bool ExperimentSkipped;
+            public bool AllowOnPublicTransportLane;
+            public bool PendingExitActive;
+            public VehicleTrafficLawProfile Profile;
+        }
+
         private static readonly Type s_PathfindExecutorType =
             AccessTools.Inner(typeof(PathfindJobs), "PathfindExecutor");
 
@@ -104,7 +113,21 @@ namespace Traffic_Law_Enforcement
                 RefreshCachedPenaltyValues();
             }
 
-            SyncPrivateTrafficIgnoredRules(entityManager, owner, ref item);
+            RuleFlags ignoredRulesBefore = item.m_Parameters.m_IgnoredRules;
+            RuleFlags taxiIgnoredRulesBefore = item.m_Parameters.m_TaxiIgnoredRules;
+
+            PathfindRuleSyncResult syncResult =
+                SyncPrivateTrafficIgnoredRules(entityManager, owner, ref item);
+
+            if (EnforcementLoggingPolicy.ShouldLogFocusedPathfindSetup(owner))
+            {
+                LogFocusedPathfindSetup(
+                    owner,
+                    ignoredRulesBefore,
+                    taxiIgnoredRulesBefore,
+                    item,
+                    syncResult);
+            }
         }
 
         private static void CalculateCostPostfix(ref float __result, RuleFlags rules, float2 delta, PathfindParameters ___m_Parameters)
@@ -152,19 +175,19 @@ namespace Traffic_Law_Enforcement
             s_CachedPublicTransportLaneFine = configuredFineAmount;
         }
 
-        private static void SyncPrivateTrafficIgnoredRules(EntityManager entityManager, Entity owner, ref SetupQueueItem item)
+        private static PathfindRuleSyncResult SyncPrivateTrafficIgnoredRules(EntityManager entityManager, Entity owner, ref SetupQueueItem item)
         {
             if (!entityManager.HasComponent<VehicleTrafficLawProfile>(owner))
             {
-                return;
+                return default;
             }
 
             VehicleTrafficLawProfile profile = entityManager.GetComponentData<VehicleTrafficLawProfile>(owner);
-
-            if (ShouldUseVanillaPathfindRulesForTrackedVehicle(profile))
+            PathfindRuleSyncResult result = new PathfindRuleSyncResult
             {
-                return;
-            }
+                HasProfile = true,
+                Profile = profile,
+            };
 
             bool allowOnPublicTransportLane = PublicTransportLanePolicy.CanUsePublicTransportLane(profile);
 
@@ -172,11 +195,22 @@ namespace Traffic_Law_Enforcement
             {
                 PublicTransportLanePendingExit pendingExit = entityManager.GetComponentData<PublicTransportLanePendingExit>(owner);
                 allowOnPublicTransportLane = pendingExit.m_HasLeftPublicTransportLane == 0;
+                result.PendingExitActive = pendingExit.m_HasLeftPublicTransportLane == 0;
+            }
+
+            result.AllowOnPublicTransportLane = allowOnPublicTransportLane;
+
+            if (ShouldUseVanillaPathfindRulesForTrackedVehicle(profile))
+            {
+                result.ExperimentSkipped = true;
+                return result;
             }
 
             SetRuleFlag(ref item.m_Parameters.m_IgnoredRules, RuleFlags.ForbidPrivateTraffic, allowOnPublicTransportLane);
 
             SetRuleFlag(ref item.m_Parameters.m_TaxiIgnoredRules, RuleFlags.ForbidPrivateTraffic, allowOnPublicTransportLane);
+
+            return result;
         }
 
         private static bool ShouldUseVanillaPathfindRulesForTrackedVehicle(VehicleTrafficLawProfile profile)
@@ -195,6 +229,50 @@ namespace Traffic_Law_Enforcement
             {
                 rules &= ~flag;
             }
+        }
+
+        private static void LogFocusedPathfindSetup(
+            Entity owner,
+            RuleFlags ignoredRulesBefore,
+            RuleFlags taxiIgnoredRulesBefore,
+            SetupQueueItem item,
+            PathfindRuleSyncResult syncResult)
+        {
+            bool experimentEnabled =
+                Mod.Settings?.EnablePolicyTrackedVehicleVanillaPathfindRulesExperiment == true;
+
+            string accessBits = syncResult.HasProfile
+                ? FormatAccessBits(syncResult.Profile.m_PublicTransportLaneAccessBits)
+                : "none";
+
+            string allowOnPublicTransportLane = syncResult.HasProfile
+                ? syncResult.AllowOnPublicTransportLane.ToString()
+                : "unavailable";
+
+            Mod.log.Info(
+                $"FOCUSED_SETUP_PATHFIND: vehicle={owner}, " +
+                $"experimentEnabled={experimentEnabled}, " +
+                $"experimentSkip={syncResult.ExperimentSkipped}, " +
+                $"hasProfile={syncResult.HasProfile}, " +
+                $"shouldTrack={(syncResult.HasProfile ? syncResult.Profile.m_ShouldTrack.ToString() : "n/a")}, " +
+                $"emergency={(syncResult.HasProfile ? (syncResult.Profile.m_EmergencyVehicle != 0).ToString() : "n/a")}, " +
+                $"accessBits={accessBits}, " +
+                $"allowOnPTLane={allowOnPublicTransportLane}, " +
+                $"pendingExitActive={(syncResult.HasProfile ? syncResult.PendingExitActive.ToString() : "n/a")}, " +
+                $"ignoredRulesBefore={FormatRuleFlags(ignoredRulesBefore)}, " +
+                $"ignoredRulesAfter={FormatRuleFlags(item.m_Parameters.m_IgnoredRules)}, " +
+                $"taxiIgnoredRulesBefore={FormatRuleFlags(taxiIgnoredRulesBefore)}, " +
+                $"taxiIgnoredRulesAfter={FormatRuleFlags(item.m_Parameters.m_TaxiIgnoredRules)}");
+        }
+
+        private static string FormatRuleFlags(RuleFlags flags)
+        {
+            return flags == 0 ? "none" : flags.ToString();
+        }
+
+        private static string FormatAccessBits(PublicTransportLaneAccessBits bits)
+        {
+            return bits == 0 ? "none" : bits.ToString();
         }
     }
 }
