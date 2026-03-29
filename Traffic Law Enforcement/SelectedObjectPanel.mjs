@@ -34,6 +34,12 @@ const entitySelectionSubmitTextBinding = api.bindValue(group, "entitySelectionSu
 const entitySelectionSuggestedValueBinding = api.bindValue(group, "entitySelectionSuggestedValue", "");
 const entitySelectionStatusBinding = api.bindValue(group, "entitySelectionStatus", "");
 const entitySelectionStatusIsErrorBinding = api.bindValue(group, "entitySelectionStatusIsError", false);
+const pathActionLabelTextBinding = api.bindValue(group, "pathActionLabelText", "");
+const pathObsoleteButtonTextBinding = api.bindValue(group, "pathObsoleteButtonText", "");
+const pathObsoleteButtonVisibleBinding = api.bindValue(group, "pathObsoleteButtonVisible", false);
+const pathObsoleteButtonEnabledBinding = api.bindValue(group, "pathObsoleteButtonEnabled", false);
+const pathObsoleteStatusBinding = api.bindValue(group, "pathObsoleteStatus", "");
+const pathObsoleteStatusIsErrorBinding = api.bindValue(group, "pathObsoleteStatusIsError", false);
 const headerTextBinding = api.bindValue(group, "headerText", "");
 const summaryTitleBinding = api.bindValue(group, "summaryTitle", "");
 const tleStatusLabelTextBinding = api.bindValue(group, "tleStatusLabelText", "");
@@ -156,7 +162,18 @@ const styles = {
         cursor: "pointer",
         flexShrink: 0,
     },
+    selectionButtonDisabled: {
+        opacity: 0.45,
+        cursor: "default",
+    },
     selectionStatus: {
+        minHeight: "16px",
+        color: "#b8c6da",
+        fontSize: "12px",
+        lineHeight: 1.3,
+        paddingLeft: "146px",
+    },
+    actionStatus: {
         minHeight: "16px",
         color: "#b8c6da",
         fontSize: "12px",
@@ -474,6 +491,12 @@ function SelectedObjectPanel() {
     const entitySelectionSuggestedValue = api.useValue(entitySelectionSuggestedValueBinding);
     const entitySelectionStatus = api.useValue(entitySelectionStatusBinding);
     const entitySelectionStatusIsError = api.useValue(entitySelectionStatusIsErrorBinding);
+    const pathActionLabelText = api.useValue(pathActionLabelTextBinding);
+    const pathObsoleteButtonText = api.useValue(pathObsoleteButtonTextBinding);
+    const pathObsoleteButtonVisible = api.useValue(pathObsoleteButtonVisibleBinding);
+    const pathObsoleteButtonEnabled = api.useValue(pathObsoleteButtonEnabledBinding);
+    const pathObsoleteStatus = api.useValue(pathObsoleteStatusBinding);
+    const pathObsoleteStatusIsError = api.useValue(pathObsoleteStatusIsErrorBinding);
     const headerText = api.useValue(headerTextBinding);
     const summaryTitle = api.useValue(summaryTitleBinding);
     const tleStatusLabelText = api.useValue(tleStatusLabelTextBinding);
@@ -545,6 +568,11 @@ function SelectedObjectPanel() {
         },
         [entitySelectionInput]
     );
+
+    const onMarkSelectedVehiclePathObsolete = React.useCallback(function (event) {
+        stopEvent(event);
+        api.trigger(group, "markSelectedVehiclePathObsolete");
+    }, []);
 
     if (!visible) {
         return null;
@@ -623,6 +651,45 @@ function SelectedObjectPanel() {
                       ),
                   },
                   entitySelectionStatus
+              )
+            : null,
+        pathObsoleteButtonVisible
+            ? h(
+                  "div",
+                  { style: styles.selectionRow },
+                  h("div", { style: styles.label }, pathActionLabelText),
+                  h(
+                      "div",
+                      { style: styles.selectionRowInputCell },
+                      h(
+                          "button",
+                          {
+                              type: "button",
+                              style: Object.assign(
+                                  {},
+                                  styles.selectionButton,
+                                  pathObsoleteButtonEnabled ? null : styles.selectionButtonDisabled
+                              ),
+                              disabled: !pathObsoleteButtonEnabled,
+                              onMouseDown: stopEvent,
+                              onClick: onMarkSelectedVehiclePathObsolete,
+                          },
+                          pathObsoleteButtonText
+                      )
+                  )
+              )
+            : null,
+        pathObsoleteButtonVisible && pathObsoleteStatus
+            ? h(
+                  "div",
+                  {
+                      style: Object.assign(
+                          {},
+                          styles.actionStatus,
+                          pathObsoleteStatusIsError ? styles.selectionStatusError : null
+                      ),
+                  },
+                  pathObsoleteStatus
               )
             : null
     );

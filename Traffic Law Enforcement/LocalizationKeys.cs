@@ -163,6 +163,13 @@ namespace Traffic_Law_Enforcement
             map["SelectedObjectPanel.EntitySelectionStatusEntityNotFoundFormat"] = SelectedObjectPanelUISystem.kEntitySelectionStatusEntityNotFoundFormatLocaleId;
             map["SelectedObjectPanel.EntitySelectionStatusSelectedFormat"] = SelectedObjectPanelUISystem.kEntitySelectionStatusSelectedFormatLocaleId;
             map["SelectedObjectPanel.EntitySelectionStatusUnavailable"] = SelectedObjectPanelUISystem.kEntitySelectionStatusUnavailableLocaleId;
+            map["SelectedObjectPanel.PathActionLabel"] = SelectedObjectPanelUISystem.kPathActionLabelLocaleId;
+            map["SelectedObjectPanel.PathObsoleteButton"] = SelectedObjectPanelUISystem.kPathObsoleteButtonLocaleId;
+            map["SelectedObjectPanel.PathObsoleteStatusUnavailable"] = SelectedObjectPanelUISystem.kPathObsoleteStatusUnavailableLocaleId;
+            map["SelectedObjectPanel.PathObsoleteStatusNoPathOwner"] = SelectedObjectPanelUISystem.kPathObsoleteStatusNoPathOwnerLocaleId;
+            map["SelectedObjectPanel.PathObsoleteStatusPending"] = SelectedObjectPanelUISystem.kPathObsoleteStatusPendingLocaleId;
+            map["SelectedObjectPanel.PathObsoleteStatusAlreadyObsolete"] = SelectedObjectPanelUISystem.kPathObsoleteStatusAlreadyObsoleteLocaleId;
+            map["SelectedObjectPanel.PathObsoleteStatusMarkedFormat"] = SelectedObjectPanelUISystem.kPathObsoleteStatusMarkedFormatLocaleId;
             map["SelectedObjectPanel.ActiveFlagsFormat"] = SelectedObjectPanelUISystem.kActiveFlagsValueFormatLocaleId;
             map["SelectedObjectPanel.ActiveFlagsViolationName"] = SelectedObjectPanelUISystem.kActiveFlagsViolationNameLocaleId;
             map["SelectedObjectPanel.ActiveFlagsPendingName"] = SelectedObjectPanelUISystem.kActiveFlagsPendingNameLocaleId;

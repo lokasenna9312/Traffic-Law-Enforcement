@@ -7,6 +7,7 @@ using Game.Routes;
 using Game.SceneFlow;
 using Game.UI;
 using Game.UI.InGame;
+using Game.Vehicles;
 using System.Text.RegularExpressions;
 using Unity.Entities;
 
@@ -57,6 +58,13 @@ namespace Traffic_Law_Enforcement
         internal const string kEntitySelectionStatusEntityNotFoundFormatLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Text.EntitySelectionStatusEntityNotFoundFormat";
         internal const string kEntitySelectionStatusSelectedFormatLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Text.EntitySelectionStatusSelectedFormat";
         internal const string kEntitySelectionStatusUnavailableLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Text.EntitySelectionStatusUnavailable";
+        internal const string kPathActionLabelLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Label.PathAction";
+        internal const string kPathObsoleteButtonLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Text.PathObsoleteButton";
+        internal const string kPathObsoleteStatusUnavailableLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Text.PathObsoleteStatusUnavailable";
+        internal const string kPathObsoleteStatusNoPathOwnerLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Text.PathObsoleteStatusNoPathOwner";
+        internal const string kPathObsoleteStatusPendingLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Text.PathObsoleteStatusPending";
+        internal const string kPathObsoleteStatusAlreadyObsoleteLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Text.PathObsoleteStatusAlreadyObsolete";
+        internal const string kPathObsoleteStatusMarkedFormatLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Text.PathObsoleteStatusMarkedFormat";
         internal const string kLiveLaneStateReadyLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Text.LiveLaneStateReady";
         internal const string kLiveLaneStateNoLiveLaneLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Text.LiveLaneStateNoLiveLane";
         internal const string kLiveLaneStateNotApplicableLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Text.LiveLaneStateNotApplicable";
@@ -100,6 +108,12 @@ namespace Traffic_Law_Enforcement
         private ValueBinding<string> m_EntitySelectionSuggestedValueBinding;
         private ValueBinding<string> m_EntitySelectionStatusBinding;
         private ValueBinding<bool> m_EntitySelectionStatusIsErrorBinding;
+        private ValueBinding<string> m_PathActionLabelBinding;
+        private ValueBinding<string> m_PathObsoleteButtonBinding;
+        private ValueBinding<bool> m_PathObsoleteButtonVisibleBinding;
+        private ValueBinding<bool> m_PathObsoleteButtonEnabledBinding;
+        private ValueBinding<string> m_PathObsoleteStatusBinding;
+        private ValueBinding<bool> m_PathObsoleteStatusIsErrorBinding;
         private ValueBinding<string> m_HeaderTextBinding;
         private ValueBinding<string> m_SummaryTitleBinding;
         private ValueBinding<string> m_TleStatusLabelBinding;
@@ -148,6 +162,9 @@ namespace Traffic_Law_Enforcement
         private string m_EntitySelectionStatus = string.Empty;
         private bool m_EntitySelectionStatusIsError;
         private string m_EntitySelectionStatusSelectedEntity = string.Empty;
+        private string m_PathObsoleteStatus = string.Empty;
+        private bool m_PathObsoleteStatusIsError;
+        private string m_PathObsoleteStatusSelectedEntity = string.Empty;
 
         public override GameMode gameMode => GameMode.Game;
 
@@ -168,6 +185,10 @@ namespace Traffic_Law_Enforcement
             public string EntitySelectionSuggestedValue;
             public string EntitySelectionStatus;
             public bool EntitySelectionStatusIsError;
+            public bool PathObsoleteButtonVisible;
+            public bool PathObsoleteButtonEnabled;
+            public string PathObsoleteStatus;
+            public bool PathObsoleteStatusIsError;
             public bool LaneDetailsVisible;
             public string CurrentLane;
             public string PreviousLane;
@@ -213,6 +234,12 @@ namespace Traffic_Law_Enforcement
             AddBinding(m_EntitySelectionSuggestedValueBinding = new ValueBinding<string>(kGroup, "entitySelectionSuggestedValue", string.Empty));
             AddBinding(m_EntitySelectionStatusBinding = new ValueBinding<string>(kGroup, "entitySelectionStatus", string.Empty));
             AddBinding(m_EntitySelectionStatusIsErrorBinding = new ValueBinding<bool>(kGroup, "entitySelectionStatusIsError", false));
+            AddBinding(m_PathActionLabelBinding = new ValueBinding<string>(kGroup, "pathActionLabelText", string.Empty));
+            AddBinding(m_PathObsoleteButtonBinding = new ValueBinding<string>(kGroup, "pathObsoleteButtonText", string.Empty));
+            AddBinding(m_PathObsoleteButtonVisibleBinding = new ValueBinding<bool>(kGroup, "pathObsoleteButtonVisible", false));
+            AddBinding(m_PathObsoleteButtonEnabledBinding = new ValueBinding<bool>(kGroup, "pathObsoleteButtonEnabled", false));
+            AddBinding(m_PathObsoleteStatusBinding = new ValueBinding<string>(kGroup, "pathObsoleteStatus", string.Empty));
+            AddBinding(m_PathObsoleteStatusIsErrorBinding = new ValueBinding<bool>(kGroup, "pathObsoleteStatusIsError", false));
             AddBinding(m_HeaderTextBinding = new ValueBinding<string>(kGroup, "headerText", string.Empty));
             AddBinding(m_SummaryTitleBinding = new ValueBinding<string>(kGroup, "summaryTitle", string.Empty));
             AddBinding(m_TleStatusLabelBinding = new ValueBinding<string>(kGroup, "tleStatusLabelText", string.Empty));
@@ -258,6 +285,7 @@ namespace Traffic_Law_Enforcement
             AddBinding(new TriggerBinding(kGroup, "toggleLaneDetailsCollapsed", ToggleLaneDetailsCollapsed));
             AddBinding(new TriggerBinding(kGroup, "toggleRouteDiagnosticsCollapsed", ToggleRouteDiagnosticsCollapsed));
             AddBinding(new TriggerBinding<string>(kGroup, "submitEntitySelection", HandleSubmitEntitySelection));
+            AddBinding(new TriggerBinding(kGroup, "markSelectedVehiclePathObsolete", HandleMarkSelectedVehiclePathObsolete));
         }
 
         protected override void OnDestroy()
@@ -295,6 +323,7 @@ namespace Traffic_Law_Enforcement
             if (m_SelectedObjectBridgeSystem == null || !m_SelectedObjectBridgeSystem.HasSnapshot)
             {
                 RefreshEntitySelectionStatus(currentSuggestedEntitySelectionValue);
+                RefreshPathObsoleteStatus(currentSuggestedEntitySelectionValue);
                 PanelState noSnapshotState = BuildNoSelectionState();
                 UpdateBindings(noSnapshotState);
                 return;
@@ -303,6 +332,7 @@ namespace Traffic_Law_Enforcement
             currentSuggestedEntitySelectionValue =
                 BuildSuggestedEntitySelectionValue(m_SelectedObjectBridgeSystem.CurrentSnapshot);
             RefreshEntitySelectionStatus(currentSuggestedEntitySelectionValue);
+            RefreshPathObsoleteStatus(currentSuggestedEntitySelectionValue);
             SelectedObjectDebugSnapshot snapshot = m_SelectedObjectBridgeSystem.CurrentSnapshot;
             PanelState state = BuildState(snapshot);
             UpdateBindings(state);
@@ -324,7 +354,11 @@ namespace Traffic_Law_Enforcement
                     Message = LocalizeText(kNotVehicleLocaleId, "Not a vehicle"),
                     EntitySelectionSuggestedValue = BuildSuggestedEntitySelectionValue(snapshot),
                     EntitySelectionStatus = m_EntitySelectionStatus,
-                    EntitySelectionStatusIsError = m_EntitySelectionStatusIsError
+                    EntitySelectionStatusIsError = m_EntitySelectionStatusIsError,
+                    PathObsoleteButtonVisible = false,
+                    PathObsoleteButtonEnabled = false,
+                    PathObsoleteStatus = string.Empty,
+                    PathObsoleteStatusIsError = false
                 };
             }
 
@@ -353,6 +387,10 @@ namespace Traffic_Law_Enforcement
                 EntitySelectionSuggestedValue = BuildSuggestedEntitySelectionValue(snapshot),
                 EntitySelectionStatus = m_EntitySelectionStatus,
                 EntitySelectionStatusIsError = m_EntitySelectionStatusIsError,
+                PathObsoleteButtonVisible = true,
+                PathObsoleteButtonEnabled = CanMarkPathObsolete(snapshot),
+                PathObsoleteStatus = BuildPathObsoleteStatusText(snapshot),
+                PathObsoleteStatusIsError = m_PathObsoleteStatusIsError,
                 LaneDetailsVisible = true,
                 CurrentLane = NormalizeText(snapshot.CurrentLaneText),
                 PreviousLane = NormalizeText(snapshot.PreviousLaneText),
@@ -388,6 +426,10 @@ namespace Traffic_Law_Enforcement
             m_EntitySelectionSuggestedValueBinding.Update(state.EntitySelectionSuggestedValue ?? string.Empty);
             m_EntitySelectionStatusBinding.Update(state.EntitySelectionStatus ?? string.Empty);
             m_EntitySelectionStatusIsErrorBinding.Update(state.EntitySelectionStatusIsError);
+            m_PathObsoleteButtonVisibleBinding.Update(state.PathObsoleteButtonVisible);
+            m_PathObsoleteButtonEnabledBinding.Update(state.PathObsoleteButtonEnabled);
+            m_PathObsoleteStatusBinding.Update(state.PathObsoleteStatus ?? string.Empty);
+            m_PathObsoleteStatusIsErrorBinding.Update(state.PathObsoleteStatusIsError);
             m_CurrentLaneBinding.Update(state.CurrentLane ?? string.Empty);
             m_PreviousLaneBinding.Update(state.PreviousLane ?? string.Empty);
             m_LaneChangesBinding.Update(state.LaneChanges ?? string.Empty);
@@ -421,6 +463,8 @@ namespace Traffic_Law_Enforcement
             m_EntitySelectionLabelBinding.Update(LocalizeText(kEntitySelectionLabelLocaleId, "Entity number"));
             m_EntitySelectionPlaceholderBinding.Update(LocalizeText(kEntitySelectionPlaceholderLocaleId, "#154656:v1 or entity://154656/1"));
             m_EntitySelectionSubmitBinding.Update(LocalizeText(kEntitySelectionSubmitLocaleId, "Select"));
+            m_PathActionLabelBinding.Update(LocalizeText(kPathActionLabelLocaleId, "Path action"));
+            m_PathObsoleteButtonBinding.Update(LocalizeText(kPathObsoleteButtonLocaleId, "Mark path obsolete"));
             m_FooterTextBinding.Update(LocalizeText(kFooterHintLocaleId, "If Developer Mode is enabled, press Tab for more details."));
             m_ExpandSectionTooltipBinding.Update(LocalizeText(kExpandSectionLocaleId, "Expand section"));
             m_CollapseSectionTooltipBinding.Update(LocalizeText(kCollapseSectionLocaleId, "Collapse section"));
@@ -466,6 +510,7 @@ namespace Traffic_Law_Enforcement
         {
             m_IsPanelEnabled = false;
             ClearEntitySelectionStatus();
+            ClearPathObsoleteStatus();
         }
 
         private void ToggleCollapsed()
@@ -535,6 +580,97 @@ namespace Traffic_Law_Enforcement
             SetEntitySelectionSuccessStatus(entity);
         }
 
+        private void HandleMarkSelectedVehiclePathObsolete()
+        {
+            if (m_SelectedObjectBridgeSystem == null || !m_SelectedObjectBridgeSystem.HasSnapshot)
+            {
+                SetPathObsoleteStatus(
+                    LocalizeText(
+                        kPathObsoleteStatusUnavailableLocaleId,
+                        "Selected vehicle unavailable."),
+                    isError: true,
+                    trackedEntityText: string.Empty);
+                return;
+            }
+
+            SelectedObjectDebugSnapshot snapshot = m_SelectedObjectBridgeSystem.CurrentSnapshot;
+            Entity vehicle = snapshot.ResolvedVehicleEntity;
+            string trackedEntityText = BuildSuggestedEntitySelectionValue(snapshot);
+
+            if (vehicle == Entity.Null || !EntityManager.Exists(vehicle))
+            {
+                SetPathObsoleteStatus(
+                    LocalizeText(
+                        kPathObsoleteStatusUnavailableLocaleId,
+                        "Selected vehicle unavailable."),
+                    isError: true,
+                    trackedEntityText);
+                return;
+            }
+
+            if (!EntityManager.HasComponent<PathOwner>(vehicle))
+            {
+                SetPathObsoleteStatus(
+                    LocalizeText(
+                        kPathObsoleteStatusNoPathOwnerLocaleId,
+                        "Vehicle has no path owner."),
+                    isError: false,
+                    trackedEntityText);
+                return;
+            }
+
+            PathOwner pathOwner = EntityManager.GetComponentData<PathOwner>(vehicle);
+            if ((pathOwner.m_State & PathFlags.Pending) != 0)
+            {
+                SetPathObsoleteStatus(
+                    LocalizeText(
+                        kPathObsoleteStatusPendingLocaleId,
+                        "Path is already pending rebuild."),
+                    isError: false,
+                    trackedEntityText);
+                return;
+            }
+
+            if ((pathOwner.m_State & PathFlags.Obsolete) != 0)
+            {
+                SetPathObsoleteStatus(
+                    LocalizeText(
+                        kPathObsoleteStatusAlreadyObsoleteLocaleId,
+                        "Path is already obsolete."),
+                    isError: false,
+                    trackedEntityText);
+                return;
+            }
+
+            PathFlags stateBefore = pathOwner.m_State;
+            pathOwner.m_State |= PathFlags.Obsolete;
+            EntityManager.SetComponentData(vehicle, pathOwner);
+
+            Car car = EntityManager.HasComponent<Car>(vehicle)
+                ? EntityManager.GetComponentData<Car>(vehicle)
+                : default;
+
+            PathObsoleteTraceLogging.Record(
+                "SELECTED_OBJECT_PANEL",
+                vehicle,
+                snapshot.CurrentLaneEntity,
+                stateBefore,
+                pathOwner.m_State,
+                "manual-panel-action",
+                car,
+                NormalizeText(snapshot.RoleText),
+                $"selectionEntity={FormatEntity(snapshot.SourceSelectedEntity)}");
+
+            SetPathObsoleteStatus(
+                string.Format(
+                    LocalizeText(
+                        kPathObsoleteStatusMarkedFormatLocaleId,
+                        "Marked {0} path obsolete."),
+                    FormatEntity(vehicle)),
+                isError: false,
+                trackedEntityText);
+        }
+
         private static string NormalizeText(string text)
         {
             return string.IsNullOrWhiteSpace(text)
@@ -591,8 +727,57 @@ namespace Traffic_Law_Enforcement
                 Message = LocalizeText(kNoSelectionLocaleId, "No selection"),
                 EntitySelectionSuggestedValue = string.Empty,
                 EntitySelectionStatus = m_EntitySelectionStatus,
-                EntitySelectionStatusIsError = m_EntitySelectionStatusIsError
+                EntitySelectionStatusIsError = m_EntitySelectionStatusIsError,
+                PathObsoleteButtonVisible = false,
+                PathObsoleteButtonEnabled = false,
+                PathObsoleteStatus = string.Empty,
+                PathObsoleteStatusIsError = false
             };
+        }
+
+        private bool CanMarkPathObsolete(SelectedObjectDebugSnapshot snapshot)
+        {
+            return snapshot.ResolveState != SelectedObjectResolveState.NotVehicle &&
+                snapshot.ResolvedVehicleEntity != Entity.Null &&
+                snapshot.HasPathOwner &&
+                (snapshot.CurrentPathFlags & (PathFlags.Pending | PathFlags.Obsolete)) == 0;
+        }
+
+        private string BuildPathObsoleteStatusText(SelectedObjectDebugSnapshot snapshot)
+        {
+            if (!string.IsNullOrEmpty(m_PathObsoleteStatus))
+            {
+                return m_PathObsoleteStatus;
+            }
+
+            if (snapshot.ResolveState == SelectedObjectResolveState.NotVehicle ||
+                snapshot.ResolvedVehicleEntity == Entity.Null)
+            {
+                return string.Empty;
+            }
+
+            if (!snapshot.HasPathOwner)
+            {
+                return LocalizeText(
+                    kPathObsoleteStatusNoPathOwnerLocaleId,
+                    "Vehicle has no path owner.");
+            }
+
+            if ((snapshot.CurrentPathFlags & PathFlags.Pending) != 0)
+            {
+                return LocalizeText(
+                    kPathObsoleteStatusPendingLocaleId,
+                    "Path is already pending rebuild.");
+            }
+
+            if ((snapshot.CurrentPathFlags & PathFlags.Obsolete) != 0)
+            {
+                return LocalizeText(
+                    kPathObsoleteStatusAlreadyObsoleteLocaleId,
+                    "Path is already obsolete.");
+            }
+
+            return string.Empty;
         }
 
         private string BuildLiveLaneStateText(SelectedObjectDebugSnapshot snapshot)
@@ -898,6 +1083,41 @@ namespace Traffic_Law_Enforcement
         {
             m_EntitySelectionStatusSelectedEntity = string.Empty;
             SetEntitySelectionStatus(string.Empty, isError: false);
+        }
+
+        private void SetPathObsoleteStatus(string text, bool isError, string trackedEntityText)
+        {
+            m_PathObsoleteStatus = NormalizeText(text);
+            m_PathObsoleteStatusIsError = isError;
+            m_PathObsoleteStatusSelectedEntity = trackedEntityText ?? string.Empty;
+            m_PathObsoleteStatusBinding.Update(m_PathObsoleteStatus);
+            m_PathObsoleteStatusIsErrorBinding.Update(m_PathObsoleteStatusIsError);
+        }
+
+        private void RefreshPathObsoleteStatus(string currentSuggestedEntitySelectionValue)
+        {
+            if (string.IsNullOrEmpty(m_PathObsoleteStatus))
+            {
+                return;
+            }
+
+            bool selectedEntityChanged =
+                !string.IsNullOrEmpty(m_PathObsoleteStatusSelectedEntity) &&
+                !string.Equals(
+                    m_PathObsoleteStatusSelectedEntity,
+                    currentSuggestedEntitySelectionValue ?? string.Empty,
+                    System.StringComparison.Ordinal);
+
+            if (selectedEntityChanged)
+            {
+                ClearPathObsoleteStatus();
+            }
+        }
+
+        private void ClearPathObsoleteStatus()
+        {
+            m_PathObsoleteStatusSelectedEntity = string.Empty;
+            SetPathObsoleteStatus(string.Empty, isError: false, trackedEntityText: string.Empty);
         }
 
         private string FormatEntity(Entity entity)
