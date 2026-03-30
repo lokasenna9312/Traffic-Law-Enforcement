@@ -31,7 +31,7 @@ namespace Traffic_Law_Enforcement
 
         public static bool ShouldLogEstimatedReroutes()
         {
-            return Mod.IsEnforcementEnabled && EnableEstimatedRerouteLogging;
+            return EnableEstimatedRerouteLogging;
         }
 
         public static bool ShouldLogEnforcementEvents()
@@ -84,7 +84,8 @@ namespace Traffic_Law_Enforcement
 
         public static bool ShouldObserveRouteDebugState()
         {
-            return ShouldLogAllVehicleRouteSelectionChanges() ||
+            return ShouldLogEstimatedReroutes() ||
+                ShouldLogAllVehicleRouteSelectionChanges() ||
                 ShouldLogFocusedRouteRebuildDiagnostics() ||
                 ShouldLogPathfindingPenaltyDiagnostics();
         }
