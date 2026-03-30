@@ -34,7 +34,7 @@ namespace Traffic_Law_Enforcement
             }
 
             OverrideSummary =
-                $"UTurn money +{midBlockMoneyPenalty:0}; " +
+                // $"UTurn money +{midBlockMoneyPenalty:0}; " +
                 $"UnsafeUTurn money +{midBlockMoneyPenalty:0}; " +
                 // $"LaneCross money +{midBlockMoneyPenalty:0}; " +
                 "PT-lane route penalties are still handled per route rather than through shared PathfindCarData prefabs";
@@ -135,7 +135,7 @@ namespace Traffic_Law_Enforcement
             PathfindCarData originalData = GetOriginalData(prefab, currentData);
             PathfindCarData updatedData = originalData;
 
-            AddMoneyPenalty(ref updatedData.m_UTurnCost, midBlockMoneyPenalty);
+            // AddMoneyPenalty(ref updatedData.m_UTurnCost, midBlockMoneyPenalty);
             AddMoneyPenalty(ref updatedData.m_UnsafeUTurnCost, midBlockMoneyPenalty);
             // AddMoneyPenalty(ref updatedData.m_LaneCrossCost, midBlockMoneyPenalty);
 
