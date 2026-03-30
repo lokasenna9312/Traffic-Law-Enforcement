@@ -173,7 +173,7 @@ namespace Traffic_Law_Enforcement
                 PathfindCostsEquals(left.m_UTurnCost, right.m_UTurnCost) &&
                 PathfindCostsEquals(left.m_UnsafeUTurnCost, right.m_UnsafeUTurnCost) &&
                 PathfindCostsEquals(left.m_CurveAngleCost, right.m_CurveAngleCost) &&
-                // PathfindCostsEquals(left.m_LaneCrossCost, right.m_LaneCrossCost) &&
+                PathfindCostsEquals(left.m_LaneCrossCost, right.m_LaneCrossCost) &&
                 PathfindCostsEquals(left.m_ParkingCost, right.m_ParkingCost) &&
                 PathfindCostsEquals(left.m_SpawnCost, right.m_SpawnCost) &&
                 PathfindCostsEquals(left.m_ForbiddenCost, right.m_ForbiddenCost);
