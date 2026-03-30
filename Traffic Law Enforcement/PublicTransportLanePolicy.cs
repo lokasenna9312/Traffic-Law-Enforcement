@@ -301,6 +301,11 @@ namespace Traffic_Law_Enforcement
         {
             shouldTrack = false;
 
+            if (!settings.EnablePublicTransportLaneEnforcement)
+            {
+                return PublicTransportLaneAccessBits.None;
+            }
+
             bool emergency = EmergencyVehiclePolicy.IsEmergencyVehicle(car);
             PublicTransportLaneVehicleCategory authorizedCategories =
                 GetVanillaAuthorizedCategories(vehicle, ref lookups);

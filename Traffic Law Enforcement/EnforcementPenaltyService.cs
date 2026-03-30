@@ -24,17 +24,17 @@ namespace Traffic_Law_Enforcement
 
         public static int GetPublicTransportLaneFine()
         {
-            return EnforcementGameplaySettingsService.Current.PublicTransportLaneFineAmount;
+            return EnforcementGameplaySettingsService.Current.GetEffectivePublicTransportLaneFineAmount();
         }
 
         public static int GetMidBlockCrossingFine()
         {
-            return EnforcementGameplaySettingsService.Current.MidBlockCrossingFineAmount;
+            return EnforcementGameplaySettingsService.Current.GetEffectiveMidBlockCrossingFineAmount();
         }
 
         public static int GetIntersectionMovementFine()
         {
-            return EnforcementGameplaySettingsService.Current.IntersectionMovementFineAmount;
+            return EnforcementGameplaySettingsService.Current.GetEffectiveIntersectionMovementFineAmount();
         }
 
         public static int ApplyRepeatOffenderPenalty(string kind, int baseFine, int vehicleId)
@@ -70,19 +70,19 @@ namespace Traffic_Law_Enforcement
             {
                 case EnforcementKinds.PublicTransportLane:
                     return BuildRepeatPolicyDebugSummary(
-                        settings.EnablePublicTransportLaneRepeatPenalty,
+                        settings.IsPublicTransportLaneRepeatPenaltyEffectivelyEnabled(),
                         settings.PublicTransportLaneRepeatWindowMonths,
                         settings.PublicTransportLaneRepeatThreshold,
                         settings.PublicTransportLaneRepeatMultiplierPercent);
                 case EnforcementKinds.MidBlockCrossing:
                     return BuildRepeatPolicyDebugSummary(
-                        settings.EnableMidBlockCrossingRepeatPenalty,
+                        settings.IsMidBlockCrossingRepeatPenaltyEffectivelyEnabled(),
                         settings.MidBlockCrossingRepeatWindowMonths,
                         settings.MidBlockCrossingRepeatThreshold,
                         settings.MidBlockCrossingRepeatMultiplierPercent);
                 case EnforcementKinds.IntersectionMovement:
                     return BuildRepeatPolicyDebugSummary(
-                        settings.EnableIntersectionMovementRepeatPenalty,
+                        settings.IsIntersectionMovementRepeatPenaltyEffectivelyEnabled(),
                         settings.IntersectionMovementRepeatWindowMonths,
                         settings.IntersectionMovementRepeatThreshold,
                         settings.IntersectionMovementRepeatMultiplierPercent);
@@ -116,19 +116,19 @@ namespace Traffic_Law_Enforcement
             {
                 case EnforcementKinds.PublicTransportLane:
                     return new RepeatOffenderPolicy(
-                        settings.EnablePublicTransportLaneRepeatPenalty,
+                        settings.IsPublicTransportLaneRepeatPenaltyEffectivelyEnabled(),
                         EnforcementGameTime.GetMonthTickWindow(settings.PublicTransportLaneRepeatWindowMonths),
                         settings.PublicTransportLaneRepeatThreshold,
                         settings.PublicTransportLaneRepeatMultiplierPercent);
                 case EnforcementKinds.MidBlockCrossing:
                     return new RepeatOffenderPolicy(
-                        settings.EnableMidBlockCrossingRepeatPenalty,
+                        settings.IsMidBlockCrossingRepeatPenaltyEffectivelyEnabled(),
                         EnforcementGameTime.GetMonthTickWindow(settings.MidBlockCrossingRepeatWindowMonths),
                         settings.MidBlockCrossingRepeatThreshold,
                         settings.MidBlockCrossingRepeatMultiplierPercent);
                 case EnforcementKinds.IntersectionMovement:
                     return new RepeatOffenderPolicy(
-                        settings.EnableIntersectionMovementRepeatPenalty,
+                        settings.IsIntersectionMovementRepeatPenaltyEffectivelyEnabled(),
                         EnforcementGameTime.GetMonthTickWindow(settings.IntersectionMovementRepeatWindowMonths),
                         settings.IntersectionMovementRepeatThreshold,
                         settings.IntersectionMovementRepeatMultiplierPercent);

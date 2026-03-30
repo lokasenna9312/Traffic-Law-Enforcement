@@ -228,6 +228,11 @@ namespace Traffic_Law_Enforcement
                 Profile = profile,
             };
 
+            if (!Mod.IsPublicTransportLaneEnforcementEnabled)
+            {
+                return result;
+            }
+
             bool allowOnPublicTransportLane = PublicTransportLanePolicy.CanUsePublicTransportLane(profile);
 
             if (!allowOnPublicTransportLane && entityManager.HasComponent<PublicTransportLanePendingExit>(owner))

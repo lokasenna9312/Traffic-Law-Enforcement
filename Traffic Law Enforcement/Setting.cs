@@ -104,7 +104,7 @@ namespace Traffic_Law_Enforcement
 
         [Exclude]
         [SettingsUISection(kCurrentSaveTab, kPublicTransportLaneAuthorizedGroup)]
-        [SettingsUIDisableByCondition(typeof(Setting), nameof(IsCurrentSaveSettingsDisabled))]
+        [SettingsUIDisableByCondition(typeof(Setting), nameof(IsCurrentPublicTransportLaneSettingsDisabled))]
         public bool AllowRoadPublicTransportVehicles
         {
             get => EnforcementGameplaySettingsService.Current.AllowRoadPublicTransportVehicles;
@@ -113,7 +113,7 @@ namespace Traffic_Law_Enforcement
 
         [Exclude]
         [SettingsUISection(kCurrentSaveTab, kPublicTransportLaneAuthorizedGroup)]
-        [SettingsUIDisableByCondition(typeof(Setting), nameof(IsCurrentSaveSettingsDisabled))]
+        [SettingsUIDisableByCondition(typeof(Setting), nameof(IsCurrentPublicTransportLaneSettingsDisabled))]
         public bool AllowTaxis
         {
             get => EnforcementGameplaySettingsService.Current.AllowTaxis;
@@ -122,7 +122,7 @@ namespace Traffic_Law_Enforcement
 
         [Exclude]
         [SettingsUISection(kCurrentSaveTab, kPublicTransportLaneAuthorizedGroup)]
-        [SettingsUIDisableByCondition(typeof(Setting), nameof(IsCurrentSaveSettingsDisabled))]
+        [SettingsUIDisableByCondition(typeof(Setting), nameof(IsCurrentPublicTransportLaneSettingsDisabled))]
         public bool AllowPoliceCars
         {
             get => EnforcementGameplaySettingsService.Current.AllowPoliceCars;
@@ -131,7 +131,7 @@ namespace Traffic_Law_Enforcement
 
         [Exclude]
         [SettingsUISection(kCurrentSaveTab, kPublicTransportLaneAuthorizedGroup)]
-        [SettingsUIDisableByCondition(typeof(Setting), nameof(IsCurrentSaveSettingsDisabled))]
+        [SettingsUIDisableByCondition(typeof(Setting), nameof(IsCurrentPublicTransportLaneSettingsDisabled))]
         public bool AllowFireEngines
         {
             get => EnforcementGameplaySettingsService.Current.AllowFireEngines;
@@ -140,7 +140,7 @@ namespace Traffic_Law_Enforcement
 
         [Exclude]
         [SettingsUISection(kCurrentSaveTab, kPublicTransportLaneAuthorizedGroup)]
-        [SettingsUIDisableByCondition(typeof(Setting), nameof(IsCurrentSaveSettingsDisabled))]
+        [SettingsUIDisableByCondition(typeof(Setting), nameof(IsCurrentPublicTransportLaneSettingsDisabled))]
         public bool AllowAmbulances
         {
             get => EnforcementGameplaySettingsService.Current.AllowAmbulances;
@@ -149,7 +149,7 @@ namespace Traffic_Law_Enforcement
 
         [Exclude]
         [SettingsUISection(kCurrentSaveTab, kPublicTransportLaneAuthorizedGroup)]
-        [SettingsUIDisableByCondition(typeof(Setting), nameof(IsCurrentSaveSettingsDisabled))]
+        [SettingsUIDisableByCondition(typeof(Setting), nameof(IsCurrentPublicTransportLaneSettingsDisabled))]
         public bool AllowGarbageTrucks
         {
             get => EnforcementGameplaySettingsService.Current.AllowGarbageTrucks;
@@ -158,7 +158,7 @@ namespace Traffic_Law_Enforcement
 
         [Exclude]
         [SettingsUISection(kCurrentSaveTab, kPublicTransportLaneAuthorizedGroup)]
-        [SettingsUIDisableByCondition(typeof(Setting), nameof(IsCurrentSaveSettingsDisabled))]
+        [SettingsUIDisableByCondition(typeof(Setting), nameof(IsCurrentPublicTransportLaneSettingsDisabled))]
         public bool AllowPostVans
         {
             get => EnforcementGameplaySettingsService.Current.AllowPostVans;
@@ -167,7 +167,7 @@ namespace Traffic_Law_Enforcement
 
         [Exclude]
         [SettingsUISection(kCurrentSaveTab, kPublicTransportLaneAuthorizedGroup)]
-        [SettingsUIDisableByCondition(typeof(Setting), nameof(IsCurrentSaveSettingsDisabled))]
+        [SettingsUIDisableByCondition(typeof(Setting), nameof(IsCurrentPublicTransportLaneSettingsDisabled))]
         public bool AllowRoadMaintenanceVehicles
         {
             get => EnforcementGameplaySettingsService.Current.AllowRoadMaintenanceVehicles;
@@ -176,7 +176,7 @@ namespace Traffic_Law_Enforcement
 
         [Exclude]
         [SettingsUISection(kCurrentSaveTab, kPublicTransportLaneAuthorizedGroup)]
-        [SettingsUIDisableByCondition(typeof(Setting), nameof(IsCurrentSaveSettingsDisabled))]
+        [SettingsUIDisableByCondition(typeof(Setting), nameof(IsCurrentPublicTransportLaneSettingsDisabled))]
         public bool AllowSnowplows
         {
             get => EnforcementGameplaySettingsService.Current.AllowSnowplows;
@@ -185,7 +185,7 @@ namespace Traffic_Law_Enforcement
 
         [Exclude]
         [SettingsUISection(kCurrentSaveTab, kPublicTransportLaneAuthorizedGroup)]
-        [SettingsUIDisableByCondition(typeof(Setting), nameof(IsCurrentSaveSettingsDisabled))]
+        [SettingsUIDisableByCondition(typeof(Setting), nameof(IsCurrentPublicTransportLaneSettingsDisabled))]
         public bool AllowVehicleMaintenanceVehicles
         {
             get => EnforcementGameplaySettingsService.Current.AllowVehicleMaintenanceVehicles;
@@ -194,7 +194,7 @@ namespace Traffic_Law_Enforcement
 
         [Exclude]
         [SettingsUISection(kCurrentSaveTab, kPublicTransportLaneAdditionalGroup)]
-        [SettingsUIDisableByCondition(typeof(Setting), nameof(IsCurrentSaveSettingsDisabled))]
+        [SettingsUIDisableByCondition(typeof(Setting), nameof(IsCurrentPublicTransportLaneSettingsDisabled))]
         public bool AllowPersonalCars
         {
             get => EnforcementGameplaySettingsService.Current.AllowPersonalCars;
@@ -203,7 +203,7 @@ namespace Traffic_Law_Enforcement
 
         [Exclude]
         [SettingsUISection(kCurrentSaveTab, kPublicTransportLaneAdditionalGroup)]
-        [SettingsUIDisableByCondition(typeof(Setting), nameof(IsCurrentSaveSettingsDisabled))]
+        [SettingsUIDisableByCondition(typeof(Setting), nameof(IsCurrentPublicTransportLaneSettingsDisabled))]
         public bool AllowDeliveryTrucks
         {
             get => EnforcementGameplaySettingsService.Current.AllowDeliveryTrucks;
@@ -212,7 +212,7 @@ namespace Traffic_Law_Enforcement
 
         [Exclude]
         [SettingsUISection(kCurrentSaveTab, kPublicTransportLaneAdditionalGroup)]
-        [SettingsUIDisableByCondition(typeof(Setting), nameof(IsCurrentSaveSettingsDisabled))]
+        [SettingsUIDisableByCondition(typeof(Setting), nameof(IsCurrentPublicTransportLaneSettingsDisabled))]
         public bool AllowCargoTransportVehicles
         {
             get => EnforcementGameplaySettingsService.Current.AllowCargoTransportVehicles;
@@ -221,7 +221,7 @@ namespace Traffic_Law_Enforcement
 
         [Exclude]
         [SettingsUISection(kCurrentSaveTab, kPublicTransportLaneAdditionalGroup)]
-        [SettingsUIDisableByCondition(typeof(Setting), nameof(IsCurrentSaveSettingsDisabled))]
+        [SettingsUIDisableByCondition(typeof(Setting), nameof(IsCurrentPublicTransportLaneSettingsDisabled))]
         public bool AllowHearses
         {
             get => EnforcementGameplaySettingsService.Current.AllowHearses;
@@ -230,7 +230,7 @@ namespace Traffic_Law_Enforcement
 
         [Exclude]
         [SettingsUISection(kCurrentSaveTab, kPublicTransportLaneAdditionalGroup)]
-        [SettingsUIDisableByCondition(typeof(Setting), nameof(IsCurrentSaveSettingsDisabled))]
+        [SettingsUIDisableByCondition(typeof(Setting), nameof(IsCurrentPublicTransportLaneSettingsDisabled))]
         public bool AllowPrisonerTransports
         {
             get => EnforcementGameplaySettingsService.Current.AllowPrisonerTransports;
@@ -239,7 +239,7 @@ namespace Traffic_Law_Enforcement
 
         [Exclude]
         [SettingsUISection(kCurrentSaveTab, kPublicTransportLaneAdditionalGroup)]
-        [SettingsUIDisableByCondition(typeof(Setting), nameof(IsCurrentSaveSettingsDisabled))]
+        [SettingsUIDisableByCondition(typeof(Setting), nameof(IsCurrentPublicTransportLaneSettingsDisabled))]
         public bool AllowParkMaintenanceVehicles
         {
             get => EnforcementGameplaySettingsService.Current.AllowParkMaintenanceVehicles;
@@ -249,7 +249,7 @@ namespace Traffic_Law_Enforcement
         [Exclude]
         [SettingsUISlider(min = 0f, max = 1f, step = 0.01f, unit = Unit.kFloatThreeFractions)]
         [SettingsUISection(kCurrentSaveTab, kPublicTransportLanePressureGroup)]
-        [SettingsUIDisableByCondition(typeof(Setting), nameof(IsCurrentSaveSettingsDisabled))]
+        [SettingsUIDisableByCondition(typeof(Setting), nameof(IsCurrentPublicTransportLaneSettingsDisabled))]
         public float PublicTransportLaneExitPressureThresholdDays
         {
             get => EnforcementGameplaySettingsService.Current.PublicTransportLaneExitPressureThresholdDays;
@@ -259,7 +259,7 @@ namespace Traffic_Law_Enforcement
         [Exclude]
         [SettingsUISlider(min = 0, max = 5000, step = 25, scalarMultiplier = 1, unit = Unit.kMoney)]
         [SettingsUISection(kCurrentSaveTab, kFineGroup)]
-        [SettingsUIDisableByCondition(typeof(Setting), nameof(IsCurrentSaveSettingsDisabled))]
+        [SettingsUIDisableByCondition(typeof(Setting), nameof(IsCurrentPublicTransportLaneSettingsDisabled))]
         public int PublicTransportLaneFineAmount
         {
             get => EnforcementGameplaySettingsService.Current.PublicTransportLaneFineAmount;
@@ -269,7 +269,7 @@ namespace Traffic_Law_Enforcement
         [Exclude]
         [SettingsUISlider(min = 0, max = 5000, step = 25, scalarMultiplier = 1, unit = Unit.kMoney)]
         [SettingsUISection(kCurrentSaveTab, kFineGroup)]
-        [SettingsUIDisableByCondition(typeof(Setting), nameof(IsCurrentSaveSettingsDisabled))]
+        [SettingsUIDisableByCondition(typeof(Setting), nameof(IsCurrentMidBlockCrossingPolicySettingsDisabled))]
         public int MidBlockCrossingFineAmount
         {
             get => EnforcementGameplaySettingsService.Current.MidBlockCrossingFineAmount;
@@ -279,7 +279,7 @@ namespace Traffic_Law_Enforcement
         [Exclude]
         [SettingsUISlider(min = 0, max = 5000, step = 25, scalarMultiplier = 1, unit = Unit.kMoney)]
         [SettingsUISection(kCurrentSaveTab, kFineGroup)]
-        [SettingsUIDisableByCondition(typeof(Setting), nameof(IsCurrentSaveSettingsDisabled))]
+        [SettingsUIDisableByCondition(typeof(Setting), nameof(IsCurrentIntersectionMovementPolicySettingsDisabled))]
         public int IntersectionMovementFineAmount
         {
             get => EnforcementGameplaySettingsService.Current.IntersectionMovementFineAmount;
@@ -288,7 +288,7 @@ namespace Traffic_Law_Enforcement
 
         [Exclude]
         [SettingsUISection(kCurrentSaveTab, kRepeatOffenderGroup)]
-        [SettingsUIDisableByCondition(typeof(Setting), nameof(IsCurrentSaveSettingsDisabled))]
+        [SettingsUIDisableByCondition(typeof(Setting), nameof(IsCurrentPublicTransportLaneSettingsDisabled))]
         public bool EnablePublicTransportLaneRepeatPenalty
         {
             get => EnforcementGameplaySettingsService.Current.EnablePublicTransportLaneRepeatPenalty;
@@ -327,7 +327,7 @@ namespace Traffic_Law_Enforcement
 
         [Exclude]
         [SettingsUISection(kCurrentSaveTab, kRepeatOffenderGroup)]
-        [SettingsUIDisableByCondition(typeof(Setting), nameof(IsCurrentSaveSettingsDisabled))]
+        [SettingsUIDisableByCondition(typeof(Setting), nameof(IsCurrentMidBlockCrossingPolicySettingsDisabled))]
         public bool EnableMidBlockCrossingRepeatPenalty
         {
             get => EnforcementGameplaySettingsService.Current.EnableMidBlockCrossingRepeatPenalty;
@@ -366,7 +366,7 @@ namespace Traffic_Law_Enforcement
 
         [Exclude]
         [SettingsUISection(kCurrentSaveTab, kRepeatOffenderGroup)]
-        [SettingsUIDisableByCondition(typeof(Setting), nameof(IsCurrentSaveSettingsDisabled))]
+        [SettingsUIDisableByCondition(typeof(Setting), nameof(IsCurrentIntersectionMovementPolicySettingsDisabled))]
         public bool EnableIntersectionMovementRepeatPenalty
         {
             get => EnforcementGameplaySettingsService.Current.EnableIntersectionMovementRepeatPenalty;
@@ -413,70 +413,91 @@ namespace Traffic_Law_Enforcement
         public bool DefaultEnableIntersectionMovementEnforcement { get; set; }
 
         [SettingsUISection(kNewSaveDefaultsTab, kPublicTransportLaneAuthorizedGroup)]
+        [SettingsUIDisableByCondition(typeof(Setting), nameof(IsNewSavePublicTransportLaneSettingsDisabled))]
         public bool DefaultAllowRoadPublicTransportVehicles { get; set; }
 
         [SettingsUISection(kNewSaveDefaultsTab, kPublicTransportLaneAuthorizedGroup)]
+        [SettingsUIDisableByCondition(typeof(Setting), nameof(IsNewSavePublicTransportLaneSettingsDisabled))]
         public bool DefaultAllowTaxis { get; set; }
 
         [SettingsUISection(kNewSaveDefaultsTab, kPublicTransportLaneAuthorizedGroup)]
+        [SettingsUIDisableByCondition(typeof(Setting), nameof(IsNewSavePublicTransportLaneSettingsDisabled))]
         public bool DefaultAllowPoliceCars { get; set; }
 
         [SettingsUISection(kNewSaveDefaultsTab, kPublicTransportLaneAuthorizedGroup)]
+        [SettingsUIDisableByCondition(typeof(Setting), nameof(IsNewSavePublicTransportLaneSettingsDisabled))]
         public bool DefaultAllowFireEngines { get; set; }
 
         [SettingsUISection(kNewSaveDefaultsTab, kPublicTransportLaneAuthorizedGroup)]
+        [SettingsUIDisableByCondition(typeof(Setting), nameof(IsNewSavePublicTransportLaneSettingsDisabled))]
         public bool DefaultAllowAmbulances { get; set; }
 
         [SettingsUISection(kNewSaveDefaultsTab, kPublicTransportLaneAuthorizedGroup)]
+        [SettingsUIDisableByCondition(typeof(Setting), nameof(IsNewSavePublicTransportLaneSettingsDisabled))]
         public bool DefaultAllowGarbageTrucks { get; set; }
 
         [SettingsUISection(kNewSaveDefaultsTab, kPublicTransportLaneAuthorizedGroup)]
+        [SettingsUIDisableByCondition(typeof(Setting), nameof(IsNewSavePublicTransportLaneSettingsDisabled))]
         public bool DefaultAllowPostVans { get; set; }
 
         [SettingsUISection(kNewSaveDefaultsTab, kPublicTransportLaneAuthorizedGroup)]
+        [SettingsUIDisableByCondition(typeof(Setting), nameof(IsNewSavePublicTransportLaneSettingsDisabled))]
         public bool DefaultAllowRoadMaintenanceVehicles { get; set; }
 
         [SettingsUISection(kNewSaveDefaultsTab, kPublicTransportLaneAuthorizedGroup)]
+        [SettingsUIDisableByCondition(typeof(Setting), nameof(IsNewSavePublicTransportLaneSettingsDisabled))]
         public bool DefaultAllowSnowplows { get; set; }
 
         [SettingsUISection(kNewSaveDefaultsTab, kPublicTransportLaneAuthorizedGroup)]
+        [SettingsUIDisableByCondition(typeof(Setting), nameof(IsNewSavePublicTransportLaneSettingsDisabled))]
         public bool DefaultAllowVehicleMaintenanceVehicles { get; set; }
 
         [SettingsUISection(kNewSaveDefaultsTab, kPublicTransportLaneAdditionalGroup)]
+        [SettingsUIDisableByCondition(typeof(Setting), nameof(IsNewSavePublicTransportLaneSettingsDisabled))]
         public bool DefaultAllowPersonalCars { get; set; }
 
         [SettingsUISection(kNewSaveDefaultsTab, kPublicTransportLaneAdditionalGroup)]
+        [SettingsUIDisableByCondition(typeof(Setting), nameof(IsNewSavePublicTransportLaneSettingsDisabled))]
         public bool DefaultAllowDeliveryTrucks { get; set; }
 
         [SettingsUISection(kNewSaveDefaultsTab, kPublicTransportLaneAdditionalGroup)]
+        [SettingsUIDisableByCondition(typeof(Setting), nameof(IsNewSavePublicTransportLaneSettingsDisabled))]
         public bool DefaultAllowCargoTransportVehicles { get; set; }
 
         [SettingsUISection(kNewSaveDefaultsTab, kPublicTransportLaneAdditionalGroup)]
+        [SettingsUIDisableByCondition(typeof(Setting), nameof(IsNewSavePublicTransportLaneSettingsDisabled))]
         public bool DefaultAllowHearses { get; set; }
 
         [SettingsUISection(kNewSaveDefaultsTab, kPublicTransportLaneAdditionalGroup)]
+        [SettingsUIDisableByCondition(typeof(Setting), nameof(IsNewSavePublicTransportLaneSettingsDisabled))]
         public bool DefaultAllowPrisonerTransports { get; set; }
 
         [SettingsUISection(kNewSaveDefaultsTab, kPublicTransportLaneAdditionalGroup)]
+        [SettingsUIDisableByCondition(typeof(Setting), nameof(IsNewSavePublicTransportLaneSettingsDisabled))]
         public bool DefaultAllowParkMaintenanceVehicles { get; set; }
 
         [SettingsUISlider(min = 0f, max = 1f, step = 0.01f, unit = Unit.kFloatThreeFractions)]
         [SettingsUISection(kNewSaveDefaultsTab, kPublicTransportLanePressureGroup)]
+        [SettingsUIDisableByCondition(typeof(Setting), nameof(IsNewSavePublicTransportLaneSettingsDisabled))]
         public float DefaultPublicTransportLaneExitPressureThresholdDays { get; set; }
 
         [SettingsUISlider(min = 0, max = 5000, step = 25, scalarMultiplier = 1, unit = Unit.kMoney)]
         [SettingsUISection(kNewSaveDefaultsTab, kFineGroup)]
+        [SettingsUIDisableByCondition(typeof(Setting), nameof(IsNewSavePublicTransportLaneSettingsDisabled))]
         public int DefaultPublicTransportLaneFineAmount { get; set; }
 
         [SettingsUISlider(min = 0, max = 5000, step = 25, scalarMultiplier = 1, unit = Unit.kMoney)]
         [SettingsUISection(kNewSaveDefaultsTab, kFineGroup)]
+        [SettingsUIDisableByCondition(typeof(Setting), nameof(IsNewSaveMidBlockCrossingPolicySettingsDisabled))]
         public int DefaultMidBlockCrossingFineAmount { get; set; }
 
         [SettingsUISlider(min = 0, max = 5000, step = 25, scalarMultiplier = 1, unit = Unit.kMoney)]
         [SettingsUISection(kNewSaveDefaultsTab, kFineGroup)]
+        [SettingsUIDisableByCondition(typeof(Setting), nameof(IsNewSaveIntersectionMovementPolicySettingsDisabled))]
         public int DefaultIntersectionMovementFineAmount { get; set; }
 
         [SettingsUISection(kNewSaveDefaultsTab, kRepeatOffenderGroup)]
+        [SettingsUIDisableByCondition(typeof(Setting), nameof(IsNewSavePublicTransportLaneSettingsDisabled))]
         public bool DefaultEnablePublicTransportLaneRepeatPenalty { get; set; }
 
         [SettingsUISlider(min = 1, max = 12, step = 1, scalarMultiplier = 1, unit = Unit.kInteger)]
@@ -495,6 +516,7 @@ namespace Traffic_Law_Enforcement
         public int DefaultPublicTransportLaneRepeatMultiplierPercent { get; set; }
 
         [SettingsUISection(kNewSaveDefaultsTab, kRepeatOffenderGroup)]
+        [SettingsUIDisableByCondition(typeof(Setting), nameof(IsNewSaveMidBlockCrossingPolicySettingsDisabled))]
         public bool DefaultEnableMidBlockCrossingRepeatPenalty { get; set; }
 
         [SettingsUISlider(min = 1, max = 12, step = 1, scalarMultiplier = 1, unit = Unit.kInteger)]
@@ -513,6 +535,7 @@ namespace Traffic_Law_Enforcement
         public int DefaultMidBlockCrossingRepeatMultiplierPercent { get; set; }
 
         [SettingsUISection(kNewSaveDefaultsTab, kRepeatOffenderGroup)]
+        [SettingsUIDisableByCondition(typeof(Setting), nameof(IsNewSaveIntersectionMovementPolicySettingsDisabled))]
         public bool DefaultEnableIntersectionMovementRepeatPenalty { get; set; }
 
         [SettingsUISlider(min = 1, max = 12, step = 1, scalarMultiplier = 1, unit = Unit.kInteger)]
@@ -765,12 +788,18 @@ namespace Traffic_Law_Enforcement
             return !IsGameplayContextAvailable();
         }
 
-        public bool IsCurrentPublicTransportLaneRepeatSettingsDisabled() => IsCurrentSaveSettingsDisabled() || !EnablePublicTransportLaneRepeatPenalty;
-        public bool IsCurrentMidBlockCrossingRepeatSettingsDisabled() => IsCurrentSaveSettingsDisabled() || !EnableMidBlockCrossingRepeatPenalty;
-        public bool IsCurrentIntersectionMovementRepeatSettingsDisabled() => IsCurrentSaveSettingsDisabled() || !EnableIntersectionMovementRepeatPenalty;
-        public bool IsNewSavePublicTransportLaneRepeatSettingsDisabled() => !DefaultEnablePublicTransportLaneRepeatPenalty;
-        public bool IsNewSaveMidBlockCrossingRepeatSettingsDisabled() => !DefaultEnableMidBlockCrossingRepeatPenalty;
-        public bool IsNewSaveIntersectionMovementRepeatSettingsDisabled() => !DefaultEnableIntersectionMovementRepeatPenalty;
+        public bool IsCurrentPublicTransportLaneSettingsDisabled() => IsCurrentSaveSettingsDisabled() || !EnablePublicTransportLaneEnforcement;
+        public bool IsCurrentMidBlockCrossingPolicySettingsDisabled() => IsCurrentSaveSettingsDisabled() || !EnableMidBlockCrossingEnforcement;
+        public bool IsCurrentIntersectionMovementPolicySettingsDisabled() => IsCurrentSaveSettingsDisabled() || !EnableIntersectionMovementEnforcement;
+        public bool IsCurrentPublicTransportLaneRepeatSettingsDisabled() => IsCurrentPublicTransportLaneSettingsDisabled() || !EnablePublicTransportLaneRepeatPenalty;
+        public bool IsCurrentMidBlockCrossingRepeatSettingsDisabled() => IsCurrentMidBlockCrossingPolicySettingsDisabled() || !EnableMidBlockCrossingRepeatPenalty;
+        public bool IsCurrentIntersectionMovementRepeatSettingsDisabled() => IsCurrentIntersectionMovementPolicySettingsDisabled() || !EnableIntersectionMovementRepeatPenalty;
+        public bool IsNewSavePublicTransportLaneSettingsDisabled() => !DefaultEnablePublicTransportLaneEnforcement;
+        public bool IsNewSaveMidBlockCrossingPolicySettingsDisabled() => !DefaultEnableMidBlockCrossingEnforcement;
+        public bool IsNewSaveIntersectionMovementPolicySettingsDisabled() => !DefaultEnableIntersectionMovementEnforcement;
+        public bool IsNewSavePublicTransportLaneRepeatSettingsDisabled() => IsNewSavePublicTransportLaneSettingsDisabled() || !DefaultEnablePublicTransportLaneRepeatPenalty;
+        public bool IsNewSaveMidBlockCrossingRepeatSettingsDisabled() => IsNewSaveMidBlockCrossingPolicySettingsDisabled() || !DefaultEnableMidBlockCrossingRepeatPenalty;
+        public bool IsNewSaveIntersectionMovementRepeatSettingsDisabled() => IsNewSaveIntersectionMovementPolicySettingsDisabled() || !DefaultEnableIntersectionMovementRepeatPenalty;
         public bool IsMonthlyChirperPreviewButtonDisabled() => !IsGameplayContextAvailable() || !EnforcementGameplaySettingsService.Current.HasAnyEnforcementEnabled();
 
         private static void UpdateCurrentSaveSettings(CurrentSaveSettingsMutator mutator)

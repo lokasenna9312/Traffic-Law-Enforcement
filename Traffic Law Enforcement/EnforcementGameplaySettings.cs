@@ -91,8 +91,43 @@ namespace Traffic_Law_Enforcement
             return EnablePublicTransportLaneEnforcement || EnableMidBlockCrossingEnforcement || EnableIntersectionMovementEnforcement;
         }
 
+        public int GetEffectivePublicTransportLaneFineAmount()
+        {
+            return EnablePublicTransportLaneEnforcement ? PublicTransportLaneFineAmount : 0;
+        }
+
+        public int GetEffectiveMidBlockCrossingFineAmount()
+        {
+            return EnableMidBlockCrossingEnforcement ? MidBlockCrossingFineAmount : 0;
+        }
+
+        public int GetEffectiveIntersectionMovementFineAmount()
+        {
+            return EnableIntersectionMovementEnforcement ? IntersectionMovementFineAmount : 0;
+        }
+
+        public bool IsPublicTransportLaneRepeatPenaltyEffectivelyEnabled()
+        {
+            return EnablePublicTransportLaneEnforcement && EnablePublicTransportLaneRepeatPenalty;
+        }
+
+        public bool IsMidBlockCrossingRepeatPenaltyEffectivelyEnabled()
+        {
+            return EnableMidBlockCrossingEnforcement && EnableMidBlockCrossingRepeatPenalty;
+        }
+
+        public bool IsIntersectionMovementRepeatPenaltyEffectivelyEnabled()
+        {
+            return EnableIntersectionMovementEnforcement && EnableIntersectionMovementRepeatPenalty;
+        }
+
         public PublicTransportLaneVehicleCategory GetEnabledPublicTransportLaneCategories()
         {
+            if (!EnablePublicTransportLaneEnforcement)
+            {
+                return PublicTransportLaneVehicleCategory.None;
+            }
+
             PublicTransportLaneVehicleCategory categories = PublicTransportLaneVehicleCategory.None;
             if (AllowRoadPublicTransportVehicles) categories |= PublicTransportLaneVehicleCategory.RoadPublicTransportVehicle;
             if (AllowTaxis) categories |= PublicTransportLaneVehicleCategory.Taxi;
@@ -114,6 +149,11 @@ namespace Traffic_Law_Enforcement
 
         public bool AllowsAdditionalPublicTransportLaneRole(PublicTransportLaneFlagGrantExperimentRole role)
         {
+            if (!EnablePublicTransportLaneEnforcement)
+            {
+                return false;
+            }
+
             switch (role)
             {
                 case PublicTransportLaneFlagGrantExperimentRole.PersonalCar:
@@ -135,6 +175,11 @@ namespace Traffic_Law_Enforcement
 
         public int GetPermissionSettingsMask()
         {
+            if (!EnablePublicTransportLaneEnforcement)
+            {
+                return 0;
+            }
+
             int mask = 0;
             if (AllowRoadPublicTransportVehicles) mask |= 1 << 0;
             if (AllowTaxis) mask |= 1 << 1;
