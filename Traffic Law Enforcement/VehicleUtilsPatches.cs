@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using Game;
@@ -18,7 +19,6 @@ namespace Traffic_Law_Enforcement
         private struct PathfindRuleSyncResult
         {
             public bool HasProfile;
-            public bool ExperimentSkipped;
             public bool AllowOnPublicTransportLane;
             public bool PendingExitActive;
             public VehicleTrafficLawProfile Profile;
@@ -42,6 +42,8 @@ namespace Traffic_Law_Enforcement
         private static bool s_CachedPublicTransportLaneEnforcementEnabled;
         private static int s_CachedConfiguredPublicTransportLaneFine;
         private static bool s_LoggedFirstSetupPathfindInvocation;
+        private const int MaxFocusedPublicTransportLaneCostLogsPerVehicle = 6;
+        private static readonly Dictionary<Entity, int> s_FocusedPublicTransportLaneCostLogCounts = new Dictionary<Entity, int>();
 
         public static void Apply()
         {
@@ -97,6 +99,7 @@ namespace Traffic_Law_Enforcement
             s_CachedPublicTransportLaneEnforcementEnabled = false;
             s_CachedConfiguredPublicTransportLaneFine = 0;
             s_LoggedFirstSetupPathfindInvocation = false;
+            s_FocusedPublicTransportLaneCostLogCounts.Clear();
         }
 
         internal static void InvalidateCachedPenaltyValues()
@@ -152,6 +155,8 @@ namespace Traffic_Law_Enforcement
 
         private static void CalculateCostPostfix(ref float __result, RuleFlags rules, float2 delta, PathfindParameters ___m_Parameters)
         {
+            Entity focusedVehicle = ResolveFocusedVehicle(___m_Parameters);
+
             if (!s_CachedPublicTransportLaneEnforcementEnabled)
             {
                 return;
@@ -174,7 +179,21 @@ namespace Traffic_Law_Enforcement
                 return;
             }
 
-            __result += publicTransportPenalty * moneyWeight * math.abs(delta.y - delta.x);
+            float addedPenalty = publicTransportPenalty * moneyWeight * math.abs(delta.y - delta.x);
+
+            if (ShouldLogFocusedPublicTransportLaneCost(focusedVehicle))
+            {
+                LogFocusedPublicTransportLaneCost(
+                    focusedVehicle,
+                    rules,
+                    delta,
+                    ___m_Parameters,
+                    publicTransportPenalty,
+                    moneyWeight,
+                    addedPenalty);
+            }
+
+            __result += addedPenalty;
         }
 
         private static void RefreshCachedPenaltyValues()
@@ -220,12 +239,6 @@ namespace Traffic_Law_Enforcement
 
             result.AllowOnPublicTransportLane = allowOnPublicTransportLane;
 
-            if (ShouldUseVanillaPathfindRulesForTrackedVehicle(profile))
-            {
-                result.ExperimentSkipped = true;
-                return result;
-            }
-
             SetRuleFlag(ref item.m_Parameters.m_IgnoredRules, RuleFlags.ForbidPrivateTraffic, allowOnPublicTransportLane);
 
             SetRuleFlag(ref item.m_Parameters.m_TaxiIgnoredRules, RuleFlags.ForbidPrivateTraffic, allowOnPublicTransportLane);
@@ -233,10 +246,61 @@ namespace Traffic_Law_Enforcement
             return result;
         }
 
-        private static bool ShouldUseVanillaPathfindRulesForTrackedVehicle(VehicleTrafficLawProfile profile)
+        private static Entity ResolveFocusedVehicle(PathfindParameters parameters)
         {
-            return Mod.Settings?.EnablePolicyTrackedVehicleVanillaPathfindRulesExperiment == true &&
-                   profile.m_ShouldTrack != 0;
+            Entity parkingTarget = parameters.m_ParkingTarget;
+            return parkingTarget != Entity.Null ? parkingTarget : Entity.Null;
+        }
+
+        private static bool ShouldLogFocusedPublicTransportLaneCost(Entity vehicle)
+        {
+            if (vehicle == Entity.Null ||
+                !EnforcementLoggingPolicy.ShouldLogFocusedRouteRebuildDiagnostics() ||
+                !FocusedLoggingService.IsWatched(vehicle))
+            {
+                return false;
+            }
+
+            if (s_FocusedPublicTransportLaneCostLogCounts.TryGetValue(vehicle, out int count) &&
+                count >= MaxFocusedPublicTransportLaneCostLogsPerVehicle)
+            {
+                return false;
+            }
+
+            return true;
+        }
+
+        private static void LogFocusedPublicTransportLaneCost(
+            Entity vehicle,
+            RuleFlags rules,
+            float2 delta,
+            PathfindParameters parameters,
+            int configuredFine,
+            float moneyWeight,
+            float addedPenalty)
+        {
+            int nextCount = 1;
+            if (s_FocusedPublicTransportLaneCostLogCounts.TryGetValue(vehicle, out int currentCount))
+            {
+                nextCount = currentCount + 1;
+            }
+
+            s_FocusedPublicTransportLaneCostLogCounts[vehicle] = nextCount;
+
+            Mod.log.Info(
+                $"FOCUSED_PT_LANE_COST: vehicle={vehicle}, " +
+                $"vehicleEntity={FocusedLoggingService.FormatEntity(vehicle)}, " +
+                $"logIndex={nextCount}, " +
+                $"rules={FormatRuleFlags(rules)}, " +
+                $"ignoredRules={FormatRuleFlags(parameters.m_IgnoredRules)}, " +
+                $"taxiIgnoredRules={FormatRuleFlags(parameters.m_TaxiIgnoredRules)}, " +
+                $"methods={(parameters.m_Methods == 0 ? "none" : parameters.m_Methods.ToString())}, " +
+                $"pathfindFlags={(parameters.m_PathfindFlags == 0 ? "none" : parameters.m_PathfindFlags.ToString())}, " +
+                $"delta=({delta.x:0.###},{delta.y:0.###}), " +
+                $"moneyWeight={moneyWeight:0.###}, " +
+                $"configuredFine={configuredFine}, " +
+                $"addedPenalty={addedPenalty:0.###}, " +
+                $"parkingTarget={FocusedLoggingService.FormatEntity(parameters.m_ParkingTarget)}");
         }
 
         private static void SetRuleFlag(ref RuleFlags rules, RuleFlags flag, bool enabled)
@@ -258,9 +322,6 @@ namespace Traffic_Law_Enforcement
             SetupQueueItem item,
             PathfindRuleSyncResult syncResult)
         {
-            bool experimentEnabled =
-                Mod.Settings?.EnablePolicyTrackedVehicleVanillaPathfindRulesExperiment == true;
-
             string accessBits = syncResult.HasProfile
                 ? FormatAccessBits(syncResult.Profile.m_PublicTransportLaneAccessBits)
                 : "none";
@@ -271,8 +332,6 @@ namespace Traffic_Law_Enforcement
 
             Mod.log.Info(
                 $"FOCUSED_SETUP_PATHFIND: vehicle={owner}, " +
-                $"experimentEnabled={experimentEnabled}, " +
-                $"experimentSkip={syncResult.ExperimentSkipped}, " +
                 $"hasProfile={syncResult.HasProfile}, " +
                 $"shouldTrack={(syncResult.HasProfile ? syncResult.Profile.m_ShouldTrack.ToString() : "n/a")}, " +
                 $"emergency={(syncResult.HasProfile ? (syncResult.Profile.m_EmergencyVehicle != 0).ToString() : "n/a")}, " +

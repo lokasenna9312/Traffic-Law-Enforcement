@@ -61,7 +61,6 @@ namespace Traffic_Law_Enforcement
             LogChange(nameof(Setting.EnableAllVehicleRouteSelectionChangeLogging), previous.EnableAllVehicleRouteSelectionChangeLogging, current.EnableAllVehicleRouteSelectionChangeLogging);
             LogChange(nameof(Setting.EnableFocusedRouteRebuildDiagnosticsLogging), previous.EnableFocusedRouteRebuildDiagnosticsLogging, current.EnableFocusedRouteRebuildDiagnosticsLogging);
             LogChange(nameof(Setting.EnableFocusedVehicleOnlyRouteLogging), previous.EnableFocusedVehicleOnlyRouteLogging, current.EnableFocusedVehicleOnlyRouteLogging);
-            LogChange(nameof(Setting.EnablePolicyTrackedVehicleVanillaPathfindRulesExperiment), previous.EnablePolicyTrackedVehicleVanillaPathfindRulesExperiment, current.EnablePolicyTrackedVehicleVanillaPathfindRulesExperiment);
             LogChange(nameof(Setting.AllowRoadPublicTransportVehicles), previous.Gameplay.AllowRoadPublicTransportVehicles, current.Gameplay.AllowRoadPublicTransportVehicles);
             LogChange(nameof(Setting.AllowTaxis), previous.Gameplay.AllowTaxis, current.Gameplay.AllowTaxis);
             LogChange(nameof(Setting.AllowPoliceCars), previous.Gameplay.AllowPoliceCars, current.Gameplay.AllowPoliceCars);
@@ -157,7 +156,6 @@ namespace Traffic_Law_Enforcement
             public readonly bool EnableAllVehicleRouteSelectionChangeLogging;
             public readonly bool EnableFocusedRouteRebuildDiagnosticsLogging;
             public readonly bool EnableFocusedVehicleOnlyRouteLogging;
-            public readonly bool EnablePolicyTrackedVehicleVanillaPathfindRulesExperiment;
 
             private LoggedSettingsSnapshot(
                 EnforcementGameplaySettingsState gameplay,
@@ -170,8 +168,7 @@ namespace Traffic_Law_Enforcement
                 bool enablePathObsoleteSourceLogging,
                 bool enableAllVehicleRouteSelectionChangeLogging,
                 bool enableFocusedRouteRebuildDiagnosticsLogging,
-                bool enableFocusedVehicleOnlyRouteLogging,
-                bool enablePolicyTrackedVehicleVanillaPathfindRulesExperiment)
+                bool enableFocusedVehicleOnlyRouteLogging)
             {
                 Gameplay = gameplay;
                 EnableEstimatedRerouteLogging = enableEstimatedRerouteLogging;
@@ -184,7 +181,6 @@ namespace Traffic_Law_Enforcement
                 EnableAllVehicleRouteSelectionChangeLogging = enableAllVehicleRouteSelectionChangeLogging;
                 EnableFocusedRouteRebuildDiagnosticsLogging = enableFocusedRouteRebuildDiagnosticsLogging;
                 EnableFocusedVehicleOnlyRouteLogging = enableFocusedVehicleOnlyRouteLogging;
-                EnablePolicyTrackedVehicleVanillaPathfindRulesExperiment = enablePolicyTrackedVehicleVanillaPathfindRulesExperiment;
             }
 
             public static LoggedSettingsSnapshot Capture()
@@ -200,8 +196,7 @@ namespace Traffic_Law_Enforcement
                     Mod.Settings?.EnablePathObsoleteSourceLogging ?? false,
                     Mod.Settings?.EnableAllVehicleRouteSelectionChangeLogging ?? false,
                     Mod.Settings?.EnableFocusedRouteRebuildDiagnosticsLogging ?? false,
-                    Mod.Settings?.EnableFocusedVehicleOnlyRouteLogging ?? false,
-                    Mod.Settings?.EnablePolicyTrackedVehicleVanillaPathfindRulesExperiment ?? false);
+                    Mod.Settings?.EnableFocusedVehicleOnlyRouteLogging ?? false);
             }
 
             public string ToLogString()
@@ -220,7 +215,6 @@ namespace Traffic_Law_Enforcement
                 Append(builder, nameof(Setting.EnableAllVehicleRouteSelectionChangeLogging), EnableAllVehicleRouteSelectionChangeLogging);
                 Append(builder, nameof(Setting.EnableFocusedRouteRebuildDiagnosticsLogging), EnableFocusedRouteRebuildDiagnosticsLogging);
                 Append(builder, nameof(Setting.EnableFocusedVehicleOnlyRouteLogging), EnableFocusedVehicleOnlyRouteLogging);
-                Append(builder, nameof(Setting.EnablePolicyTrackedVehicleVanillaPathfindRulesExperiment), EnablePolicyTrackedVehicleVanillaPathfindRulesExperiment);
                 Append(builder, nameof(Setting.AllowRoadPublicTransportVehicles), Gameplay.AllowRoadPublicTransportVehicles);
                 Append(builder, nameof(Setting.AllowTaxis), Gameplay.AllowTaxis);
                 Append(builder, nameof(Setting.AllowPoliceCars), Gameplay.AllowPoliceCars);

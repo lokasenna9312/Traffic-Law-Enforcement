@@ -1,11 +1,16 @@
 using System;
 using System.Collections.Generic;
 using System.Reflection;
+using Game.Common;
+using Game.Net;
+using Game.Objects;
 using Game.Pathfind;
 using Game.Simulation;
+using Game.Vehicles;
 using HarmonyLib;
 using Unity.Collections;
 using Unity.Entities;
+using Unity.Mathematics;
 
 namespace Traffic_Law_Enforcement
 {
@@ -137,17 +142,17 @@ namespace Traffic_Law_Enforcement
                     entityManager.HasComponent<PublicTransportLanePendingExit>(startItem.m_Owner))
                 {
                     PublicTransportLanePendingExit pendingExit =
-                        entityManager.GetComponentData<PublicTransportLanePendingExit>(startItem.m_Owner);
+                    entityManager.GetComponentData<PublicTransportLanePendingExit>(startItem.m_Owner);
                     pendingExitActive = pendingExit.m_HasLeftPublicTransportLane == 0;
                     allowOnPublicTransportLane = pendingExitActive;
                 }
 
-                Mod.log.Info(
+                string liveState = BuildLiveStateSuffix(startItem.m_Owner, entityManager);
+                string message =
                     $"FOCUSED_SETUP_PATHFIND: source=PathfindSetupSystem.CompleteSetup, " +
                     $"vehicle={startItem.m_Owner}, " +
                     $"vehicleEntity={FocusedLoggingService.FormatEntity(startItem.m_Owner)}, " +
                     $"actionIndex={pair.Key}, " +
-                    $"experimentEnabled={(Mod.Settings?.EnablePolicyTrackedVehicleVanillaPathfindRulesExperiment == true)}, " +
                     $"hasProfile={hasProfile}, " +
                     $"shouldTrack={(hasProfile ? profile.m_ShouldTrack.ToString() : "n/a")}, " +
                     $"emergency={(hasProfile ? (profile.m_EmergencyVehicle != 0).ToString() : "n/a")}, " +
@@ -161,7 +166,24 @@ namespace Traffic_Law_Enforcement
                     $"weights={FormatWeights(startItem.m_Parameters.m_Weights)}, " +
                     $"parkingTarget={FocusedLoggingService.FormatEntity(startItem.m_Parameters.m_ParkingTarget)}, " +
                     $"origin={FormatTarget(startItem.m_Target)}, " +
-                    $"destination={(endItem.m_Owner != Entity.Null ? FormatTarget(endItem.m_Target) : "missing")}");
+                    $"destination={(endItem.m_Owner != Entity.Null ? FormatTarget(endItem.m_Target) : "missing")}";
+
+                if (!string.IsNullOrWhiteSpace(liveState))
+                {
+                    message += $", {liveState}";
+                }
+
+                Mod.log.Info(message);
+
+                if (endItem.m_Owner != Entity.Null)
+                {
+                    PathfindCandidateProbePatches.RegisterWatchedRequest(
+                        startItem.m_Owner,
+                        pair.Key,
+                        startItem.m_Parameters,
+                        startItem.m_Buffer,
+                        endItem.m_Buffer);
+                }
             }
         }
 
@@ -181,6 +203,121 @@ namespace Traffic_Law_Enforcement
         private static string FormatWeights(PathfindWeights weights)
         {
             return $"time={weights.m_Value.x},behaviour={weights.m_Value.y},money={weights.m_Value.z},comfort={weights.m_Value.w}";
+        }
+
+        private static string BuildLiveStateSuffix(Entity vehicle, EntityManager entityManager)
+        {
+            if (vehicle == Entity.Null || !entityManager.Exists(vehicle))
+            {
+                return string.Empty;
+            }
+
+            string currentLaneState = string.Empty;
+            if (entityManager.HasComponent<CarCurrentLane>(vehicle))
+            {
+                CarCurrentLane currentLane = entityManager.GetComponentData<CarCurrentLane>(vehicle);
+                Entity normalizedCurrentLane = NormalizeLane(entityManager, currentLane.m_Lane);
+                Entity normalizedChangeLane = NormalizeLane(entityManager, currentLane.m_ChangeLane);
+                currentLaneState =
+                    $"liveCurrentLane={FormatEntityOrNone(currentLane.m_Lane)}, " +
+                    $"liveNormalizedCurrentLane={FormatEntityOrNone(normalizedCurrentLane)}, " +
+                    $"liveChangeLane={FormatEntityOrNone(currentLane.m_ChangeLane)}, " +
+                    $"liveNormalizedChangeLane={FormatEntityOrNone(normalizedChangeLane)}, " +
+                    $"liveCurve={FormatFloat3(currentLane.m_CurvePosition)}, " +
+                    $"liveChangeProgress={currentLane.m_ChangeProgress:0.###}, " +
+                    $"liveLanePosition={currentLane.m_LanePosition:0.###}, " +
+                    $"liveLaneDistance={currentLane.m_Distance:0.###}, " +
+                    $"liveLaneDuration={currentLane.m_Duration:0.###}, " +
+                    $"liveLaneFlags={(currentLane.m_LaneFlags == 0 ? "none" : currentLane.m_LaneFlags.ToString())}";
+            }
+
+            string pathOwnerState = string.Empty;
+            if (entityManager.HasComponent<PathOwner>(vehicle))
+            {
+                PathOwner pathOwner = entityManager.GetComponentData<PathOwner>(vehicle);
+                int pathElementCount =
+                    entityManager.HasBuffer<PathElement>(vehicle)
+                        ? entityManager.GetBuffer<PathElement>(vehicle).Length
+                        : 0;
+                int remainingElements =
+                    pathElementCount > 0
+                        ? math.max(0, pathElementCount - pathOwner.m_ElementIndex)
+                        : 0;
+                pathOwnerState =
+                    $"livePathElementIndex={pathOwner.m_ElementIndex}, " +
+                    $"livePathElementCount={pathElementCount}, " +
+                    $"liveRemainingElements={remainingElements}";
+            }
+
+            string transformState = string.Empty;
+            if (entityManager.HasComponent<Transform>(vehicle))
+            {
+                Transform transform = entityManager.GetComponentData<Transform>(vehicle);
+                transformState = $"liveWorldPos={FormatFloat3(transform.m_Position)}";
+            }
+
+            return JoinNonEmpty(currentLaneState, pathOwnerState, transformState);
+        }
+
+        private static Entity NormalizeLane(EntityManager entityManager, Entity lane)
+        {
+            if (lane == Entity.Null || !entityManager.Exists(lane))
+            {
+                return Entity.Null;
+            }
+
+            Entity normalizedLane = lane;
+            if (entityManager.HasComponent<SlaveLane>(lane) &&
+                entityManager.HasComponent<Owner>(lane))
+            {
+                SlaveLane slaveLane = entityManager.GetComponentData<SlaveLane>(lane);
+                Owner owner = entityManager.GetComponentData<Owner>(lane);
+                if (owner.m_Owner != Entity.Null &&
+                    entityManager.Exists(owner.m_Owner) &&
+                    entityManager.HasBuffer<SubLane>(owner.m_Owner))
+                {
+                    DynamicBuffer<SubLane> subLanes = entityManager.GetBuffer<SubLane>(owner.m_Owner);
+                    if (slaveLane.m_MasterIndex >= 0 &&
+                        slaveLane.m_MasterIndex < subLanes.Length)
+                    {
+                        Entity masterLane = subLanes[slaveLane.m_MasterIndex].m_SubLane;
+                        if (masterLane != Entity.Null)
+                        {
+                            normalizedLane = masterLane;
+                        }
+                    }
+                }
+            }
+
+            return normalizedLane;
+        }
+
+        private static string JoinNonEmpty(params string[] parts)
+        {
+            string result = string.Empty;
+            for (int index = 0; index < parts.Length; index += 1)
+            {
+                if (string.IsNullOrWhiteSpace(parts[index]))
+                {
+                    continue;
+                }
+
+                result = string.IsNullOrEmpty(result)
+                    ? parts[index]
+                    : result + ", " + parts[index];
+            }
+
+            return result;
+        }
+
+        private static string FormatEntityOrNone(Entity entity)
+        {
+            return entity == Entity.Null ? "none" : entity.ToString();
+        }
+
+        private static string FormatFloat3(float3 value)
+        {
+            return $"({value.x:0.###},{value.y:0.###},{value.z:0.###})";
         }
 
         private static string FormatRuleFlags(RuleFlags flags)
