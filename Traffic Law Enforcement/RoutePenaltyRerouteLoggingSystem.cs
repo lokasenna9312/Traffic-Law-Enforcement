@@ -405,6 +405,7 @@ namespace Traffic_Law_Enforcement
             m_LastRouteSelectionSnapshots.Clear();
             m_CandidateVehicles.Clear();
             m_UpdateCount = 0;
+            ObsoleteAttemptCorrelationService.ResetForRuntimeWorldGeneration(currentGeneration);
             FocusedLoggingService.ClearWatchedVehiclesForRuntimeWorldReset(currentGeneration);
             RerouteLoggingTelemetry.SetState(false, 0, 0, 0);
 
@@ -747,9 +748,22 @@ namespace Traffic_Law_Enforcement
             string pathfindContext =
                 BuildPredictedPathfindContext(vehicle);
             string liveState = BuildLiveRouteState(vehicle);
+            string obsoleteAttemptId =
+                ObsoleteAttemptCorrelationService.GetAttemptId(vehicle);
+            string elapsedSinceObsolete =
+                ObsoleteAttemptCorrelationService.GetElapsedSinceObsolete(vehicle);
+            string targetKindNormalized =
+                RouteDebugNormalization.NormalizeTargetKind(EntityManager, currentTarget);
+            targetKindNormalized =
+                ObsoleteAttemptCorrelationService.ResolveTargetKindNormalized(
+                    vehicle,
+                    targetKindNormalized);
 
             string message =
                 $"FOCUSED_ROUTE_REBUILD: vehicle={vehicle}, " +
+                $"obsoleteAttemptId={obsoleteAttemptId}, " +
+                $"elapsedSinceObsolete={elapsedSinceObsolete}, " +
+                $"targetKindNormalized={targetKindNormalized}, " +
                 $"previousTarget={FormatOptionalEntity(previousSnapshot.HasCurrentTarget, previousTarget)}, " +
                 $"currentTarget={FormatOptionalEntity(currentSnapshot.HasCurrentTarget, currentTarget)}, " +
                 $"currentLane={currentLane}, normalizedCurrentLane={normalizedCurrentLane}, " +
@@ -787,6 +801,10 @@ namespace Traffic_Law_Enforcement
             int elementIndex = hasPathOwner ? pathOwner.m_ElementIndex : -1;
             string acceptedPathPreview = BuildUpcomingPathElementPreview(vehicle, maxPreviewElements: 8);
             string acceptedPathHeadPreview = BuildAcceptedPathHeadPreview(vehicle, maxPreviewElements: 8);
+            string acceptedHeadFamilyKey =
+                hasPathElements
+                    ? RouteDebugNormalization.BuildAcceptedHeadFamilyKey(EntityManager, pathElements)
+                    : "none";
             string liveState = BuildLiveRouteState(vehicle);
             bool pathInfoChanged =
                 previousSnapshot.HasPathInformation != currentSnapshot.HasPathInformation ||
@@ -795,9 +813,28 @@ namespace Traffic_Law_Enforcement
                 previousSnapshot.AcceptedPathHash != currentSnapshot.AcceptedPathHash;
             bool acceptedResultChanged =
                 previousSnapshot.AcceptedResultHash != currentSnapshot.AcceptedResultHash;
+            Entity currentTarget =
+                currentSnapshot.HasCurrentTarget
+                    ? currentSnapshot.CurrentTarget
+                    : (hasPathInformation
+                        ? pathInformation.m_Destination
+                        : ObsoleteAttemptCorrelationService.GetLastKnownTarget(vehicle));
+            string obsoleteAttemptId =
+                ObsoleteAttemptCorrelationService.GetAttemptId(vehicle);
+            string elapsedSinceObsolete =
+                ObsoleteAttemptCorrelationService.GetElapsedSinceObsolete(vehicle);
+            string targetKindNormalized =
+                RouteDebugNormalization.NormalizeTargetKind(EntityManager, currentTarget);
+            targetKindNormalized =
+                ObsoleteAttemptCorrelationService.ResolveTargetKindNormalized(
+                    vehicle,
+                    targetKindNormalized);
 
             string message =
                 $"FOCUSED_ROUTE_ACCEPTED_RESULT: vehicle={vehicle}, " +
+                $"obsoleteAttemptId={obsoleteAttemptId}, " +
+                $"elapsedSinceObsolete={elapsedSinceObsolete}, " +
+                $"targetKindNormalized={targetKindNormalized}, " +
                 $"routeHash={previousSnapshot.RouteHash}->{currentSnapshot.RouteHash}, " +
                 $"previousPathState={FormatPathState(previousSnapshot)}, " +
                 $"currentPathState={FormatPathState(currentSnapshot)}, " +
@@ -817,6 +854,7 @@ namespace Traffic_Law_Enforcement
                 $"resultState={(hasPathInformation ? pathInformation.m_State.ToString() : "none")}, " +
                 $"pathElementCount={pathElementCount}, " +
                 $"elementIndex={elementIndex}, " +
+                $"acceptedHeadFamilyKey={acceptedHeadFamilyKey}, " +
                 $"acceptedPathHead={acceptedPathHeadPreview}, " +
                 $"acceptedPath={acceptedPathPreview}";
 

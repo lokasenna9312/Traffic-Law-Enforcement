@@ -147,12 +147,31 @@ namespace Traffic_Law_Enforcement
                     allowOnPublicTransportLane = pendingExitActive;
                 }
 
+                string obsoleteAttemptId =
+                    ObsoleteAttemptCorrelationService.GetAttemptId(startItem.m_Owner);
+                string elapsedSinceObsolete =
+                    ObsoleteAttemptCorrelationService.GetElapsedSinceObsolete(startItem.m_Owner);
+                string targetKindNormalized =
+                    world != null
+                        ? RouteDebugNormalization.NormalizeTargetKind(
+                            entityManager,
+                            endItem.m_Owner != Entity.Null ? endItem.m_Target : startItem.m_Target,
+                            startItem.m_Parameters.m_ParkingTarget)
+                        : RouteDebugNormalization.UnknownTargetKind;
+                targetKindNormalized =
+                    ObsoleteAttemptCorrelationService.ResolveTargetKindNormalized(
+                        startItem.m_Owner,
+                        targetKindNormalized);
+
                 string liveState = BuildLiveStateSuffix(startItem.m_Owner, entityManager);
                 string message =
                     $"FOCUSED_SETUP_PATHFIND: source=PathfindSetupSystem.CompleteSetup, " +
                     $"vehicle={startItem.m_Owner}, " +
                     $"vehicleEntity={FocusedLoggingService.FormatEntity(startItem.m_Owner)}, " +
                     $"actionIndex={pair.Key}, " +
+                    $"obsoleteAttemptId={obsoleteAttemptId}, " +
+                    $"elapsedSinceObsolete={elapsedSinceObsolete}, " +
+                    $"targetKindNormalized={targetKindNormalized}, " +
                     $"hasProfile={hasProfile}, " +
                     $"shouldTrack={(hasProfile ? profile.m_ShouldTrack.ToString() : "n/a")}, " +
                     $"emergency={(hasProfile ? (profile.m_EmergencyVehicle != 0).ToString() : "n/a")}, " +

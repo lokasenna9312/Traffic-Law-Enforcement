@@ -1,4 +1,5 @@
 using System;
+using Game.Common;
 using Game.Objects;
 using Game.Pathfind;
 using Game.Vehicles;
@@ -36,8 +37,36 @@ namespace Traffic_Law_Enforcement
 
             bool emergency = EmergencyVehiclePolicy.IsEmergencyVehicle(car);
             bool usePublicTransportLanes = (car.m_Flags & CarFlags.UsePublicTransportLanes) != 0;
+            Entity currentTarget = Entity.Null;
+            string targetKindNormalized = RouteDebugNormalization.UnknownTargetKind;
+            World world = World.DefaultGameObjectInjectionWorld;
+            if (world != null)
+            {
+                EntityManager entityManager = world.EntityManager;
+                if (vehicle != Entity.Null && entityManager.Exists(vehicle))
+                {
+                    if (entityManager.HasComponent<Target>(vehicle))
+                    {
+                        Target target = entityManager.GetComponentData<Target>(vehicle);
+                        currentTarget = target.m_Target;
+                    }
+
+                    targetKindNormalized =
+                        RouteDebugNormalization.NormalizeTargetKind(
+                            entityManager,
+                            currentTarget);
+                }
+            }
+
+            string obsoleteAttemptId =
+                ObsoleteAttemptCorrelationService.RegisterAttempt(
+                    vehicle,
+                    currentTarget,
+                    targetKindNormalized);
             string liveState = BuildLiveStateSuffix(vehicle);
             string suffix = string.Empty;
+            suffix +=
+                $", obsoleteAttemptId={obsoleteAttemptId}, targetKindNormalized={targetKindNormalized}";
             if (!string.IsNullOrWhiteSpace(liveState))
             {
                 suffix += ", " + liveState;

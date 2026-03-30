@@ -43,6 +43,7 @@ namespace Traffic_Law_Enforcement
             EnforcementGameTime.Reset();
             BurstLoggingService.Reset();
             FocusedLoggingService.Reset();
+            ObsoleteAttemptCorrelationService.Reset();
             SaveLoadTraceService.Reset();
             SaveLoadTracePatches.Apply();
             m_Setting = new Setting(this);
@@ -98,6 +99,7 @@ namespace Traffic_Law_Enforcement
             log.Info(nameof(OnDispose));
             BurstLoggingService.Reset();
             FocusedLoggingService.Reset();
+            ObsoleteAttemptCorrelationService.Reset();
             SaveLoadTracePatches.Remove();
             SaveLoadTraceService.Reset();
             BudgetUIPatches.Remove();
