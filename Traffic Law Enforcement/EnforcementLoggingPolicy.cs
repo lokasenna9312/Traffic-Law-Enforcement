@@ -67,7 +67,7 @@ namespace Traffic_Law_Enforcement
 
         public static bool ShouldLogAllVehicleRouteSelectionChanges()
         {
-            return Mod.IsEnforcementEnabled && EnableAllVehicleRouteSelectionChangeLogging;
+            return EnableAllVehicleRouteSelectionChangeLogging;
         }
 
         public static bool ShouldLogRouteSelectionChangeSummary(Entity vehicle)
@@ -79,7 +79,14 @@ namespace Traffic_Law_Enforcement
 
         public static bool ShouldLogFocusedRouteRebuildDiagnostics()
         {
-            return Mod.IsEnforcementEnabled && EnableFocusedRouteRebuildDiagnosticsLogging;
+            return EnableFocusedRouteRebuildDiagnosticsLogging;
+        }
+
+        public static bool ShouldObserveRouteDebugState()
+        {
+            return ShouldLogAllVehicleRouteSelectionChanges() ||
+                ShouldLogFocusedRouteRebuildDiagnostics() ||
+                ShouldLogPathfindingPenaltyDiagnostics();
         }
 
         public static bool ShouldLogFocusedPathfindSetup(Entity vehicle)

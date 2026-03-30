@@ -161,6 +161,8 @@ namespace Traffic_Law_Enforcement
                 EnforcementLoggingPolicy.ShouldLogFocusedRouteRebuildDiagnostics();
             bool pathfindingPenaltyDiagnosticLoggingEnabled =
                 EnforcementLoggingPolicy.ShouldLogPathfindingPenaltyDiagnostics();
+            bool observeRouteDebugState =
+                EnforcementLoggingPolicy.ShouldObserveRouteDebugState();
             bool restrictVehicleSpecificRouteLogsToWatchedVehicles =
                 EnforcementLoggingPolicy.ShouldRestrictVehicleSpecificRouteDebugLogsToWatchedVehicles();
             bool burstLoggingActive = EnforcementLoggingPolicy.IsBurstLoggingActive;
@@ -173,7 +175,7 @@ namespace Traffic_Law_Enforcement
                     ? BurstLoggingService.BurstRouteSelectionChangeLogsPerUpdate
                     : MaxRouteSelectionChangeLogsPerUpdate;
             m_PublicTransportLaneDecisionDiagnosticLogsThisUpdate = 0;
-            if (!Mod.IsEnforcementEnabled)
+            if (!Mod.IsEnforcementEnabled && !observeRouteDebugState)
             {
                 m_LastSnapshots.Clear();
                 m_LastRouteSelectionSnapshots.Clear();
