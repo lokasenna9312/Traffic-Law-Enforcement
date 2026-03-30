@@ -36,7 +36,7 @@ namespace Traffic_Law_Enforcement
             OverrideSummary =
                 $"UTurn money +{midBlockMoneyPenalty:0}; " +
                 $"UnsafeUTurn money +{midBlockMoneyPenalty:0}; " +
-                $"LaneCross money +{midBlockMoneyPenalty:0}; " +
+                // $"LaneCross money +{midBlockMoneyPenalty:0}; " +
                 "PT-lane route penalties are still handled per route rather than through shared PathfindCarData prefabs";
         }
     }
@@ -137,7 +137,7 @@ namespace Traffic_Law_Enforcement
 
             AddMoneyPenalty(ref updatedData.m_UTurnCost, midBlockMoneyPenalty);
             AddMoneyPenalty(ref updatedData.m_UnsafeUTurnCost, midBlockMoneyPenalty);
-            AddMoneyPenalty(ref updatedData.m_LaneCrossCost, midBlockMoneyPenalty);
+            // AddMoneyPenalty(ref updatedData.m_LaneCrossCost, midBlockMoneyPenalty);
 
             if (!PathfindCarDataEquals(currentData, updatedData))
             {
@@ -173,7 +173,7 @@ namespace Traffic_Law_Enforcement
                 PathfindCostsEquals(left.m_UTurnCost, right.m_UTurnCost) &&
                 PathfindCostsEquals(left.m_UnsafeUTurnCost, right.m_UnsafeUTurnCost) &&
                 PathfindCostsEquals(left.m_CurveAngleCost, right.m_CurveAngleCost) &&
-                PathfindCostsEquals(left.m_LaneCrossCost, right.m_LaneCrossCost) &&
+                // PathfindCostsEquals(left.m_LaneCrossCost, right.m_LaneCrossCost) &&
                 PathfindCostsEquals(left.m_ParkingCost, right.m_ParkingCost) &&
                 PathfindCostsEquals(left.m_SpawnCost, right.m_SpawnCost) &&
                 PathfindCostsEquals(left.m_ForbiddenCost, right.m_ForbiddenCost);
