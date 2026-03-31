@@ -98,6 +98,13 @@ namespace Traffic_Law_Enforcement
         private readonly List<Entity> m_RemovedVehiclesBuffer = new List<Entity>();
         private Game.UI.NameSystem m_NameSystem;
         private Game.Prefabs.PrefabSystem m_PrefabSystem;
+        private const int RerouteSummaryFlushInterval = 64;
+        private int m_RerouteSummaryPendingCount;
+        private int m_RerouteSummaryPendingAvoidedPenalty;
+        private int m_RerouteSummaryPendingPublicTransport;
+        private int m_RerouteSummaryPendingMidBlock;
+        private int m_RerouteSummaryPendingIntersection;
+        private int m_RerouteSummaryPendingUpdates;
         private int m_UpdateCount;
         private int m_LastObservedRuntimeWorldGeneration = -1;
 
@@ -316,11 +323,6 @@ namespace Traffic_Law_Enforcement
 
             int routeSelectionLogsEmitted = 0;
             int routeSelectionLogsDropped = 0;
-            int rerouteSummaryCount = 0;
-            int rerouteSummaryAvoidedPenalty = 0;
-            int rerouteSummaryPublicTransport = 0;
-            int rerouteSummaryMidBlock = 0;
-            int rerouteSummaryIntersection = 0;
             foreach (KeyValuePair<Entity, CandidateChangeReason> candidate in m_CandidateVehicles)
             {
                 Entity vehicle = candidate.Key;
@@ -418,22 +420,22 @@ namespace Traffic_Law_Enforcement
                             }
                             else
                             {
-                                rerouteSummaryCount += 1;
-                                rerouteSummaryAvoidedPenalty += avoidedPenalty;
+                                m_RerouteSummaryPendingCount += 1;
+                                m_RerouteSummaryPendingAvoidedPenalty += avoidedPenalty;
 
                                 if (avoidedPublicTransportLanePenalty)
                                 {
-                                    rerouteSummaryPublicTransport += 1;
+                                    m_RerouteSummaryPendingPublicTransport += 1;
                                 }
 
                                 if (avoidedMidBlockPenalty)
                                 {
-                                    rerouteSummaryMidBlock += 1;
-                                }       
+                                    m_RerouteSummaryPendingMidBlock += 1;
+                                }
 
                                 if (avoidedIntersectionPenalty)
                                 {
-                                    rerouteSummaryIntersection += 1;
+                                    m_RerouteSummaryPendingIntersection += 1;
                                 }
                             }
                         }
@@ -534,17 +536,30 @@ namespace Traffic_Law_Enforcement
                 }
             }
 
-            if (rerouteSummaryCount > 0)
+            if (m_RerouteSummaryPendingCount > 0)
             {
-                string rerouteSummaryMessage =
-                    $"[REROUTE_SUMMARY] count={rerouteSummaryCount}, " +
-                    $"avoidedPenalty={rerouteSummaryAvoidedPenalty}, " +
-                    $"avoidedPT={rerouteSummaryPublicTransport}, " +
-                    $"avoidedMidBlock={rerouteSummaryMidBlock}, " +
-                    $"avoidedIntersection={rerouteSummaryIntersection}";
+                m_RerouteSummaryPendingUpdates += 1;
 
-                EnforcementTelemetry.RecordEvent(rerouteSummaryMessage);
-                Mod.log.Info(rerouteSummaryMessage);
+                if (m_RerouteSummaryPendingUpdates >= RerouteSummaryFlushInterval)
+                {
+                    string rerouteSummaryMessage =
+                        $"[REROUTE_SUMMARY] count={m_RerouteSummaryPendingCount}, " +
+                        $"avoidedPenalty={m_RerouteSummaryPendingAvoidedPenalty}, " +
+                        $"avoidedPT={m_RerouteSummaryPendingPublicTransport}, " +
+                        $"avoidedMidBlock={m_RerouteSummaryPendingMidBlock}, " +
+                        $"avoidedIntersection={m_RerouteSummaryPendingIntersection}, " +
+                        $"updates={m_RerouteSummaryPendingUpdates}";
+
+                    EnforcementTelemetry.RecordEvent(rerouteSummaryMessage);
+                    Mod.log.Info(rerouteSummaryMessage);
+
+                    m_RerouteSummaryPendingCount = 0;
+                    m_RerouteSummaryPendingAvoidedPenalty = 0;
+                    m_RerouteSummaryPendingPublicTransport = 0;
+                    m_RerouteSummaryPendingMidBlock = 0;
+                    m_RerouteSummaryPendingIntersection = 0;
+                    m_RerouteSummaryPendingUpdates = 0;
+                }
             }
 
             if (trackRouteSelectionChanges && routeSelectionLogsDropped > 0)
@@ -566,6 +581,12 @@ namespace Traffic_Law_Enforcement
 
         private void ClearRouteLoggingState()
         {
+            m_RerouteSummaryPendingCount = 0;
+            m_RerouteSummaryPendingAvoidedPenalty = 0;
+            m_RerouteSummaryPendingPublicTransport = 0;
+            m_RerouteSummaryPendingMidBlock = 0;
+            m_RerouteSummaryPendingIntersection = 0;
+            m_RerouteSummaryPendingUpdates = 0;
             m_LastSnapshots.Clear();
             m_LastRouteSelectionSnapshots.Clear();
             m_CandidateVehicles.Clear();
@@ -581,7 +602,12 @@ namespace Traffic_Law_Enforcement
             }
 
             m_LastObservedRuntimeWorldGeneration = currentGeneration;
-
+            m_RerouteSummaryPendingCount = 0;
+            m_RerouteSummaryPendingAvoidedPenalty = 0;
+            m_RerouteSummaryPendingPublicTransport = 0;
+            m_RerouteSummaryPendingMidBlock = 0;
+            m_RerouteSummaryPendingIntersection = 0;
+            m_RerouteSummaryPendingUpdates = 0;
             m_LastSnapshots.Clear();
             m_LastRouteSelectionSnapshots.Clear();
             m_CandidateVehicles.Clear();
