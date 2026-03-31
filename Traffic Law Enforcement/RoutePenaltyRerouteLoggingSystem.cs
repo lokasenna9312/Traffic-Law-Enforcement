@@ -435,7 +435,7 @@ namespace Traffic_Law_Enforcement
                                 if (avoidedMidBlockPenalty)
                                 {
                                     rerouteSummaryMidBlock += 1;
-                                }
+                                }       
 
                                 if (avoidedIntersectionPenalty)
                                 {
@@ -908,10 +908,38 @@ namespace Traffic_Law_Enforcement
                     previousSnapshot.Inspection.TagSnapshot,
                     currentSnapshot.Inspection.TagSnapshot);
 
-            return routeEndpointsUnchanged &&
+            bool existingLowValueCase =
+                routeEndpointsUnchanged &&
                 acceptedResultUnchanged &&
                 penaltyUnchanged &&
                 tagsUnchanged;
+
+            bool routeIntentUnchanged =
+                previousSnapshot.RouteHash == currentSnapshot.RouteHash &&
+                routeEndpointsUnchanged;
+
+            bool zeroPenaltyNoTags =
+                previousSnapshot.Inspection.TotalPenalty == 0 &&
+                currentSnapshot.Inspection.TotalPenalty == 0 &&
+                previousSnapshot.Inspection.TagSnapshot.Count == 0 &&
+                currentSnapshot.Inspection.TagSnapshot.Count == 0 &&
+                previousSnapshot.Inspection.TagSnapshot.OmittedCount == 0 &&
+                currentSnapshot.Inspection.TagSnapshot.OmittedCount == 0;
+
+            bool acceptedResultRebuildChurn =
+                previousSnapshot.HasPathOwner != currentSnapshot.HasPathOwner ||
+                previousSnapshot.PathFlags != currentSnapshot.PathFlags ||
+                previousSnapshot.HasPathInformation != currentSnapshot.HasPathInformation ||
+                previousSnapshot.PathInfoHash != currentSnapshot.PathInfoHash ||
+                previousSnapshot.AcceptedPathHash != currentSnapshot.AcceptedPathHash ||
+                previousSnapshot.AcceptedResultHash != currentSnapshot.AcceptedResultHash;
+
+            bool zeroPenaltyAcceptedResultChurn =
+                routeIntentUnchanged &&
+                zeroPenaltyNoTags &&
+                acceptedResultRebuildChurn;
+
+            return existingLowValueCase || zeroPenaltyAcceptedResultChurn;
         }
 
         private void LogRouteSelectionChange(
