@@ -2034,6 +2034,22 @@ namespace Traffic_Law_Enforcement
                     vehicle,
                     ref m_TypeLookups);
 
+            bool watchedVehicle = FocusedLoggingService.IsWatched(vehicle);
+
+            bool permissionChangedByMod = hasProfile &&
+                PublicTransportLanePolicy.PermissionChangedByMod(
+                    vehicleProfile.m_PublicTransportLaneAccessBits);
+
+            bool interestingNonWatchedCase =
+                unauthorizedPublicTransportLane ||
+                permissionChangedByMod ||
+                (!hasResolvedPublicTransportLanePolicy && hasProfile);
+
+            if (!forceLogging && !watchedVehicle && !interestingNonWatchedCase)
+            {
+                return;
+            }
+
             string vanillaAllows = hasProfile
                 ? PublicTransportLanePolicy.VanillaAllowsAccess(
                     vehicleProfile.m_PublicTransportLaneAccessBits).ToString()
@@ -2055,9 +2071,8 @@ namespace Traffic_Law_Enforcement
                     vehicleProfile.m_PublicTransportLaneAccessBits)
                 : "n/a";
 
-            string permissionChangedByMod = hasProfile
-                ? PublicTransportLanePolicy.PermissionChangedByMod(
-                    vehicleProfile.m_PublicTransportLaneAccessBits).ToString()
+            string permissionChangedByModText = hasProfile
+                ? permissionChangedByMod.ToString()
                 : "n/a";
 
             string emergencyOverrideActive = hasProfile
@@ -2085,10 +2100,11 @@ namespace Traffic_Law_Enforcement
                 $"emergency={emergency}, emergencyOverrideActive={emergencyOverrideActive}, " +
                 $"type={type}, vanillaAllows={vanillaAllows}, modAllows={modAllows}, " +
                 $"canUsePublicTransportLane={canUsePublicTransportLane}, " +
-                $"permissionChangedByMod={permissionChangedByMod}, accessBits={accessBits}";
+                $"permissionChangedByMod={permissionChangedByModText}, accessBits={accessBits}";
 
             EnforcementTelemetry.RecordEvent(message);
             Mod.log.Info(message);
+
             if (!forceLogging)
             {
                 m_PublicTransportLaneDecisionDiagnosticLogsThisUpdate += 1;
