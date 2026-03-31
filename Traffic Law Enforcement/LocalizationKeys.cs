@@ -238,6 +238,8 @@ namespace Traffic_Law_Enforcement
             map["SelectedObjectPanel.Role.ParkMaintenanceVehicle"] = SelectedObjectBridgeSystem.kRoleParkMaintenanceVehicleLocaleId;
             map["SelectedObjectPanel.Role.UnclassifiedRoadVehicle"] = SelectedObjectBridgeSystem.kRoleUnclassifiedRoadVehicleLocaleId;
             map["SelectedObjectPanel.Role.EmergencyQualifier"] = SelectedObjectBridgeSystem.kRoleEmergencyQualifierLocaleId;
+            map["SelectedObjectPanel.Role.ListSeparator"] = SelectedObjectBridgeSystem.kRoleListSeparatorLocaleId;
+            map["SelectedObjectPanel.Role.EmergencyFormat"] = SelectedObjectBridgeSystem.kRoleEmergencyFormatLocaleId;
             map["SelectedObjectPanel.Reason.NoneRecorded"] = SelectedObjectBridgeSystem.kReasonNoneRecordedLocaleId;
             map["SelectedObjectPanel.Reason.PublicTransportLaneRevokedByModFormat"] = SelectedObjectBridgeSystem.kReasonPublicTransportLaneRevokedByModFormatLocaleId;
             map["SelectedObjectPanel.Reason.PublicTransportLaneMissingVanillaCategoriesFormat"] = SelectedObjectBridgeSystem.kReasonPublicTransportLaneMissingVanillaCategoriesFormatLocaleId;
@@ -263,6 +265,10 @@ namespace Traffic_Law_Enforcement
                 SelectedObjectBridgeSystem.kPublicTransportLanePolicyQualifierPublicTransportLocaleId;
             map["SelectedObjectPanel.PublicTransportLanePolicyQualifierEmergency"] =
                 SelectedObjectBridgeSystem.kPublicTransportLanePolicyQualifierEmergencyLocaleId;
+            map["SelectedObjectPanel.PublicTransportLanePolicyQualifierSeparator"] =
+                SelectedObjectBridgeSystem.kPublicTransportLanePolicyQualifierSeparatorLocaleId;
+            map["SelectedObjectPanel.PublicTransportLanePolicyQualifiedFormat"] =
+                SelectedObjectBridgeSystem.kPublicTransportLanePolicyQualifiedFormatLocaleId;
             map["SelectedObjectPanel.PublicTransportLanePolicyVanillaAllow"] =
                 SelectedObjectBridgeSystem.kPublicTransportLanePolicyVanillaAllowLocaleId;
             map["SelectedObjectPanel.PublicTransportLanePolicyVanillaDeny"] =
