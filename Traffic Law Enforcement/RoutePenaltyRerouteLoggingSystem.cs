@@ -416,16 +416,11 @@ namespace Traffic_Law_Enforcement
                         {
                             if (watchedVehicle)
                             {
-                                if (logsEmitted < rerouteLogLimit)
-                                {
-                                    LogReroute(
-                                        vehicle,
-                                        previousSnapshot,
-                                        snapshot,
-                                        watchedVehicle);
-
-                                    logsEmitted += 1;
-                                }
+                                LogReroute(
+                                    vehicle,
+                                    previousSnapshot,
+                                    snapshot,
+                                    watchedVehicle);
                             }
                             else
                             {
