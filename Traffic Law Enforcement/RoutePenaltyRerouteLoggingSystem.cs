@@ -14,19 +14,18 @@ using Entity = Unity.Entities.Entity;
 
 namespace Traffic_Law_Enforcement
 {
-    public static class RerouteLoggingTelemetry
+    public static class RerouteDebugLoggingTelemetry
     {
         public static bool Enabled { get; private set; }
         public static int CachedSnapshotCount { get; private set; }
         public static int LastCandidateCount { get; private set; }
-        public static int LastEmittedLogCount { get; private set; }
+        public static int LastRouteSelectionLogsEmitted { get; private set; }
 
-        public static void SetState(bool enabled, int cachedSnapshotCount, int lastCandidateCount, int lastEmittedLogCount)
+        public static void SetState(bool enabled, int cachedSnapshotCount, int lastCandidateCount, int LastRouteSelectionLogsEmitted)
         {
             Enabled = enabled;
             CachedSnapshotCount = cachedSnapshotCount;
             LastCandidateCount = lastCandidateCount;
-            LastEmittedLogCount = lastEmittedLogCount;
         }
     }
     [BurstCompile]
@@ -257,7 +256,7 @@ namespace Traffic_Law_Enforcement
                     SweepInactiveSnapshots();
                 }
 
-                RerouteLoggingTelemetry.SetState(true, m_LastSnapshots.Count, 0, 0);
+                RerouteDebugLoggingTelemetry.SetState(true, m_LastSnapshots.Count, 0, 0);
                 return;
             }
 
@@ -576,7 +575,7 @@ namespace Traffic_Law_Enforcement
                 SweepInactiveSnapshots();
             }
 
-            RerouteLoggingTelemetry.SetState(true, m_LastSnapshots.Count, m_CandidateVehicles.Count, routeSelectionLogsEmitted);
+            RerouteDebugLoggingTelemetry.SetState(true, m_LastSnapshots.Count, m_CandidateVehicles.Count, routeSelectionLogsEmitted);
         }
 
         private void ClearRouteLoggingState()
@@ -590,7 +589,7 @@ namespace Traffic_Law_Enforcement
             m_LastSnapshots.Clear();
             m_LastRouteSelectionSnapshots.Clear();
             m_CandidateVehicles.Clear();
-            RerouteLoggingTelemetry.SetState(false, 0, 0, 0);
+            RerouteDebugLoggingTelemetry.SetState(false, 0, 0, 0);
         }
 
         private void HandleRuntimeWorldReload()
@@ -614,7 +613,7 @@ namespace Traffic_Law_Enforcement
             m_UpdateCount = 0;
             ObsoleteAttemptCorrelationService.ResetForRuntimeWorldGeneration(currentGeneration);
             FocusedLoggingService.ClearWatchedVehiclesForRuntimeWorldReset(currentGeneration);
-            RerouteLoggingTelemetry.SetState(false, 0, 0, 0);
+            RerouteDebugLoggingTelemetry.SetState(false, 0, 0, 0);
 
         }
 
