@@ -449,6 +449,17 @@ namespace Traffic_Law_Enforcement
                             continue;
                         }
 
+                        if (!watchedVehicle &&
+                            !emitFocusedDiagnostics &&
+                            IsLowValueNonWatchedRouteSelectionChange(
+                                previousRouteSelectionSnapshot,
+                                routeSelectionSnapshot,
+                                rerouteDetected))
+                        {
+                            m_LastRouteSelectionSnapshots[vehicle] = routeSelectionSnapshot;
+                            continue;
+                        }
+
                         if (emitFocusedDiagnostics ||
                             routeSelectionLogsEmitted < routeSelectionLogLimit)
                         {
@@ -783,6 +794,36 @@ namespace Traffic_Law_Enforcement
                 previousSnapshot.AcceptedResultHash != currentSnapshot.AcceptedResultHash;
         }
 
+        private static bool IsLowValueNonWatchedRouteSelectionChange(
+            RouteSelectionChangeSnapshot previousSnapshot,
+            RouteSelectionChangeSnapshot currentSnapshot,
+            bool rerouteDetected)
+        {
+            if (rerouteDetected)
+            {
+                return false;
+            }
+
+            bool onlyPathStateChanged =
+                previousSnapshot.RouteHash == currentSnapshot.RouteHash &&
+                previousSnapshot.HasCurrentRoute == currentSnapshot.HasCurrentRoute &&
+                previousSnapshot.CurrentRoute == currentSnapshot.CurrentRoute &&
+                previousSnapshot.HasCurrentTarget == currentSnapshot.HasCurrentTarget &&
+                previousSnapshot.CurrentTarget == currentSnapshot.CurrentTarget &&
+                previousSnapshot.HasPathInformation == currentSnapshot.HasPathInformation &&
+                previousSnapshot.PathInfoHash == currentSnapshot.PathInfoHash &&
+                previousSnapshot.AcceptedPathHash == currentSnapshot.AcceptedPathHash &&
+                previousSnapshot.AcceptedResultHash == currentSnapshot.AcceptedResultHash;
+
+            bool penaltyUnchanged =
+                previousSnapshot.Inspection.TotalPenalty == currentSnapshot.Inspection.TotalPenalty;
+
+            bool tagsUnchanged =
+                RoutePenaltyInspection.BuildTagSummary(previousSnapshot.Inspection.TagSnapshot) ==
+                RoutePenaltyInspection.BuildTagSummary(currentSnapshot.Inspection.TagSnapshot);
+
+            return onlyPathStateChanged && penaltyUnchanged && tagsUnchanged;
+        }
         private void LogRouteSelectionChange(
             Entity vehicle,
             RouteSelectionChangeSnapshot previousSnapshot,
