@@ -96,6 +96,7 @@ namespace Traffic_Law_Enforcement
             Entity vehicle,
             Entity currentLaneEntity,
             bool includeDebugFields,
+            bool includeDeferredDisplayFields,
             ref SelectedObjectRouteDiagnosticsContext context)
         {
             if (!tleReady ||
@@ -124,21 +125,27 @@ namespace Traffic_Law_Enforcement
             bool hasPathElements = includeDebugFields &&
                 context.PathElementData.TryGetBuffer(vehicle, out pathElements);
 
-            RoutePenaltyInspectionResult inspection =
-                RoutePenaltyInspection.InspectCurrentRoute(
-                    vehicle,
-                    currentLaneEntity,
-                    navigationLanes,
-                    hasNavigationLanes,
-                    ref context.InspectionContext,
-                    captureBreakdown: includeDebugFields,
-                    captureTagSummary: true);
-            string plannedPenaltiesText = includeDebugFields
-                ? NormalizeInspectionText(inspection.Breakdown)
-                : string.Empty;
-            string penaltyTagsText =
-                NormalizeInspectionText(
-                    RoutePenaltyInspection.BuildTagSummary(inspection.TagSnapshot));
+            RoutePenaltyInspectionResult inspection = default;
+            string plannedPenaltiesText = string.Empty;
+            string penaltyTagsText = string.Empty;
+            if (includeDeferredDisplayFields || includeDebugFields)
+            {
+                inspection =
+                    RoutePenaltyInspection.InspectCurrentRoute(
+                        vehicle,
+                        currentLaneEntity,
+                        navigationLanes,
+                        hasNavigationLanes,
+                        ref context.InspectionContext,
+                        captureBreakdown: includeDebugFields,
+                        captureTagSummary: true);
+                plannedPenaltiesText = includeDebugFields
+                    ? NormalizeInspectionText(inspection.Breakdown)
+                    : string.Empty;
+                penaltyTagsText =
+                    NormalizeInspectionText(
+                        RoutePenaltyInspection.BuildTagSummary(inspection.TagSnapshot));
+            }
 
             return new SelectedObjectRouteDiagnosticsData(
                 hasDiagnostics: true,
@@ -166,11 +173,15 @@ namespace Traffic_Law_Enforcement
                     : string.Empty,
                 plannedPenaltiesText: plannedPenaltiesText,
                 penaltyTagsText: includeDebugFields ? penaltyTagsText : string.Empty,
-                explanationText: BuildRouteDecisionExplanation(vehicle, currentLaneEntity, hasCurrentTarget, targetEntity, hasCurrentRoute, inspection, penaltyTagsText, ref context),
+                explanationText: includeDeferredDisplayFields
+                    ? BuildRouteDecisionExplanation(vehicle, currentLaneEntity, hasCurrentTarget, targetEntity, hasCurrentRoute, inspection, penaltyTagsText, ref context)
+                    : string.Empty,
                 waypointRouteLaneText: includeDebugFields
                     ? BuildWaypointRouteLaneText(targetEntity, ref context)
                     : string.Empty,
-                connectedStopText: BuildConnectedStopText(targetEntity, ref context));
+                connectedStopText: includeDeferredDisplayFields
+                    ? BuildConnectedStopText(targetEntity, ref context)
+                    : string.Empty);
         }
 
         private static string BuildNavigationLanesText(Entity currentLaneEntity, DynamicBuffer<CarNavigationLane> navigationLanes, bool hasNavigationLanes, ref SelectedObjectRouteDiagnosticsContext context, int maxPreviewLanes = 4)

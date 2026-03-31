@@ -204,6 +204,8 @@ namespace Traffic_Law_Enforcement
         private bool m_LastPanelPathObsoleteStatusIsError;
         private bool m_LastPanelLaneDetailsCollapsed = true;
         private bool m_LastPanelRouteDiagnosticsCollapsed = true;
+        private bool m_LastPanelLaneDetailsReady = true;
+        private bool m_LastPanelRouteDiagnosticsReady = true;
 
         public override GameMode gameMode => GameMode.Game;
 
@@ -387,22 +389,37 @@ namespace Traffic_Law_Enforcement
             RefreshEntitySelectionStatus(currentSuggestedEntitySelectionValue);
             RefreshPathObsoleteStatus(currentSuggestedEntitySelectionValue);
             SelectedObjectDebugSnapshot snapshot = m_SelectedObjectBridgeSystem.CurrentSnapshot;
+            bool laneDetailsReady = m_SelectedObjectBridgeSystem.AreLaneDetailsHydrated;
+            bool routeDiagnosticsReady = m_SelectedObjectBridgeSystem.AreRouteDiagnosticsHydrated;
             if (TryReusePanelState(
                     snapshot,
                     currentSuggestedEntitySelectionValue,
+                    laneDetailsReady,
+                    routeDiagnosticsReady,
                     out _))
             {
                 return;
             }
 
-            PanelState state = BuildState(snapshot, currentSuggestedEntitySelectionValue);
-            CachePanelState(snapshot, currentSuggestedEntitySelectionValue, state);
+            PanelState state = BuildState(
+                snapshot,
+                currentSuggestedEntitySelectionValue,
+                laneDetailsReady,
+                routeDiagnosticsReady);
+            CachePanelState(
+                snapshot,
+                currentSuggestedEntitySelectionValue,
+                laneDetailsReady,
+                routeDiagnosticsReady,
+                state);
             UpdateBindings(state);
         }
 
         private PanelState BuildState(
             SelectedObjectDebugSnapshot snapshot,
-            string suggestedEntitySelectionValue)
+            string suggestedEntitySelectionValue,
+            bool laneDetailsReady,
+            bool routeDiagnosticsReady)
         {
             if (snapshot.ResolveState == SelectedObjectResolveState.None)
             {
@@ -429,10 +446,12 @@ namespace Traffic_Law_Enforcement
             bool tleReady =
                 snapshot.TleApplicability == SelectedObjectTleApplicability.ApplicableReady;
             bool laneDetailsExpanded = !m_IsLaneDetailsCollapsed;
+            bool laneDetailsContentReady = laneDetailsExpanded && laneDetailsReady;
             bool routeDiagnosticsVisible = snapshot.HasRouteDiagnostics;
             bool routeDiagnosticsExpanded =
                 routeDiagnosticsVisible &&
-                !m_IsRouteDiagnosticsCollapsed;
+                !m_IsRouteDiagnosticsCollapsed &&
+                routeDiagnosticsReady;
 
             return new PanelState
             {
@@ -464,16 +483,16 @@ namespace Traffic_Law_Enforcement
                 PathObsoleteStatus = BuildPathObsoleteStatusText(snapshot),
                 PathObsoleteStatusIsError = m_PathObsoleteStatusIsError,
                 LaneDetailsVisible = true,
-                CurrentLane = laneDetailsExpanded
+                CurrentLane = laneDetailsContentReady
                     ? NormalizeText(snapshot.CurrentLaneText)
                     : string.Empty,
-                PreviousLane = laneDetailsExpanded
+                PreviousLane = laneDetailsContentReady
                     ? NormalizeText(snapshot.PreviousLaneText)
                     : string.Empty,
-                LaneChanges = laneDetailsExpanded
+                LaneChanges = laneDetailsContentReady
                     ? snapshot.LaneChangeCount.ToString()
                     : string.Empty,
-                LiveLaneState = laneDetailsExpanded
+                LiveLaneState = laneDetailsContentReady
                     ? BuildLiveLaneStateText(snapshot)
                     : string.Empty,
                 RouteDiagnosticsVisible = routeDiagnosticsVisible,
@@ -642,10 +661,16 @@ namespace Traffic_Law_Enforcement
         private bool TryReusePanelState(
             SelectedObjectDebugSnapshot snapshot,
             string suggestedEntitySelectionValue,
+            bool laneDetailsReady,
+            bool routeDiagnosticsReady,
             out PanelState state)
         {
             if (!m_HasCachedPanelState ||
-                !CanReusePanelState(snapshot, suggestedEntitySelectionValue))
+                !CanReusePanelState(
+                    snapshot,
+                    suggestedEntitySelectionValue,
+                    laneDetailsReady,
+                    routeDiagnosticsReady))
             {
                 state = default;
                 return false;
@@ -657,8 +682,35 @@ namespace Traffic_Law_Enforcement
 
         private bool CanReusePanelState(
             SelectedObjectDebugSnapshot snapshot,
-            string suggestedEntitySelectionValue)
+            string suggestedEntitySelectionValue,
+            bool laneDetailsReady,
+            bool routeDiagnosticsReady)
         {
+            bool laneDetailsStateMatches =
+                m_IsLaneDetailsCollapsed ||
+                (!laneDetailsReady && !m_LastPanelLaneDetailsReady) ||
+                (laneDetailsReady == m_LastPanelLaneDetailsReady &&
+                 snapshot.CurrentLaneText == m_LastPanelSnapshot.CurrentLaneText &&
+                 snapshot.PreviousLaneText == m_LastPanelSnapshot.PreviousLaneText &&
+                 snapshot.LaneChangeCount == m_LastPanelSnapshot.LaneChangeCount &&
+                 snapshot.HasCurrentTarget == m_LastPanelSnapshot.HasCurrentTarget &&
+                 snapshot.HasCurrentRoute == m_LastPanelSnapshot.HasCurrentRoute &&
+                 snapshot.CurrentPathFlags == m_LastPanelSnapshot.CurrentPathFlags);
+            bool routeDiagnosticsRelevant =
+                snapshot.HasRouteDiagnostics && !m_IsRouteDiagnosticsCollapsed;
+            bool routeDiagnosticsStateMatches =
+                !routeDiagnosticsRelevant ||
+                (!routeDiagnosticsReady && !m_LastPanelRouteDiagnosticsReady) ||
+                (routeDiagnosticsReady == m_LastPanelRouteDiagnosticsReady &&
+                 snapshot.CurrentTargetEntity == m_LastPanelSnapshot.CurrentTargetEntity &&
+                 snapshot.CurrentRouteEntity == m_LastPanelSnapshot.CurrentRouteEntity &&
+                 snapshot.CurrentRouteColorText == m_LastPanelSnapshot.CurrentRouteColorText &&
+                 snapshot.RouteDiagnosticsCurrentTargetText == m_LastPanelSnapshot.RouteDiagnosticsCurrentTargetText &&
+                 snapshot.RouteDiagnosticsCurrentRouteText == m_LastPanelSnapshot.RouteDiagnosticsCurrentRouteText &&
+                 snapshot.RouteDiagnosticsTargetRoadText == m_LastPanelSnapshot.RouteDiagnosticsTargetRoadText &&
+                 snapshot.RouteDiagnosticsExplanationText == m_LastPanelSnapshot.RouteDiagnosticsExplanationText &&
+                 snapshot.RouteDiagnosticsConnectedStopText == m_LastPanelSnapshot.RouteDiagnosticsConnectedStopText);
+
             return
                 snapshot.ResolveState == m_LastPanelSnapshot.ResolveState &&
                 snapshot.TleApplicability == m_LastPanelSnapshot.TleApplicability &&
@@ -669,9 +721,6 @@ namespace Traffic_Law_Enforcement
                 snapshot.SummaryTleStatusText == m_LastPanelSnapshot.SummaryTleStatusText &&
                 snapshot.RoleText == m_LastPanelSnapshot.RoleText &&
                 snapshot.PublicTransportLanePolicyText == m_LastPanelSnapshot.PublicTransportLanePolicyText &&
-                snapshot.CurrentLaneText == m_LastPanelSnapshot.CurrentLaneText &&
-                snapshot.PreviousLaneText == m_LastPanelSnapshot.PreviousLaneText &&
-                snapshot.LaneChangeCount == m_LastPanelSnapshot.LaneChangeCount &&
                 snapshot.PublicTransportLaneViolationActive == m_LastPanelSnapshot.PublicTransportLaneViolationActive &&
                 snapshot.PendingExitActive == m_LastPanelSnapshot.PendingExitActive &&
                 snapshot.TotalFines == m_LastPanelSnapshot.TotalFines &&
@@ -679,30 +728,24 @@ namespace Traffic_Law_Enforcement
                 snapshot.CompactLastReasonText == m_LastPanelSnapshot.CompactLastReasonText &&
                 snapshot.CompactRepeatPenaltyText == m_LastPanelSnapshot.CompactRepeatPenaltyText &&
                 snapshot.HasPathOwner == m_LastPanelSnapshot.HasPathOwner &&
-                snapshot.HasCurrentTarget == m_LastPanelSnapshot.HasCurrentTarget &&
-                snapshot.HasCurrentRoute == m_LastPanelSnapshot.HasCurrentRoute &&
                 snapshot.CurrentPathFlags == m_LastPanelSnapshot.CurrentPathFlags &&
-                snapshot.CurrentTargetEntity == m_LastPanelSnapshot.CurrentTargetEntity &&
-                snapshot.CurrentRouteEntity == m_LastPanelSnapshot.CurrentRouteEntity &&
-                snapshot.CurrentRouteColorText == m_LastPanelSnapshot.CurrentRouteColorText &&
                 snapshot.HasRouteDiagnostics == m_LastPanelSnapshot.HasRouteDiagnostics &&
-                snapshot.RouteDiagnosticsCurrentTargetText == m_LastPanelSnapshot.RouteDiagnosticsCurrentTargetText &&
-                snapshot.RouteDiagnosticsCurrentRouteText == m_LastPanelSnapshot.RouteDiagnosticsCurrentRouteText &&
-                snapshot.RouteDiagnosticsTargetRoadText == m_LastPanelSnapshot.RouteDiagnosticsTargetRoadText &&
-                snapshot.RouteDiagnosticsExplanationText == m_LastPanelSnapshot.RouteDiagnosticsExplanationText &&
-                snapshot.RouteDiagnosticsConnectedStopText == m_LastPanelSnapshot.RouteDiagnosticsConnectedStopText &&
                 suggestedEntitySelectionValue == m_LastPanelSuggestedEntitySelectionValue &&
                 m_EntitySelectionStatus == m_LastPanelEntitySelectionStatus &&
                 m_EntitySelectionStatusIsError == m_LastPanelEntitySelectionStatusIsError &&
                 m_PathObsoleteStatus == m_LastPanelPathObsoleteStatus &&
                 m_PathObsoleteStatusIsError == m_LastPanelPathObsoleteStatusIsError &&
                 m_IsLaneDetailsCollapsed == m_LastPanelLaneDetailsCollapsed &&
-                m_IsRouteDiagnosticsCollapsed == m_LastPanelRouteDiagnosticsCollapsed;
+                m_IsRouteDiagnosticsCollapsed == m_LastPanelRouteDiagnosticsCollapsed &&
+                laneDetailsStateMatches &&
+                routeDiagnosticsStateMatches;
         }
 
         private void CachePanelState(
             SelectedObjectDebugSnapshot snapshot,
             string suggestedEntitySelectionValue,
+            bool laneDetailsReady,
+            bool routeDiagnosticsReady,
             PanelState state)
         {
             m_HasCachedPanelState = true;
@@ -715,6 +758,8 @@ namespace Traffic_Law_Enforcement
             m_LastPanelPathObsoleteStatusIsError = m_PathObsoleteStatusIsError;
             m_LastPanelLaneDetailsCollapsed = m_IsLaneDetailsCollapsed;
             m_LastPanelRouteDiagnosticsCollapsed = m_IsRouteDiagnosticsCollapsed;
+            m_LastPanelLaneDetailsReady = laneDetailsReady;
+            m_LastPanelRouteDiagnosticsReady = routeDiagnosticsReady;
         }
 
         private void UpdateLocalizedTextBindingsIfNeeded()

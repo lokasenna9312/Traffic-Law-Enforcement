@@ -206,8 +206,13 @@ namespace Traffic_Law_Enforcement
         private SelectedObjectDebugSnapshot m_CurrentSnapshot;
         private bool m_HasSnapshot;
         private int m_LastSnapshotSettingsVersion = -1;
+        private Entity m_LastHydratedSelectionSourceEntity;
+        private Entity m_LastHydratedResolvedVehicleEntity;
+        private int m_SelectionHydrationPhase = 3;
         public SelectedObjectDebugSnapshot CurrentSnapshot => m_CurrentSnapshot;
         public bool HasSnapshot => m_HasSnapshot;
+        internal bool AreLaneDetailsHydrated => m_SelectionHydrationPhase >= 1;
+        internal bool AreRouteDiagnosticsHydrated => m_SelectionHydrationPhase >= 2;
 
         internal static void SetDetailedSnapshotConsumerActive(bool active)
         {
@@ -300,6 +305,8 @@ namespace Traffic_Law_Enforcement
             bool includeRouteDiagnosticsDisplayFields =
                 s_RouteDiagnosticsConsumerActive ||
                 routeDiagnosticsRequested;
+            bool includeDeferredRouteDiagnosticsFields =
+                includeRouteDiagnosticsDisplayFields;
             bool includeFormatterFields =
                 includeLaneDetailsFields ||
                 includeRouteDiagnosticsDisplayFields;
@@ -339,6 +346,54 @@ namespace Traffic_Law_Enforcement
                 tleApplicability != SelectedObjectTleApplicability.NotApplicable;
             bool tleReady =
                 tleApplicability == SelectedObjectTleApplicability.ApplicableReady;
+            bool selectionIdentityChanged =
+                HasSelectionIdentityChanged(resolveResult);
+            if (selectionIdentityChanged)
+            {
+                m_LastHydratedSelectionSourceEntity = resolveResult.SourceSelectedEntity;
+                m_LastHydratedResolvedVehicleEntity = resolveResult.ResolvedVehicleEntity;
+                m_SelectionHydrationPhase = 0;
+            }
+
+            bool panelSelectionHydrationActive =
+                buildDetailedSnapshot &&
+                s_DetailedSnapshotConsumerActive &&
+                !summaryRequested &&
+                !debugFieldsRequested &&
+                !laneDetailsRequested &&
+                !routeDiagnosticsRequested &&
+                resolveResult.HasSelection &&
+                resolveResult.IsVehicle;
+            if (panelSelectionHydrationActive)
+            {
+                if (s_LaneDetailsConsumerActive && m_SelectionHydrationPhase < 1)
+                {
+                    includeLaneDetailsFields = false;
+                }
+
+                if (s_RouteDiagnosticsConsumerActive && m_SelectionHydrationPhase < 2)
+                {
+                    includeRouteDiagnosticsDisplayFields = false;
+                }
+
+                if (s_RouteDiagnosticsConsumerActive && m_SelectionHydrationPhase < 3)
+                {
+                    includeDeferredRouteDiagnosticsFields = false;
+                }
+
+                includeFormatterFields =
+                    includeLaneDetailsFields ||
+                    includeRouteDiagnosticsDisplayFields;
+                includeCurrentLaneFields =
+                    includeLaneDetailsFields ||
+                    includeRouteDiagnosticsDisplayFields;
+                includePathStateFields =
+                    s_DetailedSnapshotConsumerActive ||
+                    includeRouteDiagnosticsDisplayFields;
+                includeProfileData =
+                    includeSummaryFields ||
+                    includeRouteDiagnosticsDisplayFields;
+            }
 
             if (buildDetailedSnapshot &&
                 (!resolveResult.HasSelection || !resolveResult.IsVehicle))
@@ -353,10 +408,12 @@ namespace Traffic_Law_Enforcement
                     includeViolationStateFields,
                     includeLaneDetailsFields,
                     includeRouteDiagnosticsDisplayFields,
+                    includeDeferredRouteDiagnosticsFields,
                     includeCurrentLaneFields,
                     includePathStateFields);
                 m_LastSnapshotSettingsVersion = EnforcementGameplaySettingsService.Version;
                 m_HasSnapshot = true;
+                AdvanceSelectionHydrationPhase(panelSelectionHydrationActive);
                 return;
             }
 
@@ -426,10 +483,12 @@ namespace Traffic_Law_Enforcement
                 includeViolationStateFields,
                 includeLaneDetailsFields,
                 includeRouteDiagnosticsDisplayFields,
+                includeDeferredRouteDiagnosticsFields,
                 includeCurrentLaneFields,
                 includePathStateFields);
             m_LastSnapshotSettingsVersion = EnforcementGameplaySettingsService.Version;
             m_HasSnapshot = true;
+            AdvanceSelectionHydrationPhase(panelSelectionHydrationActive);
         }
 
         private SelectedObjectDebugSnapshot BuildSnapshot(
@@ -442,6 +501,7 @@ namespace Traffic_Law_Enforcement
             bool includeViolationStateFields,
             bool includeLaneDetailsFields,
             bool includeRouteDiagnosticsDisplayFields,
+            bool includeDeferredRouteDiagnosticsFields,
             bool includeCurrentLaneFields,
             bool includePathStateFields)
         {
@@ -581,7 +641,8 @@ namespace Traffic_Law_Enforcement
                     currentLaneEntity,
                     currentTargetEntity,
                     currentRouteEntity,
-                    currentPathFlags);
+                    currentPathFlags,
+                    includeDeferredRouteDiagnosticsFields);
             bool canReuseSummaryPresentation =
                 CanReuseSummaryPresentationFields(
                     resolveResult,
@@ -666,6 +727,7 @@ namespace Traffic_Law_Enforcement
                             vehicle,
                             currentLaneEntity,
                             includeRouteDiagnosticsDebugFields,
+                            includeDeferredRouteDiagnosticsFields,
                             ref routeDiagnosticsContext);
                 }
             }
@@ -827,6 +889,23 @@ namespace Traffic_Law_Enforcement
                 previousLaneEntity == m_CurrentSnapshot.PreviousLaneEntity;
         }
 
+        private bool HasSelectionIdentityChanged(
+            SelectedObjectResolveResult resolveResult)
+        {
+            return resolveResult.SourceSelectedEntity != m_LastHydratedSelectionSourceEntity ||
+                resolveResult.ResolvedVehicleEntity != m_LastHydratedResolvedVehicleEntity;
+        }
+
+        private void AdvanceSelectionHydrationPhase(bool panelSelectionHydrationActive)
+        {
+            if (!panelSelectionHydrationActive || m_SelectionHydrationPhase >= 3)
+            {
+                return;
+            }
+
+            m_SelectionHydrationPhase++;
+        }
+
         private static SelectedObjectEnforcementSummaryData BuildEnforcementSummaryFromSnapshot(
             SelectedObjectDebugSnapshot snapshot,
             bool includePermissionStateSummary)
@@ -968,11 +1047,13 @@ namespace Traffic_Law_Enforcement
             Entity currentLaneEntity,
             Entity currentTargetEntity,
             Entity currentRouteEntity,
-            PathFlags currentPathFlags)
+            PathFlags currentPathFlags,
+            bool includeDeferredRouteDiagnosticsFields)
         {
             return m_HasSnapshot &&
                 m_CurrentSnapshot.HasRouteDiagnostics &&
-                !string.IsNullOrEmpty(m_CurrentSnapshot.RouteDiagnosticsExplanationText) &&
+                (!includeDeferredRouteDiagnosticsFields ||
+                 !string.IsNullOrEmpty(m_CurrentSnapshot.RouteDiagnosticsExplanationText)) &&
                 resolveResult.SourceSelectedEntity == m_CurrentSnapshot.SourceSelectedEntity &&
                 resolveResult.ResolvedVehicleEntity == m_CurrentSnapshot.ResolvedVehicleEntity &&
                 tleApplicability == m_CurrentSnapshot.TleApplicability &&
