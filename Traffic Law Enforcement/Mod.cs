@@ -58,6 +58,7 @@ namespace Traffic_Law_Enforcement
             BudgetUIPatches.Apply();
             VehicleUtilsPatches.Apply();
             FocusedRouteDiagnosticsPatchController.Sync();
+            MidBlockAccessPathfindingPenaltyPatches.Apply();
             IntersectionMovementPathfindingPenaltyPatches.Apply();
             IntersectionMovementPathfindingPenaltyReflectionPatches.Apply();
             updateSystem.UpdateAfter<EnforcementSaveDataSystem, EnforcementGameTimeSystem>(SystemUpdatePhase.GameSimulation);
@@ -100,6 +101,7 @@ namespace Traffic_Law_Enforcement
             BudgetUIPatches.Remove();
             FocusedRouteDiagnosticsPatchController.RemoveAll();
             VehicleUtilsPatches.Remove();
+            MidBlockAccessPathfindingPenaltyPatches.Remove();
             IntersectionMovementPathfindingPenaltyPatches.Remove();
             IntersectionMovementPathfindingPenaltyReflectionPatches.Remove();
             if (m_Setting != null)
