@@ -500,6 +500,36 @@ namespace Traffic_Law_Enforcement
                 laneChangeCount = history.m_LaneChangeCount;
             }
 
+            Target currentTarget = default;
+            bool hasCurrentTarget =
+                includeCurrentLaneFields &&
+                tleReady &&
+                hasVehicleEntity &&
+                m_TargetData.TryGetComponent(vehicle, out currentTarget) &&
+                currentTarget.m_Target != Entity.Null;
+            Entity currentTargetEntity =
+                hasCurrentTarget
+                    ? currentTarget.m_Target
+                    : Entity.Null;
+            CurrentRoute currentRoute = default;
+            bool hasCurrentRoute =
+                includeCurrentLaneFields &&
+                tleReady &&
+                hasVehicleEntity &&
+                m_CurrentRouteData.TryGetComponent(vehicle, out currentRoute) &&
+                currentRoute.m_Route != Entity.Null;
+            Entity currentRouteEntity =
+                hasCurrentRoute
+                    ? currentRoute.m_Route
+                    : Entity.Null;
+            PathOwner pathOwner = default;
+            bool hasPathOwner =
+                includePathStateFields &&
+                tleReady &&
+                hasVehicleEntity &&
+                m_PathOwnerData.TryGetComponent(vehicle, out pathOwner);
+            PathFlags currentPathFlags = hasPathOwner ? pathOwner.m_State : default;
+
             bool ptLaneViolationActive =
                 includeViolationStateFields &&
                 tleReady &&
@@ -531,46 +561,35 @@ namespace Traffic_Law_Enforcement
                 }
             }
 
+            bool canReuseLaneDisplayText =
+                includeLaneDetailsFields &&
+                CanReuseLaneDisplayText(
+                    resolveResult,
+                    tleApplicability,
+                    currentLaneEntity,
+                    previousLaneEntity);
+            bool canReuseRouteDiagnostics =
+                includeRouteDiagnosticsDisplayFields &&
+                !includeRouteDiagnosticsDebugFields &&
+                CanReuseRouteDiagnostics(
+                    resolveResult,
+                    tleApplicability,
+                    currentLaneEntity,
+                    currentTargetEntity,
+                    currentRouteEntity,
+                    currentPathFlags);
+
             bool needsFormatterContext =
-                includeRouteDiagnosticsDisplayFields ||
-                ((currentLaneEntity != Entity.Null || previousLaneEntity != Entity.Null) &&
-                 includeLaneDetailsFields);
+                (includeRouteDiagnosticsDisplayFields && !canReuseRouteDiagnostics) ||
+                (includeLaneDetailsFields &&
+                 !canReuseLaneDisplayText &&
+                 (currentLaneEntity != Entity.Null || previousLaneEntity != Entity.Null));
 
             if (needsFormatterContext)
             {
                 formatterContext = CreateDisplayFormatterContext();
                 hasFormatterContext = true;
             }
-
-            Target currentTarget = default;
-            bool hasCurrentTarget =
-                includeCurrentLaneFields &&
-                tleReady &&
-                hasVehicleEntity &&
-                m_TargetData.TryGetComponent(vehicle, out currentTarget) &&
-                currentTarget.m_Target != Entity.Null;
-            Entity currentTargetEntity =
-                hasCurrentTarget
-                    ? currentTarget.m_Target
-                    : Entity.Null;
-            CurrentRoute currentRoute = default;
-            bool hasCurrentRoute =
-                includeCurrentLaneFields &&
-                tleReady &&
-                hasVehicleEntity &&
-                m_CurrentRouteData.TryGetComponent(vehicle, out currentRoute) &&
-                currentRoute.m_Route != Entity.Null;
-            Entity currentRouteEntity =
-                hasCurrentRoute
-                    ? currentRoute.m_Route
-                    : Entity.Null;
-            PathOwner pathOwner = default;
-            bool hasPathOwner =
-                includePathStateFields &&
-                tleReady &&
-                hasVehicleEntity &&
-                m_PathOwnerData.TryGetComponent(vehicle, out pathOwner);
-            PathFlags currentPathFlags = hasPathOwner ? pathOwner.m_State : default;
 
             bool routeDiagnosticsAvailable =
                 tleReady &&
@@ -579,22 +598,29 @@ namespace Traffic_Law_Enforcement
             SelectedObjectRouteDiagnosticsData routeDiagnostics = default;
             if (routeDiagnosticsAvailable && includeRouteDiagnosticsDisplayFields)
             {
-                if (!hasFormatterContext)
+                if (canReuseRouteDiagnostics)
                 {
-                    formatterContext = CreateDisplayFormatterContext();
-                    hasFormatterContext = true;
+                    routeDiagnostics = BuildRouteDiagnosticsFromSnapshot(m_CurrentSnapshot);
                 }
+                else
+                {
+                    if (!hasFormatterContext)
+                    {
+                        formatterContext = CreateDisplayFormatterContext();
+                        hasFormatterContext = true;
+                    }
 
-                SelectedObjectRouteDiagnosticsContext routeDiagnosticsContext =
-                    CreateRouteDiagnosticsContext(formatterContext);
-                routeDiagnostics =
-                    SelectedObjectRouteDiagnosticsBuilder.Build(
-                        resolveResult,
-                        tleReady,
-                        vehicle,
-                        currentLaneEntity,
-                        includeRouteDiagnosticsDebugFields,
-                        ref routeDiagnosticsContext);
+                    SelectedObjectRouteDiagnosticsContext routeDiagnosticsContext =
+                        CreateRouteDiagnosticsContext(formatterContext);
+                    routeDiagnostics =
+                        SelectedObjectRouteDiagnosticsBuilder.Build(
+                            resolveResult,
+                            tleReady,
+                            vehicle,
+                            currentLaneEntity,
+                            includeRouteDiagnosticsDebugFields,
+                            ref routeDiagnosticsContext);
+                }
             }
 
             SelectedObjectEnforcementSummaryData enforcementSummary = default;
@@ -613,8 +639,13 @@ namespace Traffic_Law_Enforcement
                         ref enforcementSummaryContext);
             }
 
-            string currentRouteColorText = string.Empty;
+            string currentRouteColorText =
+                includeRouteDiagnosticsDisplayFields &&
+                canReuseRouteDiagnostics
+                    ? m_CurrentSnapshot.CurrentRouteColorText
+                    : string.Empty;
             if (includeRouteDiagnosticsDisplayFields &&
+                !canReuseRouteDiagnostics &&
                 currentRouteEntity != Entity.Null &&
                 EntityManager.HasComponent<Game.Routes.Color>(currentRouteEntity))
             {
@@ -626,6 +657,8 @@ namespace Traffic_Law_Enforcement
             string currentLaneText =
                 !includeLaneDetailsFields
                     ? string.Empty
+                    : canReuseLaneDisplayText
+                    ? m_CurrentSnapshot.CurrentLaneText
                     : currentLaneEntity == Entity.Null
                     ? SelectedObjectDisplayFormatter.FormatEntityOrNone(Entity.Null)
                     : SelectedObjectDisplayFormatter.BuildLaneDisplayText(
@@ -634,6 +667,8 @@ namespace Traffic_Law_Enforcement
             string previousLaneText =
                 !includeLaneDetailsFields
                     ? string.Empty
+                    : canReuseLaneDisplayText
+                    ? m_CurrentSnapshot.PreviousLaneText
                     : previousLaneEntity == Entity.Null
                     ? SelectedObjectDisplayFormatter.FormatEntityOrNone(Entity.Null)
                     : SelectedObjectDisplayFormatter.BuildLaneDisplayText(
@@ -702,6 +737,66 @@ namespace Traffic_Law_Enforcement
                 routeDiagnostics.ExplanationText,
                 routeDiagnostics.WaypointRouteLaneText,
                 routeDiagnostics.ConnectedStopText);
+        }
+
+        private bool CanReuseLaneDisplayText(
+            SelectedObjectResolveResult resolveResult,
+            SelectedObjectTleApplicability tleApplicability,
+            Entity currentLaneEntity,
+            Entity previousLaneEntity)
+        {
+            return m_HasSnapshot &&
+                !string.IsNullOrEmpty(m_CurrentSnapshot.CurrentLaneText) &&
+                !string.IsNullOrEmpty(m_CurrentSnapshot.PreviousLaneText) &&
+                resolveResult.SourceSelectedEntity == m_CurrentSnapshot.SourceSelectedEntity &&
+                resolveResult.ResolvedVehicleEntity == m_CurrentSnapshot.ResolvedVehicleEntity &&
+                tleApplicability == m_CurrentSnapshot.TleApplicability &&
+                currentLaneEntity == m_CurrentSnapshot.CurrentLaneEntity &&
+                previousLaneEntity == m_CurrentSnapshot.PreviousLaneEntity;
+        }
+
+        private bool CanReuseRouteDiagnostics(
+            SelectedObjectResolveResult resolveResult,
+            SelectedObjectTleApplicability tleApplicability,
+            Entity currentLaneEntity,
+            Entity currentTargetEntity,
+            Entity currentRouteEntity,
+            PathFlags currentPathFlags)
+        {
+            return m_HasSnapshot &&
+                m_CurrentSnapshot.HasRouteDiagnostics &&
+                !string.IsNullOrEmpty(m_CurrentSnapshot.RouteDiagnosticsExplanationText) &&
+                resolveResult.SourceSelectedEntity == m_CurrentSnapshot.SourceSelectedEntity &&
+                resolveResult.ResolvedVehicleEntity == m_CurrentSnapshot.ResolvedVehicleEntity &&
+                tleApplicability == m_CurrentSnapshot.TleApplicability &&
+                currentLaneEntity == m_CurrentSnapshot.CurrentLaneEntity &&
+                currentTargetEntity == m_CurrentSnapshot.CurrentTargetEntity &&
+                currentRouteEntity == m_CurrentSnapshot.CurrentRouteEntity &&
+                currentPathFlags == m_CurrentSnapshot.CurrentPathFlags;
+        }
+
+        private static SelectedObjectRouteDiagnosticsData BuildRouteDiagnosticsFromSnapshot(
+            SelectedObjectDebugSnapshot snapshot)
+        {
+            return new SelectedObjectRouteDiagnosticsData(
+                snapshot.HasRouteDiagnostics,
+                snapshot.HasPathOwner,
+                snapshot.HasCurrentTarget,
+                snapshot.HasCurrentRoute,
+                snapshot.CurrentPathFlags,
+                snapshot.RouteDiagnosticsCurrentTargetText,
+                snapshot.RouteDiagnosticsCurrentRouteText,
+                snapshot.RouteDiagnosticsTargetRoadText,
+                snapshot.RouteDiagnosticsStartOwnerRoadText,
+                snapshot.RouteDiagnosticsEndOwnerRoadText,
+                snapshot.RouteDiagnosticsDirectConnectText,
+                snapshot.RouteDiagnosticsFullPathToTargetStartText,
+                snapshot.RouteDiagnosticsNavigationLanesText,
+                snapshot.RouteDiagnosticsPlannedPenaltiesText,
+                snapshot.RouteDiagnosticsPenaltyTagsText,
+                snapshot.RouteDiagnosticsExplanationText,
+                snapshot.RouteDiagnosticsWaypointRouteLaneText,
+                snapshot.RouteDiagnosticsConnectedStopText);
         }
 
         private SelectedObjectDebugSnapshot BuildMinimalSnapshot(
