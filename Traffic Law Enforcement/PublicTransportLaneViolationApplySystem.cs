@@ -167,9 +167,9 @@ namespace Traffic_Law_Enforcement
         {
             return events.Length == 0 &&
                 m_HasCachedActiveViolatorCount &&
-                m_LastActiveViolatorCount == 0 &&
                 m_ChangedViolationQuery.IsEmptyIgnoreFilter;
         }
+
         private bool ApplyDetectedEvent(
             DetectedPublicTransportLaneEvent evt,
             EnforcementGameplaySettingsState settings,
@@ -289,7 +289,6 @@ namespace Traffic_Law_Enforcement
         private int GetActiveViolatorCount()
         {
             if (!m_HasCachedActiveViolatorCount ||
-                m_LastActiveViolatorCount > 0 ||
                 !m_ChangedViolationQuery.IsEmptyIgnoreFilter)
             {
                 m_LastActiveViolatorCount = m_ViolationQuery.CalculateEntityCount();
