@@ -804,12 +804,13 @@ namespace Traffic_Law_Enforcement
                 return false;
             }
 
-            bool onlyPathStateChanged =
-                previousSnapshot.RouteHash == currentSnapshot.RouteHash &&
+            bool routeEndpointsUnchanged =
                 previousSnapshot.HasCurrentRoute == currentSnapshot.HasCurrentRoute &&
                 previousSnapshot.CurrentRoute == currentSnapshot.CurrentRoute &&
                 previousSnapshot.HasCurrentTarget == currentSnapshot.HasCurrentTarget &&
-                previousSnapshot.CurrentTarget == currentSnapshot.CurrentTarget &&
+                previousSnapshot.CurrentTarget == currentSnapshot.CurrentTarget;
+
+            bool acceptedResultUnchanged =
                 previousSnapshot.HasPathInformation == currentSnapshot.HasPathInformation &&
                 previousSnapshot.PathInfoHash == currentSnapshot.PathInfoHash &&
                 previousSnapshot.AcceptedPathHash == currentSnapshot.AcceptedPathHash &&
@@ -822,8 +823,12 @@ namespace Traffic_Law_Enforcement
                 RoutePenaltyInspection.BuildTagSummary(previousSnapshot.Inspection.TagSnapshot) ==
                 RoutePenaltyInspection.BuildTagSummary(currentSnapshot.Inspection.TagSnapshot);
 
-            return onlyPathStateChanged && penaltyUnchanged && tagsUnchanged;
+            return routeEndpointsUnchanged &&
+                acceptedResultUnchanged &&
+                penaltyUnchanged &&
+                tagsUnchanged;
         }
+
         private void LogRouteSelectionChange(
             Entity vehicle,
             RouteSelectionChangeSnapshot previousSnapshot,
