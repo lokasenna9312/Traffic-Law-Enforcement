@@ -39,17 +39,16 @@ namespace Traffic_Law_Enforcement
 
         protected override void OnUpdate()
         {
-            if (!Mod.IsPublicTransportLaneEnforcementEnabled || !EnforcementGameTime.IsInitialized)
+            if (!ShouldApplyPublicTransportLaneIntervention() ||
+                !EnforcementGameTime.IsInitialized)
             {
                 return;
             }
 
-            long thresholdDayTicks = (long)System.Math.Round(System.Math.Max(0f, EnforcementGameplaySettingsService.Current.PublicTransportLaneExitPressureThresholdDays) * EnforcementGameTime.DayTicksPerDay);
+            long thresholdDayTicks = GetExitPressureThresholdDayTicks();
             long currentDayTicks = EnforcementGameTime.CurrentTimestampDayTicks;
 
-            if (thresholdDayTicks == m_LastThresholdDayTicks &&
-                currentDayTicks < m_NextPressureEvaluationDayTicks &&
-                m_ChangedViolationQuery.IsEmptyIgnoreFilter)
+            if (CanSkipExitPressureUpdate(thresholdDayTicks, currentDayTicks))
             {
                 return;
             }
@@ -86,92 +85,48 @@ namespace Traffic_Law_Enforcement
                             continue;
                         }
 
-                        if (!violation.m_ExitPressureApplied)
-                        {
-                            long vehiclePressureEvaluationDayTicks =
-                                violation.m_StartDayTicks + thresholdDayTicks;
-                            if (vehiclePressureEvaluationDayTicks < nextPressureEvaluationDayTicks)
-                            {
-                                nextPressureEvaluationDayTicks = vehiclePressureEvaluationDayTicks;
-                            }
-                        }
+                        TrackNextPressureEvaluation(
+                            violation,
+                            thresholdDayTicks,
+                            ref nextPressureEvaluationDayTicks);
 
-                        if (violation.m_ExitPressureApplied)
-                        {
-                            continue;
-                        }
-
-                        long elapsedDayTicks = currentDayTicks - violation.m_StartDayTicks;
-                        if (elapsedDayTicks < thresholdDayTicks)
+                        if (!ShouldApplyExitPressure(
+                                violation,
+                                currentDayTicks,
+                                thresholdDayTicks,
+                                out long elapsedDayTicks))
                         {
                             continue;
                         }
 
-                        if (!m_PathOwnerData.TryGetComponent(vehicle, out PathOwner pathOwner))
+                        if (!TryGetEligiblePathOwner(vehicle, out PathOwner pathOwner))
                         {
                             continue;
                         }
 
-                        if ((pathOwner.m_State & PathFlags.Pending) != 0)
-                        {
-                            continue;
-                        }
-
-                        if ((pathOwner.m_State & PathFlags.Obsolete) == 0)
-                        {
-                            PathFlags stateBefore = pathOwner.m_State;
-                            pathOwner.m_State |= PathFlags.Obsolete;
-                            EntityManager.SetComponentData(vehicle, pathOwner);
-                            bool shouldLogPathObsoleteTrace =
-                                EnforcementLoggingPolicy
-                                    .ShouldLogVehicleSpecificPathObsoleteSource(
-                                        vehicle);
-
-                            if (!currentLaneDataReady)
-                            {
-                                m_CurrentLaneData.Update(this);
-                                currentLaneDataReady = true;
-                            }
-
-                            Entity currentLane = m_CurrentLaneData.TryGetComponent(vehicle, out CarCurrentLane currentLaneData)
-                                ? currentLaneData.m_Lane
-                                : violation.m_Lane;
-
-                            if (shouldLogPathObsoleteTrace &&
-                                !typeLookupsReady)
-                            {
-                                m_TypeLookups.Update(this);
-                                typeLookupsReady = true;
-                            }
-
-                            string role =
-                                shouldLogPathObsoleteTrace
-                                    ? PublicTransportLanePolicy.DescribeVehicleRole(vehicle, ref m_TypeLookups)
-                                    : null;
-                            string reason = "PT-lane-exit-pressure-threshold-reached";
-                            string extra =
-                                $"violationLane={violation.m_Lane}, elapsedDayTicks={elapsedDayTicks}, " +
-                                $"thresholdDayTicks={thresholdDayTicks}, exitPressureAppliedBefore={violation.m_ExitPressureApplied}";
-
-                            PathObsoleteTraceLogging.Record(
-                                "PT_EXIT_PRESSURE",
+                        if (TryApplyExitPressurePathObsolete(
                                 vehicle,
-                                currentLane,
+                                ref pathOwner,
+                                out PathFlags stateBefore))
+                        {
+                            RecordExitPressurePathObsoleteTrace(
+                                vehicle,
+                                car,
+                                violation,
+                                elapsedDayTicks,
+                                thresholdDayTicks,
                                 stateBefore,
                                 pathOwner.m_State,
-                                reason,
-                                car,
-                                role,
-                                extra);
-
-                            if (EnforcementLoggingPolicy.ShouldLogVehicleSpecificEnforcementEvent(vehicle))
-                            {
-                                Mod.log.Info($"Applied PT-lane exit pressure: vehicle={vehicle}, lane={violation.m_Lane}, elapsedDayTicks={elapsedDayTicks}, thresholdDayTicks={thresholdDayTicks}");
-                            }
+                                ref currentLaneDataReady,
+                                ref typeLookupsReady);
+                            TryLogExitPressureApplication(
+                                vehicle,
+                                violation.m_Lane,
+                                elapsedDayTicks,
+                                thresholdDayTicks);
                         }
 
-                        violation.m_ExitPressureApplied = true;
-                        EntityManager.SetComponentData(vehicle, violation);
+                        MarkExitPressureApplied(vehicle, ref violation);
                     }
                 }
             }
@@ -182,6 +137,171 @@ namespace Traffic_Law_Enforcement
 
             m_LastThresholdDayTicks = thresholdDayTicks;
             m_NextPressureEvaluationDayTicks = nextPressureEvaluationDayTicks;
+        }
+
+        private static bool ShouldApplyPublicTransportLaneIntervention()
+        {
+            return Mod.IsPublicTransportLaneEnforcementEnabled;
+        }
+
+        private static long GetExitPressureThresholdDayTicks()
+        {
+            return (long)System.Math.Round(
+                System.Math.Max(
+                    0f,
+                    EnforcementGameplaySettingsService.Current
+                        .PublicTransportLaneExitPressureThresholdDays) *
+                EnforcementGameTime.DayTicksPerDay);
+        }
+
+        private bool CanSkipExitPressureUpdate(
+            long thresholdDayTicks,
+            long currentDayTicks)
+        {
+            return thresholdDayTicks == m_LastThresholdDayTicks &&
+                currentDayTicks < m_NextPressureEvaluationDayTicks &&
+                m_ChangedViolationQuery.IsEmptyIgnoreFilter;
+        }
+
+        private static void TrackNextPressureEvaluation(
+            PublicTransportLaneViolation violation,
+            long thresholdDayTicks,
+            ref long nextPressureEvaluationDayTicks)
+        {
+            if (violation.m_ExitPressureApplied)
+            {
+                return;
+            }
+
+            long vehiclePressureEvaluationDayTicks =
+                violation.m_StartDayTicks + thresholdDayTicks;
+            if (vehiclePressureEvaluationDayTicks < nextPressureEvaluationDayTicks)
+            {
+                nextPressureEvaluationDayTicks = vehiclePressureEvaluationDayTicks;
+            }
+        }
+
+        private static bool ShouldApplyExitPressure(
+            PublicTransportLaneViolation violation,
+            long currentDayTicks,
+            long thresholdDayTicks,
+            out long elapsedDayTicks)
+        {
+            elapsedDayTicks = 0L;
+            if (violation.m_ExitPressureApplied)
+            {
+                return false;
+            }
+
+            elapsedDayTicks = currentDayTicks - violation.m_StartDayTicks;
+            return elapsedDayTicks >= thresholdDayTicks;
+        }
+
+        private bool TryGetEligiblePathOwner(
+            Entity vehicle,
+            out PathOwner pathOwner)
+        {
+            if (!m_PathOwnerData.TryGetComponent(vehicle, out pathOwner))
+            {
+                return false;
+            }
+
+            return (pathOwner.m_State & PathFlags.Pending) == 0;
+        }
+
+        private bool TryApplyExitPressurePathObsolete(
+            Entity vehicle,
+            ref PathOwner pathOwner,
+            out PathFlags stateBefore)
+        {
+            stateBefore = pathOwner.m_State;
+            if ((pathOwner.m_State & PathFlags.Obsolete) != 0)
+            {
+                return false;
+            }
+
+            pathOwner.m_State |= PathFlags.Obsolete;
+            EntityManager.SetComponentData(vehicle, pathOwner);
+            return true;
+        }
+
+        private void MarkExitPressureApplied(
+            Entity vehicle,
+            ref PublicTransportLaneViolation violation)
+        {
+            violation.m_ExitPressureApplied = true;
+            EntityManager.SetComponentData(vehicle, violation);
+        }
+
+        private void RecordExitPressurePathObsoleteTrace(
+            Entity vehicle,
+            Car car,
+            PublicTransportLaneViolation violation,
+            long elapsedDayTicks,
+            long thresholdDayTicks,
+            PathFlags stateBefore,
+            PathFlags stateAfter,
+            ref bool currentLaneDataReady,
+            ref bool typeLookupsReady)
+        {
+            if (!EnforcementLoggingPolicy.ShouldLogVehicleSpecificPathObsoleteSource(
+                    vehicle))
+            {
+                return;
+            }
+
+            if (!currentLaneDataReady)
+            {
+                m_CurrentLaneData.Update(this);
+                currentLaneDataReady = true;
+            }
+
+            Entity currentLane =
+                m_CurrentLaneData.TryGetComponent(vehicle, out CarCurrentLane currentLaneData)
+                    ? currentLaneData.m_Lane
+                    : violation.m_Lane;
+
+            if (!typeLookupsReady)
+            {
+                m_TypeLookups.Update(this);
+                typeLookupsReady = true;
+            }
+
+            string role =
+                PublicTransportLanePolicy.DescribeVehicleRole(
+                    vehicle,
+                    ref m_TypeLookups);
+            string extra =
+                $"violationLane={violation.m_Lane}, elapsedDayTicks={elapsedDayTicks}, " +
+                $"thresholdDayTicks={thresholdDayTicks}, exitPressureAppliedBefore={violation.m_ExitPressureApplied}";
+
+            PathObsoleteTraceLogging.Record(
+                "PT_EXIT_PRESSURE",
+                vehicle,
+                currentLane,
+                stateBefore,
+                stateAfter,
+                "PT-lane-exit-pressure-threshold-reached",
+                car,
+                role,
+                extra);
+        }
+
+        private static void TryLogExitPressureApplication(
+            Entity vehicle,
+            Entity lane,
+            long elapsedDayTicks,
+            long thresholdDayTicks)
+        {
+            if (!EnforcementLoggingPolicy.ShouldLogVehicleSpecificEnforcementEvent(
+                    vehicle))
+            {
+                return;
+            }
+
+            Mod.log.Info(
+                $"Applied PT-lane exit pressure: vehicle={vehicle}, lane={lane}, " +
+                $"elapsedDayTicks={elapsedDayTicks}, thresholdDayTicks={thresholdDayTicks}");
         }
     }
 }
