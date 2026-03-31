@@ -35,6 +35,8 @@ namespace Traffic_Law_Enforcement
     public class Setting : ModSetting
     {
         private static string s_ModLogPath;
+        private const string EnforcementLoggingMigrationMarkerFileName =
+            "enforcement_logging_summary_migration_v1.flag";
         private bool m_EnableFocusedRouteRebuildDiagnosticsLogging;
 
         public const string kCurrentSaveTab = "CurrentSave";
@@ -623,9 +625,6 @@ namespace Traffic_Law_Enforcement
         [SettingsUISection(kDebugTab, kDebugLoggingGroup)]
         public bool EnableFineIncomeLogging { get; set; }
 
-        [Exclude]
-        public bool HasMigratedEnforcementLoggingSummaryToggles { get; set; }
-
 
         [Exclude]
         [SettingsUISection(kDebugTab, kDebugLoggingGroup)]
@@ -721,25 +720,30 @@ namespace Traffic_Law_Enforcement
             EnableAllVehicleRouteSelectionChangeLogging = false;
             EnableFocusedRouteRebuildDiagnosticsLogging = false;
             EnableFocusedVehicleOnlyRouteLogging = false;
-            HasMigratedEnforcementLoggingSummaryToggles = false;
             ResetKeyBindings();
         }
 
         public void ApplyEnforcementLoggingMigrationIfNeeded()
         {
-            if (HasMigratedEnforcementLoggingSummaryToggles)
+            if (HasAppliedEnforcementLoggingMigration())
             {
                 return;
             }
 
+            bool shouldSave = false;
             if (EnableEnforcementEventLogging)
             {
                 EnablePolicyImpactSummaryLogging = true;
                 EnableFineIncomeLogging = true;
+                shouldSave = true;
             }
 
-            HasMigratedEnforcementLoggingSummaryToggles = true;
-            ApplyAndSave();
+            if (shouldSave)
+            {
+                ApplyAndSave();
+            }
+
+            MarkEnforcementLoggingMigrationApplied();
         }
 
         public EnforcementGameplaySettingsState GetNewSaveDefaultSettings()
@@ -877,6 +881,65 @@ namespace Traffic_Law_Enforcement
             }
 
             return @"C:\Users\(USERNAME)\AppData\LocalLow\Colossal Order\Cities Skylines II\Logs\Traffic_Law_Enforcement.Mod.log";
+        }
+
+        private static bool HasAppliedEnforcementLoggingMigration()
+        {
+            try
+            {
+                return File.Exists(GetEnforcementLoggingMigrationMarkerPath());
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private static void MarkEnforcementLoggingMigrationApplied()
+        {
+            try
+            {
+                string markerPath = GetEnforcementLoggingMigrationMarkerPath();
+                string markerDirectory = Path.GetDirectoryName(markerPath);
+                if (!string.IsNullOrWhiteSpace(markerDirectory))
+                {
+                    Directory.CreateDirectory(markerDirectory);
+                }
+
+                File.WriteAllText(
+                    markerPath,
+                    DateTime.UtcNow.ToString("O"));
+            }
+            catch
+            {
+            }
+        }
+
+        private static string GetEnforcementLoggingMigrationMarkerPath()
+        {
+            try
+            {
+                string localAppData = Environment.GetFolderPath(
+                    Environment.SpecialFolder.LocalApplicationData);
+                string appData = Directory.GetParent(localAppData)?.FullName;
+
+                if (!string.IsNullOrWhiteSpace(appData))
+                {
+                    return Path.Combine(
+                        appData,
+                        "LocalLow",
+                        "Colossal Order",
+                        "Cities Skylines II",
+                        "ModsData",
+                        nameof(Traffic_Law_Enforcement),
+                        EnforcementLoggingMigrationMarkerFileName);
+                }
+            }
+            catch
+            {
+            }
+
+            return EnforcementLoggingMigrationMarkerFileName;
         }
 
         private delegate void CurrentSaveSettingsMutator(ref EnforcementGameplaySettingsState state);
