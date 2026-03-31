@@ -488,7 +488,7 @@ namespace Traffic_Law_Enforcement
             bool hasViolation = m_ViolationData.HasComponent(vehicle);
             if (!isViolation)
             {
-                ClearVehicleViolationTracking(vehicle, hasViolation);
+                ClearVehicleViolationTracking(vehicle, hasViolation, events);
                 return;
             }
 
@@ -502,12 +502,32 @@ namespace Traffic_Law_Enforcement
             RefreshViolationTracking(vehicle, violation);
         }
 
-        private void ClearVehicleViolationTracking(Entity vehicle, bool hasViolation)
+        private void ClearVehicleViolationTracking(
+            Entity vehicle,
+            bool hasViolation,
+            DynamicBuffer<DetectedPublicTransportLaneEvent> events)
         {
-            if (hasViolation)
+            if (!hasViolation)
             {
-                EntityManager.RemoveComponent<PublicTransportLaneViolation>(vehicle);
+                return;
             }
+
+            Entity lane = Entity.Null;
+            if (m_ViolationData.TryGetComponent(
+                    vehicle,
+                    out PublicTransportLaneViolation existingViolation))
+            {
+                lane = existingViolation.m_Lane;
+            }
+
+            EntityManager.RemoveComponent<PublicTransportLaneViolation>(vehicle);
+
+            events.Add(new DetectedPublicTransportLaneEvent
+            {
+                Vehicle = vehicle,
+                Lane = lane,
+                Kind = PublicTransportLaneEventKind.ViolationEnd,
+            });
         }
 
         private static PublicTransportLaneViolation CreateViolationState(Entity laneEntity)

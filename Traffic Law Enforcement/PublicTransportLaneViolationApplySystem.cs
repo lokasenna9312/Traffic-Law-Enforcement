@@ -167,9 +167,9 @@ namespace Traffic_Law_Enforcement
         {
             return events.Length == 0 &&
                 m_HasCachedActiveViolatorCount &&
+                m_LastActiveViolatorCount == 0 &&
                 m_ChangedViolationQuery.IsEmptyIgnoreFilter;
         }
-
         private bool ApplyDetectedEvent(
             DetectedPublicTransportLaneEvent evt,
             EnforcementGameplaySettingsState settings,
@@ -179,15 +179,22 @@ namespace Traffic_Law_Enforcement
             {
                 case PublicTransportLaneEventKind.ViolationStart:
                     return ApplyViolationStart(evt, settings, ref statistics);
+
+                case PublicTransportLaneEventKind.ViolationEnd:
+                    return ApplyViolationEnd(evt);
+
                 case PublicTransportLaneEventKind.UsageType2:
                     RecordType2UsageObservation(evt);
                     return false;
+
                 case PublicTransportLaneEventKind.UsageType3:
                     RecordType3UsageObservation(evt);
                     return false;
+
                 case PublicTransportLaneEventKind.UsageType4:
                     RecordType4UsageObservation(evt);
                     return false;
+
                 default:
                     return false;
             }
@@ -276,6 +283,7 @@ namespace Traffic_Law_Enforcement
         private int GetActiveViolatorCount()
         {
             if (!m_HasCachedActiveViolatorCount ||
+                m_LastActiveViolatorCount > 0 ||
                 !m_ChangedViolationQuery.IsEmptyIgnoreFilter)
             {
                 m_LastActiveViolatorCount = m_ViolationQuery.CalculateEntityCount();
