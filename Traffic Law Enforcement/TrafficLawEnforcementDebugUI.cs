@@ -122,22 +122,22 @@ namespace Traffic_Law_Enforcement
             overview.children.Add(new DebugUI.Value
             {
                 displayName = "Reroute logging enabled",
-                getter = () => RerouteDebugLoggingTelemetry.Enabled
+                getter = () => RouteDebugLoggingTelemetry.Enabled
             });
             overview.children.Add(new DebugUI.Value
             {
                 displayName = "Reroute snapshot cache",
-                getter = () => RerouteDebugLoggingTelemetry.CachedSnapshotCount
+                getter = () => RouteDebugLoggingTelemetry.CachedSnapshotCount
             });
             overview.children.Add(new DebugUI.Value
             {
                 displayName = "Reroute candidates (last update)",
-                getter = () => RerouteDebugLoggingTelemetry.LastCandidateCount
+                getter = () => RouteDebugLoggingTelemetry.LastCandidateCount
             });
             overview.children.Add(new DebugUI.Value
             {
                 displayName = "Reroute logs emitted (last update)",
-                getter = () => RerouteDebugLoggingTelemetry.LastRouteSelectionLogsEmitted
+                getter = () => RouteDebugLoggingTelemetry.LastRouteSelectionLogsEmitted
             });
             overview.children.Add(new DebugUI.Value
             {

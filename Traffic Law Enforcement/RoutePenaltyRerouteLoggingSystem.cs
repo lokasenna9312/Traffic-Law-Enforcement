@@ -14,7 +14,7 @@ using Entity = Unity.Entities.Entity;
 
 namespace Traffic_Law_Enforcement
 {
-    public static class RerouteDebugLoggingTelemetry
+    public static class RouteDebugLoggingTelemetry
     {
         public static bool Enabled { get; private set; }
         public static int CachedSnapshotCount { get; private set; }
@@ -257,7 +257,7 @@ namespace Traffic_Law_Enforcement
                     SweepInactiveSnapshots();
                 }
 
-                RerouteDebugLoggingTelemetry.SetState(true, m_LastSnapshots.Count, 0, 0);
+                RouteDebugLoggingTelemetry.SetState(true, m_LastSnapshots.Count, 0, 0);
                 return;
             }
 
@@ -576,7 +576,7 @@ namespace Traffic_Law_Enforcement
                 SweepInactiveSnapshots();
             }
 
-            RerouteDebugLoggingTelemetry.SetState(true, m_LastSnapshots.Count, m_CandidateVehicles.Count, routeSelectionLogsEmitted);
+            RouteDebugLoggingTelemetry.SetState(true, m_LastSnapshots.Count, m_CandidateVehicles.Count, routeSelectionLogsEmitted);
         }
 
         private void ClearRouteLoggingState()
@@ -590,7 +590,7 @@ namespace Traffic_Law_Enforcement
             m_LastSnapshots.Clear();
             m_LastRouteSelectionSnapshots.Clear();
             m_CandidateVehicles.Clear();
-            RerouteDebugLoggingTelemetry.SetState(false, 0, 0, 0);
+            RouteDebugLoggingTelemetry.SetState(false, 0, 0, 0);
         }
 
         private void HandleRuntimeWorldReload()
@@ -614,7 +614,7 @@ namespace Traffic_Law_Enforcement
             m_UpdateCount = 0;
             ObsoleteAttemptCorrelationService.ResetForRuntimeWorldGeneration(currentGeneration);
             FocusedLoggingService.ClearWatchedVehiclesForRuntimeWorldReset(currentGeneration);
-            RerouteDebugLoggingTelemetry.SetState(false, 0, 0, 0);
+            RouteDebugLoggingTelemetry.SetState(false, 0, 0, 0);
 
         }
 
