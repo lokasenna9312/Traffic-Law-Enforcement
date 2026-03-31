@@ -222,9 +222,10 @@ namespace Traffic_Law_Enforcement
             return true;
         }
 
-        private static bool ApplyViolationEnd(
+        private bool ApplyViolationEnd(
             DetectedPublicTransportLaneEvent evt)
         {
+            m_HasCachedActiveViolatorCount = false;
             return false;
         }
 

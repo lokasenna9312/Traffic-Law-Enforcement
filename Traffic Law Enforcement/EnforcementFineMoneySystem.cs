@@ -375,6 +375,7 @@ namespace Traffic_Law_Enforcement
             if (!EnforcementFineMoneyService.HasPendingCharges)
             {
                 EnforcementBudgetUIService.UpdateCurrentFineIncome(currentTimestampMonthTicks);
+                EnforcementBudgetUIService.TryLogFineIncomeSummary(currentTimestampMonthTicks);
                 return;
             }
 
