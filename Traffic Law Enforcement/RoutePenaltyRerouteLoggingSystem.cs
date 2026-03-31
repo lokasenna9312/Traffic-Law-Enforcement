@@ -379,75 +379,76 @@ namespace Traffic_Law_Enforcement
                 if (m_LastSnapshots.TryGetValue(vehicle, out RoutePenaltyInspectionResult previousSnapshot))
                 {
                     rerouteDetected = ShouldLogReroute(previousSnapshot, snapshot);
-                if (rerouteDetected)
-                {
-                    RecordRerouteTelemetry(vehicle, previousSnapshot, snapshot);
-
-                    bool allowPublicTransportLaneComparison =
-                        previousSnapshot.PublicTransportLanePolicyResolved &&
-                        snapshot.PublicTransportLanePolicyResolved;
-
-                    int previousComparablePenalty =
-                        CalculateComparableTotalPenalty(
-                            previousSnapshot,
-                            allowPublicTransportLaneComparison);
-
-                    int currentComparablePenalty =
-                        CalculateComparableTotalPenalty(
-                            snapshot,
-                            allowPublicTransportLaneComparison);
-
-                    int avoidedPenalty = previousComparablePenalty - currentComparablePenalty;
-
-                    bool avoidedPublicTransportLanePenalty =
-                        allowPublicTransportLaneComparison &&
-                        previousSnapshot.Profile.PublicTransportLaneSegments >
-                        snapshot.Profile.PublicTransportLaneSegments;
-
-                    bool avoidedMidBlockPenalty =
-                        previousSnapshot.Profile.MidBlockTransitions >
-                        snapshot.Profile.MidBlockTransitions;
-
-                    bool avoidedIntersectionPenalty =
-                        previousSnapshot.Profile.IntersectionTransitions >
-                        snapshot.Profile.IntersectionTransitions;
-
-                    if (estimatedRerouteLoggingEnabled &&
-                        allowVehicleSpecificVisibleLogs &&
-                        (watchedVehicle || logsEmitted < rerouteLogLimit))
+                    if (rerouteDetected)
                     {
-                        if (watchedVehicle)
-                        {
-                            LogReroute(
-                                vehicle,
+                        RecordRerouteTelemetry(vehicle, previousSnapshot, snapshot);
+
+                        bool allowPublicTransportLaneComparison =
+                            previousSnapshot.PublicTransportLanePolicyResolved &&
+                            snapshot.PublicTransportLanePolicyResolved;
+
+                        int previousComparablePenalty =
+                            CalculateComparableTotalPenalty(
                                 previousSnapshot,
+                                allowPublicTransportLaneComparison);
+
+                        int currentComparablePenalty =
+                            CalculateComparableTotalPenalty(
                                 snapshot,
-                                watchedVehicle);
-                        }
-                        else
+                                allowPublicTransportLaneComparison);
+
+                        int avoidedPenalty = previousComparablePenalty - currentComparablePenalty;
+
+                        bool avoidedPublicTransportLanePenalty =
+                            allowPublicTransportLaneComparison &&
+                            previousSnapshot.Profile.PublicTransportLaneSegments >
+                            snapshot.Profile.PublicTransportLaneSegments;
+
+                        bool avoidedMidBlockPenalty =
+                            previousSnapshot.Profile.MidBlockTransitions >
+                            snapshot.Profile.MidBlockTransitions;
+
+                        bool avoidedIntersectionPenalty =
+                            previousSnapshot.Profile.IntersectionTransitions >
+                            snapshot.Profile.IntersectionTransitions;
+
+                        if (estimatedRerouteLoggingEnabled && allowVehicleSpecificVisibleLogs)
                         {
-                            rerouteSummaryCount += 1;
-                            rerouteSummaryAvoidedPenalty += avoidedPenalty;
-
-                            if (avoidedPublicTransportLanePenalty)
+                            if (watchedVehicle)
                             {
-                                rerouteSummaryPublicTransport += 1;
-                            }
+                                if (logsEmitted < rerouteLogLimit)
+                                {
+                                    LogReroute(
+                                        vehicle,
+                                        previousSnapshot,
+                                        snapshot,
+                                        watchedVehicle);
 
-                            if (avoidedMidBlockPenalty)
+                                    logsEmitted += 1;
+                                }
+                            }
+                            else
                             {
-                                rerouteSummaryMidBlock += 1;
-                            }
+                                rerouteSummaryCount += 1;
+                                rerouteSummaryAvoidedPenalty += avoidedPenalty;
 
-                            if (avoidedIntersectionPenalty)
-                            {
-                                rerouteSummaryIntersection += 1;
-                            }
+                                if (avoidedPublicTransportLanePenalty)
+                                {
+                                    rerouteSummaryPublicTransport += 1;
+                                }
 
-                            logsEmitted += 1;
+                                if (avoidedMidBlockPenalty)
+                                {
+                                    rerouteSummaryMidBlock += 1;
+                                }
+
+                                if (avoidedIntersectionPenalty)
+                                {
+                                    rerouteSummaryIntersection += 1;
+                                }
+                            }
                         }
                     }
-                }
 
                     m_LastSnapshots[vehicle] = snapshot;
                 }
