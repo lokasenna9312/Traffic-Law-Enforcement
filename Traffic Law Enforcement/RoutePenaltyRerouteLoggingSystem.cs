@@ -794,6 +794,27 @@ namespace Traffic_Law_Enforcement
                 previousSnapshot.AcceptedResultHash != currentSnapshot.AcceptedResultHash;
         }
 
+        private static bool AreTagSnapshotsEqual(
+            RoutePenaltyTagSnapshot previousTags,
+            RoutePenaltyTagSnapshot currentTags)
+        {
+            if (previousTags.Count != currentTags.Count ||
+                previousTags.OmittedCount != currentTags.OmittedCount)
+            {
+                return false;
+            }
+
+            for (int i = 0; i < previousTags.Count; i += 1)
+            {
+                if (previousTags.GetToken(i) != currentTags.GetToken(i))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
         private static bool IsLowValueNonWatchedRouteSelectionChange(
             RouteSelectionChangeSnapshot previousSnapshot,
             RouteSelectionChangeSnapshot currentSnapshot,
@@ -820,8 +841,9 @@ namespace Traffic_Law_Enforcement
                 previousSnapshot.Inspection.TotalPenalty == currentSnapshot.Inspection.TotalPenalty;
 
             bool tagsUnchanged =
-                RoutePenaltyInspection.BuildTagSummary(previousSnapshot.Inspection.TagSnapshot) ==
-                RoutePenaltyInspection.BuildTagSummary(currentSnapshot.Inspection.TagSnapshot);
+                AreTagSnapshotsEqual(
+                    previousSnapshot.Inspection.TagSnapshot,
+                    currentSnapshot.Inspection.TagSnapshot);
 
             return routeEndpointsUnchanged &&
                 acceptedResultUnchanged &&
