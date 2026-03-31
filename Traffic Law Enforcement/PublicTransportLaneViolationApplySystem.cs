@@ -222,6 +222,12 @@ namespace Traffic_Law_Enforcement
             return true;
         }
 
+        private static bool ApplyViolationEnd(
+            DetectedPublicTransportLaneEvent evt)
+        {
+            return false;
+        }
+
         private static void RecordViolationStartObservation(
             DetectedPublicTransportLaneEvent evt,
             int violationCount,
