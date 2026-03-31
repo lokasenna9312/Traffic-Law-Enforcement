@@ -771,7 +771,6 @@ namespace Traffic_Law_Enforcement
             bool rerouteDetected)
         {
             return rerouteDetected ||
-                previousSnapshot.RouteHash != currentSnapshot.RouteHash ||
                 previousSnapshot.HasCurrentRoute != currentSnapshot.HasCurrentRoute ||
                 previousSnapshot.CurrentRoute != currentSnapshot.CurrentRoute ||
                 previousSnapshot.HasCurrentTarget != currentSnapshot.HasCurrentTarget ||
@@ -942,6 +941,17 @@ namespace Traffic_Law_Enforcement
                 }
 
                 reasons.Append("accepted-path");
+                hasReasons = true;
+            }
+
+            if (previousSnapshot.AcceptedResultHash != currentSnapshot.AcceptedResultHash)
+            {
+                if (hasReasons)
+                {
+                    reasons.Append(',');
+                }
+
+                reasons.Append("accepted-result");
                 hasReasons = true;
             }
 

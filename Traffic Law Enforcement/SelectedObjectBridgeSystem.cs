@@ -205,6 +205,7 @@ namespace Traffic_Law_Enforcement
 
         private SelectedObjectDebugSnapshot m_CurrentSnapshot;
         private bool m_HasSnapshot;
+        private int m_LastSnapshotSettingsVersion = -1;
         public SelectedObjectDebugSnapshot CurrentSnapshot => m_CurrentSnapshot;
         public bool HasSnapshot => m_HasSnapshot;
 
@@ -354,6 +355,7 @@ namespace Traffic_Law_Enforcement
                     includeRouteDiagnosticsDisplayFields,
                     includeCurrentLaneFields,
                     includePathStateFields);
+                m_LastSnapshotSettingsVersion = EnforcementGameplaySettingsService.Version;
                 m_HasSnapshot = true;
                 return;
             }
@@ -426,6 +428,7 @@ namespace Traffic_Law_Enforcement
                 includeRouteDiagnosticsDisplayFields,
                 includeCurrentLaneFields,
                 includePathStateFields);
+            m_LastSnapshotSettingsVersion = EnforcementGameplaySettingsService.Version;
             m_HasSnapshot = true;
         }
 
@@ -547,6 +550,7 @@ namespace Traffic_Law_Enforcement
             string lastReason = string.Empty;
             SelectedObjectDisplayFormatterContext formatterContext = default;
             bool hasFormatterContext = false;
+            int settingsVersion = EnforcementGameplaySettingsService.Version;
 
             if (includeSummaryFields && tleApplicable && resolveResult.IsVehicle)
             {
@@ -578,6 +582,36 @@ namespace Traffic_Law_Enforcement
                     currentTargetEntity,
                     currentRouteEntity,
                     currentPathFlags);
+
+            if (CanReuseDetailedSnapshot(
+                    resolveResult,
+                    tleApplicability,
+                    settingsVersion,
+                    hasTrafficLawProfile,
+                    currentLaneEntity,
+                    previousLaneEntity,
+                    laneChangeCount,
+                    ptLaneViolationActive,
+                    pendingExitActive,
+                    totalFines,
+                    totalViolations,
+                    lastReason,
+                    hasPathOwner,
+                    hasCurrentTarget,
+                    hasCurrentRoute,
+                    currentPathFlags,
+                    currentTargetEntity,
+                    currentRouteEntity,
+                    includeGeneralDebugFields,
+                    includeRouteDiagnosticsDebugFields,
+                    includePermissionStateSummary,
+                    includeLaneDetailsFields,
+                    canReuseLaneDisplayText,
+                    includeRouteDiagnosticsDisplayFields,
+                    canReuseRouteDiagnostics))
+            {
+                return m_CurrentSnapshot;
+            }
 
             bool needsFormatterContext =
                 (includeRouteDiagnosticsDisplayFields && !canReuseRouteDiagnostics) ||
@@ -753,6 +787,77 @@ namespace Traffic_Law_Enforcement
                 tleApplicability == m_CurrentSnapshot.TleApplicability &&
                 currentLaneEntity == m_CurrentSnapshot.CurrentLaneEntity &&
                 previousLaneEntity == m_CurrentSnapshot.PreviousLaneEntity;
+        }
+
+        private bool CanReuseDetailedSnapshot(
+            SelectedObjectResolveResult resolveResult,
+            SelectedObjectTleApplicability tleApplicability,
+            int settingsVersion,
+            bool hasTrafficLawProfile,
+            Entity currentLaneEntity,
+            Entity previousLaneEntity,
+            int laneChangeCount,
+            bool ptLaneViolationActive,
+            bool pendingExitActive,
+            int totalFines,
+            int totalViolations,
+            string lastReason,
+            bool hasPathOwner,
+            bool hasCurrentTarget,
+            bool hasCurrentRoute,
+            PathFlags currentPathFlags,
+            Entity currentTargetEntity,
+            Entity currentRouteEntity,
+            bool includeGeneralDebugFields,
+            bool includeRouteDiagnosticsDebugFields,
+            bool includePermissionStateSummary,
+            bool includeLaneDetailsFields,
+            bool canReuseLaneDisplayText,
+            bool includeRouteDiagnosticsDisplayFields,
+            bool canReuseRouteDiagnostics)
+        {
+            return m_HasSnapshot &&
+                !includeGeneralDebugFields &&
+                !includeRouteDiagnosticsDebugFields &&
+                !includePermissionStateSummary &&
+                settingsVersion == m_LastSnapshotSettingsVersion &&
+                resolveResult.ResolveState == m_CurrentSnapshot.ResolveState &&
+                resolveResult.VehicleKind == m_CurrentSnapshot.VehicleKind &&
+                tleApplicability == m_CurrentSnapshot.TleApplicability &&
+                resolveResult.SourceSelectedEntity == m_CurrentSnapshot.SourceSelectedEntity &&
+                resolveResult.ResolvedVehicleEntity == m_CurrentSnapshot.ResolvedVehicleEntity &&
+                resolveResult.PrefabEntity == m_CurrentSnapshot.PrefabEntity &&
+                resolveResult.HasPrefabRef == m_CurrentSnapshot.HasPrefabRef &&
+                resolveResult.IsTrailerChild == m_CurrentSnapshot.IsTrailerChild &&
+                resolveResult.IsVehicle == m_CurrentSnapshot.IsVehicle &&
+                resolveResult.IsCar == m_CurrentSnapshot.IsCar &&
+                resolveResult.IsTrain == m_CurrentSnapshot.IsTrain &&
+                resolveResult.IsParked == m_CurrentSnapshot.IsParked &&
+                resolveResult.HasCarCurrentLane == m_CurrentSnapshot.HasCarCurrentLane &&
+                resolveResult.HasTrainCurrentLane == m_CurrentSnapshot.HasTrainCurrentLane &&
+                resolveResult.HasLiveLaneData == m_CurrentSnapshot.HasLiveLaneData &&
+                resolveResult.HasPublicTransportVehicleData == m_CurrentSnapshot.HasPublicTransportVehicleData &&
+                resolveResult.HasTrainData == m_CurrentSnapshot.HasTrainData &&
+                hasTrafficLawProfile == m_CurrentSnapshot.HasTrafficLawProfile &&
+                currentLaneEntity == m_CurrentSnapshot.CurrentLaneEntity &&
+                previousLaneEntity == m_CurrentSnapshot.PreviousLaneEntity &&
+                laneChangeCount == m_CurrentSnapshot.LaneChangeCount &&
+                ptLaneViolationActive == m_CurrentSnapshot.PublicTransportLaneViolationActive &&
+                pendingExitActive == m_CurrentSnapshot.PendingExitActive &&
+                totalFines == m_CurrentSnapshot.TotalFines &&
+                totalViolations == m_CurrentSnapshot.TotalViolations &&
+                string.Equals(
+                    lastReason ?? string.Empty,
+                    m_CurrentSnapshot.LastReason ?? string.Empty,
+                    System.StringComparison.Ordinal) &&
+                hasPathOwner == m_CurrentSnapshot.HasPathOwner &&
+                hasCurrentTarget == m_CurrentSnapshot.HasCurrentTarget &&
+                hasCurrentRoute == m_CurrentSnapshot.HasCurrentRoute &&
+                currentPathFlags == m_CurrentSnapshot.CurrentPathFlags &&
+                currentTargetEntity == m_CurrentSnapshot.CurrentTargetEntity &&
+                currentRouteEntity == m_CurrentSnapshot.CurrentRouteEntity &&
+                (!includeLaneDetailsFields || canReuseLaneDisplayText) &&
+                (!includeRouteDiagnosticsDisplayFields || canReuseRouteDiagnostics);
         }
 
         private bool CanReuseRouteDiagnostics(

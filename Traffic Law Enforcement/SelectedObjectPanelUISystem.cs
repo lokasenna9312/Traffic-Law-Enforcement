@@ -194,6 +194,16 @@ namespace Traffic_Law_Enforcement
         private string m_FlagOnText = "On";
         private string m_FlagOffText = "Off";
         private string m_TotalsFormatText = "Violations {0}, Fines {1}";
+        private bool m_HasCachedPanelState;
+        private SelectedObjectDebugSnapshot m_LastPanelSnapshot;
+        private PanelState m_LastPanelState;
+        private string m_LastPanelSuggestedEntitySelectionValue = string.Empty;
+        private string m_LastPanelEntitySelectionStatus = string.Empty;
+        private bool m_LastPanelEntitySelectionStatusIsError;
+        private string m_LastPanelPathObsoleteStatus = string.Empty;
+        private bool m_LastPanelPathObsoleteStatusIsError;
+        private bool m_LastPanelLaneDetailsCollapsed = true;
+        private bool m_LastPanelRouteDiagnosticsCollapsed = true;
 
         public override GameMode gameMode => GameMode.Game;
 
@@ -341,6 +351,7 @@ namespace Traffic_Law_Enforcement
 
             if (!m_IsPanelEnabled)
             {
+                m_HasCachedPanelState = false;
                 m_VisibleBinding.Update(false);
                 return;
             }
@@ -349,6 +360,7 @@ namespace Traffic_Law_Enforcement
 
             if (m_IsCollapsed)
             {
+                m_HasCachedPanelState = false;
                 UpdateBindings(BuildCollapsedState());
                 return;
             }
@@ -362,6 +374,7 @@ namespace Traffic_Law_Enforcement
             string currentSuggestedEntitySelectionValue = string.Empty;
             if (m_SelectedObjectBridgeSystem == null || !m_SelectedObjectBridgeSystem.HasSnapshot)
             {
+                m_HasCachedPanelState = false;
                 RefreshEntitySelectionStatus(currentSuggestedEntitySelectionValue);
                 RefreshPathObsoleteStatus(currentSuggestedEntitySelectionValue);
                 PanelState noSnapshotState = BuildNoSelectionState();
@@ -374,7 +387,16 @@ namespace Traffic_Law_Enforcement
             RefreshEntitySelectionStatus(currentSuggestedEntitySelectionValue);
             RefreshPathObsoleteStatus(currentSuggestedEntitySelectionValue);
             SelectedObjectDebugSnapshot snapshot = m_SelectedObjectBridgeSystem.CurrentSnapshot;
+            if (TryReusePanelState(
+                    snapshot,
+                    currentSuggestedEntitySelectionValue,
+                    out _))
+            {
+                return;
+            }
+
             PanelState state = BuildState(snapshot, currentSuggestedEntitySelectionValue);
+            CachePanelState(snapshot, currentSuggestedEntitySelectionValue, state);
             UpdateBindings(state);
         }
 
@@ -524,6 +546,7 @@ namespace Traffic_Law_Enforcement
 
         private void UpdateLocalizedTextBindings()
         {
+            m_HasCachedPanelState = false;
             m_HeaderTextBinding.Update(LocalizeText(kHeaderTextLocaleId, "Selected Object"));
             m_SummaryTitleBinding.Update(LocalizeText(kSummaryTitleLocaleId, "Summary"));
             m_ClassificationLabelBinding.Update(LocalizeText(kClassificationLabelLocaleId, "Classification"));
@@ -614,6 +637,84 @@ namespace Traffic_Law_Enforcement
             m_TotalsFormatText = LocalizeText(
                 kTotalsValueFormatLocaleId,
                 "Violations {0}, Fines {1}");
+        }
+
+        private bool TryReusePanelState(
+            SelectedObjectDebugSnapshot snapshot,
+            string suggestedEntitySelectionValue,
+            out PanelState state)
+        {
+            if (!m_HasCachedPanelState ||
+                !CanReusePanelState(snapshot, suggestedEntitySelectionValue))
+            {
+                state = default;
+                return false;
+            }
+
+            state = m_LastPanelState;
+            return true;
+        }
+
+        private bool CanReusePanelState(
+            SelectedObjectDebugSnapshot snapshot,
+            string suggestedEntitySelectionValue)
+        {
+            return
+                snapshot.ResolveState == m_LastPanelSnapshot.ResolveState &&
+                snapshot.TleApplicability == m_LastPanelSnapshot.TleApplicability &&
+                snapshot.SourceSelectedEntity == m_LastPanelSnapshot.SourceSelectedEntity &&
+                snapshot.ResolvedVehicleEntity == m_LastPanelSnapshot.ResolvedVehicleEntity &&
+                snapshot.VehicleKind == m_LastPanelSnapshot.VehicleKind &&
+                snapshot.SummaryClassificationText == m_LastPanelSnapshot.SummaryClassificationText &&
+                snapshot.SummaryTleStatusText == m_LastPanelSnapshot.SummaryTleStatusText &&
+                snapshot.RoleText == m_LastPanelSnapshot.RoleText &&
+                snapshot.PublicTransportLanePolicyText == m_LastPanelSnapshot.PublicTransportLanePolicyText &&
+                snapshot.CurrentLaneText == m_LastPanelSnapshot.CurrentLaneText &&
+                snapshot.PreviousLaneText == m_LastPanelSnapshot.PreviousLaneText &&
+                snapshot.LaneChangeCount == m_LastPanelSnapshot.LaneChangeCount &&
+                snapshot.PublicTransportLaneViolationActive == m_LastPanelSnapshot.PublicTransportLaneViolationActive &&
+                snapshot.PendingExitActive == m_LastPanelSnapshot.PendingExitActive &&
+                snapshot.TotalFines == m_LastPanelSnapshot.TotalFines &&
+                snapshot.TotalViolations == m_LastPanelSnapshot.TotalViolations &&
+                snapshot.CompactLastReasonText == m_LastPanelSnapshot.CompactLastReasonText &&
+                snapshot.CompactRepeatPenaltyText == m_LastPanelSnapshot.CompactRepeatPenaltyText &&
+                snapshot.HasPathOwner == m_LastPanelSnapshot.HasPathOwner &&
+                snapshot.HasCurrentTarget == m_LastPanelSnapshot.HasCurrentTarget &&
+                snapshot.HasCurrentRoute == m_LastPanelSnapshot.HasCurrentRoute &&
+                snapshot.CurrentPathFlags == m_LastPanelSnapshot.CurrentPathFlags &&
+                snapshot.CurrentTargetEntity == m_LastPanelSnapshot.CurrentTargetEntity &&
+                snapshot.CurrentRouteEntity == m_LastPanelSnapshot.CurrentRouteEntity &&
+                snapshot.CurrentRouteColorText == m_LastPanelSnapshot.CurrentRouteColorText &&
+                snapshot.HasRouteDiagnostics == m_LastPanelSnapshot.HasRouteDiagnostics &&
+                snapshot.RouteDiagnosticsCurrentTargetText == m_LastPanelSnapshot.RouteDiagnosticsCurrentTargetText &&
+                snapshot.RouteDiagnosticsCurrentRouteText == m_LastPanelSnapshot.RouteDiagnosticsCurrentRouteText &&
+                snapshot.RouteDiagnosticsTargetRoadText == m_LastPanelSnapshot.RouteDiagnosticsTargetRoadText &&
+                snapshot.RouteDiagnosticsExplanationText == m_LastPanelSnapshot.RouteDiagnosticsExplanationText &&
+                snapshot.RouteDiagnosticsConnectedStopText == m_LastPanelSnapshot.RouteDiagnosticsConnectedStopText &&
+                suggestedEntitySelectionValue == m_LastPanelSuggestedEntitySelectionValue &&
+                m_EntitySelectionStatus == m_LastPanelEntitySelectionStatus &&
+                m_EntitySelectionStatusIsError == m_LastPanelEntitySelectionStatusIsError &&
+                m_PathObsoleteStatus == m_LastPanelPathObsoleteStatus &&
+                m_PathObsoleteStatusIsError == m_LastPanelPathObsoleteStatusIsError &&
+                m_IsLaneDetailsCollapsed == m_LastPanelLaneDetailsCollapsed &&
+                m_IsRouteDiagnosticsCollapsed == m_LastPanelRouteDiagnosticsCollapsed;
+        }
+
+        private void CachePanelState(
+            SelectedObjectDebugSnapshot snapshot,
+            string suggestedEntitySelectionValue,
+            PanelState state)
+        {
+            m_HasCachedPanelState = true;
+            m_LastPanelSnapshot = snapshot;
+            m_LastPanelState = state;
+            m_LastPanelSuggestedEntitySelectionValue = suggestedEntitySelectionValue ?? string.Empty;
+            m_LastPanelEntitySelectionStatus = m_EntitySelectionStatus ?? string.Empty;
+            m_LastPanelEntitySelectionStatusIsError = m_EntitySelectionStatusIsError;
+            m_LastPanelPathObsoleteStatus = m_PathObsoleteStatus ?? string.Empty;
+            m_LastPanelPathObsoleteStatusIsError = m_PathObsoleteStatusIsError;
+            m_LastPanelLaneDetailsCollapsed = m_IsLaneDetailsCollapsed;
+            m_LastPanelRouteDiagnosticsCollapsed = m_IsRouteDiagnosticsCollapsed;
         }
 
         private void UpdateLocalizedTextBindingsIfNeeded()
