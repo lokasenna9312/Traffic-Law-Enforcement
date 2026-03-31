@@ -83,49 +83,17 @@ namespace Traffic_Law_Enforcement
             bool observeType3Usage = EnforcementLoggingPolicy.ShouldLogType3Usage();
             bool observeType4Usage = EnforcementLoggingPolicy.ShouldLogType4Usage();
 
-            bool enforcementEnabled = Mod.IsPublicTransportLaneEnforcementEnabled;
+            bool enforcementEnabled = ShouldApplyPublicTransportLaneIntervention();
             if (!enforcementEnabled)
             {
-                if (!m_ViolationQuery.IsEmptyIgnoreFilter)
-                {
-                    EntityManager.RemoveComponent<PublicTransportLaneViolation>(m_ViolationQuery);
-                }
-
-                if (!m_Type2UsageQuery.IsEmptyIgnoreFilter)
-                {
-                    EntityManager.RemoveComponent<PublicTransportLaneType2UsageState>(m_Type2UsageQuery);
-                }
-
-                if (!m_Type3UsageQuery.IsEmptyIgnoreFilter)
-                {
-                    EntityManager.RemoveComponent<PublicTransportLaneType3UsageState>(m_Type3UsageQuery);
-                }
-
-                if (!m_Type4UsageQuery.IsEmptyIgnoreFilter)
-                {
-                    EntityManager.RemoveComponent<PublicTransportLaneType4UsageState>(m_Type4UsageQuery);
-                }
-
-                ClearPendingRefresh();
-                m_HasEvaluated = false;
-                m_LastEnforcementEnabled = false;
+                ResetViolationTrackingForDisabledEnforcement();
                 return;
             }
 
-            if (!observeType2Usage && !m_Type2UsageQuery.IsEmptyIgnoreFilter)
-            {
-                EntityManager.RemoveComponent<PublicTransportLaneType2UsageState>(m_Type2UsageQuery);
-            }
-
-            if (!observeType3Usage && !m_Type3UsageQuery.IsEmptyIgnoreFilter)
-            {
-                EntityManager.RemoveComponent<PublicTransportLaneType3UsageState>(m_Type3UsageQuery);
-            }
-
-            if (!observeType4Usage && !m_Type4UsageQuery.IsEmptyIgnoreFilter)
-            {
-                EntityManager.RemoveComponent<PublicTransportLaneType4UsageState>(m_Type4UsageQuery);
-            }
+            ResetDisabledUsageObservations(
+                observeType2Usage,
+                observeType3Usage,
+                observeType4Usage);
 
             if (m_EventEntity == Entity.Null || !EntityManager.Exists(m_EventEntity))
             {
@@ -198,6 +166,74 @@ namespace Traffic_Law_Enforcement
 
             m_HasEvaluated = true;
             m_LastEnforcementEnabled = true;
+        }
+
+        private static bool ShouldApplyPublicTransportLaneIntervention()
+        {
+            return Mod.IsPublicTransportLaneEnforcementEnabled;
+        }
+
+        private void ResetViolationTrackingForDisabledEnforcement()
+        {
+            ClearViolationTracking();
+            ClearUsageObservationTracking();
+            ClearPendingRefresh();
+            m_HasEvaluated = false;
+            m_LastEnforcementEnabled = false;
+        }
+
+        private void ClearViolationTracking()
+        {
+            if (!m_ViolationQuery.IsEmptyIgnoreFilter)
+            {
+                EntityManager.RemoveComponent<PublicTransportLaneViolation>(
+                    m_ViolationQuery);
+            }
+        }
+
+        private void ClearUsageObservationTracking()
+        {
+            if (!m_Type2UsageQuery.IsEmptyIgnoreFilter)
+            {
+                EntityManager.RemoveComponent<PublicTransportLaneType2UsageState>(
+                    m_Type2UsageQuery);
+            }
+
+            if (!m_Type3UsageQuery.IsEmptyIgnoreFilter)
+            {
+                EntityManager.RemoveComponent<PublicTransportLaneType3UsageState>(
+                    m_Type3UsageQuery);
+            }
+
+            if (!m_Type4UsageQuery.IsEmptyIgnoreFilter)
+            {
+                EntityManager.RemoveComponent<PublicTransportLaneType4UsageState>(
+                    m_Type4UsageQuery);
+            }
+        }
+
+        private void ResetDisabledUsageObservations(
+            bool observeType2Usage,
+            bool observeType3Usage,
+            bool observeType4Usage)
+        {
+            if (!observeType2Usage && !m_Type2UsageQuery.IsEmptyIgnoreFilter)
+            {
+                EntityManager.RemoveComponent<PublicTransportLaneType2UsageState>(
+                    m_Type2UsageQuery);
+            }
+
+            if (!observeType3Usage && !m_Type3UsageQuery.IsEmptyIgnoreFilter)
+            {
+                EntityManager.RemoveComponent<PublicTransportLaneType3UsageState>(
+                    m_Type3UsageQuery);
+            }
+
+            if (!observeType4Usage && !m_Type4UsageQuery.IsEmptyIgnoreFilter)
+            {
+                EntityManager.RemoveComponent<PublicTransportLaneType4UsageState>(
+                    m_Type4UsageQuery);
+            }
         }
 
         protected override void OnDestroy()
@@ -339,91 +375,182 @@ namespace Traffic_Law_Enforcement
             bool observeType4Usage)
         {
             Entity laneEntity = currentLane.m_Lane;
-            bool isViolation = false;
-            bool shouldTrackType2Usage = false;
-            bool shouldTrackType3Usage = false;
-            bool shouldTrackType4Usage = false;
-
-            if (laneEntity != Entity.Null &&
-                m_CarLaneData.TryGetComponent(laneEntity, out CarLane laneData) &&
-                (laneData.m_Flags & Game.Net.CarLaneFlags.PublicOnly) != 0)
+            if (!TryObserveVehiclePublicTransportLaneState(
+                    vehicle,
+                    laneEntity,
+                    settings,
+                    observeType2Usage,
+                    observeType3Usage,
+                    observeType4Usage,
+                    out bool isViolation,
+                    out bool shouldTrackType2Usage,
+                    out bool shouldTrackType3Usage,
+                    out bool shouldTrackType4Usage))
             {
-                if (!IsEmergencyVehicle(vehicle))
-                {
-                    if (!m_ProfileData.TryGetComponent(vehicle, out VehicleTrafficLawProfile profile))
-                    {
-                        return;
-                    }
-
-                    PublicTransportLaneAccessBits bits = profile.m_PublicTransportLaneAccessBits;
-
-                    bool configuredModAllowsAccess =
-                        PublicTransportLanePolicy.ModAllowsAccess(bits);
-
-                    isViolation = !configuredModAllowsAccess;
-
-                    if (observeType2Usage)
-                    {
-                        shouldTrackType2Usage = PublicTransportLanePolicy.IsType2(bits);
-                    }
-
-                    if (observeType3Usage)
-                    {
-                        shouldTrackType3Usage = PublicTransportLanePolicy.IsType3(bits);
-                    }
-
-                    if (observeType4Usage)
-                    {
-                        shouldTrackType4Usage = PublicTransportLanePolicy.IsType4(bits);
-                    }
-                }
-            }
-
-            UpdateType2UsageObservation(vehicle, laneEntity, shouldTrackType2Usage, events);
-            UpdateType3UsageObservation(vehicle, laneEntity, shouldTrackType3Usage, events);
-            UpdateType4UsageObservation(vehicle, laneEntity, shouldTrackType4Usage, events);
-
-            // --- Violation tracing and logging ---
-            bool hasViolation = m_ViolationData.HasComponent(vehicle);
-            if (!isViolation)
-            {
-                if (hasViolation)
-                {
-                    EntityManager.RemoveComponent<PublicTransportLaneViolation>(vehicle);
-                }
                 return;
             }
 
-            PublicTransportLaneViolation violation = new PublicTransportLaneViolation
+            UpdateUsageObservations(
+                vehicle,
+                laneEntity,
+                shouldTrackType2Usage,
+                shouldTrackType3Usage,
+                shouldTrackType4Usage,
+                events);
+            ApplyViolationTracking(vehicle, laneEntity, isViolation, events);
+        }
+
+        private bool TryObserveVehiclePublicTransportLaneState(
+            Entity vehicle,
+            Entity laneEntity,
+            EnforcementGameplaySettingsState settings,
+            bool observeType2Usage,
+            bool observeType3Usage,
+            bool observeType4Usage,
+            out bool isViolation,
+            out bool shouldTrackType2Usage,
+            out bool shouldTrackType3Usage,
+            out bool shouldTrackType4Usage)
+        {
+            isViolation = false;
+            shouldTrackType2Usage = false;
+            shouldTrackType3Usage = false;
+            shouldTrackType4Usage = false;
+
+            if (laneEntity == Entity.Null ||
+                !m_CarLaneData.TryGetComponent(laneEntity, out CarLane laneData) ||
+                (laneData.m_Flags & Game.Net.CarLaneFlags.PublicOnly) == 0 ||
+                IsEmergencyVehicle(vehicle))
+            {
+                return true;
+            }
+
+            if (!m_ProfileData.TryGetComponent(vehicle, out VehicleTrafficLawProfile profile))
+            {
+                return false;
+            }
+
+            PublicTransportLaneAccessBits bits = profile.m_PublicTransportLaneAccessBits;
+            bool configuredModAllowsAccess =
+                PublicTransportLanePolicy.ModAllowsAccess(bits);
+
+            isViolation = !configuredModAllowsAccess;
+
+            if (observeType2Usage)
+            {
+                shouldTrackType2Usage = PublicTransportLanePolicy.IsType2(bits);
+            }
+
+            if (observeType3Usage)
+            {
+                shouldTrackType3Usage = PublicTransportLanePolicy.IsType3(bits);
+            }
+
+            if (observeType4Usage)
+            {
+                shouldTrackType4Usage = PublicTransportLanePolicy.IsType4(bits);
+            }
+
+            return true;
+        }
+
+        private void UpdateUsageObservations(
+            Entity vehicle,
+            Entity laneEntity,
+            bool shouldTrackType2Usage,
+            bool shouldTrackType3Usage,
+            bool shouldTrackType4Usage,
+            DynamicBuffer<DetectedPublicTransportLaneEvent> events)
+        {
+            UpdateType2UsageObservation(
+                vehicle,
+                laneEntity,
+                shouldTrackType2Usage,
+                events);
+            UpdateType3UsageObservation(
+                vehicle,
+                laneEntity,
+                shouldTrackType3Usage,
+                events);
+            UpdateType4UsageObservation(
+                vehicle,
+                laneEntity,
+                shouldTrackType4Usage,
+                events);
+        }
+
+        private void ApplyViolationTracking(
+            Entity vehicle,
+            Entity laneEntity,
+            bool isViolation,
+            DynamicBuffer<DetectedPublicTransportLaneEvent> events)
+        {
+            bool hasViolation = m_ViolationData.HasComponent(vehicle);
+            if (!isViolation)
+            {
+                ClearVehicleViolationTracking(vehicle, hasViolation);
+                return;
+            }
+
+            PublicTransportLaneViolation violation = CreateViolationState(laneEntity);
+            if (!hasViolation)
+            {
+                StartViolationTracking(vehicle, violation, events);
+                return;
+            }
+
+            RefreshViolationTracking(vehicle, violation);
+        }
+
+        private void ClearVehicleViolationTracking(Entity vehicle, bool hasViolation)
+        {
+            if (hasViolation)
+            {
+                EntityManager.RemoveComponent<PublicTransportLaneViolation>(vehicle);
+            }
+        }
+
+        private static PublicTransportLaneViolation CreateViolationState(Entity laneEntity)
+        {
+            return new PublicTransportLaneViolation
             {
                 m_Lane = laneEntity,
                 m_StartDayTicks = EnforcementGameTime.CurrentTimestampDayTicks,
                 m_ExitPressureApplied = false,
             };
+        }
 
-            if (!hasViolation)
+        private void StartViolationTracking(
+            Entity vehicle,
+            PublicTransportLaneViolation violation,
+            DynamicBuffer<DetectedPublicTransportLaneEvent> events)
+        {
+            EntityManager.AddComponentData(vehicle, violation);
+            events.Add(new DetectedPublicTransportLaneEvent
             {
-                EntityManager.AddComponentData(vehicle, violation);
-                events.Add(new DetectedPublicTransportLaneEvent
-                {
-                    Vehicle = vehicle,
-                    Lane = laneEntity,
-                    Kind = PublicTransportLaneEventKind.ViolationStart,
-                });
-            }
-            else if (m_ViolationData.TryGetComponent(vehicle, out PublicTransportLaneViolation existingViolation))
+                Vehicle = vehicle,
+                Lane = violation.m_Lane,
+                Kind = PublicTransportLaneEventKind.ViolationStart,
+            });
+        }
+
+        private void RefreshViolationTracking(
+            Entity vehicle,
+            PublicTransportLaneViolation violation)
+        {
+            if (m_ViolationData.TryGetComponent(
+                    vehicle,
+                    out PublicTransportLaneViolation existingViolation))
             {
                 if (existingViolation.m_Lane != violation.m_Lane)
                 {
-                    violation.m_StartDayTicks = EnforcementGameTime.CurrentTimestampDayTicks;
-                    violation.m_ExitPressureApplied = false;
                     EntityManager.SetComponentData(vehicle, violation);
                 }
+
+                return;
             }
-            else
-            {
-                EntityManager.SetComponentData(vehicle, violation);
-            }
+
+            EntityManager.SetComponentData(vehicle, violation);
         }
         // --- Trace and Log Type 2 ---
         private void UpdateType2UsageObservation(Entity vehicle, Entity laneEntity, bool shouldLogType2Usage, DynamicBuffer<DetectedPublicTransportLaneEvent> events)

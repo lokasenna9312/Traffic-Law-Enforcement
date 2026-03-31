@@ -83,44 +83,16 @@ namespace Traffic_Law_Enforcement
                 m_EventEntity = m_EventBufferQuery.GetSingletonEntity();
             }
 
-            if (!Mod.IsPublicTransportLaneEnforcementEnabled)
+            if (!ShouldApplyPublicTransportLaneIntervention())
             {
-                TrafficLawEnforcementStatistics disabledStatistics =
-                    EntityManager.GetComponentData<TrafficLawEnforcementStatistics>(m_StatisticsEntity);
-
-                bool disabledStatisticsChanged = false;
-
-                if (disabledStatistics.m_ActivePublicTransportLaneViolatorCount != 0)
-                {
-                    disabledStatistics.m_ActivePublicTransportLaneViolatorCount = 0;
-                    disabledStatisticsChanged = true;
-                }
-
-                if (disabledStatisticsChanged)
-                {
-                    EntityManager.SetComponentData(m_StatisticsEntity, disabledStatistics);
-                }
-
-                m_LastActiveViolatorCount = 0;
-                m_HasCachedActiveViolatorCount = true;
-                EnforcementTelemetry.SetStatistics(disabledStatistics);
-
-                DynamicBuffer<DetectedPublicTransportLaneEvent> disabledEvents =
-                    EntityManager.GetBuffer<DetectedPublicTransportLaneEvent>(m_EventEntity);
-                if (disabledEvents.Length > 0)
-                {
-                    disabledEvents.Clear();
-                }
-
+                ResetViolationApplyStateForDisabledEnforcement();
                 return;
             }
 
             DynamicBuffer<DetectedPublicTransportLaneEvent> events =
                 EntityManager.GetBuffer<DetectedPublicTransportLaneEvent>(m_EventEntity);
 
-            if (events.Length == 0 &&
-                m_HasCachedActiveViolatorCount &&
-                m_ChangedViolationQuery.IsEmptyIgnoreFilter)
+            if (CanSkipViolationApplyUpdate(events))
             {
                 return;
             }
@@ -137,72 +109,172 @@ namespace Traffic_Law_Enforcement
 
                 for (int index = 0; index < events.Length; index += 1)
                 {
-                    DetectedPublicTransportLaneEvent evt = events[index];
-
-                    switch (evt.Kind)
+                    if (ApplyDetectedEvent(
+                            events[index],
+                            settings,
+                            ref statistics))
                     {
-                        case PublicTransportLaneEventKind.ViolationStart:
-                        {
-                            statistics.m_PublicTransportLaneViolationCount += 1;
-                            statisticsChanged = true;
-
-                            string reason = PublicTransportLanePolicy.DescribeMissingPermissionReason(
-                                evt.Vehicle,
-                                settings,
-                                ref m_TypeLookups);
-
-                            EnforcementPenaltyService.RecordPublicTransportLaneViolation(
-                                evt.Vehicle,
-                                evt.Lane,
-                                reason);
-
-                            if (EnforcementLoggingPolicy.ShouldLogVehicleSpecificEnforcementEvent(evt.Vehicle))
-                            {
-                                string message =
-                                    $"Public transport lane violation #{statistics.m_PublicTransportLaneViolationCount}: vehicle={evt.Vehicle}, lane={evt.Lane}, reason={reason}";
-                                EnforcementLoggingPolicy.RecordEnforcementEvent(message, evt.Vehicle);
-                            }
-                            break;
-                        }
-
-                        case PublicTransportLaneEventKind.UsageType2:
-                        {
-                            if (EnforcementLoggingPolicy.ShouldLogVehicleSpecificType2Usage(evt.Vehicle))
-                            {
-                                string message =
-                                    $"PT-lane usage by vanilla-allowed but mod-denied vehicle (Type 2): vehicle={evt.Vehicle}, lane={evt.Lane}";
-                                EnforcementLoggingPolicy.RecordType2Usage(message, evt.Vehicle);
-                            }
-                            break;
-                        }
-
-                        case PublicTransportLaneEventKind.UsageType3:
-                        {
-                            if (EnforcementLoggingPolicy.ShouldLogVehicleSpecificType3Usage(evt.Vehicle))
-                            {
-                                string message =
-                                    $"PT-lane usage by vanilla-denied but mod-allowed vehicle (Type 3): vehicle={evt.Vehicle}, lane={evt.Lane}";
-                                EnforcementLoggingPolicy.RecordType3Usage(message, evt.Vehicle);
-                            }
-                            break;
-                        }
-
-                        case PublicTransportLaneEventKind.UsageType4:
-                        {
-                            if (EnforcementLoggingPolicy.ShouldLogVehicleSpecificType4Usage(evt.Vehicle))
-                            {
-                                string message =
-                                    $"PT-lane usage by vanilla-denied and mod-denied vehicle (Type 4): vehicle={evt.Vehicle}, lane={evt.Lane}";
-                                EnforcementLoggingPolicy.RecordType4Usage(message, evt.Vehicle);
-                            }
-                            break;
-                        }
+                        statisticsChanged = true;
                     }
                 }
 
                 events.Clear();
             }
 
+            int activeViolatorCount = GetActiveViolatorCount();
+            if (statistics.m_ActivePublicTransportLaneViolatorCount != activeViolatorCount)
+            {
+                statistics.m_ActivePublicTransportLaneViolatorCount = activeViolatorCount;
+                statisticsChanged = true;
+            }
+
+            PublishStatistics(statistics, statisticsChanged);
+        }
+
+        private static bool ShouldApplyPublicTransportLaneIntervention()
+        {
+            return Mod.IsPublicTransportLaneEnforcementEnabled;
+        }
+
+        private void ResetViolationApplyStateForDisabledEnforcement()
+        {
+            TrafficLawEnforcementStatistics statistics =
+                EntityManager.GetComponentData<TrafficLawEnforcementStatistics>(
+                    m_StatisticsEntity);
+            bool statisticsChanged =
+                ResetActiveViolatorStatisticsForDisabledEnforcement(ref statistics);
+
+            m_LastActiveViolatorCount = 0;
+            m_HasCachedActiveViolatorCount = true;
+            PublishStatistics(statistics, statisticsChanged);
+            ClearDetectedEvents();
+        }
+
+        private static bool ResetActiveViolatorStatisticsForDisabledEnforcement(
+            ref TrafficLawEnforcementStatistics statistics)
+        {
+            if (statistics.m_ActivePublicTransportLaneViolatorCount == 0)
+            {
+                return false;
+            }
+
+            statistics.m_ActivePublicTransportLaneViolatorCount = 0;
+            return true;
+        }
+
+        private bool CanSkipViolationApplyUpdate(
+            DynamicBuffer<DetectedPublicTransportLaneEvent> events)
+        {
+            return events.Length == 0 &&
+                m_HasCachedActiveViolatorCount &&
+                m_ChangedViolationQuery.IsEmptyIgnoreFilter;
+        }
+
+        private bool ApplyDetectedEvent(
+            DetectedPublicTransportLaneEvent evt,
+            EnforcementGameplaySettingsState settings,
+            ref TrafficLawEnforcementStatistics statistics)
+        {
+            switch (evt.Kind)
+            {
+                case PublicTransportLaneEventKind.ViolationStart:
+                    return ApplyViolationStart(evt, settings, ref statistics);
+                case PublicTransportLaneEventKind.UsageType2:
+                    RecordType2UsageObservation(evt);
+                    return false;
+                case PublicTransportLaneEventKind.UsageType3:
+                    RecordType3UsageObservation(evt);
+                    return false;
+                case PublicTransportLaneEventKind.UsageType4:
+                    RecordType4UsageObservation(evt);
+                    return false;
+                default:
+                    return false;
+            }
+        }
+
+        private bool ApplyViolationStart(
+            DetectedPublicTransportLaneEvent evt,
+            EnforcementGameplaySettingsState settings,
+            ref TrafficLawEnforcementStatistics statistics)
+        {
+            statistics.m_PublicTransportLaneViolationCount += 1;
+            string reason = PublicTransportLanePolicy.DescribeMissingPermissionReason(
+                evt.Vehicle,
+                settings,
+                ref m_TypeLookups);
+
+            EnforcementPenaltyService.RecordPublicTransportLaneViolation(
+                evt.Vehicle,
+                evt.Lane,
+                reason);
+            RecordViolationStartObservation(
+                evt,
+                statistics.m_PublicTransportLaneViolationCount,
+                reason);
+            return true;
+        }
+
+        private static void RecordViolationStartObservation(
+            DetectedPublicTransportLaneEvent evt,
+            int violationCount,
+            string reason)
+        {
+            if (!EnforcementLoggingPolicy.ShouldLogVehicleSpecificEnforcementEvent(
+                    evt.Vehicle))
+            {
+                return;
+            }
+
+            string message =
+                $"Public transport lane violation #{violationCount}: vehicle={evt.Vehicle}, lane={evt.Lane}, reason={reason}";
+            EnforcementLoggingPolicy.RecordEnforcementEvent(message, evt.Vehicle);
+        }
+
+        private static void RecordType2UsageObservation(
+            DetectedPublicTransportLaneEvent evt)
+        {
+            if (!EnforcementLoggingPolicy.ShouldLogVehicleSpecificType2Usage(
+                    evt.Vehicle))
+            {
+                return;
+            }
+
+            string message =
+                $"PT-lane usage by vanilla-allowed but mod-denied vehicle (Type 2): vehicle={evt.Vehicle}, lane={evt.Lane}";
+            EnforcementLoggingPolicy.RecordType2Usage(message, evt.Vehicle);
+        }
+
+        private static void RecordType3UsageObservation(
+            DetectedPublicTransportLaneEvent evt)
+        {
+            if (!EnforcementLoggingPolicy.ShouldLogVehicleSpecificType3Usage(
+                    evt.Vehicle))
+            {
+                return;
+            }
+
+            string message =
+                $"PT-lane usage by vanilla-denied but mod-allowed vehicle (Type 3): vehicle={evt.Vehicle}, lane={evt.Lane}";
+            EnforcementLoggingPolicy.RecordType3Usage(message, evt.Vehicle);
+        }
+
+        private static void RecordType4UsageObservation(
+            DetectedPublicTransportLaneEvent evt)
+        {
+            if (!EnforcementLoggingPolicy.ShouldLogVehicleSpecificType4Usage(
+                    evt.Vehicle))
+            {
+                return;
+            }
+
+            string message =
+                $"PT-lane usage by vanilla-denied and mod-denied vehicle (Type 4): vehicle={evt.Vehicle}, lane={evt.Lane}";
+            EnforcementLoggingPolicy.RecordType4Usage(message, evt.Vehicle);
+        }
+
+        private int GetActiveViolatorCount()
+        {
             if (!m_HasCachedActiveViolatorCount ||
                 !m_ChangedViolationQuery.IsEmptyIgnoreFilter)
             {
@@ -210,18 +282,30 @@ namespace Traffic_Law_Enforcement
                 m_HasCachedActiveViolatorCount = true;
             }
 
-            if (statistics.m_ActivePublicTransportLaneViolatorCount != m_LastActiveViolatorCount)
-            {
-                statistics.m_ActivePublicTransportLaneViolatorCount = m_LastActiveViolatorCount;
-                statisticsChanged = true;
-            }
+            return m_LastActiveViolatorCount;
+        }
 
+        private void PublishStatistics(
+            TrafficLawEnforcementStatistics statistics,
+            bool statisticsChanged)
+        {
             if (statisticsChanged)
             {
                 EntityManager.SetComponentData(m_StatisticsEntity, statistics);
             }
 
             EnforcementTelemetry.SetStatistics(statistics);
+        }
+
+        private void ClearDetectedEvents()
+        {
+            DynamicBuffer<DetectedPublicTransportLaneEvent> events =
+                EntityManager.GetBuffer<DetectedPublicTransportLaneEvent>(
+                    m_EventEntity);
+            if (events.Length > 0)
+            {
+                events.Clear();
+            }
         }
     }
 }
