@@ -957,7 +957,22 @@ namespace Traffic_Law_Enforcement
                 zeroPenaltyNoTags &&
                 acceptedResultRebuildChurn;
 
-            return existingLowValueCase || zeroPenaltyAcceptedResultChurn;
+            bool targetChanged =
+                previousSnapshot.HasCurrentTarget != currentSnapshot.HasCurrentTarget ||
+                previousSnapshot.CurrentTarget != currentSnapshot.CurrentTarget;
+
+            bool currentRouteUnchanged =
+                previousSnapshot.HasCurrentRoute == currentSnapshot.HasCurrentRoute &&
+                previousSnapshot.CurrentRoute == currentSnapshot.CurrentRoute;
+
+            bool zeroPenaltyRetargetChurn =
+                previousSnapshot.RouteHash == currentSnapshot.RouteHash &&
+                currentRouteUnchanged &&
+                targetChanged &&
+                acceptedResultUnchanged &&
+                zeroPenaltyNoTags;
+
+            return existingLowValueCase || zeroPenaltyAcceptedResultChurn || zeroPenaltyRetargetChurn;
         }
 
         private void LogRouteSelectionChange(
