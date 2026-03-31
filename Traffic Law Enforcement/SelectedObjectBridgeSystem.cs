@@ -816,6 +816,20 @@ namespace Traffic_Law_Enforcement
             bool includeRouteDiagnosticsDisplayFields,
             bool canReuseRouteDiagnostics)
         {
+            bool laneDetailsStateMatches =
+                !includeLaneDetailsFields ||
+                (currentLaneEntity == m_CurrentSnapshot.CurrentLaneEntity &&
+                 previousLaneEntity == m_CurrentSnapshot.PreviousLaneEntity &&
+                 laneChangeCount == m_CurrentSnapshot.LaneChangeCount &&
+                 hasCurrentTarget == m_CurrentSnapshot.HasCurrentTarget &&
+                 hasCurrentRoute == m_CurrentSnapshot.HasCurrentRoute &&
+                 canReuseLaneDisplayText);
+            bool routeDiagnosticsStateMatches =
+                !includeRouteDiagnosticsDisplayFields ||
+                (currentTargetEntity == m_CurrentSnapshot.CurrentTargetEntity &&
+                 currentRouteEntity == m_CurrentSnapshot.CurrentRouteEntity &&
+                 canReuseRouteDiagnostics);
+
             return m_HasSnapshot &&
                 !includeGeneralDebugFields &&
                 !includeRouteDiagnosticsDebugFields &&
@@ -839,9 +853,6 @@ namespace Traffic_Law_Enforcement
                 resolveResult.HasPublicTransportVehicleData == m_CurrentSnapshot.HasPublicTransportVehicleData &&
                 resolveResult.HasTrainData == m_CurrentSnapshot.HasTrainData &&
                 hasTrafficLawProfile == m_CurrentSnapshot.HasTrafficLawProfile &&
-                currentLaneEntity == m_CurrentSnapshot.CurrentLaneEntity &&
-                previousLaneEntity == m_CurrentSnapshot.PreviousLaneEntity &&
-                laneChangeCount == m_CurrentSnapshot.LaneChangeCount &&
                 ptLaneViolationActive == m_CurrentSnapshot.PublicTransportLaneViolationActive &&
                 pendingExitActive == m_CurrentSnapshot.PendingExitActive &&
                 totalFines == m_CurrentSnapshot.TotalFines &&
@@ -851,13 +862,9 @@ namespace Traffic_Law_Enforcement
                     m_CurrentSnapshot.LastReason ?? string.Empty,
                     System.StringComparison.Ordinal) &&
                 hasPathOwner == m_CurrentSnapshot.HasPathOwner &&
-                hasCurrentTarget == m_CurrentSnapshot.HasCurrentTarget &&
-                hasCurrentRoute == m_CurrentSnapshot.HasCurrentRoute &&
                 currentPathFlags == m_CurrentSnapshot.CurrentPathFlags &&
-                currentTargetEntity == m_CurrentSnapshot.CurrentTargetEntity &&
-                currentRouteEntity == m_CurrentSnapshot.CurrentRouteEntity &&
-                (!includeLaneDetailsFields || canReuseLaneDisplayText) &&
-                (!includeRouteDiagnosticsDisplayFields || canReuseRouteDiagnostics);
+                laneDetailsStateMatches &&
+                routeDiagnosticsStateMatches;
         }
 
         private bool CanReuseRouteDiagnostics(
