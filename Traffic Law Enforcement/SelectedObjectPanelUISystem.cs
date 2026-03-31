@@ -158,13 +158,55 @@ namespace Traffic_Law_Enforcement
         private bool m_IsCollapsed;
         private bool m_IsLaneDetailsCollapsed = true;
         private bool m_IsRouteDiagnosticsCollapsed = true;
-        private int m_LastSeenPendingLoadSequence = -1;
+        private int m_LastSeenRuntimeWorldGeneration = -1;
+        private string m_LastLocalizedLocaleId = string.Empty;
+        private bool m_LocalizedBindingsInitialized;
         private string m_EntitySelectionStatus = string.Empty;
         private bool m_EntitySelectionStatusIsError;
         private string m_EntitySelectionStatusSelectedEntity = string.Empty;
         private string m_PathObsoleteStatus = string.Empty;
         private bool m_PathObsoleteStatusIsError;
         private string m_PathObsoleteStatusSelectedEntity = string.Empty;
+        private string m_NoneText = "None";
+        private string m_NotApplicableText = "Not applicable";
+        private string m_NoLiveLaneText = "No live lane";
+        private string m_TrackingText = "Tracking";
+        private string m_NoSelectionText = "No selection";
+        private string m_PathObsoleteNoPathOwnerText = "Vehicle has no path owner.";
+        private string m_PathObsoletePendingText = "Path is already pending rebuild.";
+        private string m_PathObsoleteAlreadyObsoleteText = "Path is already obsolete.";
+        private string m_LiveLaneStateReadyText = "Ready";
+        private string m_LiveLaneStateNoLiveLaneText = "No live lane";
+        private string m_LiveLaneStateNotApplicableText = "Not applicable";
+        private string m_LiveLaneStateParkedRoadCarText = "Parked road car";
+        private string m_LiveLaneStateNoPathOwnerText = "Ready, no path owner";
+        private string m_LiveLaneStateNoCurrentRouteText = "Ready, no current route";
+        private string m_LiveLaneStateNoCurrentTargetText = "Ready, no current target";
+        private string m_LiveLaneStatePathPendingText = "Ready, path pending";
+        private string m_LiveLaneStatePathScheduledText = "Ready, path scheduled";
+        private string m_LiveLaneStatePathObsoleteText = "Ready, path obsolete";
+        private string m_LiveLaneStatePathFailedText = "Ready, path failed";
+        private string m_LiveLaneStatePathStuckText = "Ready, path stuck";
+        private string m_LiveLaneStatePathUpdatedText = "Ready, path updated";
+        private string m_ActiveFlagsFormatText = "{0} {1}, {2} {3}";
+        private string m_ActiveFlagsViolationNameText = "Violation";
+        private string m_ActiveFlagsPendingNameText = "Pending";
+        private string m_FlagOnText = "On";
+        private string m_FlagOffText = "Off";
+        private string m_TotalsFormatText = "Violations {0}, Fines {1}";
+        private bool m_HasCachedPanelState;
+        private SelectedObjectDebugSnapshot m_LastPanelSnapshot;
+        private PanelState m_LastPanelState;
+        private string m_LastPanelSuggestedEntitySelectionValue = string.Empty;
+        private string m_LastPanelEntitySelectionStatus = string.Empty;
+        private bool m_LastPanelEntitySelectionStatusIsError;
+        private string m_LastPanelPathObsoleteStatus = string.Empty;
+        private bool m_LastPanelPathObsoleteStatusIsError;
+        private bool m_LastPanelLaneDetailsCollapsed = true;
+        private bool m_LastPanelRouteDiagnosticsCollapsed = true;
+        private bool m_LastPanelLaneDetailsReady = true;
+        private bool m_LastPanelRouteDiagnosticsReady = true;
+        private bool m_CollapsedFastPathApplied;
 
         public override GameMode gameMode => GameMode.Game;
 
@@ -290,6 +332,9 @@ namespace Traffic_Law_Enforcement
 
         protected override void OnDestroy()
         {
+            SelectedObjectBridgeSystem.SetDetailedSnapshotConsumerActive(false);
+            SelectedObjectBridgeSystem.SetLaneDetailsConsumerActive(false);
+            SelectedObjectBridgeSystem.SetRouteDiagnosticsConsumerActive(false);
             if (m_PanelToggleAction != null)
             {
                 m_PanelToggleAction.shouldBeEnabled = false;
@@ -305,7 +350,26 @@ namespace Traffic_Law_Enforcement
 
             UpdatePanelToggle();
             UpdateSaveScopedUiState();
-            UpdateLocalizedTextBindings();
+            SyncSnapshotConsumers();
+
+            if (!m_IsPanelEnabled)
+            {
+                m_HasCachedPanelState = false;
+                m_CollapsedFastPathApplied = false;
+                m_VisibleBinding.Update(false);
+                return;
+            }
+
+            UpdateLocalizedTextBindingsIfNeeded();
+
+            if (m_IsCollapsed)
+            {
+                m_HasCachedPanelState = false;
+                ApplyCollapsedBindings();
+                return;
+            }
+
+            m_CollapsedFastPathApplied = false;
 
             if (m_SelectedObjectBridgeSystem == null)
             {
@@ -313,15 +377,10 @@ namespace Traffic_Law_Enforcement
                     World.GetExistingSystemManaged<SelectedObjectBridgeSystem>();
             }
 
-            if (!m_IsPanelEnabled)
-            {
-                UpdateBindings(default);
-                return;
-            }
-
             string currentSuggestedEntitySelectionValue = string.Empty;
             if (m_SelectedObjectBridgeSystem == null || !m_SelectedObjectBridgeSystem.HasSnapshot)
             {
+                m_HasCachedPanelState = false;
                 RefreshEntitySelectionStatus(currentSuggestedEntitySelectionValue);
                 RefreshPathObsoleteStatus(currentSuggestedEntitySelectionValue);
                 PanelState noSnapshotState = BuildNoSelectionState();
@@ -334,11 +393,37 @@ namespace Traffic_Law_Enforcement
             RefreshEntitySelectionStatus(currentSuggestedEntitySelectionValue);
             RefreshPathObsoleteStatus(currentSuggestedEntitySelectionValue);
             SelectedObjectDebugSnapshot snapshot = m_SelectedObjectBridgeSystem.CurrentSnapshot;
-            PanelState state = BuildState(snapshot);
+            bool laneDetailsReady = m_SelectedObjectBridgeSystem.AreLaneDetailsHydrated;
+            bool routeDiagnosticsReady = m_SelectedObjectBridgeSystem.AreRouteDiagnosticsHydrated;
+            if (TryReusePanelState(
+                    snapshot,
+                    currentSuggestedEntitySelectionValue,
+                    laneDetailsReady,
+                    routeDiagnosticsReady,
+                    out _))
+            {
+                return;
+            }
+
+            PanelState state = BuildState(
+                snapshot,
+                currentSuggestedEntitySelectionValue,
+                laneDetailsReady,
+                routeDiagnosticsReady);
+            CachePanelState(
+                snapshot,
+                currentSuggestedEntitySelectionValue,
+                laneDetailsReady,
+                routeDiagnosticsReady,
+                state);
             UpdateBindings(state);
         }
 
-        private PanelState BuildState(SelectedObjectDebugSnapshot snapshot)
+        private PanelState BuildState(
+            SelectedObjectDebugSnapshot snapshot,
+            string suggestedEntitySelectionValue,
+            bool laneDetailsReady,
+            bool routeDiagnosticsReady)
         {
             if (snapshot.ResolveState == SelectedObjectResolveState.None)
             {
@@ -352,7 +437,7 @@ namespace Traffic_Law_Enforcement
                     Visible = true,
                     Compact = false,
                     Message = LocalizeText(kNotVehicleLocaleId, "Not a vehicle"),
-                    EntitySelectionSuggestedValue = BuildSuggestedEntitySelectionValue(snapshot),
+                    EntitySelectionSuggestedValue = suggestedEntitySelectionValue,
                     EntitySelectionStatus = m_EntitySelectionStatus,
                     EntitySelectionStatusIsError = m_EntitySelectionStatusIsError,
                     PathObsoleteButtonVisible = false,
@@ -361,6 +446,16 @@ namespace Traffic_Law_Enforcement
                     PathObsoleteStatusIsError = false
                 };
             }
+
+            bool tleReady =
+                snapshot.TleApplicability == SelectedObjectTleApplicability.ApplicableReady;
+            bool laneDetailsExpanded = !m_IsLaneDetailsCollapsed;
+            bool laneDetailsContentReady = laneDetailsExpanded && laneDetailsReady;
+            bool routeDiagnosticsVisible = snapshot.HasRouteDiagnostics;
+            bool routeDiagnosticsExpanded =
+                routeDiagnosticsVisible &&
+                !m_IsRouteDiagnosticsCollapsed &&
+                routeDiagnosticsReady;
 
             return new PanelState
             {
@@ -372,19 +467,19 @@ namespace Traffic_Law_Enforcement
                 PublicTransportLanePolicy =
                     NormalizeText(snapshot.PublicTransportLanePolicyText),
                 VehicleIndex = BuildDisplayedVehicleEntityText(snapshot),
-                ViolationPending = snapshot.TleApplicability == SelectedObjectTleApplicability.ApplicableReady
+                ViolationPending = tleReady
                     ? BuildActiveFlagsText(snapshot)
                     : string.Empty,
-                Totals = snapshot.TleApplicability == SelectedObjectTleApplicability.ApplicableReady
+                Totals = tleReady
                     ? BuildTotalsText(snapshot)
                     : string.Empty,
-                LastReason = snapshot.TleApplicability == SelectedObjectTleApplicability.ApplicableReady
+                LastReason = tleReady
                     ? NormalizeText(snapshot.CompactLastReasonText)
                     : string.Empty,
-                RepeatPenalty = snapshot.TleApplicability == SelectedObjectTleApplicability.ApplicableReady
+                RepeatPenalty = tleReady
                     ? NormalizeText(snapshot.CompactRepeatPenaltyText)
                     : string.Empty,
-                EntitySelectionSuggestedValue = BuildSuggestedEntitySelectionValue(snapshot),
+                EntitySelectionSuggestedValue = suggestedEntitySelectionValue,
                 EntitySelectionStatus = m_EntitySelectionStatus,
                 EntitySelectionStatusIsError = m_EntitySelectionStatusIsError,
                 PathObsoleteButtonVisible = true,
@@ -392,19 +487,43 @@ namespace Traffic_Law_Enforcement
                 PathObsoleteStatus = BuildPathObsoleteStatusText(snapshot),
                 PathObsoleteStatusIsError = m_PathObsoleteStatusIsError,
                 LaneDetailsVisible = true,
-                CurrentLane = NormalizeText(snapshot.CurrentLaneText),
-                PreviousLane = NormalizeText(snapshot.PreviousLaneText),
-                LaneChanges = snapshot.LaneChangeCount.ToString(),
-                LiveLaneState = BuildLiveLaneStateText(snapshot),
-                RouteDiagnosticsVisible = snapshot.HasRouteDiagnostics,
-                CurrentTarget = BuildCurrentTargetDisplayText(snapshot),
-                CurrentTargetEntity = BuildCurrentTargetEntityText(snapshot),
-                CurrentRoute = NormalizeText(snapshot.RouteDiagnosticsCurrentRouteText),
-                CurrentRouteEntityText = BuildCurrentRouteEntityText(snapshot),
-                CurrentRouteColor = BuildCurrentRouteColorText(snapshot),
-                TargetRoad = NormalizeText(snapshot.RouteDiagnosticsTargetRoadText),
-                RouteExplanation = NormalizeText(snapshot.RouteDiagnosticsExplanationText),
-                ConnectedStop = NormalizeText(snapshot.RouteDiagnosticsConnectedStopText)
+                CurrentLane = laneDetailsContentReady
+                    ? NormalizeText(snapshot.CurrentLaneText)
+                    : string.Empty,
+                PreviousLane = laneDetailsContentReady
+                    ? NormalizeText(snapshot.PreviousLaneText)
+                    : string.Empty,
+                LaneChanges = laneDetailsContentReady
+                    ? snapshot.LaneChangeCount.ToString()
+                    : string.Empty,
+                LiveLaneState = laneDetailsContentReady
+                    ? BuildLiveLaneStateText(snapshot)
+                    : string.Empty,
+                RouteDiagnosticsVisible = routeDiagnosticsVisible,
+                CurrentTarget = routeDiagnosticsExpanded
+                    ? BuildCurrentTargetDisplayText(snapshot)
+                    : string.Empty,
+                CurrentTargetEntity = routeDiagnosticsExpanded
+                    ? BuildCurrentTargetEntityText(snapshot)
+                    : string.Empty,
+                CurrentRoute = routeDiagnosticsExpanded
+                    ? NormalizeText(snapshot.RouteDiagnosticsCurrentRouteText)
+                    : string.Empty,
+                CurrentRouteEntityText = routeDiagnosticsExpanded
+                    ? BuildCurrentRouteEntityText(snapshot)
+                    : string.Empty,
+                CurrentRouteColor = routeDiagnosticsExpanded
+                    ? BuildCurrentRouteColorText(snapshot)
+                    : string.Empty,
+                TargetRoad = routeDiagnosticsExpanded
+                    ? NormalizeText(snapshot.RouteDiagnosticsTargetRoadText)
+                    : string.Empty,
+                RouteExplanation = routeDiagnosticsExpanded
+                    ? NormalizeText(snapshot.RouteDiagnosticsExplanationText)
+                    : string.Empty,
+                ConnectedStop = routeDiagnosticsExpanded
+                    ? NormalizeText(snapshot.RouteDiagnosticsConnectedStopText)
+                    : string.Empty
             };
         }
 
@@ -450,6 +569,7 @@ namespace Traffic_Law_Enforcement
 
         private void UpdateLocalizedTextBindings()
         {
+            m_HasCachedPanelState = false;
             m_HeaderTextBinding.Update(LocalizeText(kHeaderTextLocaleId, "Selected Object"));
             m_SummaryTitleBinding.Update(LocalizeText(kSummaryTitleLocaleId, "Summary"));
             m_ClassificationLabelBinding.Update(LocalizeText(kClassificationLabelLocaleId, "Classification"));
@@ -479,6 +599,184 @@ namespace Traffic_Law_Enforcement
             m_TargetRoadLabelBinding.Update(LocalizeText(kTargetRoadLabelLocaleId, "Target road"));
             m_RouteExplanationLabelBinding.Update(LocalizeText(kRouteExplanationLabelLocaleId, "Route context"));
             m_ConnectedStopLabelBinding.Update(LocalizeText(kConnectedStopLabelLocaleId, "Connected stop"));
+            m_NoneText = LocalizeText(kNoneLocaleId, "None");
+            m_NotApplicableText = LocalizeText(kNotApplicableLocaleId, "Not applicable");
+            m_NoLiveLaneText = LocalizeText(kNoLiveLaneLocaleId, "No live lane");
+            m_TrackingText = LocalizeText(kTrackingLocaleId, "Tracking");
+            m_NoSelectionText = LocalizeText(kNoSelectionLocaleId, "No selection");
+            m_PathObsoleteNoPathOwnerText = LocalizeText(
+                kPathObsoleteStatusNoPathOwnerLocaleId,
+                "Vehicle has no path owner.");
+            m_PathObsoletePendingText = LocalizeText(
+                kPathObsoleteStatusPendingLocaleId,
+                "Path is already pending rebuild.");
+            m_PathObsoleteAlreadyObsoleteText = LocalizeText(
+                kPathObsoleteStatusAlreadyObsoleteLocaleId,
+                "Path is already obsolete.");
+            m_LiveLaneStateReadyText = LocalizeText(kLiveLaneStateReadyLocaleId, "Ready");
+            m_LiveLaneStateNoLiveLaneText = LocalizeText(kLiveLaneStateNoLiveLaneLocaleId, "No live lane");
+            m_LiveLaneStateNotApplicableText = LocalizeText(kLiveLaneStateNotApplicableLocaleId, "Not applicable");
+            m_LiveLaneStateParkedRoadCarText = LocalizeText(
+                kLiveLaneStateParkedRoadCarLocaleId,
+                "Parked road car");
+            m_LiveLaneStateNoPathOwnerText = LocalizeText(
+                kLiveLaneStateNoPathOwnerLocaleId,
+                "Ready, no path owner");
+            m_LiveLaneStateNoCurrentRouteText = LocalizeText(
+                kLiveLaneStateNoCurrentRouteLocaleId,
+                "Ready, no current route");
+            m_LiveLaneStateNoCurrentTargetText = LocalizeText(
+                kLiveLaneStateNoCurrentTargetLocaleId,
+                "Ready, no current target");
+            m_LiveLaneStatePathPendingText = LocalizeText(
+                kLiveLaneStatePathPendingLocaleId,
+                "Ready, path pending");
+            m_LiveLaneStatePathScheduledText = LocalizeText(
+                kLiveLaneStatePathScheduledLocaleId,
+                "Ready, path scheduled");
+            m_LiveLaneStatePathObsoleteText = LocalizeText(
+                kLiveLaneStatePathObsoleteLocaleId,
+                "Ready, path obsolete");
+            m_LiveLaneStatePathFailedText = LocalizeText(
+                kLiveLaneStatePathFailedLocaleId,
+                "Ready, path failed");
+            m_LiveLaneStatePathStuckText = LocalizeText(
+                kLiveLaneStatePathStuckLocaleId,
+                "Ready, path stuck");
+            m_LiveLaneStatePathUpdatedText = LocalizeText(
+                kLiveLaneStatePathUpdatedLocaleId,
+                "Ready, path updated");
+            m_ActiveFlagsFormatText = LocalizeText(
+                kActiveFlagsValueFormatLocaleId,
+                "{0} {1}, {2} {3}");
+            m_ActiveFlagsViolationNameText = LocalizeText(
+                kActiveFlagsViolationNameLocaleId,
+                "Violation");
+            m_ActiveFlagsPendingNameText = LocalizeText(
+                kActiveFlagsPendingNameLocaleId,
+                "Pending");
+            m_FlagOnText = LocalizeText(kFlagOnLocaleId, "On");
+            m_FlagOffText = LocalizeText(kFlagOffLocaleId, "Off");
+            m_TotalsFormatText = LocalizeText(
+                kTotalsValueFormatLocaleId,
+                "Violations {0}, Fines {1}");
+        }
+
+        private bool TryReusePanelState(
+            SelectedObjectDebugSnapshot snapshot,
+            string suggestedEntitySelectionValue,
+            bool laneDetailsReady,
+            bool routeDiagnosticsReady,
+            out PanelState state)
+        {
+            if (!m_HasCachedPanelState ||
+                !CanReusePanelState(
+                    snapshot,
+                    suggestedEntitySelectionValue,
+                    laneDetailsReady,
+                    routeDiagnosticsReady))
+            {
+                state = default;
+                return false;
+            }
+
+            state = m_LastPanelState;
+            return true;
+        }
+
+        private bool CanReusePanelState(
+            SelectedObjectDebugSnapshot snapshot,
+            string suggestedEntitySelectionValue,
+            bool laneDetailsReady,
+            bool routeDiagnosticsReady)
+        {
+            bool laneDetailsStateMatches =
+                m_IsLaneDetailsCollapsed ||
+                (!laneDetailsReady && !m_LastPanelLaneDetailsReady) ||
+                (laneDetailsReady == m_LastPanelLaneDetailsReady &&
+                 snapshot.CurrentLaneText == m_LastPanelSnapshot.CurrentLaneText &&
+                 snapshot.PreviousLaneText == m_LastPanelSnapshot.PreviousLaneText &&
+                 snapshot.LaneChangeCount == m_LastPanelSnapshot.LaneChangeCount &&
+                 snapshot.HasCurrentTarget == m_LastPanelSnapshot.HasCurrentTarget &&
+                 snapshot.HasCurrentRoute == m_LastPanelSnapshot.HasCurrentRoute &&
+                 snapshot.CurrentPathFlags == m_LastPanelSnapshot.CurrentPathFlags);
+            bool routeDiagnosticsRelevant =
+                snapshot.HasRouteDiagnostics && !m_IsRouteDiagnosticsCollapsed;
+            bool routeDiagnosticsStateMatches =
+                !routeDiagnosticsRelevant ||
+                (!routeDiagnosticsReady && !m_LastPanelRouteDiagnosticsReady) ||
+                (routeDiagnosticsReady == m_LastPanelRouteDiagnosticsReady &&
+                 snapshot.CurrentTargetEntity == m_LastPanelSnapshot.CurrentTargetEntity &&
+                 snapshot.CurrentRouteEntity == m_LastPanelSnapshot.CurrentRouteEntity &&
+                 snapshot.CurrentRouteColorText == m_LastPanelSnapshot.CurrentRouteColorText &&
+                 snapshot.RouteDiagnosticsCurrentTargetText == m_LastPanelSnapshot.RouteDiagnosticsCurrentTargetText &&
+                 snapshot.RouteDiagnosticsCurrentRouteText == m_LastPanelSnapshot.RouteDiagnosticsCurrentRouteText &&
+                 snapshot.RouteDiagnosticsTargetRoadText == m_LastPanelSnapshot.RouteDiagnosticsTargetRoadText &&
+                 snapshot.RouteDiagnosticsExplanationText == m_LastPanelSnapshot.RouteDiagnosticsExplanationText &&
+                 snapshot.RouteDiagnosticsConnectedStopText == m_LastPanelSnapshot.RouteDiagnosticsConnectedStopText);
+
+            return
+                snapshot.ResolveState == m_LastPanelSnapshot.ResolveState &&
+                snapshot.TleApplicability == m_LastPanelSnapshot.TleApplicability &&
+                snapshot.SourceSelectedEntity == m_LastPanelSnapshot.SourceSelectedEntity &&
+                snapshot.ResolvedVehicleEntity == m_LastPanelSnapshot.ResolvedVehicleEntity &&
+                snapshot.VehicleKind == m_LastPanelSnapshot.VehicleKind &&
+                snapshot.SummaryClassificationText == m_LastPanelSnapshot.SummaryClassificationText &&
+                snapshot.SummaryTleStatusText == m_LastPanelSnapshot.SummaryTleStatusText &&
+                snapshot.RoleText == m_LastPanelSnapshot.RoleText &&
+                snapshot.PublicTransportLanePolicyText == m_LastPanelSnapshot.PublicTransportLanePolicyText &&
+                snapshot.PublicTransportLaneViolationActive == m_LastPanelSnapshot.PublicTransportLaneViolationActive &&
+                snapshot.PendingExitActive == m_LastPanelSnapshot.PendingExitActive &&
+                snapshot.TotalFines == m_LastPanelSnapshot.TotalFines &&
+                snapshot.TotalViolations == m_LastPanelSnapshot.TotalViolations &&
+                snapshot.CompactLastReasonText == m_LastPanelSnapshot.CompactLastReasonText &&
+                snapshot.CompactRepeatPenaltyText == m_LastPanelSnapshot.CompactRepeatPenaltyText &&
+                snapshot.HasPathOwner == m_LastPanelSnapshot.HasPathOwner &&
+                snapshot.CurrentPathFlags == m_LastPanelSnapshot.CurrentPathFlags &&
+                snapshot.HasRouteDiagnostics == m_LastPanelSnapshot.HasRouteDiagnostics &&
+                suggestedEntitySelectionValue == m_LastPanelSuggestedEntitySelectionValue &&
+                m_EntitySelectionStatus == m_LastPanelEntitySelectionStatus &&
+                m_EntitySelectionStatusIsError == m_LastPanelEntitySelectionStatusIsError &&
+                m_PathObsoleteStatus == m_LastPanelPathObsoleteStatus &&
+                m_PathObsoleteStatusIsError == m_LastPanelPathObsoleteStatusIsError &&
+                m_IsLaneDetailsCollapsed == m_LastPanelLaneDetailsCollapsed &&
+                m_IsRouteDiagnosticsCollapsed == m_LastPanelRouteDiagnosticsCollapsed &&
+                laneDetailsStateMatches &&
+                routeDiagnosticsStateMatches;
+        }
+
+        private void CachePanelState(
+            SelectedObjectDebugSnapshot snapshot,
+            string suggestedEntitySelectionValue,
+            bool laneDetailsReady,
+            bool routeDiagnosticsReady,
+            PanelState state)
+        {
+            m_HasCachedPanelState = true;
+            m_LastPanelSnapshot = snapshot;
+            m_LastPanelState = state;
+            m_LastPanelSuggestedEntitySelectionValue = suggestedEntitySelectionValue ?? string.Empty;
+            m_LastPanelEntitySelectionStatus = m_EntitySelectionStatus ?? string.Empty;
+            m_LastPanelEntitySelectionStatusIsError = m_EntitySelectionStatusIsError;
+            m_LastPanelPathObsoleteStatus = m_PathObsoleteStatus ?? string.Empty;
+            m_LastPanelPathObsoleteStatusIsError = m_PathObsoleteStatusIsError;
+            m_LastPanelLaneDetailsCollapsed = m_IsLaneDetailsCollapsed;
+            m_LastPanelRouteDiagnosticsCollapsed = m_IsRouteDiagnosticsCollapsed;
+            m_LastPanelLaneDetailsReady = laneDetailsReady;
+            m_LastPanelRouteDiagnosticsReady = routeDiagnosticsReady;
+        }
+
+        private void UpdateLocalizedTextBindingsIfNeeded()
+        {
+            string activeLocaleId = GetActiveLocaleId();
+            if (m_LocalizedBindingsInitialized && activeLocaleId == m_LastLocalizedLocaleId)
+            {
+                return;
+            }
+
+            UpdateLocalizedTextBindings();
+            m_LastLocalizedLocaleId = activeLocaleId;
+            m_LocalizedBindingsInitialized = true;
         }
 
         private void UpdatePanelToggle()
@@ -509,6 +807,10 @@ namespace Traffic_Law_Enforcement
         private void HandleCloseRequested()
         {
             m_IsPanelEnabled = false;
+            m_CollapsedFastPathApplied = false;
+            SelectedObjectBridgeSystem.SetDetailedSnapshotConsumerActive(false);
+            SelectedObjectBridgeSystem.SetLaneDetailsConsumerActive(false);
+            SelectedObjectBridgeSystem.SetRouteDiagnosticsConsumerActive(false);
             ClearEntitySelectionStatus();
             ClearPathObsoleteStatus();
         }
@@ -521,7 +823,16 @@ namespace Traffic_Law_Enforcement
             }
 
             m_IsCollapsed = !m_IsCollapsed;
-            m_CollapsedBinding.Update(m_IsCollapsed);
+            m_HasCachedPanelState = false;
+            if (m_IsCollapsed)
+            {
+                ApplyCollapsedBindings();
+            }
+            else
+            {
+                m_CollapsedFastPathApplied = false;
+                m_CollapsedBinding.Update(false);
+            }
         }
 
         private void ToggleLaneDetailsCollapsed()
@@ -679,16 +990,31 @@ namespace Traffic_Law_Enforcement
                 : text.Trim();
         }
 
+        private static string GetActiveLocaleId()
+        {
+            return GameManager.instance?.localizationManager?.activeLocaleId ?? string.Empty;
+        }
+
+        private void SyncSnapshotConsumers()
+        {
+            bool panelBodyVisible = m_IsPanelEnabled && !m_IsCollapsed;
+            SelectedObjectBridgeSystem.SetDetailedSnapshotConsumerActive(panelBodyVisible);
+            SelectedObjectBridgeSystem.SetLaneDetailsConsumerActive(
+                panelBodyVisible && !m_IsLaneDetailsCollapsed);
+            SelectedObjectBridgeSystem.SetRouteDiagnosticsConsumerActive(
+                panelBodyVisible && !m_IsRouteDiagnosticsCollapsed);
+        }
+
         private void UpdateSaveScopedUiState()
         {
-            int pendingLoadSequence = SaveLoadTraceService.PendingLoadSequence;
-            if (pendingLoadSequence == m_LastSeenPendingLoadSequence)
+            int runtimeWorldGeneration = EnforcementSaveDataSystem.RuntimeWorldGeneration;
+            if (runtimeWorldGeneration == m_LastSeenRuntimeWorldGeneration)
             {
                 return;
             }
 
-            if (m_LastSeenPendingLoadSequence >= 0 &&
-                pendingLoadSequence > m_LastSeenPendingLoadSequence)
+            if (m_LastSeenRuntimeWorldGeneration >= 0 &&
+                runtimeWorldGeneration > m_LastSeenRuntimeWorldGeneration)
             {
                 m_IsLaneDetailsCollapsed = true;
                 m_LaneDetailsCollapsedBinding.Update(true);
@@ -696,7 +1022,7 @@ namespace Traffic_Law_Enforcement
                 m_RouteDiagnosticsCollapsedBinding.Update(true);
             }
 
-            m_LastSeenPendingLoadSequence = pendingLoadSequence;
+            m_LastSeenRuntimeWorldGeneration = runtimeWorldGeneration;
         }
 
         private string BuildCompactTleStatusText(SelectedObjectDebugSnapshot snapshot)
@@ -706,13 +1032,13 @@ namespace Traffic_Law_Enforcement
                 case SelectedObjectTleApplicability.NotApplicable:
                     return snapshot.ResolveState == SelectedObjectResolveState.NotVehicle
                         ? string.Empty
-                        : LocalizeText(kNotApplicableLocaleId, "Not applicable");
+                        : m_NotApplicableText;
 
                 case SelectedObjectTleApplicability.ApplicableNoLiveLaneData:
-                    return LocalizeText(kNoLiveLaneLocaleId, "No live lane");
+                    return m_NoLiveLaneText;
 
                 case SelectedObjectTleApplicability.ApplicableReady:
-                    return LocalizeText(kTrackingLocaleId, "Tracking");
+                    return m_TrackingText;
 
                 default:
                     return NormalizeText(snapshot.SummaryTleStatusText);
@@ -725,7 +1051,7 @@ namespace Traffic_Law_Enforcement
             {
                 Visible = true,
                 Compact = false,
-                Message = LocalizeText(kNoSelectionLocaleId, "No selection"),
+                Message = m_NoSelectionText,
                 EntitySelectionSuggestedValue = string.Empty,
                 EntitySelectionStatus = m_EntitySelectionStatus,
                 EntitySelectionStatusIsError = m_EntitySelectionStatusIsError,
@@ -734,6 +1060,28 @@ namespace Traffic_Law_Enforcement
                 PathObsoleteStatus = string.Empty,
                 PathObsoleteStatusIsError = false
             };
+        }
+
+        private PanelState BuildCollapsedState()
+        {
+            return new PanelState
+            {
+                Visible = true,
+                Compact = false
+            };
+        }
+
+        private void ApplyCollapsedBindings()
+        {
+            if (m_CollapsedFastPathApplied)
+            {
+                return;
+            }
+
+            m_VisibleBinding.Update(true);
+            m_CompactBinding.Update(false);
+            m_CollapsedBinding.Update(true);
+            m_CollapsedFastPathApplied = true;
         }
 
         private bool CanMarkPathObsolete(SelectedObjectDebugSnapshot snapshot)
@@ -759,23 +1107,17 @@ namespace Traffic_Law_Enforcement
 
             if (!snapshot.HasPathOwner)
             {
-                return LocalizeText(
-                    kPathObsoleteStatusNoPathOwnerLocaleId,
-                    "Vehicle has no path owner.");
+                return m_PathObsoleteNoPathOwnerText;
             }
 
             if ((snapshot.CurrentPathFlags & PathFlags.Pending) != 0)
             {
-                return LocalizeText(
-                    kPathObsoleteStatusPendingLocaleId,
-                    "Path is already pending rebuild.");
+                return m_PathObsoletePendingText;
             }
 
             if ((snapshot.CurrentPathFlags & PathFlags.Obsolete) != 0)
             {
-                return LocalizeText(
-                    kPathObsoleteStatusAlreadyObsoleteLocaleId,
-                    "Path is already obsolete.");
+                return m_PathObsoleteAlreadyObsoleteText;
             }
 
             return string.Empty;
@@ -788,98 +1130,75 @@ namespace Traffic_Law_Enforcement
                 case SelectedObjectTleApplicability.ApplicableReady:
                     if (!snapshot.HasPathOwner)
                     {
-                        return LocalizeText(
-                            kLiveLaneStateNoPathOwnerLocaleId,
-                            "Ready, no path owner");
+                        return m_LiveLaneStateNoPathOwnerText;
                     }
 
                     if ((snapshot.CurrentPathFlags & PathFlags.Failed) != 0)
                     {
-                        return LocalizeText(
-                            kLiveLaneStatePathFailedLocaleId,
-                            "Ready, path failed");
+                        return m_LiveLaneStatePathFailedText;
                     }
 
                     if ((snapshot.CurrentPathFlags & PathFlags.Stuck) != 0)
                     {
-                        return LocalizeText(
-                            kLiveLaneStatePathStuckLocaleId,
-                            "Ready, path stuck");
+                        return m_LiveLaneStatePathStuckText;
                     }
 
                     if ((snapshot.CurrentPathFlags & PathFlags.Pending) != 0)
                     {
-                        return LocalizeText(
-                            kLiveLaneStatePathPendingLocaleId,
-                            "Ready, path pending");
+                        return m_LiveLaneStatePathPendingText;
                     }
 
                     if ((snapshot.CurrentPathFlags & PathFlags.Scheduled) != 0)
                     {
-                        return LocalizeText(
-                            kLiveLaneStatePathScheduledLocaleId,
-                            "Ready, path scheduled");
+                        return m_LiveLaneStatePathScheduledText;
                     }
 
                     if (!snapshot.HasCurrentRoute)
                     {
-                        return LocalizeText(
-                            kLiveLaneStateNoCurrentRouteLocaleId,
-                            "Ready, no current route");
+                        return m_LiveLaneStateNoCurrentRouteText;
                     }
 
                     if (!snapshot.HasCurrentTarget)
                     {
-                        return LocalizeText(
-                            kLiveLaneStateNoCurrentTargetLocaleId,
-                            "Ready, no current target");
+                        return m_LiveLaneStateNoCurrentTargetText;
                     }
 
                     if ((snapshot.CurrentPathFlags & PathFlags.Obsolete) != 0)
                     {
-                        return LocalizeText(
-                            kLiveLaneStatePathObsoleteLocaleId,
-                            "Ready, path obsolete");
+                        return m_LiveLaneStatePathObsoleteText;
                     }
 
                     if ((snapshot.CurrentPathFlags & PathFlags.Updated) != 0)
                     {
-                        return LocalizeText(
-                            kLiveLaneStatePathUpdatedLocaleId,
-                            "Ready, path updated");
+                        return m_LiveLaneStatePathUpdatedText;
                     }
 
-                    return LocalizeText(kLiveLaneStateReadyLocaleId, "Ready");
+                    return m_LiveLaneStateReadyText;
 
                 case SelectedObjectTleApplicability.ApplicableNoLiveLaneData:
                     return snapshot.VehicleKind == SelectedObjectKind.ParkedRoadCar
-                        ? LocalizeText(kLiveLaneStateParkedRoadCarLocaleId, "Parked road car")
-                        : LocalizeText(kLiveLaneStateNoLiveLaneLocaleId, "No live lane");
+                        ? m_LiveLaneStateParkedRoadCarText
+                        : m_LiveLaneStateNoLiveLaneText;
 
                 default:
-                    return LocalizeText(kLiveLaneStateNotApplicableLocaleId, "Not applicable");
+                    return m_LiveLaneStateNotApplicableText;
             }
         }
 
         private string BuildActiveFlagsText(SelectedObjectDebugSnapshot snapshot)
         {
-            string format = LocalizeText(
-                kActiveFlagsValueFormatLocaleId,
-                "{0} {1}, {2} {3}");
             return string.Format(
-                format,
-                LocalizeText(kActiveFlagsViolationNameLocaleId, "Violation"),
-                LocalizeText(snapshot.PublicTransportLaneViolationActive ? kFlagOnLocaleId : kFlagOffLocaleId, snapshot.PublicTransportLaneViolationActive ? "On" : "Off"),
-                LocalizeText(kActiveFlagsPendingNameLocaleId, "Pending"),
-                LocalizeText(snapshot.PendingExitActive ? kFlagOnLocaleId : kFlagOffLocaleId, snapshot.PendingExitActive ? "On" : "Off"));
+                m_ActiveFlagsFormatText,
+                m_ActiveFlagsViolationNameText,
+                snapshot.PublicTransportLaneViolationActive ? m_FlagOnText : m_FlagOffText,
+                m_ActiveFlagsPendingNameText,
+                snapshot.PendingExitActive ? m_FlagOnText : m_FlagOffText);
         }
 
         private string BuildTotalsText(SelectedObjectDebugSnapshot snapshot)
         {
             return string.Format(
-                LocalizeText(
-                    kTotalsValueFormatLocaleId,
-                    "Violations {0}, Fines {1}"),
+                m_TotalsFormatText,
                 snapshot.TotalViolations,
                 snapshot.TotalFines);
         }
@@ -934,7 +1253,8 @@ namespace Traffic_Law_Enforcement
             SelectedObjectDebugSnapshot snapshot,
             string fullText)
         {
-            if (!TryGetCurrentTargetEntity(snapshot, out Entity targetEntity))
+            Entity targetEntity = snapshot.CurrentTargetEntity;
+            if (targetEntity == Entity.Null)
             {
                 return string.Empty;
             }
@@ -945,27 +1265,10 @@ namespace Traffic_Law_Enforcement
                 : entityText;
         }
 
-        private bool TryGetCurrentTargetEntity(
-            SelectedObjectDebugSnapshot snapshot,
-            out Entity targetEntity)
-        {
-            targetEntity = Entity.Null;
-
-            Entity vehicle = snapshot.ResolvedVehicleEntity;
-            if (vehicle == Entity.Null ||
-                !EntityManager.Exists(vehicle) ||
-                !EntityManager.HasComponent<Game.Common.Target>(vehicle))
-            {
-                return false;
-            }
-
-            targetEntity = EntityManager.GetComponentData<Game.Common.Target>(vehicle).m_Target;
-            return targetEntity != Entity.Null;
-        }
-
         private string BuildCurrentRouteEntityText(SelectedObjectDebugSnapshot snapshot)
         {
-            if (!TryGetCurrentRouteEntity(snapshot, out Entity routeEntity))
+            Entity routeEntity = snapshot.CurrentRouteEntity;
+            if (routeEntity == Entity.Null)
             {
                 return string.Empty;
             }
@@ -979,34 +1282,7 @@ namespace Traffic_Law_Enforcement
 
         private string BuildCurrentRouteColorText(SelectedObjectDebugSnapshot snapshot)
         {
-            if (!TryGetCurrentRouteEntity(snapshot, out Entity routeEntity) ||
-                !EntityManager.Exists(routeEntity) ||
-                !EntityManager.HasComponent<Game.Routes.Color>(routeEntity))
-            {
-                return string.Empty;
-            }
-
-            UnityEngine.Color32 color =
-                EntityManager.GetComponentData<Game.Routes.Color>(routeEntity).m_Color;
-            return $"#{color.r:X2}{color.g:X2}{color.b:X2}";
-        }
-
-        private bool TryGetCurrentRouteEntity(
-            SelectedObjectDebugSnapshot snapshot,
-            out Entity routeEntity)
-        {
-            routeEntity = Entity.Null;
-
-            Entity vehicle = snapshot.ResolvedVehicleEntity;
-            if (vehicle == Entity.Null ||
-                !EntityManager.Exists(vehicle) ||
-                !EntityManager.HasComponent<CurrentRoute>(vehicle))
-            {
-                return false;
-            }
-
-            routeEntity = EntityManager.GetComponentData<CurrentRoute>(vehicle).m_Route;
-            return routeEntity != Entity.Null;
+            return snapshot.CurrentRouteColorText ?? string.Empty;
         }
 
         private bool TryParseEntitySelectionInput(string input, out Entity entity)
@@ -1124,7 +1400,7 @@ namespace Traffic_Law_Enforcement
         private string FormatEntity(Entity entity)
         {
             return entity == Entity.Null
-                ? LocalizeText(kNoneLocaleId, "None")
+                ? m_NoneText
                 : $"#{entity.Index}:v{entity.Version}";
         }
 

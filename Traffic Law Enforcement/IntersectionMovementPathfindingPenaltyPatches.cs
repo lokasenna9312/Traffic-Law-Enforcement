@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Reflection;
+using System.Text;
 using Game;
 using Game.Pathfind;
 using HarmonyLib;
@@ -218,7 +218,20 @@ namespace Traffic_Law_Enforcement
         private static string DescribeMethod(MethodInfo method)
         {
             ParameterInfo[] parameters = method.GetParameters();
-            string parameterList = string.Join(", ", parameters.Select(p => $"{p.ParameterType.Name} {p.Name}").ToArray());
+            StringBuilder parameterList = new StringBuilder(parameters.Length * 24);
+            for (int index = 0; index < parameters.Length; index += 1)
+            {
+                if (index > 0)
+                {
+                    parameterList.Append(", ");
+                }
+
+                ParameterInfo parameter = parameters[index];
+                parameterList.Append(parameter.ParameterType.Name);
+                parameterList.Append(' ');
+                parameterList.Append(parameter.Name);
+            }
+
             return $"{method.DeclaringType?.FullName}.{method.Name}({parameterList})";
         }
 

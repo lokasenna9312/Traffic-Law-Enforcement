@@ -19,7 +19,9 @@ namespace Traffic_Law_Enforcement
         private EntityQuery m_ChangedPathOwnerQuery;
         private EntityQuery m_TrackingStateQuery;
 
-        private ComponentLookup<PathOwner> m_PathOwnerData;
+        private EntityTypeHandle m_EntityTypeHandle;
+        private ComponentTypeHandle<PathOwner> m_PathOwnerTypeHandle;
+        private ComponentTypeHandle<RouteAttemptTrackingState> m_TrackingStateTypeHandle;
         private int m_LastObservedRuntimeWorldGeneration = -1;
         private bool m_SuppressPendingBackfillForCurrentUpdate;
 
@@ -57,8 +59,6 @@ namespace Traffic_Law_Enforcement
                 ComponentType.ReadOnly<PathOwner>(),
                 ComponentType.ReadOnly<RouteAttemptTrackingState>());
 
-            m_PathOwnerData = GetComponentLookup<PathOwner>(true);
-
             RequireForUpdate(m_PathOwnerQuery);
         }
 
@@ -66,7 +66,16 @@ namespace Traffic_Law_Enforcement
         {
             m_SuppressPendingBackfillForCurrentUpdate = false;
             HandleRuntimeWorldReload();
-            m_PathOwnerData.Update(this);
+
+            if (m_MissingStateQuery.IsEmptyIgnoreFilter &&
+                m_ChangedPathOwnerQuery.IsEmptyIgnoreFilter)
+            {
+                return;
+            }
+
+            m_EntityTypeHandle = GetEntityTypeHandle();
+            m_PathOwnerTypeHandle = GetComponentTypeHandle<PathOwner>(true);
+            m_TrackingStateTypeHandle = GetComponentTypeHandle<RouteAttemptTrackingState>(true);
 
             SeedMissingTrackingState();
             ProcessChangedPathOwners();
@@ -88,8 +97,6 @@ namespace Traffic_Law_Enforcement
                 EntityManager.RemoveComponent<RouteAttemptTrackingState>(m_TrackingStateQuery);
             }
 
-            Mod.log.Info(
-                $"[SAVELOAD] RouteAttemptTrackingSystem runtime reset: generation={currentGeneration}");
         }
 
         private void SeedMissingTrackingState()
@@ -99,45 +106,46 @@ namespace Traffic_Law_Enforcement
                 return;
             }
 
-            NativeArray<Entity> vehicles =
-                m_MissingStateQuery.ToEntityArray(Allocator.Temp);
-
+            NativeArray<ArchetypeChunk> chunks =
+                m_MissingStateQuery.ToArchetypeChunkArray(Allocator.Temp);
             try
             {
-                for (int index = 0; index < vehicles.Length; index += 1)
+                for (int chunkIndex = 0; chunkIndex < chunks.Length; chunkIndex += 1)
                 {
-                    Entity vehicle = vehicles[index];
+                    ArchetypeChunk chunk = chunks[chunkIndex];
+                    NativeArray<Entity> vehicles = chunk.GetNativeArray(m_EntityTypeHandle);
+                    NativeArray<PathOwner> pathOwners = chunk.GetNativeArray(ref m_PathOwnerTypeHandle);
 
-                    if (!m_PathOwnerData.TryGetComponent(vehicle, out PathOwner pathOwner))
+                    for (int index = 0; index < vehicles.Length; index += 1)
                     {
-                        continue;
-                    }
+                        Entity vehicle = vehicles[index];
+                        PathOwner pathOwner = pathOwners[index];
+                        bool isPending = (pathOwner.m_State & PathFlags.Pending) != 0;
 
-                    bool isPending = (pathOwner.m_State & PathFlags.Pending) != 0;
-
-                    if (isPending)
-                    {
-                        if (m_SuppressPendingBackfillForCurrentUpdate)
+                        if (isPending)
                         {
-                            EnforcementPolicyImpactService.EnsureActivePathContext(vehicle.Index);
+                            if (m_SuppressPendingBackfillForCurrentUpdate)
+                            {
+                                EnforcementPolicyImpactService.EnsureActivePathContext(vehicle.Index);
+                            }
+                            else
+                            {
+                                EnforcementPolicyImpactService.RecordPathRequest(vehicle.Index);
+                            }
                         }
-                        else
-                        {
-                            EnforcementPolicyImpactService.RecordPathRequest(vehicle.Index);
-                        }
-                    }
 
-                    EntityManager.AddComponentData(
-                        vehicle,
-                        new RouteAttemptTrackingState
-                        {
-                            m_WasPending = (byte)(isPending ? 1 : 0),
-                        });
+                        EntityManager.AddComponentData(
+                            vehicle,
+                            new RouteAttemptTrackingState
+                            {
+                                m_WasPending = (byte)(isPending ? 1 : 0),
+                            });
+                    }
                 }
             }
             finally
             {
-                vehicles.Dispose();
+                chunks.Dispose();
             }
         }
 
@@ -148,43 +156,43 @@ namespace Traffic_Law_Enforcement
                 return;
             }
 
-            NativeArray<Entity> vehicles =
-                m_ChangedPathOwnerQuery.ToEntityArray(Allocator.Temp);
-            NativeArray<RouteAttemptTrackingState> states =
-                m_ChangedPathOwnerQuery.ToComponentDataArray<RouteAttemptTrackingState>(Allocator.Temp);
-
+            NativeArray<ArchetypeChunk> chunks =
+                m_ChangedPathOwnerQuery.ToArchetypeChunkArray(Allocator.Temp);
             try
             {
-                for (int index = 0; index < vehicles.Length; index += 1)
+                for (int chunkIndex = 0; chunkIndex < chunks.Length; chunkIndex += 1)
                 {
-                    Entity vehicle = vehicles[index];
-                    RouteAttemptTrackingState state = states[index];
+                    ArchetypeChunk chunk = chunks[chunkIndex];
+                    NativeArray<Entity> vehicles = chunk.GetNativeArray(m_EntityTypeHandle);
+                    NativeArray<PathOwner> pathOwners = chunk.GetNativeArray(ref m_PathOwnerTypeHandle);
+                    NativeArray<RouteAttemptTrackingState> states =
+                        chunk.GetNativeArray(ref m_TrackingStateTypeHandle);
 
-                    if (!m_PathOwnerData.TryGetComponent(vehicle, out PathOwner pathOwner))
+                    for (int index = 0; index < vehicles.Length; index += 1)
                     {
-                        continue;
-                    }
+                        Entity vehicle = vehicles[index];
+                        PathOwner pathOwner = pathOwners[index];
+                        RouteAttemptTrackingState state = states[index];
+                        bool wasPending = state.m_WasPending != 0;
+                        bool isPending = (pathOwner.m_State & PathFlags.Pending) != 0;
 
-                    bool wasPending = state.m_WasPending != 0;
-                    bool isPending = (pathOwner.m_State & PathFlags.Pending) != 0;
+                        if (!wasPending && isPending)
+                        {
+                            EnforcementPolicyImpactService.RecordPathRequest(vehicle.Index);
+                        }
 
-                    if (!wasPending && isPending)
-                    {
-                        EnforcementPolicyImpactService.RecordPathRequest(vehicle.Index);
-                    }
-
-                    byte updatedWasPending = (byte)(isPending ? 1 : 0);
-                    if (state.m_WasPending != updatedWasPending)
-                    {
-                        state.m_WasPending = updatedWasPending;
-                        EntityManager.SetComponentData(vehicle, state);
+                        byte updatedWasPending = (byte)(isPending ? 1 : 0);
+                        if (state.m_WasPending != updatedWasPending)
+                        {
+                            state.m_WasPending = updatedWasPending;
+                            EntityManager.SetComponentData(vehicle, state);
+                        }
                     }
                 }
             }
             finally
             {
-                vehicles.Dispose();
-                states.Dispose();
+                chunks.Dispose();
             }
         }
     }

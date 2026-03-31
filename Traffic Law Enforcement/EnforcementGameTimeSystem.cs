@@ -1,9 +1,5 @@
 using Game;
-using Game.Net;
-using Game.Pathfind;
 using Game.Simulation;
-using Game.Vehicles;
-using Unity.Collections;
 using Unity.Entities;
 using UnityEngine;
 
@@ -22,12 +18,20 @@ namespace Traffic_Law_Enforcement
         public static bool IsInitialized { get; private set; }
         public static long CurrentMonthTicksPerMonth => GetMonthTicksPerMonth(CurrentDaysPerYear);
 
-        public static void Update(long currentTimestampMonthTicks, long currentTimestampDayTicks, int currentDaysPerYear)
+        public static bool Update(long currentTimestampMonthTicks, long currentTimestampDayTicks, int currentDaysPerYear)
         {
+            int safeDaysPerYear = Mathf.Max(1, currentDaysPerYear);
+            bool timeChanged =
+                !IsInitialized ||
+                CurrentTimestampMonthTicks != currentTimestampMonthTicks ||
+                CurrentTimestampDayTicks != currentTimestampDayTicks ||
+                CurrentDaysPerYear != safeDaysPerYear;
+
             CurrentTimestampMonthTicks = currentTimestampMonthTicks;
             CurrentTimestampDayTicks = currentTimestampDayTicks;
-            CurrentDaysPerYear = Mathf.Max(1, currentDaysPerYear);
+            CurrentDaysPerYear = safeDaysPerYear;
             IsInitialized = true;
+            return timeChanged;
         }
 
         public static void Reset()
@@ -53,15 +57,29 @@ namespace Traffic_Law_Enforcement
 
         public static bool TryUpdateFromTimeSystem(TimeSystem timeSystem, bool logOnInitialization, out string failureReason)
         {
+            return TryUpdateFromTimeSystem(
+                timeSystem,
+                logOnInitialization,
+                out _,
+                out failureReason);
+        }
+
+        public static bool TryUpdateFromTimeSystem(
+            TimeSystem timeSystem,
+            bool logOnInitialization,
+            out bool timeChanged,
+            out string failureReason)
+        {
             if (timeSystem == null)
             {
+                timeChanged = false;
                 failureReason = "time system is unavailable";
                 return false;
             }
 
             CalculateAbsoluteTicks(timeSystem, out long absoluteMonthTicks, out long absoluteDayTicks, out int daysPerYear);
             bool wasInitialized = IsInitialized;
-            Update(absoluteMonthTicks, absoluteDayTicks, daysPerYear);
+            timeChanged = Update(absoluteMonthTicks, absoluteDayTicks, daysPerYear);
 
             if (logOnInitialization && !wasInitialized && !s_HasLoggedInitialization)
             {
@@ -111,95 +129,32 @@ namespace Traffic_Law_Enforcement
     public partial class EnforcementGameTimeSystem : GameSystemBase
     {
         private TimeSystem m_TimeSystem;
-        private EntityQuery m_ActiveTrafficQuery;
-        private ComponentLookup<EdgeLane> m_EdgeLaneData;
-        private ComponentLookup<CarLane> m_CarLaneData;
-        private ComponentLookup<ParkingLane> m_ParkingLaneData;
-        private ComponentLookup<GarageLane> m_GarageLaneData;
 
         protected override void OnCreate()
         {
             base.OnCreate();
             m_TimeSystem = World.GetOrCreateSystemManaged<TimeSystem>();
-            m_ActiveTrafficQuery = GetEntityQuery(
-                ComponentType.ReadOnly<Car>(),
-                ComponentType.ReadOnly<CarCurrentLane>(),
-                ComponentType.ReadOnly<PathOwner>());
-            m_EdgeLaneData = GetComponentLookup<EdgeLane>(true);
-            m_CarLaneData = GetComponentLookup<CarLane>(true);
-            m_ParkingLaneData = GetComponentLookup<ParkingLane>(true);
-            m_GarageLaneData = GetComponentLookup<GarageLane>(true);
         }
 
         protected override void OnUpdate()
         {
-            bool result = EnforcementGameTime.TryUpdateFromTimeSystem(m_TimeSystem, logOnInitialization: true, out string failureReason);
+            bool result = EnforcementGameTime.TryUpdateFromTimeSystem(
+                m_TimeSystem,
+                logOnInitialization: true,
+                out bool timeChanged,
+                out string failureReason);
             if (!result)
+            {
+                return;
+            }
+
+            if (!timeChanged)
             {
                 return;
             }
 
             EnforcementPolicyImpactService.UpdateTrackingForCurrentMonth();
             EnforcementTelemetry.PruneExpiredViolationTimestamps();
-        }
-
-        private int CountActiveRoadTrafficVehicles()
-        {
-            m_EdgeLaneData.Update(this);
-            m_CarLaneData.Update(this);
-            m_ParkingLaneData.Update(this);
-            m_GarageLaneData.Update(this);
-
-            NativeArray<CarCurrentLane> currentLanes = m_ActiveTrafficQuery.ToComponentDataArray<CarCurrentLane>(Allocator.Temp);
-            try
-            {
-                int activeRoadTrafficCount = 0;
-                int nullLaneCount = 0;
-                int missingEdgeLaneCount = 0;
-                int missingCarLaneCount = 0;
-                int parkingLaneCount = 0;
-                int garageLaneCount = 0;
-                for (int index = 0; index < currentLanes.Length; index += 1)
-                {
-                    Entity lane = currentLanes[index].m_Lane;
-                    if (lane == Entity.Null)
-                    {
-                        nullLaneCount += 1;
-                        continue;
-                    }
-
-                    if (!m_EdgeLaneData.HasComponent(lane))
-                    {
-                        missingEdgeLaneCount += 1;
-                        continue;
-                    }
-
-                    if (!m_CarLaneData.HasComponent(lane))
-                    {
-                        missingCarLaneCount += 1;
-                        continue;
-                    }
-
-                    if (m_ParkingLaneData.HasComponent(lane))
-                    {
-                        parkingLaneCount += 1;
-                        continue;
-                    }
-
-                    if (m_GarageLaneData.HasComponent(lane))
-                    {
-                        garageLaneCount += 1;
-                        continue;
-                    }
-
-                    activeRoadTrafficCount += 1;
-                }
-                return activeRoadTrafficCount;
-            }
-            finally
-            {
-                currentLanes.Dispose();
-            }
         }
     }
 }

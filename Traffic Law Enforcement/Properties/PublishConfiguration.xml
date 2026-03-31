@@ -14,14 +14,14 @@ Visual Studio Code의 GPT-5.4에게서 많은 도움을 받아 만든 저의 첫
 
 ## Language Info
 
-Version 0.2.* supports English and Korean.
+Version 0.3.* supports English and Korean.
 
-0.2.* 기준 영어와 한국어를 지원합니다.
+0.3.* 기준 영어와 한국어를 지원합니다.
 
 ## English Introduction
 
 ### 1. Main Features
-As of version 0.2.*, this mod discourages drivers from committing the following three types of traffic law violations by imposing fines and increasing the cost of the affected routes.
+As of version 0.3.*, this mod discourages drivers from committing the following three types of traffic law violations by imposing fines and increasing the cost of the affected routes.
 - **Illegal center line crossing:** Making a U-turn where U-turns are not permitted; crossing the center line to enter a parking lot or service building on the opposite side of the road; and crossing the center line when leaving such a building to enter a lane on the opposite side.
 - **Intersection rule violations:** Traveling in a direction that is not permitted at an intersection. (Example: making a left turn from a lane where left turns are not allowed.)
 - **PT lane violations:** Using a PT (public transport) lane with a vehicle that is not permitted to enter PT lanes.
@@ -58,13 +58,13 @@ The following options can be configured either for the currently loaded save fil
 - I would like serious habitual traffic offenders to face harsher penalties, such as having their driver's licenses suspended or revoked, or having them sent to jail, but I could not implement that either because of my limited coding skills.
 
 ### 7. Known Issues : Investigation and Fixing in Progress
-- CRITICAL ISSUE : This mod churns vehicles' paths. I'm investigating the cause of this issue from 2026.03.26, maybe after 0.2.9 patch.
+- Holefully path churning issue may be fixed. I alomst negated mid-block enforcement which is the main cause of path churning, but I need more testing to confirm that.
 - If you find bugs or issues, please be free to report them here or at GitHub.
 
 ## 한국어 설명
 
 ### 1. 주요 기능
-0.2.* 기준 이 모드는 다음의 3가지 교통법규 위반 행위에 대해서 벌금을 부과하고 해당 경로의 비용을 증가시킴으로써, 운전자들이 그러한 행위를 꺼리게 만듭니다.
+0.3.* 기준 이 모드는 다음의 3가지 교통법규 위반 행위에 대해서 벌금을 부과하고 해당 경로의 비용을 증가시킴으로써, 운전자들이 그러한 행위를 꺼리게 만듭니다.
 - **불법 중앙선 침입:** U턴이 허가되지 않은 곳에서 U턴을 하는 행위, 중앙선 반대편에 있는 주차장 또는 서비스 건물을 이용하기 위해 중앙선을 넘어 진입하는 행위, 그리고 그러한 건물에서 나오는 차량이 중앙선을 넘어 반대편 차선으로 진입하는 행위
 - **교차로 통행규칙 위반:** 교차로에서 허가되지 않은 방향으로 통행하는 행위 (예: 좌회전이 허가되지 않은 차선에서 좌회전하는 행위)
 - **대중교통 전용차선 침범:** 대중교통 전용차선 진입이 허가되지 않은 차량이 대중교통 전용차선을 이용하는 행위
@@ -101,7 +101,7 @@ The following options can be configured either for the currently loaded save fil
 - 심각한 상습 교통법규 위반자들에게는 더욱 강한 처벌(예: 운전면허 정지 또는 취소, 교도소 수감)을 적용하고 싶었지만, 그 기능 역시 제 코딩 실력이 부족해서 구현하지 못했습니다.
 
 ### 7. 알려진 문제점 : 조사 및 수정 진행 중
-- 심각한 문제 : 이 모드는 차량들의 경로를 심각하게 왜곡합니다. 2023.03.26부터 (아마도 0.2.9 패치 이후부터) 이 문제의 원인을 조사하고 있습니다.
+- 차량 경로 왜곡 문제가 해결됐기를 바랍니다. 차량 경로 왜곡의 주요 원인인 중앙선 침범 단속 로직을 거의 없애긴 했지만, 그게 정말 효과가 있는지는 더 많은 테스트가 필요합니다.
 - 버그나 문제점을 발견하시면, 이 글이나 GitHub에 자유롭게 제보해주세요.
 	</LongDescription>
 	<!--Thumbnail-->
@@ -116,12 +116,13 @@ The following options can be configured either for the currently loaded save fil
 	<Screenshot Value="Properties/Screenshots/07.jpg" />
 	<Screenshot Value="Properties/Screenshots/08.jpg" />
 	<Screenshot Value="Properties/Screenshots/09.jpg" />
+	<Screenshot Value="Properties/Screenshots/10.jpg" />
 	<!--Tag, can be set multiple times-->
 	<Tag Value="" />
 	<!--Link to the forum post where the mod can be discussed-->
 	<ForumLink Value="https://forum.paradoxplaza.com/forum/threads/traffic-law-enforcement.1909882/" />
 	<!--Version of the mod-->
-	<ModVersion Value="0.2.10" />
+	<ModVersion Value="0.3.1" />
 	<!--Recommended version of the base game to use the mod-->
 	<GameVersion Value="1.5.6f1" />
 	<!--Dependency for the mod, can be set multiple times-->
@@ -130,10 +131,7 @@ The following options can be configured either for the currently loaded save fil
 	<RequiredDLC Value="" />
 	<!--Change log for new version. Single line or multi line. Supports minimal markdown subset-->
 	<ChangeLog>
-- Added Selected Object Window to inspect selected object's entity ID and information.
-- Added Focused Logging option to log the selected vehicle's information, which can be used together with the Selected Object Window. Focused Log can be added to the normal logging, or be done exclusively.
-- Added new Logging policy "Route-selection change summary logging" and "Focused route rebuild diagnostics".
-- Added experimental debug option "Skip policy-tracked ignored-rule sync in pathfind setup".
+- More optimizations to logging logics.
 	</ChangeLog>
 	<!--External link, can be set multiple times. supported types are "discord", "github", "youtube", "twitch", "x", "paypal", "patreon", "buymeacoffee", "kofi", "crowdin", "gitlab", "gofundme"-->
 	<ExternalLink Type="github" Url="https://github.com/lokasenna9312/Traffic-Law-Enforcement/" />

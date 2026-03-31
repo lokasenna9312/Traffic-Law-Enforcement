@@ -7,6 +7,11 @@ namespace Traffic_Law_Enforcement
         public const int DefaultPublicTransportLaneFine = 250;
         public const int DefaultMidBlockCrossingFine = 250;
         public const int DefaultIntersectionMovementFine = 250;
+        private static int s_RepeatPolicySummaryVersion = -1;
+        private static string s_PublicTransportLaneRepeatPolicySummary = string.Empty;
+        private static string s_MidBlockCrossingRepeatPolicySummary = string.Empty;
+        private static string s_IntersectionMovementRepeatPolicySummary = string.Empty;
+
         public static void RecordPublicTransportLaneViolation(Entity vehicle, Entity lane, string reason)
         {
             RecordViolation(EnforcementKinds.PublicTransportLane, vehicle, lane, GetPublicTransportLaneFine(), reason);
@@ -24,17 +29,17 @@ namespace Traffic_Law_Enforcement
 
         public static int GetPublicTransportLaneFine()
         {
-            return EnforcementGameplaySettingsService.Current.PublicTransportLaneFineAmount;
+            return EnforcementGameplaySettingsService.Current.GetEffectivePublicTransportLaneFineAmount();
         }
 
         public static int GetMidBlockCrossingFine()
         {
-            return EnforcementGameplaySettingsService.Current.MidBlockCrossingFineAmount;
+            return EnforcementGameplaySettingsService.Current.GetEffectiveMidBlockCrossingFineAmount();
         }
 
         public static int GetIntersectionMovementFine()
         {
-            return EnforcementGameplaySettingsService.Current.IntersectionMovementFineAmount;
+            return EnforcementGameplaySettingsService.Current.GetEffectiveIntersectionMovementFineAmount();
         }
 
         public static int ApplyRepeatOffenderPenalty(string kind, int baseFine, int vehicleId)
@@ -64,31 +69,49 @@ namespace Traffic_Law_Enforcement
 
         public static string GetRepeatPolicyDebugSummary(string kind)
         {
-            EnforcementGameplaySettingsState settings = EnforcementGameplaySettingsService.Current;
+            EnsureRepeatPolicySummaryCache();
 
             switch (kind)
             {
                 case EnforcementKinds.PublicTransportLane:
-                    return BuildRepeatPolicyDebugSummary(
-                        settings.EnablePublicTransportLaneRepeatPenalty,
-                        settings.PublicTransportLaneRepeatWindowMonths,
-                        settings.PublicTransportLaneRepeatThreshold,
-                        settings.PublicTransportLaneRepeatMultiplierPercent);
+                    return s_PublicTransportLaneRepeatPolicySummary;
                 case EnforcementKinds.MidBlockCrossing:
-                    return BuildRepeatPolicyDebugSummary(
-                        settings.EnableMidBlockCrossingRepeatPenalty,
-                        settings.MidBlockCrossingRepeatWindowMonths,
-                        settings.MidBlockCrossingRepeatThreshold,
-                        settings.MidBlockCrossingRepeatMultiplierPercent);
+                    return s_MidBlockCrossingRepeatPolicySummary;
                 case EnforcementKinds.IntersectionMovement:
-                    return BuildRepeatPolicyDebugSummary(
-                        settings.EnableIntersectionMovementRepeatPenalty,
-                        settings.IntersectionMovementRepeatWindowMonths,
-                        settings.IntersectionMovementRepeatThreshold,
-                        settings.IntersectionMovementRepeatMultiplierPercent);
+                    return s_IntersectionMovementRepeatPolicySummary;
                 default:
                     return "unknown policy";
             }
+        }
+
+        private static void EnsureRepeatPolicySummaryCache()
+        {
+            int settingsVersion = EnforcementGameplaySettingsService.Version;
+            if (s_RepeatPolicySummaryVersion == settingsVersion)
+            {
+                return;
+            }
+
+            EnforcementGameplaySettingsState settings = EnforcementGameplaySettingsService.Current;
+            s_PublicTransportLaneRepeatPolicySummary =
+                BuildRepeatPolicyDebugSummary(
+                    settings.IsPublicTransportLaneRepeatPenaltyEffectivelyEnabled(),
+                    settings.PublicTransportLaneRepeatWindowMonths,
+                    settings.PublicTransportLaneRepeatThreshold,
+                    settings.PublicTransportLaneRepeatMultiplierPercent);
+            s_MidBlockCrossingRepeatPolicySummary =
+                BuildRepeatPolicyDebugSummary(
+                    settings.IsMidBlockCrossingRepeatPenaltyEffectivelyEnabled(),
+                    settings.MidBlockCrossingRepeatWindowMonths,
+                    settings.MidBlockCrossingRepeatThreshold,
+                    settings.MidBlockCrossingRepeatMultiplierPercent);
+            s_IntersectionMovementRepeatPolicySummary =
+                BuildRepeatPolicyDebugSummary(
+                    settings.IsIntersectionMovementRepeatPenaltyEffectivelyEnabled(),
+                    settings.IntersectionMovementRepeatWindowMonths,
+                    settings.IntersectionMovementRepeatThreshold,
+                    settings.IntersectionMovementRepeatMultiplierPercent);
+            s_RepeatPolicySummaryVersion = settingsVersion;
         }
 
         private static void RecordViolation(string kind, Entity vehicle, Entity lane, int fineAmount, string reason)
@@ -116,19 +139,19 @@ namespace Traffic_Law_Enforcement
             {
                 case EnforcementKinds.PublicTransportLane:
                     return new RepeatOffenderPolicy(
-                        settings.EnablePublicTransportLaneRepeatPenalty,
+                        settings.IsPublicTransportLaneRepeatPenaltyEffectivelyEnabled(),
                         EnforcementGameTime.GetMonthTickWindow(settings.PublicTransportLaneRepeatWindowMonths),
                         settings.PublicTransportLaneRepeatThreshold,
                         settings.PublicTransportLaneRepeatMultiplierPercent);
                 case EnforcementKinds.MidBlockCrossing:
                     return new RepeatOffenderPolicy(
-                        settings.EnableMidBlockCrossingRepeatPenalty,
+                        settings.IsMidBlockCrossingRepeatPenaltyEffectivelyEnabled(),
                         EnforcementGameTime.GetMonthTickWindow(settings.MidBlockCrossingRepeatWindowMonths),
                         settings.MidBlockCrossingRepeatThreshold,
                         settings.MidBlockCrossingRepeatMultiplierPercent);
                 case EnforcementKinds.IntersectionMovement:
                     return new RepeatOffenderPolicy(
-                        settings.EnableIntersectionMovementRepeatPenalty,
+                        settings.IsIntersectionMovementRepeatPenaltyEffectivelyEnabled(),
                         EnforcementGameTime.GetMonthTickWindow(settings.IntersectionMovementRepeatWindowMonths),
                         settings.IntersectionMovementRepeatThreshold,
                         settings.IntersectionMovementRepeatMultiplierPercent);

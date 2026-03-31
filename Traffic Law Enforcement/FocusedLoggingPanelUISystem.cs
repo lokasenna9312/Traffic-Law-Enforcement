@@ -11,6 +11,7 @@ namespace Traffic_Law_Enforcement
     public partial class FocusedLoggingPanelUISystem : UISystemBase
     {
         private const string kGroup = "focusedLoggingPanel";
+        private const int kWatchedVehiclePruneIntervalUpdates = 30;
 
         internal const string kHeaderTextLocaleId =
             "TrafficLawEnforcement.FocusedLoggingPanel.Text.Header";
@@ -55,6 +56,20 @@ namespace Traffic_Law_Enforcement
 
         private ProxyAction m_PanelToggleAction;
         private SelectedObjectBridgeSystem m_SelectedObjectBridgeSystem;
+        private string m_LastLocalizedLocaleId = string.Empty;
+        private bool m_LocalizedBindingsInitialized;
+        private int m_VisibleUpdateCount;
+        private string m_NoneText = "None";
+        private string m_WatchedStatusText = "Watched";
+        private string m_NotWatchedStatusText = "Not watched";
+        private string m_NoEligibleSelectionText = "No eligible selected road vehicle";
+        private string m_WatchedCountFormatText = "{0} watched";
+        private string m_BurstLoggingInactiveText = "Inactive";
+        private string m_BurstLoggingActiveFormatText = "Active ({0:0.0}s remaining)";
+        private int m_CachedWatchedCount = int.MinValue;
+        private string m_CachedWatchedCountText = string.Empty;
+        private long m_CachedBurstLoggingTenths = long.MinValue;
+        private string m_CachedBurstLoggingText = "Inactive";
 
         private ValueBinding<bool> m_VisibleBinding;
         private ValueBinding<string> m_HeaderTextBinding;
@@ -145,6 +160,7 @@ namespace Traffic_Law_Enforcement
 
         protected override void OnDestroy()
         {
+            SelectedObjectBridgeSystem.SetMinimalSnapshotConsumerActive(false);
             if (m_PanelToggleAction != null)
             {
                 m_PanelToggleAction.shouldBeEnabled = false;
@@ -159,7 +175,20 @@ namespace Traffic_Law_Enforcement
             base.OnUpdate();
 
             UpdatePanelToggle();
-            UpdateLocalizedTextBindings();
+            bool windowVisible = FocusedLoggingService.IsWindowVisible;
+            SelectedObjectBridgeSystem.SetMinimalSnapshotConsumerActive(
+                windowVisible);
+
+            if (!windowVisible)
+            {
+                m_VisibleUpdateCount = 0;
+                m_VisibleBinding.Update(false);
+                return;
+            }
+
+            m_VisibleUpdateCount += 1;
+
+            UpdateLocalizedTextBindingsIfNeeded();
 
             if (m_SelectedObjectBridgeSystem == null)
             {
@@ -167,13 +196,30 @@ namespace Traffic_Law_Enforcement
                     World.GetExistingSystemManaged<SelectedObjectBridgeSystem>();
             }
 
-            FocusedLoggingService.PruneMissingVehicles(EntityManager);
+            int watchedVehicleCount = FocusedLoggingService.WatchedVehicleCount;
+            bool hasWatchedVehicles = watchedVehicleCount > 0;
+            if (hasWatchedVehicles)
+            {
+                bool shouldPruneWatchedVehicles =
+                    m_VisibleUpdateCount == 1 ||
+                    (m_VisibleUpdateCount % kWatchedVehiclePruneIntervalUpdates) == 0;
+                if (shouldPruneWatchedVehicles)
+                {
+                    FocusedLoggingService.PruneMissingVehicles(EntityManager);
+                }
+            }
 
-            PanelState state = BuildState();
+            PanelState state = BuildState(
+                windowVisible,
+                hasWatchedVehicles,
+                watchedVehicleCount);
             UpdateBindings(state);
         }
 
-        private PanelState BuildState()
+        private PanelState BuildState(
+            bool windowVisible,
+            bool hasWatchedVehicles,
+            int watchedVehicleCount)
         {
             bool hasSelectedVehicle =
                 TryGetSelectedReadyRoadVehicle(
@@ -184,38 +230,36 @@ namespace Traffic_Law_Enforcement
                 FocusedLoggingService.IsWatched(vehicle);
 
             string watchedVehicles =
-                FocusedLoggingService.DescribeWatchedVehicles();
+                hasWatchedVehicles
+                    ? FocusedLoggingService.DescribeWatchedVehicles()
+                    : string.Empty;
+            double burstLoggingRemainingSeconds = BurstLoggingService.GetRemainingSeconds();
+            bool burstLoggingActive = burstLoggingRemainingSeconds > 0d;
 
             return new PanelState
             {
-                Visible = FocusedLoggingService.IsWindowVisible,
+                Visible = windowVisible,
                 SelectedVehicle = hasSelectedVehicle
                     ? FocusedLoggingService.FormatEntity(vehicle)
-                    : LocalizeText(kNoneLocaleId, "None"),
+                    : m_NoneText,
                 SelectedRole = hasSelectedVehicle
                     ? NormalizeText(snapshot.RoleText)
                     : string.Empty,
                 SelectedWatchStatus = hasSelectedVehicle
-                    ? LocalizeText(
-                        watchedVehicle
-                            ? kWatchedStatusLocaleId
-                            : kNotWatchedStatusLocaleId,
-                        watchedVehicle ? "Watched" : "Not watched")
-                    : LocalizeText(kNoEligibleSelectionLocaleId, "No eligible selected road vehicle"),
-                WatchedCount = string.Format(
-                    LocalizeText(kWatchedCountFormatLocaleId, "{0} watched"),
-                    FocusedLoggingService.WatchedVehicleCount),
+                    ? (watchedVehicle ? m_WatchedStatusText : m_NotWatchedStatusText)
+                    : m_NoEligibleSelectionText,
+                WatchedCount = GetWatchedCountText(watchedVehicleCount),
                 WatchedVehicles = string.IsNullOrWhiteSpace(watchedVehicles)
-                    ? LocalizeText(kNoneLocaleId, "None")
+                    ? m_NoneText
                     : watchedVehicles,
-                BurstLogging = BuildBurstLoggingText(),
-                BurstLoggingActive = BurstLoggingService.IsActive,
+                BurstLogging = BuildBurstLoggingText(burstLoggingRemainingSeconds),
+                BurstLoggingActive = burstLoggingActive,
                 Message = hasSelectedVehicle
                     ? string.Empty
-                    : LocalizeText(kNoEligibleSelectionLocaleId, "No eligible selected road vehicle"),
+                    : m_NoEligibleSelectionText,
                 WatchSelectedEnabled = hasSelectedVehicle && !watchedVehicle,
                 UnwatchSelectedEnabled = hasSelectedVehicle && watchedVehicle,
-                ClearWatchedEnabled = FocusedLoggingService.HasWatchedVehicles,
+                ClearWatchedEnabled = hasWatchedVehicles,
                 ToggleBurstLoggingEnabled = true,
             };
         }
@@ -256,6 +300,31 @@ namespace Traffic_Law_Enforcement
             m_FooterHintBinding.Update(LocalizeText(
                 kFooterHintLocaleId,
                 "For enabled vehicle-specific debug logs, watched vehicles stay filtered while global/state logs remain unchanged."));
+            m_NoneText = LocalizeText(kNoneLocaleId, "None");
+            m_WatchedStatusText = LocalizeText(kWatchedStatusLocaleId, "Watched");
+            m_NotWatchedStatusText = LocalizeText(kNotWatchedStatusLocaleId, "Not watched");
+            m_NoEligibleSelectionText = LocalizeText(
+                kNoEligibleSelectionLocaleId,
+                "No eligible selected road vehicle");
+            m_WatchedCountFormatText = LocalizeText(kWatchedCountFormatLocaleId, "{0} watched");
+            m_BurstLoggingInactiveText = LocalizeText(kBurstLoggingInactiveLocaleId, "Inactive");
+            m_BurstLoggingActiveFormatText = LocalizeText(
+                kBurstLoggingActiveFormatLocaleId,
+                "Active ({0:0.0}s remaining)");
+            InvalidateDynamicTextCaches();
+        }
+
+        private void UpdateLocalizedTextBindingsIfNeeded()
+        {
+            string activeLocaleId = GetActiveLocaleId();
+            if (m_LocalizedBindingsInitialized && activeLocaleId == m_LastLocalizedLocaleId)
+            {
+                return;
+            }
+
+            UpdateLocalizedTextBindings();
+            m_LastLocalizedLocaleId = activeLocaleId;
+            m_LocalizedBindingsInitialized = true;
         }
 
         private void UpdatePanelToggle()
@@ -286,6 +355,7 @@ namespace Traffic_Law_Enforcement
         private void HandleCloseRequested()
         {
             FocusedLoggingService.SetWindowVisible(false);
+            SelectedObjectBridgeSystem.SetMinimalSnapshotConsumerActive(false);
         }
 
         private void HandleWatchSelectedRequested()
@@ -318,18 +388,48 @@ namespace Traffic_Law_Enforcement
             BurstLoggingService.ToggleDefaultBurst();
         }
 
-        private string BuildBurstLoggingText()
+        private string BuildBurstLoggingText(double remainingSeconds)
         {
-            if (!BurstLoggingService.IsActive)
+            if (remainingSeconds <= 0d)
             {
-                return LocalizeText(kBurstLoggingInactiveLocaleId, "Inactive");
+                m_CachedBurstLoggingTenths = 0;
+                m_CachedBurstLoggingText = m_BurstLoggingInactiveText;
+                return m_CachedBurstLoggingText;
             }
 
-            return string.Format(
-                LocalizeText(
-                    kBurstLoggingActiveFormatLocaleId,
-                    "Active ({0:0.0}s remaining)"),
-                BurstLoggingService.GetRemainingSeconds());
+            long remainingTenths = (long)System.Math.Ceiling(remainingSeconds * 10d);
+            if (m_CachedBurstLoggingTenths == remainingTenths)
+            {
+                return m_CachedBurstLoggingText;
+            }
+
+            m_CachedBurstLoggingTenths = remainingTenths;
+            m_CachedBurstLoggingText = string.Format(
+                m_BurstLoggingActiveFormatText,
+                remainingTenths / 10d);
+            return m_CachedBurstLoggingText;
+        }
+
+        private string GetWatchedCountText(int watchedCount)
+        {
+            if (m_CachedWatchedCount == watchedCount)
+            {
+                return m_CachedWatchedCountText;
+            }
+
+            m_CachedWatchedCount = watchedCount;
+            m_CachedWatchedCountText = string.Format(
+                m_WatchedCountFormatText,
+                watchedCount);
+            return m_CachedWatchedCountText;
+        }
+
+        private void InvalidateDynamicTextCaches()
+        {
+            m_CachedWatchedCount = int.MinValue;
+            m_CachedWatchedCountText = string.Empty;
+            m_CachedBurstLoggingTenths = long.MinValue;
+            m_CachedBurstLoggingText = m_BurstLoggingInactiveText;
         }
 
         private bool TryGetSelectedReadyRoadVehicle(
@@ -359,6 +459,11 @@ namespace Traffic_Law_Enforcement
             return string.IsNullOrWhiteSpace(text)
                 ? string.Empty
                 : text.Trim();
+        }
+
+        private static string GetActiveLocaleId()
+        {
+            return GameManager.instance?.localizationManager?.activeLocaleId ?? string.Empty;
         }
 
         private static string LocalizeText(string localeId, string fallback)

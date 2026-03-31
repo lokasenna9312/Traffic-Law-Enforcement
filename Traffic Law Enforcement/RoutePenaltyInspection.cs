@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+using System.Text;
 using Game.Common;
 using Game.Net;
 using Game.Pathfind;
@@ -11,7 +11,6 @@ namespace Traffic_Law_Enforcement
     internal struct RoutePenaltyInspectionContext
     {
         public EntityManager EntityManager;
-        public ComponentLookup<Owner> OwnerData;
         public ComponentLookup<CarLane> CarLaneData;
         public ComponentLookup<EdgeLane> EdgeLaneData;
         public ComponentLookup<ParkingLane> ParkingLaneData;
@@ -33,13 +32,59 @@ namespace Traffic_Law_Enforcement
             IntersectionTransitions > 0;
     }
 
+    internal readonly struct RoutePenaltyTagSnapshot
+    {
+        public readonly int Count;
+        public readonly int OmittedCount;
+        public readonly int Token0;
+        public readonly int Token1;
+        public readonly int Token2;
+        public readonly int Token3;
+        public readonly int Token4;
+        public readonly int Token5;
+
+        public RoutePenaltyTagSnapshot(
+            int count,
+            int omittedCount,
+            int token0,
+            int token1,
+            int token2,
+            int token3,
+            int token4,
+            int token5)
+        {
+            Count = count;
+            OmittedCount = omittedCount;
+            Token0 = token0;
+            Token1 = token1;
+            Token2 = token2;
+            Token3 = token3;
+            Token4 = token4;
+            Token5 = token5;
+        }
+
+        public int GetToken(int index)
+        {
+            return index switch
+            {
+                0 => Token0,
+                1 => Token1,
+                2 => Token2,
+                3 => Token3,
+                4 => Token4,
+                5 => Token5,
+                _ => 0,
+            };
+        }
+    }
+
     internal readonly struct RoutePenaltyInspectionResult
     {
         public readonly uint RouteHash;
         public readonly RoutePenaltyProfile Profile;
         public readonly int TotalPenalty;
         public readonly string Breakdown;
-        public readonly string Tags;
+        public readonly RoutePenaltyTagSnapshot TagSnapshot;
         public readonly bool PublicTransportLanePolicyResolved;
         public readonly bool AllowedOnPublicTransportLane;
 
@@ -47,7 +92,7 @@ namespace Traffic_Law_Enforcement
             uint routeHash,
             RoutePenaltyProfile profile,
             string breakdown,
-            string tags,
+            RoutePenaltyTagSnapshot tagSnapshot,
             bool publicTransportLanePolicyResolved,
             bool allowedOnPublicTransportLane)
         {
@@ -55,7 +100,7 @@ namespace Traffic_Law_Enforcement
             Profile = profile;
             TotalPenalty = RoutePenaltyInspection.CalculateTotalPenalty(profile);
             Breakdown = breakdown;
-            Tags = tags;
+            TagSnapshot = tagSnapshot;
             PublicTransportLanePolicyResolved = publicTransportLanePolicyResolved;
             AllowedOnPublicTransportLane = allowedOnPublicTransportLane;
         }
@@ -65,6 +110,102 @@ namespace Traffic_Law_Enforcement
     {
         internal const int DefaultMaxPenaltyTags = 6;
         private const uint kInitialRouteHash = 2166136261u;
+        private const int TagKindShift = 24;
+        private const int TagPayloadMask = 0x00FFFFFF;
+        private const int TagKindMidBlock = 1;
+        private const int TagKindIntersection = 2;
+        private const int TagKindUnauthorizedPublicTransportLane = 3;
+        private const int LaneKindTokenLane = 1;
+        private const int LaneKindTokenRoad = 2;
+        private const int LaneKindTokenParkingLane = 3;
+        private const int LaneKindTokenGarageLane = 4;
+        private const int LaneKindTokenAccessConnection = 5;
+        private const int LaneKindTokenIntersectionBase = 0x100;
+
+        private struct RoutePenaltyTagCollector
+        {
+            public int Count;
+            public int OmittedCount;
+            public int Token0;
+            public int Token1;
+            public int Token2;
+            public int Token3;
+            public int Token4;
+            public int Token5;
+
+            public int GetToken(int index)
+            {
+                return index switch
+                {
+                    0 => Token0,
+                    1 => Token1,
+                    2 => Token2,
+                    3 => Token3,
+                    4 => Token4,
+                    5 => Token5,
+                    _ => 0,
+                };
+            }
+
+            public void Append(int token, int maxPenaltyTags)
+            {
+                if (token == 0)
+                {
+                    return;
+                }
+
+                for (int index = 0; index < Count; index += 1)
+                {
+                    if (GetToken(index) == token)
+                    {
+                        return;
+                    }
+                }
+
+                if (Count >= maxPenaltyTags)
+                {
+                    OmittedCount += 1;
+                    return;
+                }
+
+                switch (Count)
+                {
+                    case 0:
+                        Token0 = token;
+                        break;
+                    case 1:
+                        Token1 = token;
+                        break;
+                    case 2:
+                        Token2 = token;
+                        break;
+                    case 3:
+                        Token3 = token;
+                        break;
+                    case 4:
+                        Token4 = token;
+                        break;
+                    case 5:
+                        Token5 = token;
+                        break;
+                }
+
+                Count += 1;
+            }
+
+            public RoutePenaltyTagSnapshot ToSnapshot()
+            {
+                return new RoutePenaltyTagSnapshot(
+                    Count,
+                    OmittedCount,
+                    Token0,
+                    Token1,
+                    Token2,
+                    Token3,
+                    Token4,
+                    Token5);
+            }
+        }
 
         internal static RoutePenaltyInspectionResult InspectCurrentRoute(
             Entity vehicle,
@@ -72,7 +213,8 @@ namespace Traffic_Law_Enforcement
             DynamicBuffer<CarNavigationLane> navigationLanes,
             bool hasNavigationLanes,
             ref RoutePenaltyInspectionContext context,
-            bool captureDebugStrings,
+            bool captureBreakdown,
+            bool captureTagSummary,
             int maxPenaltyTags = DefaultMaxPenaltyTags)
         {
             RoutePenaltyProfile profile = default;
@@ -82,29 +224,23 @@ namespace Traffic_Law_Enforcement
                     ref context,
                     out bool allowedOnPublicTransportLane);
 
-            List<string> penaltyTags = captureDebugStrings
-                ? new List<string>(maxPenaltyTags)
-                : null;
+            RoutePenaltyTagCollector penaltyTags = default;
 
             uint hash = kInitialRouteHash;
-            int omittedTagCount = 0;
             bool previousUnauthorizedPublicTransportLane = false;
             Entity previousLane = Entity.Null;
-            Entity previousLaneOwner = Entity.Null;
 
             AppendLaneToProfile(
-                vehicle,
                 currentLane,
                 publicTransportLanePolicyResolved,
                 allowedOnPublicTransportLane,
                 ref previousLane,
-                ref previousLaneOwner,
                 ref previousUnauthorizedPublicTransportLane,
                 ref profile,
                 ref hash,
-                penaltyTags,
-                ref omittedTagCount,
+                ref penaltyTags,
                 ref context,
+                captureTagSummary,
                 maxPenaltyTags);
 
             if (hasNavigationLanes)
@@ -123,18 +259,16 @@ namespace Traffic_Law_Enforcement
                     }
 
                     AppendLaneToProfile(
-                        vehicle,
                         nextLane,
                         publicTransportLanePolicyResolved,
                         allowedOnPublicTransportLane,
                         ref previousLane,
-                        ref previousLaneOwner,
                         ref previousUnauthorizedPublicTransportLane,
                         ref profile,
                         ref hash,
-                        penaltyTags,
-                        ref omittedTagCount,
+                        ref penaltyTags,
                         ref context,
+                        captureTagSummary,
                         maxPenaltyTags);
                 }
             }
@@ -142,8 +276,8 @@ namespace Traffic_Law_Enforcement
             return new RoutePenaltyInspectionResult(
                 hash,
                 profile,
-                captureDebugStrings ? BuildBreakdown(profile) : null,
-                captureDebugStrings ? BuildTagSummary(penaltyTags, omittedTagCount) : null,
+                captureBreakdown ? BuildBreakdown(profile) : null,
+                captureTagSummary ? penaltyTags.ToSnapshot() : default,
                 publicTransportLanePolicyResolved,
                 allowedOnPublicTransportLane);
         }
@@ -160,8 +294,9 @@ namespace Traffic_Law_Enforcement
                 return "none";
             }
 
-            List<string> preview = new List<string>(maxPreviewLanes);
             int totalUpcoming = 0;
+            int previewCount = 0;
+            StringBuilder preview = new StringBuilder(96);
 
             for (int index = 0; index < navigationLanes.Length; index++)
             {
@@ -177,12 +312,21 @@ namespace Traffic_Law_Enforcement
                 }
 
                 totalUpcoming += 1;
-                if (preview.Count >= maxPreviewLanes)
+                if (previewCount >= maxPreviewLanes)
                 {
                     continue;
                 }
 
-                preview.Add($"{FormatEntity(lane)} {DescribeLaneKind(lane, ref context)}");
+                if (preview.Length > 0)
+                {
+                    preview.Append(" -> ");
+                }
+
+                preview
+                    .Append(FormatEntity(lane))
+                    .Append(' ')
+                    .Append(DescribeLaneKind(lane, ref context));
+                previewCount += 1;
             }
 
             if (totalUpcoming == 0)
@@ -190,13 +334,22 @@ namespace Traffic_Law_Enforcement
                 return "none";
             }
 
-            string summary = $"{totalUpcoming} total: {string.Join(" -> ", preview.ToArray())}";
-            if (totalUpcoming > preview.Count)
+            StringBuilder summary = new StringBuilder(128);
+            summary.Append(totalUpcoming).Append(" total");
+            if (preview.Length > 0)
             {
-                summary += $" (+{totalUpcoming - preview.Count} more)";
+                summary.Append(": ").Append(preview);
             }
 
-            return summary;
+            if (totalUpcoming > previewCount)
+            {
+                summary
+                    .Append(" (+")
+                    .Append(totalUpcoming - previewCount)
+                    .Append(" more)");
+            }
+
+            return summary.ToString();
         }
 
         internal static bool TryResolveAllowedOnPublicTransportLane(
@@ -253,6 +406,27 @@ namespace Traffic_Law_Enforcement
             }
 
             tag = $"mid-block({FormatMidBlockReasonTag(reasonCode)})";
+            return true;
+        }
+
+        private static bool TryGetMidBlockPenaltyToken(
+            Entity sourceLane,
+            Entity targetLane,
+            out int token,
+            ref RoutePenaltyInspectionContext context)
+        {
+            token = 0;
+
+            if (!MidBlockCrossingPolicy.TryGetIllegalTransition(
+                    context.EntityManager,
+                    sourceLane,
+                    targetLane,
+                    out LaneTransitionViolationReasonCode reasonCode))
+            {
+                return false;
+            }
+
+            token = EncodeMidBlockPenaltyTag(reasonCode);
             return true;
         }
 
@@ -317,18 +491,162 @@ namespace Traffic_Law_Enforcement
             return true;
         }
 
+        private static bool TryGetIntersectionPenaltyToken(
+            Entity sourceLane,
+            Entity targetLane,
+            out int token,
+            ref RoutePenaltyInspectionContext context)
+        {
+            token = 0;
+
+            if (!IntersectionMovementPolicy.TryGetIllegalIntersectionMovement(
+                    context.ConnectionLaneData,
+                    context.CarLaneData,
+                    sourceLane,
+                    targetLane,
+                    out LaneMovement actualMovement,
+                    out LaneMovement allowedMovement))
+            {
+                return false;
+            }
+
+            token = EncodeIntersectionPenaltyTag(actualMovement, allowedMovement);
+            return true;
+        }
+
         internal static string DescribeLaneKind(
+            Entity lane,
+            ref RoutePenaltyInspectionContext context)
+        {
+            return DescribeLaneKindToken(EncodeLaneKindToken(lane, ref context));
+        }
+
+        internal static string BuildBreakdown(RoutePenaltyProfile profile)
+        {
+            StringBuilder parts = new StringBuilder(64);
+            if (profile.PublicTransportLaneSegments > 0)
+            {
+                parts
+                    .Append("PT-lane ")
+                    .Append(profile.PublicTransportLaneSegments)
+                    .Append(" x ")
+                    .Append(EnforcementPenaltyService.GetPublicTransportLaneFine());
+            }
+
+            if (profile.MidBlockTransitions > 0)
+            {
+                AppendBreakdownPart(
+                    parts,
+                    "mid-block ",
+                    profile.MidBlockTransitions,
+                    EnforcementPenaltyService.GetMidBlockCrossingFine());
+            }
+
+            if (profile.IntersectionTransitions > 0)
+            {
+                AppendBreakdownPart(
+                    parts,
+                    "intersection ",
+                    profile.IntersectionTransitions,
+                    EnforcementPenaltyService.GetIntersectionMovementFine());
+            }
+
+            return parts.Length == 0
+                ? "none"
+                : parts.ToString();
+        }
+
+        internal static string BuildTagSummary(RoutePenaltyTagSnapshot tagSnapshot)
+        {
+            if (tagSnapshot.Count == 0)
+            {
+                return "none";
+            }
+
+            StringBuilder summary = new StringBuilder(96);
+            for (int index = 0; index < tagSnapshot.Count; index += 1)
+            {
+                if (index > 0)
+                {
+                    summary.Append("; ");
+                }
+
+                summary.Append(FormatTagToken(tagSnapshot.GetToken(index)));
+            }
+
+            if (tagSnapshot.OmittedCount > 0)
+            {
+                summary
+                    .Append("; ... (+")
+                    .Append(tagSnapshot.OmittedCount)
+                    .Append(" more)");
+            }
+
+            return summary.ToString();
+        }
+
+        private static int EncodeMidBlockPenaltyTag(
+            LaneTransitionViolationReasonCode reasonCode)
+        {
+            return (TagKindMidBlock << TagKindShift) | ((int)reasonCode & TagPayloadMask);
+        }
+
+        private static int EncodeIntersectionPenaltyTag(
+            LaneMovement actualMovement,
+            LaneMovement allowedMovement)
+        {
+            int payload =
+                ((int)actualMovement & 0xFF) |
+                (((int)allowedMovement & 0xFF) << 8);
+            return (TagKindIntersection << TagKindShift) | (payload & TagPayloadMask);
+        }
+
+        private static int EncodeUnauthorizedPublicTransportLaneTag(
+            Entity lane,
+            ref RoutePenaltyInspectionContext context)
+        {
+            int payload = EncodeLaneKindToken(lane, ref context);
+            return (TagKindUnauthorizedPublicTransportLane << TagKindShift) |
+                (payload & TagPayloadMask);
+        }
+
+        private static string FormatTagToken(int token)
+        {
+            int tagKind = token >> TagKindShift;
+            int payload = token & TagPayloadMask;
+
+            return tagKind switch
+            {
+                TagKindMidBlock =>
+                    $"mid-block({FormatMidBlockReasonTag((LaneTransitionViolationReasonCode)payload)})",
+                TagKindIntersection =>
+                    BuildIntersectionPenaltyTagText(payload),
+                TagKindUnauthorizedPublicTransportLane =>
+                    DescribeLaneKindToken(payload) + "(public-only, illegal)",
+                _ => "unknown",
+            };
+        }
+
+        private static string BuildIntersectionPenaltyTagText(int payload)
+        {
+            LaneMovement actualMovement = (LaneMovement)(payload & 0xFF);
+            LaneMovement allowedMovement = (LaneMovement)((payload >> 8) & 0xFF);
+            return
+                $"intersection(illegal {IntersectionMovementPolicy.FormatMovement(actualMovement)}; allowed {IntersectionMovementPolicy.FormatMovement(allowedMovement)})";
+        }
+
+        private static int EncodeLaneKindToken(
             Entity lane,
             ref RoutePenaltyInspectionContext context)
         {
             if (context.ParkingLaneData.HasComponent(lane))
             {
-                return "parking-lane";
+                return LaneKindTokenParkingLane;
             }
 
             if (context.GarageLaneData.HasComponent(lane))
             {
-                return "garage-lane";
+                return LaneKindTokenGarageLane;
             }
 
             if (context.ConnectionLaneData.TryGetComponent(lane, out ConnectionLane connectionLane))
@@ -342,64 +660,39 @@ namespace Traffic_Law_Enforcement
                         context.CarLaneData.TryGetComponent(lane, out CarLane connectionCarLane)
                             ? GetMovement(connectionCarLane.m_Flags)
                             : LaneMovement.None;
-                    string movementSuffix =
-                        movement == LaneMovement.None
-                            ? string.Empty
-                            : "-" + FormatMovement(movement);
-                    return "intersection" + movementSuffix;
+                    return LaneKindTokenIntersectionBase + (int)movement;
                 }
 
-                return "access-connection";
+                return LaneKindTokenAccessConnection;
             }
 
             if (context.EdgeLaneData.HasComponent(lane))
             {
-                return "road";
+                return LaneKindTokenRoad;
             }
 
-            return "lane";
+            return LaneKindTokenLane;
         }
 
-        internal static string BuildBreakdown(RoutePenaltyProfile profile)
+        private static string DescribeLaneKindToken(int laneKindToken)
         {
-            List<string> parts = new List<string>(3);
-            if (profile.PublicTransportLaneSegments > 0)
+            if (laneKindToken >= LaneKindTokenIntersectionBase)
             {
-                parts.Add(
-                    $"PT-lane {profile.PublicTransportLaneSegments} x {EnforcementPenaltyService.GetPublicTransportLaneFine()}");
+                LaneMovement movement =
+                    (LaneMovement)(laneKindToken - LaneKindTokenIntersectionBase);
+                return movement == LaneMovement.None
+                    ? "intersection"
+                    : "intersection-" + FormatMovement(movement);
             }
 
-            if (profile.MidBlockTransitions > 0)
+            return laneKindToken switch
             {
-                parts.Add(
-                    $"mid-block {profile.MidBlockTransitions} x {EnforcementPenaltyService.GetMidBlockCrossingFine()}");
-            }
-
-            if (profile.IntersectionTransitions > 0)
-            {
-                parts.Add(
-                    $"intersection {profile.IntersectionTransitions} x {EnforcementPenaltyService.GetIntersectionMovementFine()}");
-            }
-
-            return parts.Count == 0
-                ? "none"
-                : string.Join(", ", parts.ToArray());
-        }
-
-        internal static string BuildTagSummary(List<string> penaltyTags, int omittedTagCount)
-        {
-            if (penaltyTags == null || penaltyTags.Count == 0)
-            {
-                return "none";
-            }
-
-            string summary = string.Join("; ", penaltyTags.ToArray());
-            if (omittedTagCount > 0)
-            {
-                summary += $"; ... (+{omittedTagCount} more)";
-            }
-
-            return summary;
+                LaneKindTokenParkingLane => "parking-lane",
+                LaneKindTokenGarageLane => "garage-lane",
+                LaneKindTokenAccessConnection => "access-connection",
+                LaneKindTokenRoad => "road",
+                _ => "lane",
+            };
         }
 
         internal static int CalculateTotalPenalty(RoutePenaltyProfile profile)
@@ -420,18 +713,16 @@ namespace Traffic_Law_Enforcement
         }
 
         private static void AppendLaneToProfile(
-            Entity vehicle,
             Entity lane,
             bool publicTransportLanePolicyResolved,
             bool allowedOnPublicTransportLane,
             ref Entity previousLane,
-            ref Entity previousLaneOwner,
             ref bool previousUnauthorizedPublicTransportLane,
             ref RoutePenaltyProfile profile,
             ref uint hash,
-            List<string> penaltyTags,
-            ref int omittedTagCount,
+            ref RoutePenaltyTagCollector penaltyTags,
             ref RoutePenaltyInspectionContext context,
+            bool captureTagSummary,
             int maxPenaltyTags)
         {
             if (lane == Entity.Null)
@@ -439,35 +730,32 @@ namespace Traffic_Law_Enforcement
                 return;
             }
 
-            Entity laneOwner = GetOwner(lane, ref context);
             if (previousLane != Entity.Null)
             {
-                if (TryGetMidBlockPenaltyTag(
+                if (TryGetMidBlockPenaltyToken(
                         previousLane,
                         lane,
-                        out string midBlockTag,
+                        out int midBlockTag,
                         ref context))
                 {
                     profile.MidBlockTransitions += 1;
-                    AppendPenaltyTag(
-                        penaltyTags,
-                        midBlockTag,
-                        ref omittedTagCount,
-                        maxPenaltyTags);
+                    if (captureTagSummary)
+                    {
+                        penaltyTags.Append(midBlockTag, maxPenaltyTags);
+                    }
                 }
 
-                if (TryGetIntersectionPenaltyTag(
+                if (TryGetIntersectionPenaltyToken(
                         previousLane,
                         lane,
-                        out string intersectionTag,
+                        out int intersectionTag,
                         ref context))
                 {
                     profile.IntersectionTransitions += 1;
-                    AppendPenaltyTag(
-                        penaltyTags,
-                        intersectionTag,
-                        ref omittedTagCount,
-                        maxPenaltyTags);
+                    if (captureTagSummary)
+                    {
+                        penaltyTags.Append(intersectionTag, maxPenaltyTags);
+                    }
                 }
             }
 
@@ -482,55 +770,17 @@ namespace Traffic_Law_Enforcement
                 !previousUnauthorizedPublicTransportLane)
             {
                 profile.PublicTransportLaneSegments += 1;
-                AppendPenaltyTag(
-                    penaltyTags,
-                    DescribeLaneKind(lane, ref context) + "(public-only, illegal)",
-                    ref omittedTagCount,
-                    maxPenaltyTags);
+                if (captureTagSummary)
+                {
+                    penaltyTags.Append(
+                        EncodeUnauthorizedPublicTransportLaneTag(lane, ref context),
+                        maxPenaltyTags);
+                }
             }
 
             hash = HashLane(hash, lane, unauthorizedPublicTransportLane);
             previousLane = lane;
-            previousLaneOwner = laneOwner;
             previousUnauthorizedPublicTransportLane = unauthorizedPublicTransportLane;
-        }
-
-        private static Entity GetOwner(
-            Entity lane,
-            ref RoutePenaltyInspectionContext context)
-        {
-            if (lane != Entity.Null &&
-                context.OwnerData.TryGetComponent(lane, out Owner owner))
-            {
-                return owner.m_Owner;
-            }
-
-            return Entity.Null;
-        }
-
-        private static void AppendPenaltyTag(
-            List<string> penaltyTags,
-            string tag,
-            ref int omittedTagCount,
-            int maxPenaltyTags)
-        {
-            if (penaltyTags == null)
-            {
-                return;
-            }
-
-            if (string.IsNullOrEmpty(tag) || penaltyTags.Contains(tag))
-            {
-                return;
-            }
-
-            if (penaltyTags.Count >= maxPenaltyTags)
-            {
-                omittedTagCount += 1;
-                return;
-            }
-
-            penaltyTags.Add(tag);
         }
 
         private static uint HashLane(
@@ -550,30 +800,63 @@ namespace Traffic_Law_Enforcement
 
         private static string FormatMovement(LaneMovement movement)
         {
-            List<string> parts = new List<string>(4);
+            StringBuilder parts = new StringBuilder(24);
             if ((movement & LaneMovement.Forward) != 0)
             {
-                parts.Add("forward");
+                parts.Append("forward");
             }
 
             if ((movement & LaneMovement.Left) != 0)
             {
-                parts.Add("left");
+                AppendMovementPart(parts, "left");
             }
 
             if ((movement & LaneMovement.Right) != 0)
             {
-                parts.Add("right");
+                AppendMovementPart(parts, "right");
             }
 
             if ((movement & LaneMovement.UTurn) != 0)
             {
-                parts.Add("u-turn");
+                AppendMovementPart(parts, "u-turn");
             }
 
-            return parts.Count == 0
+            return parts.Length == 0
                 ? "none"
-                : string.Join("+", parts.ToArray());
+                : parts.ToString();
+        }
+
+        private static void AppendBreakdownPart(
+            StringBuilder parts,
+            string label,
+            int count,
+            int fine)
+        {
+            if (count <= 0)
+            {
+                return;
+            }
+
+            if (parts.Length > 0)
+            {
+                parts.Append(", ");
+            }
+
+            parts
+                .Append(label)
+                .Append(count)
+                .Append(" x ")
+                .Append(fine);
+        }
+
+        private static void AppendMovementPart(StringBuilder parts, string part)
+        {
+            if (parts.Length > 0)
+            {
+                parts.Append('+');
+            }
+
+            parts.Append(part);
         }
 
         private static LaneMovement GetMovement(Game.Net.CarLaneFlags flags)

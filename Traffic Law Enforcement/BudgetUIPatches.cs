@@ -50,7 +50,10 @@ namespace Traffic_Law_Enforcement
             try
             {
                 s_Harmony = new Harmony(HarmonyId);
-                s_Harmony.PatchAll(typeof(BudgetUIPatches).Assembly);
+                PatchClass(typeof(OnCreatePatch));
+                PatchClass(typeof(BindIncomeItemsPatch));
+                PatchClass(typeof(BindIncomeValuesPatch));
+                PatchClass(typeof(GetTotalIncomePatch));
                 RefreshExistingBudgetBindings("apply");
             }
             catch (Exception ex)
@@ -194,6 +197,11 @@ namespace Traffic_Law_Enforcement
         private static void UpdateBinding(IUpdateBinding binding)
         {
             binding?.Update();
+        }
+
+        private static void PatchClass(Type patchType)
+        {
+            s_Harmony?.CreateClassProcessor(patchType).Patch();
         }
 
         [HarmonyPatch(typeof(BudgetUISystem), "OnCreate")]

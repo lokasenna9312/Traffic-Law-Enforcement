@@ -1,5 +1,5 @@
 using System.Collections.Generic;
-using System.Linq;
+using System.Collections.ObjectModel;
 using System.Threading;
 using Game;
 using Game.SceneFlow;
@@ -139,6 +139,8 @@ namespace Traffic_Law_Enforcement
         private static bool s_HasTrackingState;
         private static MonthlyEnforcementTrackingState s_TrackingState;
         private static readonly List<MonthlyEnforcementReport> s_ReportHistory = new List<MonthlyEnforcementReport>();
+        private static readonly ReadOnlyCollection<MonthlyEnforcementReport> s_ReportHistoryView =
+            s_ReportHistory.AsReadOnly();
         private static int s_ManualPreviewRequestCount;
 
         public static bool TryGetTrackingState(out MonthlyEnforcementTrackingState trackingState)
@@ -149,7 +151,7 @@ namespace Traffic_Law_Enforcement
 
         public static IReadOnlyCollection<MonthlyEnforcementReport> GetReportHistorySnapshot()
         {
-            return s_ReportHistory.ToArray();
+            return s_ReportHistoryView;
         }
 
         public static void ResetPersistentData()
@@ -175,7 +177,14 @@ namespace Traffic_Law_Enforcement
                 return;
             }
 
-            foreach (MonthlyEnforcementReport report in reports.OrderBy(entry => entry.m_MonthIndex))
+            List<MonthlyEnforcementReport> sortedReports = new List<MonthlyEnforcementReport>();
+            foreach (MonthlyEnforcementReport report in reports)
+            {
+                sortedReports.Add(report);
+            }
+
+            sortedReports.Sort(static (left, right) => left.m_MonthIndex.CompareTo(right.m_MonthIndex));
+            foreach (MonthlyEnforcementReport report in sortedReports)
             {
                 s_ReportHistory.Add(report);
             }
@@ -340,6 +349,11 @@ namespace Traffic_Law_Enforcement
                     return true;
                 }
             }
+        }
+
+        public static bool HasPendingManualPreviewRequests()
+        {
+            return Volatile.Read(ref s_ManualPreviewRequestCount) > 0;
         }
 
         private static MonthlyEnforcementTrackingState CaptureCurrentState(long currentMonthIndex)

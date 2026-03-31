@@ -10,6 +10,12 @@ namespace Traffic_Law_Enforcement
 
         public static bool EnableEnforcementEventLogging => Mod.Settings?.EnableEnforcementEventLogging ?? false;
 
+        public static bool EnablePolicyImpactSummaryLogging =>
+            Mod.Settings?.EnablePolicyImpactSummaryLogging ?? false;
+
+        public static bool EnableFineIncomeLogging =>
+            Mod.Settings?.EnableFineIncomeLogging ?? false;
+
         public static bool EnableType2PublicTransportLaneUsageLogging => Mod.Settings?.EnableType2PublicTransportLaneUsageLogging ?? false;
 
         public static bool EnableType3PublicTransportLaneUsageLogging => Mod.Settings?.EnableType3PublicTransportLaneUsageLogging ?? false;
@@ -31,12 +37,27 @@ namespace Traffic_Law_Enforcement
 
         public static bool ShouldLogEstimatedReroutes()
         {
-            return Mod.IsEnforcementEnabled && EnableEstimatedRerouteLogging;
+            return EnableEstimatedRerouteLogging;
         }
 
         public static bool ShouldLogEnforcementEvents()
         {
             return EnableEnforcementEventLogging;
+        }
+
+        public static bool ShouldLogVehicleSpecificEnforcementEvents()
+        {
+            return EnableEnforcementEventLogging;
+        }
+
+        public static bool ShouldLogPolicyImpactSummary()
+        {
+            return EnablePolicyImpactSummaryLogging;
+        }
+
+        public static bool ShouldLogFineIncomeSummary()
+        {
+            return EnableFineIncomeLogging;
         }
 
         public static bool ShouldLogType2Usage()
@@ -65,9 +86,16 @@ namespace Traffic_Law_Enforcement
             return EnablePathObsoleteSourceLogging;
         }
 
+        public static bool ShouldLogVehicleSpecificPathObsoleteSource(Entity vehicle)
+        {
+            return ShouldLogVehicleSpecificVisibleLog(
+                ShouldLogPathObsoleteSources(),
+                vehicle);
+        }
+
         public static bool ShouldLogAllVehicleRouteSelectionChanges()
         {
-            return Mod.IsEnforcementEnabled && EnableAllVehicleRouteSelectionChangeLogging;
+            return EnableAllVehicleRouteSelectionChangeLogging;
         }
 
         public static bool ShouldLogRouteSelectionChangeSummary(Entity vehicle)
@@ -79,7 +107,15 @@ namespace Traffic_Law_Enforcement
 
         public static bool ShouldLogFocusedRouteRebuildDiagnostics()
         {
-            return Mod.IsEnforcementEnabled && EnableFocusedRouteRebuildDiagnosticsLogging;
+            return EnableFocusedRouteRebuildDiagnosticsLogging;
+        }
+
+        public static bool ShouldObserveRouteDebugState()
+        {
+            return ShouldLogEstimatedReroutes() ||
+                ShouldLogAllVehicleRouteSelectionChanges() ||
+                ShouldLogFocusedRouteRebuildDiagnostics() ||
+                ShouldLogPathfindingPenaltyDiagnostics();
         }
 
         public static bool ShouldLogFocusedPathfindSetup(Entity vehicle)
@@ -113,7 +149,9 @@ namespace Traffic_Law_Enforcement
 
         public static bool ShouldLogVehicleSpecificEnforcementEvent(Entity vehicle)
         {
-            return ShouldLogVehicleSpecificVisibleLog(ShouldLogEnforcementEvents(), vehicle);
+            return ShouldLogVehicleSpecificVisibleLog(
+                ShouldLogVehicleSpecificEnforcementEvents(),
+                vehicle);
         }
 
         public static bool ShouldLogVehicleSpecificType2Usage(Entity vehicle)
@@ -129,33 +167,6 @@ namespace Traffic_Law_Enforcement
         public static bool ShouldLogVehicleSpecificType4Usage(Entity vehicle)
         {
             return ShouldLogVehicleSpecificVisibleLog(ShouldLogType4Usage(), vehicle);
-        }
-
-        public static bool EnableSaveIdentificationLogging => true;
-
-        public static bool ShouldLogSaveIdentification()
-        {
-            return true;
-        }
-
-        public static void RecordSaveIdentification(string message)
-        {
-            if (!ShouldLogSaveIdentification() || string.IsNullOrWhiteSpace(message))
-            {
-                return;
-            }
-
-            Mod.log.Info(message);
-        }
-
-        public static void RecordSaveLoadInfo(string message)
-        {
-            if (!ShouldLogSaveIdentification() || string.IsNullOrWhiteSpace(message))
-            {
-                return;
-            }
-
-            Mod.log.Info(message);
         }
 
         public static void RecordEnforcementEvent(string message, Entity vehicle)
@@ -202,11 +213,5 @@ namespace Traffic_Law_Enforcement
             Mod.log.Info(message);
         }
 
-        public static string FormatSaveIdentificationSuffix()
-        {
-            return ShouldLogSaveIdentification()
-                ? ", " + SaveLoadTraceService.DescribePendingLoad()
-                : string.Empty;
-        }
     }
 }

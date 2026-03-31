@@ -84,15 +84,18 @@ namespace Traffic_Law_Enforcement
                         statisticsChanged = true;
 
                         string reason = FormatMidBlockReason(evt.ReasonCode);
-                        string message =
-                            $"Mid-block crossing violation #{statistics.m_MidBlockCrossingViolationCount}: vehicle={evt.Vehicle}, lane={evt.Lane}, reason={reason}";
 
                         EnforcementPenaltyService.RecordMidBlockCrossingViolation(
                             evt.Vehicle,
                             evt.Lane,
                             reason);
 
-                        EnforcementLoggingPolicy.RecordEnforcementEvent(message, evt.Vehicle);
+                        if (EnforcementLoggingPolicy.ShouldLogVehicleSpecificEnforcementEvent(evt.Vehicle))
+                        {
+                            string message =
+                                $"Mid-block crossing violation #{statistics.m_MidBlockCrossingViolationCount}: vehicle={evt.Vehicle}, lane={evt.Lane}, reason={reason}";
+                            EnforcementLoggingPolicy.RecordEnforcementEvent(message, evt.Vehicle);
+                        }
                         break;
                     }
 
@@ -103,15 +106,18 @@ namespace Traffic_Law_Enforcement
 
                         string reason =
                             $"actual {evt.ActualMovement}, allowed {evt.AllowedMovement}";
-                        string message =
-                            $"Intersection movement violation #{statistics.m_IntersectionMovementViolationCount}: vehicle={evt.Vehicle}, lane={evt.Lane}, actual={evt.ActualMovement}, allowed={evt.AllowedMovement}";
 
                         EnforcementPenaltyService.RecordIntersectionMovementViolation(
                             evt.Vehicle,
                             evt.Lane,
                             reason);
 
-                        EnforcementLoggingPolicy.RecordEnforcementEvent(message, evt.Vehicle);
+                        if (EnforcementLoggingPolicy.ShouldLogVehicleSpecificEnforcementEvent(evt.Vehicle))
+                        {
+                            string message =
+                                $"Intersection movement violation #{statistics.m_IntersectionMovementViolationCount}: vehicle={evt.Vehicle}, lane={evt.Lane}, actual={evt.ActualMovement}, allowed={evt.AllowedMovement}";
+                            EnforcementLoggingPolicy.RecordEnforcementEvent(message, evt.Vehicle);
+                        }
                         break;
                     }
                 }

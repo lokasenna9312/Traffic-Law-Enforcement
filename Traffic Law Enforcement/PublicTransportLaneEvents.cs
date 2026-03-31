@@ -10,6 +10,7 @@ namespace Traffic_Law_Enforcement
         UsageType2 = 2,
         UsageType3 = 3,
         UsageType4 = 4,
+        ViolationEnd = 5,
     }
 
     public struct DetectedPublicTransportLaneEvent : IBufferElementData

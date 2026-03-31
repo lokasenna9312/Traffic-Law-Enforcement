@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Text;
 using Unity.Entities;
 using Entity = Unity.Entities.Entity;
 
@@ -32,68 +33,107 @@ namespace Traffic_Law_Enforcement
 
     internal static class SelectedObjectEnforcementSummaryBuilder
     {
+        private const int kReasonSummaryCacheLimit = 256;
+        private const int kPolicyTextCacheLimit = 128;
+
+        private static readonly Dictionary<string, CompactReasonSummary> s_CompactReasonSummaryCache =
+            new Dictionary<string, CompactReasonSummary>();
+        private static readonly Dictionary<int, string> s_PublicTransportLanePolicyTextCache =
+            new Dictionary<int, string>();
+        private static string s_CachedReasonSummaryLocaleId = string.Empty;
+        private static string s_CachedPolicyTextLocaleId = string.Empty;
+
+        private readonly struct CompactReasonSummary
+        {
+            internal readonly string CompactLastReasonText;
+            internal readonly string CompactRepeatPenaltyText;
+
+            internal CompactReasonSummary(
+                string compactLastReasonText,
+                string compactRepeatPenaltyText)
+            {
+                CompactLastReasonText = compactLastReasonText;
+                CompactRepeatPenaltyText = compactRepeatPenaltyText;
+            }
+        }
+
         internal static SelectedObjectEnforcementSummaryData Build(
             SelectedObjectResolveResult resolveResult,
             bool tleApplicable,
             bool hasTrafficLawProfile,
             Entity vehicle,
             string lastReason,
+            bool includeDebugFields,
             ref SelectedObjectEnforcementSummaryContext context)
         {
-            string permissionStateSummary = tleApplicable
+            string permissionStateSummary = tleApplicable && includeDebugFields
                 ? BuildPermissionStateSummary(vehicle, hasTrafficLawProfile, ref context)
                 : string.Empty;
+            CompactReasonSummary compactReasonSummary = tleApplicable
+                ? GetCompactReasonSummary(lastReason)
+                : default;
 
             return new SelectedObjectEnforcementSummaryData(
-                BuildCompactLastReasonText(tleApplicable, lastReason),
-                BuildCompactRepeatPenaltyText(tleApplicable, lastReason),
+                compactReasonSummary.CompactLastReasonText,
+                compactReasonSummary.CompactRepeatPenaltyText,
                 BuildPublicTransportLanePolicyText(resolveResult, hasTrafficLawProfile, ref context),
                 permissionStateSummary);
         }
 
-        private static string BuildCompactLastReasonText(
-            bool tleApplicable,
-            string lastReason)
+        private static CompactReasonSummary GetCompactReasonSummary(string lastReason)
         {
-            if (!tleApplicable)
+            string activeLocaleId = SelectedObjectLocalization.ActiveLocaleId;
+            if (activeLocaleId != s_CachedReasonSummaryLocaleId)
             {
-                return string.Empty;
+                s_CachedReasonSummaryLocaleId = activeLocaleId;
+                s_CompactReasonSummaryCache.Clear();
             }
 
-            SplitRepeatPenaltyReason(
-                NormalizeReasonText(lastReason),
-                out string reasonText,
-                out _);
+            string cacheKey = lastReason ?? string.Empty;
+            if (s_CompactReasonSummaryCache.TryGetValue(cacheKey, out CompactReasonSummary cachedSummary))
+            {
+                return cachedSummary;
+            }
 
-            string normalizedReason = string.IsNullOrWhiteSpace(reasonText)
+            if (s_CompactReasonSummaryCache.Count >= kReasonSummaryCacheLimit)
+            {
+                s_CompactReasonSummaryCache.Clear();
+            }
+
+            string normalizedReason = NormalizeReasonText(cacheKey);
+            SplitRepeatPenaltyReason(
+                normalizedReason,
+                out string reasonText,
+                out string repeatPenaltyText);
+
+            CompactReasonSummary summary = new CompactReasonSummary(
+                BuildCompactLastReasonText(reasonText),
+                BuildCompactRepeatPenaltyText(repeatPenaltyText));
+            s_CompactReasonSummaryCache[cacheKey] = summary;
+            return summary;
+        }
+
+        private static string BuildCompactLastReasonText(
+            string lastReason)
+        {
+            string summarizedReason = string.IsNullOrWhiteSpace(lastReason)
                 ? SelectedObjectLocalization.LocalizeText(
                     SelectedObjectBridgeSystem.kReasonNoneRecordedLocaleId,
                     "None recorded")
-                : SummarizeReasonText(reasonText);
+                : SummarizeReasonText(lastReason);
 
             const int maxLength = 56;
-            if (normalizedReason.Length <= maxLength)
+            if (summarizedReason.Length <= maxLength)
             {
-                return normalizedReason;
+                return summarizedReason;
             }
 
-            return normalizedReason.Substring(0, maxLength - 3) + "...";
+            return summarizedReason.Substring(0, maxLength - 3) + "...";
         }
 
         private static string BuildCompactRepeatPenaltyText(
-            bool tleApplicable,
-            string lastReason)
+            string repeatPenaltyText)
         {
-            if (!tleApplicable)
-            {
-                return string.Empty;
-            }
-
-            SplitRepeatPenaltyReason(
-                NormalizeReasonText(lastReason),
-                out _,
-                out string repeatPenaltyText);
-
             return string.IsNullOrWhiteSpace(repeatPenaltyText)
                 ? SelectedObjectLocalization.LocalizeText(
                     SelectedObjectBridgeSystem.kReasonRepeatPenaltyNotAppliedLocaleId,
@@ -122,6 +162,34 @@ namespace Traffic_Law_Enforcement
             }
 
             PublicTransportLaneAccessBits accessBits = profile.m_PublicTransportLaneAccessBits;
+            bool emergencyVehicle = profile.m_EmergencyVehicle != 0;
+            string activeLocaleId = SelectedObjectLocalization.ActiveLocaleId;
+            if (activeLocaleId != s_CachedPolicyTextLocaleId)
+            {
+                s_CachedPolicyTextLocaleId = activeLocaleId;
+                s_PublicTransportLanePolicyTextCache.Clear();
+            }
+
+            int cacheKey = ((int)accessBits << 1) | (emergencyVehicle ? 1 : 0);
+            if (s_PublicTransportLanePolicyTextCache.TryGetValue(cacheKey, out string cachedPolicyText))
+            {
+                return cachedPolicyText;
+            }
+
+            if (s_PublicTransportLanePolicyTextCache.Count >= kPolicyTextCacheLimit)
+            {
+                s_PublicTransportLanePolicyTextCache.Clear();
+            }
+
+            string policyText = BuildPublicTransportLanePolicyText(accessBits, emergencyVehicle);
+            s_PublicTransportLanePolicyTextCache[cacheKey] = policyText;
+            return policyText;
+        }
+
+        private static string BuildPublicTransportLanePolicyText(
+            PublicTransportLaneAccessBits accessBits,
+            bool emergencyVehicle)
+        {
             string type = PublicTransportLanePolicy.DescribeType(accessBits);
             bool vanillaAllow = PublicTransportLanePolicy.VanillaAllowsAccess(accessBits);
             bool modAllow = PublicTransportLanePolicy.ModAllowsAccess(accessBits);
@@ -139,27 +207,39 @@ namespace Traffic_Law_Enforcement
                     : SelectedObjectBridgeSystem.kPublicTransportLanePolicyTleDenyLocaleId,
                 modAllow ? "TLE Allowed" : "TLE Denied");
             string meaning = string.Format(meaningFormat, type, vanillaMeaning, tleMeaning);
-
-            List<string> qualifiers = null;
+            string qualifierSeparator = SelectedObjectLocalization.LocalizeText(
+                SelectedObjectBridgeSystem.kPublicTransportLanePolicyQualifierSeparatorLocaleId,
+                ", ");
+            StringBuilder qualifiers = null;
             if (PublicTransportLanePolicy.ModPrefersLanes(accessBits))
             {
-                (qualifiers ??= new List<string>()).Add(
+                (qualifiers ??= new StringBuilder(24)).Append(
                     SelectedObjectLocalization.LocalizeText(
                         SelectedObjectBridgeSystem.kPublicTransportLanePolicyQualifierPublicTransportLocaleId,
                         "PT"));
             }
 
-            if (profile.m_EmergencyVehicle != 0)
+            if (emergencyVehicle)
             {
-                (qualifiers ??= new List<string>()).Add(
+                if (qualifiers != null)
+                {
+                    qualifiers.Append(qualifierSeparator);
+                }
+
+                (qualifiers ??= new StringBuilder(24)).Append(
                     SelectedObjectLocalization.LocalizeText(
                         SelectedObjectBridgeSystem.kPublicTransportLanePolicyQualifierEmergencyLocaleId,
                         "Emergency"));
             }
 
-            return qualifiers == null || qualifiers.Count == 0
+            return qualifiers == null || qualifiers.Length == 0
                 ? meaning
-                : $"{meaning} [{string.Join(", ", qualifiers)}]";
+                : string.Format(
+                    SelectedObjectLocalization.LocalizeText(
+                        SelectedObjectBridgeSystem.kPublicTransportLanePolicyQualifiedFormatLocaleId,
+                        "{0} [{1}]"),
+                    meaning,
+                    qualifiers.ToString());
         }
 
         private static string SummarizeReasonText(string reason)

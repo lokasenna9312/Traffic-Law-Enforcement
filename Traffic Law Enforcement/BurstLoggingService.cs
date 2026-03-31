@@ -11,12 +11,15 @@ namespace Traffic_Law_Enforcement
         internal const int BurstPublicTransportLaneDecisionDiagnosticLogsPerUpdate = 64;
 
         private static long s_EndTimestamp;
+        private static long s_CachedStatusTenths = long.MinValue;
+        private static string s_CachedStatusText = "Inactive";
 
-        internal static bool IsActive => GetRemainingSeconds() > 0d;
+        internal static bool IsActive => s_EndTimestamp > Stopwatch.GetTimestamp();
 
         internal static void Reset()
         {
             s_EndTimestamp = 0;
+            InvalidateStatusCache();
         }
 
         internal static void RequestDefaultBurst()
@@ -32,6 +35,7 @@ namespace Traffic_Law_Enforcement
             }
 
             s_EndTimestamp = 0;
+            InvalidateStatusCache();
             Mod.log.Info("[BurstLogging] Cancelled");
         }
 
@@ -60,6 +64,7 @@ namespace Traffic_Law_Enforcement
                 : now;
 
             s_EndTimestamp = baseline + durationTicks;
+            InvalidateStatusCache();
 
             Mod.log.Info(
                 $"[BurstLogging] Started: durationSeconds={durationSeconds:0.###}, " +
@@ -79,9 +84,28 @@ namespace Traffic_Law_Enforcement
         internal static string DescribeStatus()
         {
             double remainingSeconds = GetRemainingSeconds();
-            return remainingSeconds > 0d
-                ? $"Active ({remainingSeconds:0.0}s remaining)"
-                : "Inactive";
+            if (remainingSeconds <= 0d)
+            {
+                s_CachedStatusTenths = 0;
+                s_CachedStatusText = "Inactive";
+                return s_CachedStatusText;
+            }
+
+            long remainingTenths = (long)System.Math.Ceiling(remainingSeconds * 10d);
+            if (s_CachedStatusTenths == remainingTenths)
+            {
+                return s_CachedStatusText;
+            }
+
+            s_CachedStatusTenths = remainingTenths;
+            s_CachedStatusText =
+                $"Active ({remainingTenths / 10d:0.0}s remaining)";
+            return s_CachedStatusText;
+        }
+
+        private static void InvalidateStatusCache()
+        {
+            s_CachedStatusTenths = long.MinValue;
         }
     }
 }

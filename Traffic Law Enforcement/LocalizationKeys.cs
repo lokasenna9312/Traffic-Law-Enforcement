@@ -119,6 +119,8 @@ namespace Traffic_Law_Enforcement
 
             AddOption(map, setting, nameof(Setting.EnableEstimatedRerouteLogging));
             AddOption(map, setting, nameof(Setting.EnableEnforcementEventLogging));
+            AddOption(map, setting, nameof(Setting.EnablePolicyImpactSummaryLogging));
+            AddOption(map, setting, nameof(Setting.EnableFineIncomeLogging));
             AddOption(map, setting, nameof(Setting.EnablePathfindingPenaltyDiagnosticLogging));
             AddOption(map, setting, nameof(Setting.EnableType2PublicTransportLaneUsageLogging));
             AddOption(map, setting, nameof(Setting.EnableType3PublicTransportLaneUsageLogging));
@@ -127,7 +129,6 @@ namespace Traffic_Law_Enforcement
             AddOption(map, setting, nameof(Setting.EnableAllVehicleRouteSelectionChangeLogging));
             AddOption(map, setting, nameof(Setting.EnableFocusedRouteRebuildDiagnosticsLogging));
             AddOption(map, setting, nameof(Setting.EnableFocusedVehicleOnlyRouteLogging));
-            AddOption(map, setting, nameof(Setting.EnablePolicyTrackedVehicleVanillaPathfindRulesExperiment));
             AddOption(map, setting, nameof(Setting.SelectedObjectPanelToggleBinding));
             AddOption(map, setting, nameof(Setting.FocusedLoggingPanelToggleBinding));
             AddOption(map, setting, nameof(Setting.ModLogPath));
@@ -239,6 +240,8 @@ namespace Traffic_Law_Enforcement
             map["SelectedObjectPanel.Role.ParkMaintenanceVehicle"] = SelectedObjectBridgeSystem.kRoleParkMaintenanceVehicleLocaleId;
             map["SelectedObjectPanel.Role.UnclassifiedRoadVehicle"] = SelectedObjectBridgeSystem.kRoleUnclassifiedRoadVehicleLocaleId;
             map["SelectedObjectPanel.Role.EmergencyQualifier"] = SelectedObjectBridgeSystem.kRoleEmergencyQualifierLocaleId;
+            map["SelectedObjectPanel.Role.ListSeparator"] = SelectedObjectBridgeSystem.kRoleListSeparatorLocaleId;
+            map["SelectedObjectPanel.Role.EmergencyFormat"] = SelectedObjectBridgeSystem.kRoleEmergencyFormatLocaleId;
             map["SelectedObjectPanel.Reason.NoneRecorded"] = SelectedObjectBridgeSystem.kReasonNoneRecordedLocaleId;
             map["SelectedObjectPanel.Reason.PublicTransportLaneRevokedByModFormat"] = SelectedObjectBridgeSystem.kReasonPublicTransportLaneRevokedByModFormatLocaleId;
             map["SelectedObjectPanel.Reason.PublicTransportLaneMissingVanillaCategoriesFormat"] = SelectedObjectBridgeSystem.kReasonPublicTransportLaneMissingVanillaCategoriesFormatLocaleId;
@@ -264,6 +267,10 @@ namespace Traffic_Law_Enforcement
                 SelectedObjectBridgeSystem.kPublicTransportLanePolicyQualifierPublicTransportLocaleId;
             map["SelectedObjectPanel.PublicTransportLanePolicyQualifierEmergency"] =
                 SelectedObjectBridgeSystem.kPublicTransportLanePolicyQualifierEmergencyLocaleId;
+            map["SelectedObjectPanel.PublicTransportLanePolicyQualifierSeparator"] =
+                SelectedObjectBridgeSystem.kPublicTransportLanePolicyQualifierSeparatorLocaleId;
+            map["SelectedObjectPanel.PublicTransportLanePolicyQualifiedFormat"] =
+                SelectedObjectBridgeSystem.kPublicTransportLanePolicyQualifiedFormatLocaleId;
             map["SelectedObjectPanel.PublicTransportLanePolicyVanillaAllow"] =
                 SelectedObjectBridgeSystem.kPublicTransportLanePolicyVanillaAllowLocaleId;
             map["SelectedObjectPanel.PublicTransportLanePolicyVanillaDeny"] =

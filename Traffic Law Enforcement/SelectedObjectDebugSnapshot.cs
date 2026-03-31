@@ -57,6 +57,9 @@ namespace Traffic_Law_Enforcement
         public readonly bool HasCurrentTarget;
         public readonly bool HasCurrentRoute;
         public readonly PathFlags CurrentPathFlags;
+        public readonly Entity CurrentTargetEntity;
+        public readonly Entity CurrentRouteEntity;
+        public readonly string CurrentRouteColorText;
         public readonly bool HasRouteDiagnostics;
         public readonly string RouteDiagnosticsCurrentTargetText;
         public readonly string RouteDiagnosticsCurrentRouteText;
@@ -117,6 +120,9 @@ namespace Traffic_Law_Enforcement
             bool hasCurrentTarget,
             bool hasCurrentRoute,
             PathFlags currentPathFlags,
+            Entity currentTargetEntity,
+            Entity currentRouteEntity,
+            string currentRouteColorText,
             bool hasRouteDiagnostics,
             string routeDiagnosticsCurrentTargetText,
             string routeDiagnosticsCurrentRouteText,
@@ -176,6 +182,9 @@ namespace Traffic_Law_Enforcement
             HasCurrentTarget = hasCurrentTarget;
             HasCurrentRoute = hasCurrentRoute;
             CurrentPathFlags = currentPathFlags;
+            CurrentTargetEntity = currentTargetEntity;
+            CurrentRouteEntity = currentRouteEntity;
+            CurrentRouteColorText = currentRouteColorText;
             HasRouteDiagnostics = hasRouteDiagnostics;
             RouteDiagnosticsCurrentTargetText = routeDiagnosticsCurrentTargetText;
             RouteDiagnosticsCurrentRouteText = routeDiagnosticsCurrentRouteText;
