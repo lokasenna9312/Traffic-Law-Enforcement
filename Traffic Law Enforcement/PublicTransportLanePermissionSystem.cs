@@ -97,7 +97,7 @@ namespace Traffic_Law_Enforcement
             HandleRuntimeWorldReload();
 
             EnforcementGameplaySettingsState settings = EnforcementGameplaySettingsService.Current;
-            bool enforcementEnabled = Mod.IsPublicTransportLaneEnforcementEnabled;
+            bool enforcementEnabled = ShouldApplyPublicTransportLaneIntervention();
             int settingsMask = enforcementEnabled
                 ? PublicTransportLanePolicy.GetPermissionSettingsMask(settings)
                 : 0;
@@ -134,14 +134,7 @@ namespace Traffic_Law_Enforcement
 
             if (!enforcementEnabled)
             {
-                RestoreTrackedVehicles();
-                if (!m_PendingExitQuery.IsEmptyIgnoreFilter)
-                {
-                    EntityManager.RemoveComponent<PublicTransportLanePendingExit>(m_PendingExitQuery);
-                }
-                ClearPendingRefresh();
-                m_HasEvaluated = false;
-                m_LastEnforcementEnabled = false;
+                ResetPermissionInterventionsForDisabledEnforcement();
                 return;
             }
 
@@ -192,7 +185,7 @@ namespace Traffic_Law_Enforcement
 
             if (!m_PendingExitQuery.IsEmptyIgnoreFilter)
             {
-                EntityManager.RemoveComponent<PublicTransportLanePendingExit>(m_PendingExitQuery);
+                ClearAllPendingExitInterventions();
             }
 
             if (!m_TrackedQuery.IsEmptyIgnoreFilter)
@@ -251,6 +244,29 @@ namespace Traffic_Law_Enforcement
             if (m_PendingExitData.HasComponent(vehicle))
             {
                 EntityManager.RemoveComponent<PublicTransportLanePendingExit>(vehicle);
+            }
+        }
+
+        private static bool ShouldApplyPublicTransportLaneIntervention()
+        {
+            return Mod.IsPublicTransportLaneEnforcementEnabled;
+        }
+
+        private void ResetPermissionInterventionsForDisabledEnforcement()
+        {
+            RestoreTrackedVehicles();
+            ClearAllPendingExitInterventions();
+            ClearPendingRefresh();
+            m_HasEvaluated = false;
+            m_LastEnforcementEnabled = false;
+        }
+
+        private void ClearAllPendingExitInterventions()
+        {
+            if (!m_PendingExitQuery.IsEmptyIgnoreFilter)
+            {
+                EntityManager.RemoveComponent<PublicTransportLanePendingExit>(
+                    m_PendingExitQuery);
             }
         }
 
@@ -453,8 +469,7 @@ namespace Traffic_Law_Enforcement
                 vehicle,
                 out PublicTransportLanePendingExit pendingExit);
             bool shouldLogPathObsoleteTrace =
-                EnforcementLoggingPolicy.ShouldLogVehicleSpecificPathObsoleteSource(
-                    vehicle);
+                ShouldLogPermissionPathObsoleteTrace(vehicle);
 
             bool permissionBeingRevoked = !canUsePublicTransportLane;
 
@@ -502,17 +517,26 @@ namespace Traffic_Law_Enforcement
                         m_HasLeftPublicTransportLane = 0,
                     };
 
-                    EntityManager.AddComponentData(vehicle, pendingExit);
+                    ApplyPendingExitGrace(vehicle, pendingExit);
 
-                    MarkPathObsolete(
-                        vehicle,
-                        car,
-                        "pt-pending-exit-grace-granted",
-                        shouldLogPathObsoleteTrace
-                            ? obsoleteLoggingRole ??=
-                                PublicTransportLanePolicy.DescribeVehicleRole(vehicle, ref m_TypeLookups)
-                            : null,
-                        $"currentLane={currentLaneEntity}, originalMask={originalMask}, engineUseFlag={(car.m_Flags & CarFlags.UsePublicTransportLanes) != 0}, canUsePublicTransportLane={canUsePublicTransportLane}");
+                    if (TryApplyPermissionPathObsolete(
+                            vehicle,
+                            out PathFlags stateBefore,
+                            out PathFlags stateAfter))
+                    {
+                        string extra = shouldLogPathObsoleteTrace
+                            ? $"currentLane={currentLaneEntity}, originalMask={originalMask}, engineUseFlag={(car.m_Flags & CarFlags.UsePublicTransportLanes) != 0}, canUsePublicTransportLane={canUsePublicTransportLane}"
+                            : null;
+                        RecordPermissionPathObsolete(
+                            vehicle,
+                            car,
+                            "pt-pending-exit-grace-granted",
+                            extra,
+                            shouldLogPathObsoleteTrace,
+                            ref obsoleteLoggingRole,
+                            stateBefore,
+                            stateAfter);
+                    }
                 }
 
                 if (bootstrapImmediateEntryGrace)
@@ -532,17 +556,26 @@ namespace Traffic_Law_Enforcement
                 else if (pendingExit.m_HasLeftPublicTransportLane == 0)
                 {
                     pendingExit.m_HasLeftPublicTransportLane = 1;
-                    EntityManager.SetComponentData(vehicle, pendingExit);
+                    UpdatePendingExitGrace(vehicle, pendingExit);
 
-                    MarkPathObsolete(
-                        vehicle,
-                        car,
-                        "pt-pending-exit-safe-lane-reached",
-                        shouldLogPathObsoleteTrace
-                            ? obsoleteLoggingRole ??=
-                                PublicTransportLanePolicy.DescribeVehicleRole(vehicle, ref m_TypeLookups)
-                            : null,
-                        $"currentLane={currentLaneEntity}, graceGrantedLane={pendingExit.m_LaneWhenGraceGranted}, originalMask={originalMask}, engineUseFlag={(car.m_Flags & CarFlags.UsePublicTransportLanes) != 0}, canUsePublicTransportLane={canUsePublicTransportLane}");
+                    if (TryApplyPermissionPathObsolete(
+                            vehicle,
+                            out PathFlags stateBefore,
+                            out PathFlags stateAfter))
+                    {
+                        string extra = shouldLogPathObsoleteTrace
+                            ? $"currentLane={currentLaneEntity}, graceGrantedLane={pendingExit.m_LaneWhenGraceGranted}, originalMask={originalMask}, engineUseFlag={(car.m_Flags & CarFlags.UsePublicTransportLanes) != 0}, canUsePublicTransportLane={canUsePublicTransportLane}"
+                            : null;
+                        RecordPermissionPathObsolete(
+                            vehicle,
+                            car,
+                            "pt-pending-exit-safe-lane-reached",
+                            extra,
+                            shouldLogPathObsoleteTrace,
+                            ref obsoleteLoggingRole,
+                            stateBefore,
+                            stateAfter);
+                    }
                 }
                 else
                 {
@@ -578,37 +611,36 @@ namespace Traffic_Law_Enforcement
                 m_PublicTransportLaneAccessBits = accessBits,
             };
 
-            if (!hasState)
-            {
-                EntityManager.AddComponentData(vehicle, updatedState);
-            }
-            else if (!StatesEqual(state, updatedState))
-            {
-                EntityManager.SetComponentData(vehicle, updatedState);
-            }
+            ApplyPermissionState(vehicle, hasState, state, updatedState);
 
             if (obsoleteRelevantFlagsChanged || emergencyTransition)
             {
                 string reason = obsoleteRelevantFlagsChanged
                     ? "pt-permission-capability-changed"
                     : "emergency-state-changed";
-                string extra =
-                    $"vanillaAllowsAccess={vanillaAllowsAccess}, configuredModAllowsAccess={configuredModAllowsAccess}, " +
-                    $"canUsePublicTransportLane={canUsePublicTransportLane}, " +
-                    $"modPrefersLanes={modPrefersLanes}, obsoleteRelevantFlagsChanged={obsoleteRelevantFlagsChanged}, " +
-                    $"preferenceOnlyChange={preferenceOnlyChange}, emergencyTransition={emergencyTransition}, " +
-                    $"engineUseFlag={(car.m_Flags & CarFlags.UsePublicTransportLanes) != 0}, " +
-                    $"enginePreferFlag={(car.m_Flags & CarFlags.PreferPublicTransportLanes) != 0}";
-
-                MarkPathObsolete(
-                    vehicle,
-                    car,
-                    reason,
-                    shouldLogPathObsoleteTrace
-                        ? obsoleteLoggingRole ??=
-                            PublicTransportLanePolicy.DescribeVehicleRole(vehicle, ref m_TypeLookups)
-                        : null,
-                    extra);
+                if (TryApplyPermissionPathObsolete(
+                        vehicle,
+                        out PathFlags stateBefore,
+                        out PathFlags stateAfter))
+                {
+                    string extra = shouldLogPathObsoleteTrace
+                        ? $"vanillaAllowsAccess={vanillaAllowsAccess}, configuredModAllowsAccess={configuredModAllowsAccess}, " +
+                          $"canUsePublicTransportLane={canUsePublicTransportLane}, " +
+                          $"modPrefersLanes={modPrefersLanes}, obsoleteRelevantFlagsChanged={obsoleteRelevantFlagsChanged}, " +
+                          $"preferenceOnlyChange={preferenceOnlyChange}, emergencyTransition={emergencyTransition}, " +
+                          $"engineUseFlag={(car.m_Flags & CarFlags.UsePublicTransportLanes) != 0}, " +
+                          $"enginePreferFlag={(car.m_Flags & CarFlags.PreferPublicTransportLanes) != 0}"
+                        : null;
+                    RecordPermissionPathObsolete(
+                        vehicle,
+                        car,
+                        reason,
+                        extra,
+                        shouldLogPathObsoleteTrace,
+                        ref obsoleteLoggingRole,
+                        stateBefore,
+                        stateAfter);
+                }
             }
         }
 
@@ -659,18 +691,34 @@ namespace Traffic_Law_Enforcement
 
             if (hadModPermissionChange || hadTrackedEmergency)
             {
-                string role =
-                    EnforcementLoggingPolicy.ShouldLogVehicleSpecificPathObsoleteSource(vehicle)
-                        ? PublicTransportLanePolicy.DescribeVehicleRole(vehicle, ref m_TypeLookups)
-                        : null;
+                bool shouldLogPathObsoleteTrace =
+                    ShouldLogPermissionPathObsoleteTrace(vehicle);
                 string reason = hadModPermissionChange
                     ? "clear-mod-pt-policy-state"
                     : "restore-emergency-state";
-                string extra =
-                    $"hadModPermissionChange={hadModPermissionChange}, " +
-                    $"hadTrackedEmergency={hadTrackedEmergency}";
-
-                MarkPathObsolete(vehicle, car, reason, role, extra);
+                if (TryApplyPermissionPathObsolete(
+                        vehicle,
+                        out PathFlags stateBefore,
+                        out PathFlags stateAfter))
+                {
+                    string role = shouldLogPathObsoleteTrace
+                        ? PublicTransportLanePolicy.DescribeVehicleRole(
+                            vehicle,
+                            ref m_TypeLookups)
+                        : null;
+                    string extra = shouldLogPathObsoleteTrace
+                        ? $"hadModPermissionChange={hadModPermissionChange}, hadTrackedEmergency={hadTrackedEmergency}"
+                        : null;
+                    RecordPermissionPathObsolete(
+                        vehicle,
+                        car,
+                        reason,
+                        extra,
+                        shouldLogPathObsoleteTrace,
+                        ref role,
+                        stateBefore,
+                        stateAfter);
+                }
             }
 
             if (removeState && m_PermissionStateData.HasComponent(vehicle))
@@ -679,27 +727,92 @@ namespace Traffic_Law_Enforcement
             }
         }
 
-        private void MarkPathObsolete(Entity vehicle, Car car, string reason, string role, string extra)
+        private void ApplyPendingExitGrace(
+            Entity vehicle,
+            PublicTransportLanePendingExit pendingExit)
         {
+            EntityManager.AddComponentData(vehicle, pendingExit);
+        }
+
+        private void UpdatePendingExitGrace(
+            Entity vehicle,
+            PublicTransportLanePendingExit pendingExit)
+        {
+            EntityManager.SetComponentData(vehicle, pendingExit);
+        }
+
+        private void ApplyPermissionState(
+            Entity vehicle,
+            bool hasState,
+            PublicTransportLanePermissionState currentState,
+            PublicTransportLanePermissionState updatedState)
+        {
+            if (!hasState)
+            {
+                EntityManager.AddComponentData(vehicle, updatedState);
+                return;
+            }
+
+            if (!StatesEqual(currentState, updatedState))
+            {
+                EntityManager.SetComponentData(vehicle, updatedState);
+            }
+        }
+
+        private static bool ShouldLogPermissionPathObsoleteTrace(Entity vehicle)
+        {
+            return EnforcementLoggingPolicy.ShouldLogVehicleSpecificPathObsoleteSource(
+                vehicle);
+        }
+
+        private bool TryApplyPermissionPathObsolete(
+            Entity vehicle,
+            out PathFlags stateBefore,
+            out PathFlags stateAfter)
+        {
+            stateBefore = default;
+            stateAfter = default;
             if (!m_PathOwnerData.TryGetComponent(vehicle, out PathOwner pathOwner))
             {
-                return;
+                return false;
             }
 
             if ((pathOwner.m_State & PathFlags.Pending) != 0)
             {
-                return;
+                return false;
             }
 
             if ((pathOwner.m_State & PathFlags.Obsolete) != 0)
             {
+                return false;
+            }
+
+            stateBefore = pathOwner.m_State;
+            pathOwner.m_State |= PathFlags.Obsolete;
+            EntityManager.SetComponentData(vehicle, pathOwner);
+            stateAfter = pathOwner.m_State;
+            return true;
+        }
+
+        private void RecordPermissionPathObsolete(
+            Entity vehicle,
+            Car car,
+            string reason,
+            string extra,
+            bool shouldLogPathObsoleteTrace,
+            ref string cachedRole,
+            PathFlags stateBefore,
+            PathFlags stateAfter)
+        {
+            if (!shouldLogPathObsoleteTrace)
+            {
                 return;
             }
 
-            PathFlags stateBefore = pathOwner.m_State;
-            pathOwner.m_State |= PathFlags.Obsolete;
-            EntityManager.SetComponentData(vehicle, pathOwner);
-
+            cachedRole ??=
+                PublicTransportLanePolicy.DescribeVehicleRole(
+                    vehicle,
+                    ref m_TypeLookups);
             Entity currentLane = m_CurrentLaneData.TryGetComponent(vehicle, out CarCurrentLane currentLaneData)
                 ? currentLaneData.m_Lane
                 : Entity.Null;
@@ -709,10 +822,10 @@ namespace Traffic_Law_Enforcement
                 vehicle,
                 currentLane,
                 stateBefore,
-                pathOwner.m_State,
+                stateAfter,
                 reason,
                 car,
-                role,
+                cachedRole,
                 extra);
         }
 
