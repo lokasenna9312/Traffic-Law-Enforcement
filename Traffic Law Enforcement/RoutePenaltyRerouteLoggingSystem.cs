@@ -2078,7 +2078,7 @@ namespace Traffic_Law_Enforcement
 
             string message =
                 $"PT_ROUTE_DIAG: vehicle={vehicle}, role={role}, lane={lane}, laneKind={laneKind}, " +
-                $"focusedWatch={forceLogging}, " +
+                $"forceLogging={forceLogging}, " +
                 $"publicOnly={publicOnly}, hasResolvedPolicy={hasResolvedPublicTransportLanePolicy}, " +
                 $"hasProfile={hasProfile}, allowedOnPublicTransportLane={allowedOnPublicTransportLane}, " +
                 $"unauthorizedPublicTransportLane={unauthorizedPublicTransportLane}, engineHasFlag={engineHasFlag}, " +
