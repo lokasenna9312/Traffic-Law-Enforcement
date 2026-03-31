@@ -32,6 +32,25 @@ namespace Traffic_Law_Enforcement
     [BurstCompile]
     public partial class RoutePenaltyRerouteLoggingSystem : GameSystemBase
     {
+        [System.Flags]
+        private enum CandidateChangeReason
+        {
+            None = 0,
+            CurrentLane = 1 << 0,
+            NavigationLane = 1 << 1,
+            Car = 1 << 2,
+            Target = 1 << 3,
+            CurrentRoute = 1 << 4,
+            PathOwner = 1 << 5,
+            PathInformation = 1 << 6,
+        }
+
+        private const CandidateChangeReason RouteSelectionChangeReasons =
+            CandidateChangeReason.Target |
+            CandidateChangeReason.CurrentRoute |
+            CandidateChangeReason.PathOwner |
+            CandidateChangeReason.PathInformation;
+
         private EntityQuery m_CachedVehicleQuery;
         private const int MaxPenaltyTags = 6;
         private const int MaxLogsPerUpdate = 4;
@@ -76,7 +95,7 @@ namespace Traffic_Law_Enforcement
         private EntityTypeHandle m_EntityTypeHandle;
         private readonly Dictionary<Entity, RoutePenaltyInspectionResult> m_LastSnapshots = new Dictionary<Entity, RoutePenaltyInspectionResult>();
         private readonly Dictionary<Entity, RouteSelectionChangeSnapshot> m_LastRouteSelectionSnapshots = new Dictionary<Entity, RouteSelectionChangeSnapshot>();
-        private readonly HashSet<Entity> m_CandidateVehicles = new HashSet<Entity>();
+        private readonly Dictionary<Entity, CandidateChangeReason> m_CandidateVehicles = new Dictionary<Entity, CandidateChangeReason>();
         private readonly List<Entity> m_RemovedVehiclesBuffer = new List<Entity>();
         private Game.UI.NameSystem m_NameSystem;
         private Game.Prefabs.PrefabSystem m_PrefabSystem;
@@ -268,22 +287,45 @@ namespace Traffic_Law_Enforcement
             bool watchedOnlyCandidates = !requireAllCandidateVehicles;
 
             m_CandidateVehicles.Clear();
-            CollectCandidateVehicles(m_CurrentLaneChangedQuery, watchedOnlyCandidates);
-            CollectCandidateVehicles(m_NavigationLaneChangedQuery, watchedOnlyCandidates);
-            CollectCandidateVehicles(m_CarChangedQuery, watchedOnlyCandidates);
+            CollectCandidateVehicles(
+                m_CurrentLaneChangedQuery,
+                watchedOnlyCandidates,
+                CandidateChangeReason.CurrentLane);
+            CollectCandidateVehicles(
+                m_NavigationLaneChangedQuery,
+                watchedOnlyCandidates,
+                CandidateChangeReason.NavigationLane);
+            CollectCandidateVehicles(
+                m_CarChangedQuery,
+                watchedOnlyCandidates,
+                CandidateChangeReason.Car);
             if (trackRouteSelectionChanges)
             {
-                CollectCandidateVehicles(m_TargetChangedQuery, watchedOnlyCandidates);
-                CollectCandidateVehicles(m_CurrentRouteChangedQuery, watchedOnlyCandidates);
-                CollectCandidateVehicles(m_PathOwnerChangedQuery, watchedOnlyCandidates);
-                CollectCandidateVehicles(m_PathInformationChangedQuery, watchedOnlyCandidates);
+                CollectCandidateVehicles(
+                    m_TargetChangedQuery,
+                    watchedOnlyCandidates,
+                    CandidateChangeReason.Target);
+                CollectCandidateVehicles(
+                    m_CurrentRouteChangedQuery,
+                    watchedOnlyCandidates,
+                    CandidateChangeReason.CurrentRoute);
+                CollectCandidateVehicles(
+                    m_PathOwnerChangedQuery,
+                    watchedOnlyCandidates,
+                    CandidateChangeReason.PathOwner);
+                CollectCandidateVehicles(
+                    m_PathInformationChangedQuery,
+                    watchedOnlyCandidates,
+                    CandidateChangeReason.PathInformation);
             }
 
             int logsEmitted = 0;
             int routeSelectionLogsEmitted = 0;
             int routeSelectionLogsDropped = 0;
-            foreach (Entity vehicle in m_CandidateVehicles)
+            foreach (KeyValuePair<Entity, CandidateChangeReason> candidate in m_CandidateVehicles)
             {
+                Entity vehicle = candidate.Key;
+                CandidateChangeReason candidateReasons = candidate.Value;
                 if (!m_CurrentLaneData.TryGetComponent(vehicle, out CarCurrentLane currentLane))
                 {
                     continue;
@@ -365,12 +407,28 @@ namespace Traffic_Law_Enforcement
                     continue;
                 }
 
-                RouteSelectionChangeSnapshot routeSelectionSnapshot =
-                    BuildRouteSelectionSnapshot(vehicle, currentLane.m_Lane, snapshot);
+                bool hasRouteSelectionCandidateChanges =
+                    (candidateReasons & RouteSelectionChangeReasons) != 0;
+                if (!hasRouteSelectionCandidateChanges && !rerouteDetected)
+                {
+                    continue;
+                }
 
-                if (m_LastRouteSelectionSnapshots.TryGetValue(
+                bool hasPreviousRouteSelectionSnapshot =
+                    m_LastRouteSelectionSnapshots.TryGetValue(
                         vehicle,
-                        out RouteSelectionChangeSnapshot previousRouteSelectionSnapshot))
+                        out RouteSelectionChangeSnapshot previousRouteSelectionSnapshot);
+                RouteSelectionChangeSnapshot routeSelectionSnapshot =
+                    BuildRouteSelectionSnapshot(
+                        vehicle,
+                        currentLane.m_Lane,
+                        snapshot,
+                        hasPreviousRouteSelectionSnapshot
+                            ? previousRouteSelectionSnapshot
+                            : (RouteSelectionChangeSnapshot?)null,
+                        candidateReasons);
+
+                if (hasPreviousRouteSelectionSnapshot)
                 {
                     if (ShouldLogRouteSelectionChange(
                             previousRouteSelectionSnapshot,
@@ -505,7 +563,10 @@ namespace Traffic_Law_Enforcement
             m_SubLaneData.Update(this);
         }
 
-        private void CollectCandidateVehicles(EntityQuery query, bool watchedOnly)
+        private void CollectCandidateVehicles(
+            EntityQuery query,
+            bool watchedOnly,
+            CandidateChangeReason changeReason)
         {
             NativeArray<ArchetypeChunk> chunks = query.ToArchetypeChunkArray(Allocator.Temp);
             try
@@ -521,7 +582,14 @@ namespace Traffic_Law_Enforcement
                             continue;
                         }
 
-                        m_CandidateVehicles.Add(vehicle);
+                        if (m_CandidateVehicles.TryGetValue(vehicle, out CandidateChangeReason existingReasons))
+                        {
+                            m_CandidateVehicles[vehicle] = existingReasons | changeReason;
+                        }
+                        else
+                        {
+                            m_CandidateVehicles[vehicle] = changeReason;
+                        }
                     }
                 }
             }
@@ -565,48 +633,89 @@ namespace Traffic_Law_Enforcement
         private RouteSelectionChangeSnapshot BuildRouteSelectionSnapshot(
             Entity vehicle,
             Entity currentLane,
-            RoutePenaltyInspectionResult inspection)
+            RoutePenaltyInspectionResult inspection,
+            RouteSelectionChangeSnapshot? previousSnapshot,
+            CandidateChangeReason candidateReasons)
         {
-            bool hasCurrentTarget =
-                m_TargetData.TryGetComponent(vehicle, out Target targetData) &&
-                targetData.m_Target != Entity.Null;
-            Entity currentTarget =
-                hasCurrentTarget
-                    ? targetData.m_Target
-                    : Entity.Null;
+            bool hasPreviousSnapshot = previousSnapshot.HasValue;
+            RouteSelectionChangeSnapshot previous = previousSnapshot.GetValueOrDefault();
 
-            bool hasCurrentRoute =
-                m_CurrentRouteData.TryGetComponent(vehicle, out CurrentRoute currentRouteData) &&
-                currentRouteData.m_Route != Entity.Null;
-            Entity currentRoute =
-                hasCurrentRoute
-                    ? currentRouteData.m_Route
-                    : Entity.Null;
+            bool currentTargetChanged =
+                !hasPreviousSnapshot ||
+                (candidateReasons & CandidateChangeReason.Target) != 0;
+            bool currentRouteChanged =
+                !hasPreviousSnapshot ||
+                (candidateReasons & CandidateChangeReason.CurrentRoute) != 0;
+            bool pathOwnerChanged =
+                !hasPreviousSnapshot ||
+                (candidateReasons & CandidateChangeReason.PathOwner) != 0;
+            bool pathInformationChanged =
+                !hasPreviousSnapshot ||
+                (candidateReasons & CandidateChangeReason.PathInformation) != 0;
 
-            bool hasPathOwner =
-                m_PathOwnerData.TryGetComponent(vehicle, out PathOwner pathOwner);
-            PathFlags pathFlags =
-                hasPathOwner
-                    ? pathOwner.m_State
-                    : default;
-            bool hasPathInformation =
-                m_PathInformationData.TryGetComponent(vehicle, out PathInformation pathInformation);
-            int pathInfoHash =
-                hasPathInformation
-                    ? ComputePathInformationHash(pathInformation)
-                    : 0;
-            int acceptedPathHash =
-                ComputeAcceptedPathHash(vehicle);
-            int acceptedPathElementCount =
-                TryGetAcceptedPathElementCount(vehicle, out int pathElementCount)
-                    ? pathElementCount
-                    : 0;
-            int acceptedResultHash =
-                ComputeAcceptedResultHash(
-                    hasPathInformation,
-                    pathInfoHash,
-                    acceptedPathHash,
-                    acceptedPathElementCount);
+            bool hasCurrentTarget = previous.HasCurrentTarget;
+            Entity currentTarget = previous.CurrentTarget;
+            if (currentTargetChanged)
+            {
+                hasCurrentTarget =
+                    m_TargetData.TryGetComponent(vehicle, out Target targetData) &&
+                    targetData.m_Target != Entity.Null;
+                currentTarget =
+                    hasCurrentTarget
+                        ? targetData.m_Target
+                        : Entity.Null;
+            }
+
+            bool hasCurrentRoute = previous.HasCurrentRoute;
+            Entity currentRoute = previous.CurrentRoute;
+            if (currentRouteChanged)
+            {
+                hasCurrentRoute =
+                    m_CurrentRouteData.TryGetComponent(vehicle, out CurrentRoute currentRouteData) &&
+                    currentRouteData.m_Route != Entity.Null;
+                currentRoute =
+                    hasCurrentRoute
+                        ? currentRouteData.m_Route
+                        : Entity.Null;
+            }
+
+            bool hasPathOwner = previous.HasPathOwner;
+            PathFlags pathFlags = previous.PathFlags;
+            if (pathOwnerChanged)
+            {
+                hasPathOwner =
+                    m_PathOwnerData.TryGetComponent(vehicle, out PathOwner pathOwner);
+                pathFlags =
+                    hasPathOwner
+                        ? pathOwner.m_State
+                        : default;
+            }
+
+            bool hasPathInformation = previous.HasPathInformation;
+            int pathInfoHash = previous.PathInfoHash;
+            int acceptedPathHash = previous.AcceptedPathHash;
+            int acceptedPathElementCount = previous.AcceptedPathElementCount;
+            int acceptedResultHash = previous.AcceptedResultHash;
+            if (pathInformationChanged)
+            {
+                hasPathInformation =
+                    m_PathInformationData.TryGetComponent(vehicle, out PathInformation pathInformation);
+                pathInfoHash =
+                    hasPathInformation
+                        ? ComputePathInformationHash(pathInformation)
+                        : 0;
+                acceptedPathHash = ComputeAcceptedPathHash(vehicle);
+                acceptedPathElementCount =
+                    TryGetAcceptedPathElementCount(vehicle, out int pathElementCount)
+                        ? pathElementCount
+                        : 0;
+                acceptedResultHash =
+                    ComputeAcceptedResultHash(
+                        hasPathInformation,
+                        pathInfoHash,
+                        acceptedPathHash,
+                        acceptedPathElementCount);
+            }
 
             return new RouteSelectionChangeSnapshot(
                 inspection,
@@ -696,6 +805,12 @@ namespace Traffic_Law_Enforcement
             string currentBreakdown =
                 RoutePenaltyInspection.BuildBreakdown(
                     currentSnapshot.Inspection.Profile);
+            string previousTags =
+                RoutePenaltyInspection.BuildTagSummary(
+                    previousSnapshot.Inspection.TagSnapshot);
+            string currentTags =
+                RoutePenaltyInspection.BuildTagSummary(
+                    currentSnapshot.Inspection.TagSnapshot);
 
             string message =
                 $"Route selection change: vehicle={vehicle}, role={role}, focusedWatch={focusedWatch}, reasons={reasons}, " +
@@ -708,7 +823,7 @@ namespace Traffic_Law_Enforcement
                 $"acceptedPathHash={FormatHashChange(previousSnapshot.AcceptedPathHash, currentSnapshot.AcceptedPathHash)}, " +
                 $"acceptedResultHash={FormatHashChange(previousSnapshot.AcceptedResultHash, currentSnapshot.AcceptedResultHash)}, " +
                 $"plannedPenalty={previousSnapshot.Inspection.TotalPenalty} [{previousBreakdown}] -> {currentSnapshot.Inspection.TotalPenalty} [{currentBreakdown}], " +
-                $"tags={previousSnapshot.Inspection.Tags} -> {currentSnapshot.Inspection.Tags}";
+                $"tags={previousTags} -> {currentTags}";
 
             EnforcementTelemetry.RecordEvent(message);
             Mod.log.Info(message);
@@ -2165,6 +2280,10 @@ namespace Traffic_Law_Enforcement
                 BuildComparableBreakdown(
                     currentSnapshot,
                     allowPublicTransportLaneComparison);
+            string previousTags =
+                RoutePenaltyInspection.BuildTagSummary(previousSnapshot.TagSnapshot);
+            string currentTags =
+                RoutePenaltyInspection.BuildTagSummary(currentSnapshot.TagSnapshot);
 
             string comparisonMode = allowPublicTransportLaneComparison
                 ? "full"
@@ -2175,7 +2294,7 @@ namespace Traffic_Law_Enforcement
                 $"avoidedPenalty={avoidedPenalty}, " +
                 $"fromPenalty={previousComparablePenalty} [{previousComparableBreakdown}], " +
                 $"toPenalty={currentComparablePenalty} [{currentComparableBreakdown}], " +
-                $"fromTags={previousSnapshot.Tags}, toTags={currentSnapshot.Tags}";
+                $"fromTags={previousTags}, toTags={currentTags}";
 
             EnforcementTelemetry.RecordEvent(message);
             Mod.log.Info(message);

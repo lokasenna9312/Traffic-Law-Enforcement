@@ -136,7 +136,9 @@ namespace Traffic_Law_Enforcement
             string plannedPenaltiesText = includeDebugFields
                 ? NormalizeInspectionText(inspection.Breakdown)
                 : string.Empty;
-            string penaltyTagsText = NormalizeInspectionText(inspection.Tags);
+            string penaltyTagsText =
+                NormalizeInspectionText(
+                    RoutePenaltyInspection.BuildTagSummary(inspection.TagSnapshot));
 
             return new SelectedObjectRouteDiagnosticsData(
                 hasDiagnostics: true,
