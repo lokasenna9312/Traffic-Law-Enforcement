@@ -64,18 +64,21 @@ namespace Traffic_Law_Enforcement
             m_InfoviewPrefabQuery = GetEntityQuery(ComponentType.ReadOnly<InfoviewData>(), ComponentType.ReadOnly<PrefabData>());
 
             CacheStaticChirperTemplates();
+            EnsureBaseLocalizationSources();
             EnsureSenderAccount();
 
             bool rebuiltLocalization = false;
+            bool addedLocalizationSource = false;
             int restoredReportCount = 0;
 
             foreach (MonthlyEnforcementReport report in MonthlyEnforcementChirperService.GetReportHistorySnapshot())
             {
-                rebuiltLocalization |= EnsureReportLocalizationEntries(report);
+                rebuiltLocalization |= EnsureReportLocalizationEntries(report, out bool reportAddedLocalizationSource);
+                addedLocalizationSource |= reportAddedLocalizationSource;
                 restoredReportCount += 1;
             }
 
-            if (rebuiltLocalization)
+            if (rebuiltLocalization || addedLocalizationSource)
             {
                 ReloadActiveLocale();
             }
@@ -311,8 +314,8 @@ namespace Traffic_Law_Enforcement
 
         private void PublishCompletedMonthReport(MonthlyEnforcementReport report)
         {
-            bool updatedLocalization = EnsureReportLocalizationEntries(report);
-            if (updatedLocalization)
+            bool updatedLocalization = EnsureReportLocalizationEntries(report, out bool addedLocalizationSource);
+            if (addedLocalizationSource)
             {
                 ReloadActiveLocale();
             }
@@ -339,9 +342,14 @@ namespace Traffic_Law_Enforcement
                 long periodEnd = currentTimestampMonthTicks;
 
                 int previewSequence = ++m_ManualPreviewSequence;
-                bool updatedLocalization = EnsurePreviewLocalizationEntries(previewReport, periodStart, periodEnd, previewSequence);
+                bool updatedLocalization = EnsurePreviewLocalizationEntries(
+                    previewReport,
+                    periodStart,
+                    periodEnd,
+                    previewSequence,
+                    out bool addedLocalizationSource);
 
-                if (updatedLocalization)
+                if (addedLocalizationSource || (openPanel && updatedLocalization))
                 {
                     ReloadActiveLocale();
                 }
@@ -365,13 +373,20 @@ namespace Traffic_Law_Enforcement
             }
         }
 
-        private bool EnsureReportLocalizationEntries(MonthlyEnforcementReport report)
+        private bool EnsureReportLocalizationEntries(
+            MonthlyEnforcementReport report,
+            out bool addedLocalizationSource)
         {
             long periodStart = MonthlyEnforcementChirperService.GetReportPeriodStartMonthTicks(report);
             long periodEnd = MonthlyEnforcementChirperService.GetReportPeriodEndMonthTicks(report);
             string localizationId = GetReportLocalizationId(report.m_MonthIndex);
 
-            return EnsureLocalizationEntriesForLocales(localizationId, report, periodStart, periodEnd);
+            return EnsureLocalizationEntriesForLocales(
+                localizationId,
+                report,
+                periodStart,
+                periodEnd,
+                out addedLocalizationSource);
         }
 
         private Entity EnsureReportTriggerEntity(long monthIndex)
@@ -391,10 +406,20 @@ namespace Traffic_Law_Enforcement
             return triggerEntity;
         }
 
-        private bool EnsurePreviewLocalizationEntries(MonthlyEnforcementReport report, long periodStart, long periodEnd, int previewSequence)
+        private bool EnsurePreviewLocalizationEntries(
+            MonthlyEnforcementReport report,
+            long periodStart,
+            long periodEnd,
+            int previewSequence,
+            out bool addedLocalizationSource)
         {
             string localizationId = GetPreviewLocalizationId(periodEnd, previewSequence);
-            return EnsureLocalizationEntriesForLocales(localizationId, report, periodStart, periodEnd);
+            return EnsureLocalizationEntriesForLocales(
+                localizationId,
+                report,
+                periodStart,
+                periodEnd,
+                out addedLocalizationSource);
         }
 
         private Entity CreatePreviewTriggerEntity(long periodEnd, int previewSequence)
@@ -449,27 +474,39 @@ namespace Traffic_Law_Enforcement
             return localeIds;
         }
 
-        private bool EnsureLocalizationEntriesForLocales(string localizationId, MonthlyEnforcementReport report, long periodStart, long periodEnd)
+        private bool EnsureLocalizationEntriesForLocales(
+            string localizationId,
+            MonthlyEnforcementReport report,
+            long periodStart,
+            long periodEnd,
+            out bool addedLocalizationSource)
         {
             bool changed = false;
+            bool addedSource = false;
 
             foreach (string localeId in GetLocalizationBuildLocales())
             {
-                changed |= EnsureSenderLocalizationEntry(localeId);
+                changed |= EnsureSenderLocalizationEntry(localeId, ref addedSource);
                 changed |= EnsureLocalizationEntryForLocale(
                     localeId,
                     localizationId,
-                    BuildLocalizedMessage(localeId, report, periodStart, periodEnd));
+                    BuildLocalizedMessage(localeId, report, periodStart, periodEnd),
+                    ref addedSource);
             }
 
+            addedLocalizationSource = addedSource;
             return changed;
         }
 
-        private bool EnsureLocalizationEntryForLocale(string localeId, string localizationId, string localizedMessage)
+        private bool EnsureLocalizationEntryForLocale(
+            string localeId,
+            string localizationId,
+            string localizedMessage,
+            ref bool addedLocalizationSource)
         {
             localeId = NormalizeLocaleId(localeId);
             string indexedLocalizationId = LocalizationUtils.AppendIndex(localizationId, new RandomLocalizationIndex(0));
-            Dictionary<string, string> entries = EnsureLocaleEntries(localeId);
+            Dictionary<string, string> entries = EnsureLocaleEntries(localeId, ref addedLocalizationSource);
 
             if (!entries.TryGetValue(indexedLocalizationId, out string currentLocalizedMessage) || currentLocalizedMessage != localizedMessage)
             {
@@ -480,10 +517,10 @@ namespace Traffic_Law_Enforcement
             return false;
         }
 
-        private bool EnsureSenderLocalizationEntry(string localeId)
+        private bool EnsureSenderLocalizationEntry(string localeId, ref bool addedLocalizationSource)
         {
             localeId = NormalizeLocaleId(localeId);
-            Dictionary<string, string> entries = EnsureLocaleEntries(localeId);
+            Dictionary<string, string> entries = EnsureLocaleEntries(localeId, ref addedLocalizationSource);
             string senderText = GetStaticChirperTemplate(localeId, kSenderTextLocaleId);
 
             if (entries.TryGetValue(kSenderLocalizationId, out string currentSenderText) &&
@@ -496,7 +533,9 @@ namespace Traffic_Law_Enforcement
             return true;
         }
 
-        private Dictionary<string, string> EnsureLocaleEntries(string localeId)
+        private Dictionary<string, string> EnsureLocaleEntries(
+            string localeId,
+            ref bool addedLocalizationSource)
         {
             localeId = NormalizeLocaleId(localeId);
             if (m_LocalizedEntriesByLocale.TryGetValue(localeId, out Dictionary<string, string> existingEntries))
@@ -509,7 +548,17 @@ namespace Traffic_Law_Enforcement
             m_LocalizedEntriesByLocale[localeId] = entries;
             m_LocalizedSourcesByLocale[localeId] = source;
             GameManager.instance?.localizationManager?.AddSource(localeId, source);
+            addedLocalizationSource = true;
             return entries;
+        }
+
+        private void EnsureBaseLocalizationSources()
+        {
+            bool addedLocalizationSource = false;
+            foreach (string localeId in GetLocalizationBuildLocales())
+            {
+                _ = EnsureSenderLocalizationEntry(localeId, ref addedLocalizationSource);
+            }
         }
 
         private bool EnqueueChirp(Entity triggerEntity)
