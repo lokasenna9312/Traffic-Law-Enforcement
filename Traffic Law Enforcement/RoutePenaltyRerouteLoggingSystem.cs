@@ -53,7 +53,6 @@ namespace Traffic_Law_Enforcement
 
         private EntityQuery m_CachedVehicleQuery;
         private const int MaxPenaltyTags = 6;
-        private const int MaxLogsPerUpdate = 4;
         private const int MaxRouteSelectionChangeLogsPerUpdate = 12;
         private const int SnapshotSweepInterval = 2048;
         private const int MaxPublicTransportLaneDecisionDiagnosticLogsPerUpdate = 8;
@@ -188,10 +187,6 @@ namespace Traffic_Law_Enforcement
             bool restrictVehicleSpecificRouteLogsToWatchedVehicles =
                 EnforcementLoggingPolicy.ShouldRestrictVehicleSpecificRouteDebugLogsToWatchedVehicles();
             bool burstLoggingActive = EnforcementLoggingPolicy.IsBurstLoggingActive;
-            int rerouteLogLimit =
-                burstLoggingActive
-                    ? BurstLoggingService.BurstEstimatedRerouteLogsPerUpdate
-                    : MaxLogsPerUpdate;
             int routeSelectionLogLimit =
                 burstLoggingActive
                     ? BurstLoggingService.BurstRouteSelectionChangeLogsPerUpdate
@@ -319,7 +314,6 @@ namespace Traffic_Law_Enforcement
                     CandidateChangeReason.PathInformation);
             }
 
-            int logsEmitted = 0;
             int routeSelectionLogsEmitted = 0;
             int routeSelectionLogsDropped = 0;
             int rerouteSummaryCount = 0;
@@ -561,15 +555,13 @@ namespace Traffic_Law_Enforcement
                 Mod.log.Info(droppedMessage);
             }
 
-            int emittedLogs = logsEmitted;
-
             m_UpdateCount += 1;
             if ((m_UpdateCount % SnapshotSweepInterval) == 0)
             {
                 SweepInactiveSnapshots();
             }
 
-            RerouteLoggingTelemetry.SetState(true, m_LastSnapshots.Count, m_CandidateVehicles.Count, emittedLogs);
+            RerouteLoggingTelemetry.SetState(true, m_LastSnapshots.Count, m_CandidateVehicles.Count, routeSelectionLogsEmitted);
         }
 
         private void ClearRouteLoggingState()
