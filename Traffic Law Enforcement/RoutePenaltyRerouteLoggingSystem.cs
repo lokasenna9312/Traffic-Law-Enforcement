@@ -21,11 +21,12 @@ namespace Traffic_Law_Enforcement
         public static int LastCandidateCount { get; private set; }
         public static int LastRouteSelectionLogsEmitted { get; private set; }
 
-        public static void SetState(bool enabled, int cachedSnapshotCount, int lastCandidateCount, int LastRouteSelectionLogsEmitted)
+        public static void SetState(bool enabled, int cachedSnapshotCount, int lastCandidateCount, int lastRouteSelectionLogsEmitted)
         {
             Enabled = enabled;
             CachedSnapshotCount = cachedSnapshotCount;
             LastCandidateCount = lastCandidateCount;
+            LastRouteSelectionLogsEmitted = lastRouteSelectionLogsEmitted;
         }
     }
     [BurstCompile]

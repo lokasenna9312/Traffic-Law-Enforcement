@@ -122,7 +122,7 @@ The following options can be configured either for the currently loaded save fil
 	<!--Link to the forum post where the mod can be discussed-->
 	<ForumLink Value="https://forum.paradoxplaza.com/forum/threads/traffic-law-enforcement.1909882/" />
 	<!--Version of the mod-->
-	<ModVersion Value="0.3.0" />
+	<ModVersion Value="0.3.1" />
 	<!--Recommended version of the base game to use the mod-->
 	<GameVersion Value="1.5.6f1" />
 	<!--Dependency for the mod, can be set multiple times-->
@@ -131,9 +131,7 @@ The following options can be configured either for the currently loaded save fil
 	<RequiredDLC Value="" />
 	<!--Change log for new version. Single line or multi line. Supports minimal markdown subset-->
 	<ChangeLog>
-- Big optimization patch which is mainly related to logging (Logging parameters were written even when all logging options are disabled.) and getting object parameters. But Selected Object Window (SOW) is still heavy.
-- Splitted Enforcement Event Logging to 3 seperate logging options. (Enforcement event per vehicles, Policy impact summary, Fine Income summary)
-- Fixed mod options so that enforcement options are not fixable when their related enforcement is disabled. Example: When illegal center line crossing enforcement is disabled, the options related to illegal center line crossing enforcement are not fixable.
+- More optimizations to logging logics.
 	</ChangeLog>
 	<!--External link, can be set multiple times. supported types are "discord", "github", "youtube", "twitch", "x", "paypal", "patreon", "buymeacoffee", "kofi", "crowdin", "gitlab", "gofundme"-->
 	<ExternalLink Type="github" Url="https://github.com/lokasenna9312/Traffic-Law-Enforcement/" />
