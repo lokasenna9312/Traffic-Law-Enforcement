@@ -1,5 +1,6 @@
 using System.Collections.Generic;
-using System.Linq;
+using System.Collections.ObjectModel;
+using System.Text;
 
 namespace Traffic_Law_Enforcement
 {
@@ -10,8 +11,23 @@ namespace Traffic_Law_Enforcement
 
         private static readonly List<string> s_RecentEvents = new List<string>(MaxEvents);
         private static readonly List<EnforcementRecord> s_RecentRecords = new List<EnforcementRecord>(MaxRecords);
+        private static readonly ReadOnlyCollection<EnforcementRecord> s_RecentRecordsView =
+            s_RecentRecords.AsReadOnly();
         private static readonly Dictionary<int, VehicleEnforcementRecord> s_VehicleRecords =
             new Dictionary<int, VehicleEnforcementRecord>();
+        private static readonly List<KeyValuePair<int, VehicleEnforcementRecord>> s_VehicleSummaryPairsBuffer =
+            new List<KeyValuePair<int, VehicleEnforcementRecord>>();
+        private static string s_RecentEventsText = "No enforcement events yet.";
+        private static string s_RecentRecordsText = "No vehicle records yet.";
+        private static string s_VehicleFineTotalsText = "No fined vehicles yet.";
+        private static string s_VehicleViolationCountsText = "No repeat offenders yet.";
+        private static bool s_RecentEventsTextDirty;
+        private static bool s_RecentRecordsTextDirty;
+        private static bool s_VehicleFineTotalsTextDirty;
+        private static bool s_VehicleViolationCountsTextDirty;
+        private static bool s_ViolationTimestampPruneDirty = true;
+        private static long s_LastViolationTimestampPruneWindowMonthTicks = -1L;
+        private static long s_NextViolationTimestampPruneMonthTicks = long.MaxValue;
 
         public static int ActivePublicTransportLaneViolators { get; private set; }
         public static int PublicTransportLaneViolationCount { get; private set; }
@@ -23,12 +39,13 @@ namespace Traffic_Law_Enforcement
         {
             get
             {
-                if (s_RecentEvents.Count == 0)
+                if (s_RecentEventsTextDirty)
                 {
-                    return "No enforcement events yet.";
+                    s_RecentEventsText = BuildRecentEventsText();
+                    s_RecentEventsTextDirty = false;
                 }
 
-                return string.Join("\n", s_RecentEvents.ToArray());
+                return s_RecentEventsText;
             }
         }
 
@@ -36,12 +53,13 @@ namespace Traffic_Law_Enforcement
         {
             get
             {
-                if (s_RecentRecords.Count == 0)
+                if (s_RecentRecordsTextDirty)
                 {
-                    return "No vehicle records yet.";
+                    s_RecentRecordsText = BuildRecentRecordsText();
+                    s_RecentRecordsTextDirty = false;
                 }
 
-                return string.Join("\n", s_RecentRecords.Select(record => record.ToString()).ToArray());
+                return s_RecentRecordsText;
             }
         }
 
@@ -49,18 +67,17 @@ namespace Traffic_Law_Enforcement
         {
             get
             {
-                if (s_VehicleRecords.Count == 0)
+                if (s_VehicleFineTotalsTextDirty)
                 {
-                    return "No fined vehicles yet.";
+                    s_VehicleFineTotalsText =
+                        BuildVehicleSummaryText(
+                            "No fined vehicles yet.",
+                            static record => record.TotalFines,
+                            static (vehicleId, value) => $"vehicle {vehicleId}: {value}");
+                    s_VehicleFineTotalsTextDirty = false;
                 }
 
-                return string.Join(
-                    "\n",
-                    s_VehicleRecords
-                        .OrderByDescending(pair => pair.Value.TotalFines)
-                        .Take(10)
-                        .Select(pair => $"vehicle {pair.Key}: {pair.Value.TotalFines}")
-                        .ToArray());
+                return s_VehicleFineTotalsText;
             }
         }
 
@@ -68,18 +85,17 @@ namespace Traffic_Law_Enforcement
         {
             get
             {
-                if (s_VehicleRecords.Count == 0)
+                if (s_VehicleViolationCountsTextDirty)
                 {
-                    return "No repeat offenders yet.";
+                    s_VehicleViolationCountsText =
+                        BuildVehicleSummaryText(
+                            "No repeat offenders yet.",
+                            static record => record.TotalViolations,
+                            static (vehicleId, value) => $"vehicle {vehicleId}: {value} violations");
+                    s_VehicleViolationCountsTextDirty = false;
                 }
 
-                return string.Join(
-                    "\n",
-                    s_VehicleRecords
-                        .OrderByDescending(pair => pair.Value.TotalViolations)
-                        .Take(10)
-                        .Select(pair => $"vehicle {pair.Key}: {pair.Value.TotalViolations} violations")
-                        .ToArray());
+                return s_VehicleViolationCountsText;
             }
         }
 
@@ -104,6 +120,7 @@ namespace Traffic_Law_Enforcement
             }
 
             s_RecentEvents.Add(message);
+            s_RecentEventsTextDirty = true;
         }
 
         public static void RecordFine(string kind, int vehicleId, int laneId, int fineAmount, string reason)
@@ -121,6 +138,9 @@ namespace Traffic_Law_Enforcement
 
             s_RecentRecords.Add(record);
             TotalFineAmount += fineAmount;
+            s_RecentRecordsTextDirty = true;
+            s_VehicleFineTotalsTextDirty = true;
+            s_VehicleViolationCountsTextDirty = true;
 
             vehicleRecord.TotalViolations += 1;
             vehicleRecord.TotalFines += fineAmount;
@@ -205,7 +225,7 @@ namespace Traffic_Law_Enforcement
 
         public static IReadOnlyCollection<EnforcementRecord> GetRecentRecordsSnapshot()
         {
-            return s_RecentRecords.ToArray();
+            return s_RecentRecordsView;
         }
 
         public static IReadOnlyCollection<(string kind, int vehicleId, long timestampMonthTicks)> GetViolationTimestampSnapshot()
@@ -233,6 +253,17 @@ namespace Traffic_Law_Enforcement
             MidBlockCrossingViolationCount = 0;
             IntersectionMovementViolationCount = 0;
             TotalFineAmount = 0;
+            s_RecentEventsText = "No enforcement events yet.";
+            s_RecentRecordsText = "No vehicle records yet.";
+            s_VehicleFineTotalsText = "No fined vehicles yet.";
+            s_VehicleViolationCountsText = "No repeat offenders yet.";
+            s_RecentEventsTextDirty = false;
+            s_RecentRecordsTextDirty = false;
+            s_VehicleFineTotalsTextDirty = false;
+            s_VehicleViolationCountsTextDirty = false;
+            s_ViolationTimestampPruneDirty = true;
+            s_LastViolationTimestampPruneWindowMonthTicks = -1L;
+            s_NextViolationTimestampPruneMonthTicks = long.MaxValue;
         }
 
         public static void LoadPersistentData(
@@ -251,6 +282,9 @@ namespace Traffic_Law_Enforcement
                 {
                     s_VehicleRecords[pair.Key] = pair.Value?.Clone() ?? new VehicleEnforcementRecord();
                 }
+
+                s_VehicleFineTotalsTextDirty = true;
+                s_VehicleViolationCountsTextDirty = true;
             }
 
             if (records != null)
@@ -264,6 +298,8 @@ namespace Traffic_Law_Enforcement
 
                     s_RecentRecords.Add(record);
                 }
+
+                s_RecentRecordsTextDirty = true;
             }
 
             PruneExpiredViolationTimestamps();
@@ -277,14 +313,40 @@ namespace Traffic_Law_Enforcement
             }
 
             long maxWindowMonthTicks = EnforcementPenaltyService.GetMaximumRepeatWindowMonthTicks();
+            long currentTimestampMonthTicks = EnforcementGameTime.CurrentTimestampMonthTicks;
+            if (!s_ViolationTimestampPruneDirty &&
+                s_LastViolationTimestampPruneWindowMonthTicks == maxWindowMonthTicks &&
+                currentTimestampMonthTicks < s_NextViolationTimestampPruneMonthTicks)
+            {
+                return;
+            }
+
             long cutoff = EnforcementGameTime.CurrentTimestampMonthTicks - maxWindowMonthTicks;
+            long earliestRetainedTimestamp = long.MaxValue;
 
             foreach (VehicleEnforcementRecord record in s_VehicleRecords.Values)
             {
                 TrimQueue(record.PublicTransportLaneTimestamps, cutoff);
                 TrimQueue(record.MidBlockCrossingTimestamps, cutoff);
                 TrimQueue(record.IntersectionMovementTimestamps, cutoff);
+
+                UpdateEarliestTimestamp(
+                    record.PublicTransportLaneTimestamps,
+                    ref earliestRetainedTimestamp);
+                UpdateEarliestTimestamp(
+                    record.MidBlockCrossingTimestamps,
+                    ref earliestRetainedTimestamp);
+                UpdateEarliestTimestamp(
+                    record.IntersectionMovementTimestamps,
+                    ref earliestRetainedTimestamp);
             }
+
+            s_LastViolationTimestampPruneWindowMonthTicks = maxWindowMonthTicks;
+            s_NextViolationTimestampPruneMonthTicks =
+                earliestRetainedTimestamp == long.MaxValue
+                    ? long.MaxValue
+                    : earliestRetainedTimestamp + maxWindowMonthTicks;
+            s_ViolationTimestampPruneDirty = false;
         }
 
         private static VehicleEnforcementRecord GetOrCreateVehicleRecord(int vehicleId)
@@ -307,6 +369,7 @@ namespace Traffic_Law_Enforcement
             }
 
             timestamps.Add(timestampMonthTicks);
+            s_ViolationTimestampPruneDirty = true;
         }
 
         private static void AppendTimestampSnapshot(
@@ -343,6 +406,108 @@ namespace Traffic_Law_Enforcement
             {
                 timestamps.RemoveRange(0, removeCount);
             }
+        }
+
+        private static void UpdateEarliestTimestamp(
+            List<long> timestamps,
+            ref long earliestTimestamp)
+        {
+            if (timestamps == null || timestamps.Count == 0)
+            {
+                return;
+            }
+
+            long timestamp = timestamps[0];
+            if (timestamp < earliestTimestamp)
+            {
+                earliestTimestamp = timestamp;
+            }
+        }
+
+        private static string BuildRecentEventsText()
+        {
+            if (s_RecentEvents.Count == 0)
+            {
+                return "No enforcement events yet.";
+            }
+
+            StringBuilder text = new StringBuilder(s_RecentEvents.Count * 48);
+            for (int index = 0; index < s_RecentEvents.Count; index += 1)
+            {
+                if (index > 0)
+                {
+                    text.Append('\n');
+                }
+
+                text.Append(s_RecentEvents[index]);
+            }
+
+            return text.ToString();
+        }
+
+        private static string BuildRecentRecordsText()
+        {
+            if (s_RecentRecords.Count == 0)
+            {
+                return "No vehicle records yet.";
+            }
+
+            StringBuilder text = new StringBuilder(s_RecentRecords.Count * 72);
+            for (int index = 0; index < s_RecentRecords.Count; index += 1)
+            {
+                if (index > 0)
+                {
+                    text.Append('\n');
+                }
+
+                text.Append(s_RecentRecords[index]);
+            }
+
+            return text.ToString();
+        }
+
+        private static string BuildVehicleSummaryText(
+            string emptyText,
+            System.Func<VehicleEnforcementRecord, int> selector,
+            System.Func<int, int, string> formatter)
+        {
+            if (s_VehicleRecords.Count == 0)
+            {
+                return emptyText;
+            }
+
+            s_VehicleSummaryPairsBuffer.Clear();
+            foreach (KeyValuePair<int, VehicleEnforcementRecord> pair in s_VehicleRecords)
+            {
+                s_VehicleSummaryPairsBuffer.Add(pair);
+            }
+
+            s_VehicleSummaryPairsBuffer.Sort((left, right) =>
+            {
+                int rightValue = selector(right.Value);
+                int leftValue = selector(left.Value);
+                int valueComparison = rightValue.CompareTo(leftValue);
+                return valueComparison != 0
+                    ? valueComparison
+                    : left.Key.CompareTo(right.Key);
+            });
+
+            int count = System.Math.Min(10, s_VehicleSummaryPairsBuffer.Count);
+            StringBuilder text = new StringBuilder(count * 24);
+            for (int index = 0; index < count; index += 1)
+            {
+                KeyValuePair<int, VehicleEnforcementRecord> pair = s_VehicleSummaryPairsBuffer[index];
+                if (index > 0)
+                {
+                    text.Append('\n');
+                }
+
+                text.Append(formatter(pair.Key, selector(pair.Value)));
+            }
+
+            string summary = text.ToString();
+            s_VehicleSummaryPairsBuffer.Clear();
+            return summary;
         }
     }
 }

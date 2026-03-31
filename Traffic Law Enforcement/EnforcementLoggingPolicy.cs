@@ -65,6 +65,13 @@ namespace Traffic_Law_Enforcement
             return EnablePathObsoleteSourceLogging;
         }
 
+        public static bool ShouldLogVehicleSpecificPathObsoleteSource(Entity vehicle)
+        {
+            return ShouldLogVehicleSpecificVisibleLog(
+                ShouldLogPathObsoleteSources(),
+                vehicle);
+        }
+
         public static bool ShouldLogAllVehicleRouteSelectionChanges()
         {
             return EnableAllVehicleRouteSelectionChangeLogging;
@@ -139,33 +146,6 @@ namespace Traffic_Law_Enforcement
             return ShouldLogVehicleSpecificVisibleLog(ShouldLogType4Usage(), vehicle);
         }
 
-        public static bool EnableSaveIdentificationLogging => true;
-
-        public static bool ShouldLogSaveIdentification()
-        {
-            return true;
-        }
-
-        public static void RecordSaveIdentification(string message)
-        {
-            if (!ShouldLogSaveIdentification() || string.IsNullOrWhiteSpace(message))
-            {
-                return;
-            }
-
-            Mod.log.Info(message);
-        }
-
-        public static void RecordSaveLoadInfo(string message)
-        {
-            if (!ShouldLogSaveIdentification() || string.IsNullOrWhiteSpace(message))
-            {
-                return;
-            }
-
-            Mod.log.Info(message);
-        }
-
         public static void RecordEnforcementEvent(string message, Entity vehicle)
         {
             if (!ShouldLogVehicleSpecificEnforcementEvent(vehicle) || string.IsNullOrWhiteSpace(message))
@@ -210,11 +190,5 @@ namespace Traffic_Law_Enforcement
             Mod.log.Info(message);
         }
 
-        public static string FormatSaveIdentificationSuffix()
-        {
-            return ShouldLogSaveIdentification()
-                ? ", " + SaveLoadTraceService.DescribePendingLoad()
-                : string.Empty;
-        }
     }
 }

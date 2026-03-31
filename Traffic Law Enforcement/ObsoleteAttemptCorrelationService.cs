@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Text;
 using System.Diagnostics;
 using Game.Common;
 using Game.Net;
@@ -239,8 +240,9 @@ namespace Traffic_Law_Enforcement
                 return "none";
             }
 
-            List<string> tokens = new List<string>(maxElements);
-            for (int index = startIndex; index < pathElements.Length && tokens.Count < maxElements; index += 1)
+            StringBuilder tokens = new StringBuilder(maxElements * 12);
+            int tokenCount = 0;
+            for (int index = startIndex; index < pathElements.Length && tokenCount < maxElements; index += 1)
             {
                 string token = BuildLaneFamilyToken(entityManager, pathElements[index].m_Target);
                 if (string.IsNullOrWhiteSpace(token) || token == "none")
@@ -248,12 +250,18 @@ namespace Traffic_Law_Enforcement
                     continue;
                 }
 
-                tokens.Add(token);
+                if (tokenCount > 0)
+                {
+                    tokens.Append('>');
+                }
+
+                tokens.Append(token);
+                tokenCount += 1;
             }
 
-            return tokens.Count == 0
+            return tokenCount == 0
                 ? "none"
-                : string.Join(">", tokens.ToArray());
+                : tokens.ToString();
         }
 
         private static string NormalizeLaneTargetKind(EntityManager entityManager, Entity lane)

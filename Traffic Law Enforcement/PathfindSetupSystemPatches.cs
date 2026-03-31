@@ -24,8 +24,15 @@ namespace Traffic_Law_Enforcement
         private static readonly FieldInfo s_SetupListField =
             AccessTools.Field(typeof(PathfindSetupSystem), "m_SetupList");
 
+        private static readonly Dictionary<int, PathfindSetupSystem.SetupListItem> s_StartItems =
+            new Dictionary<int, PathfindSetupSystem.SetupListItem>();
+        private static readonly Dictionary<int, PathfindSetupSystem.SetupListItem> s_EndItems =
+            new Dictionary<int, PathfindSetupSystem.SetupListItem>();
+
         private static Harmony s_Harmony;
         private static bool s_LoggedFirstCompleteSetupInvocation;
+
+        internal static bool IsApplied => s_Harmony != null;
 
         public static void Apply()
         {
@@ -90,8 +97,8 @@ namespace Traffic_Law_Enforcement
                 return;
             }
 
-            Dictionary<int, PathfindSetupSystem.SetupListItem> startItems = new Dictionary<int, PathfindSetupSystem.SetupListItem>();
-            Dictionary<int, PathfindSetupSystem.SetupListItem> endItems = new Dictionary<int, PathfindSetupSystem.SetupListItem>();
+            s_StartItems.Clear();
+            s_EndItems.Clear();
 
             for (int index = 0; index < setupList.Length; index++)
             {
@@ -103,15 +110,15 @@ namespace Traffic_Law_Enforcement
 
                 if (item.m_ActionStart)
                 {
-                    startItems[item.m_ActionIndex] = item;
+                    s_StartItems[item.m_ActionIndex] = item;
                 }
                 else
                 {
-                    endItems[item.m_ActionIndex] = item;
+                    s_EndItems[item.m_ActionIndex] = item;
                 }
             }
 
-            if (startItems.Count == 0 && endItems.Count == 0)
+            if (s_StartItems.Count == 0 && s_EndItems.Count == 0)
             {
                 return;
             }
@@ -119,10 +126,10 @@ namespace Traffic_Law_Enforcement
             World world = World.DefaultGameObjectInjectionWorld;
             EntityManager entityManager = world?.EntityManager ?? default;
 
-            foreach (KeyValuePair<int, PathfindSetupSystem.SetupListItem> pair in startItems)
+            foreach (KeyValuePair<int, PathfindSetupSystem.SetupListItem> pair in s_StartItems)
             {
                 PathfindSetupSystem.SetupListItem startItem = pair.Value;
-                endItems.TryGetValue(pair.Key, out PathfindSetupSystem.SetupListItem endItem);
+                s_EndItems.TryGetValue(pair.Key, out PathfindSetupSystem.SetupListItem endItem);
 
                 bool hasProfile =
                     world != null &&

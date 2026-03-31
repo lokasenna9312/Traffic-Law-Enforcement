@@ -31,6 +31,9 @@ namespace Traffic_Law_Enforcement
         private NativeList<Entity> m_PendingRefreshVehicles;
         private HashSet<Entity> m_ProcessedThisFrame;
         private ComponentLookup<Car> m_CarData;
+        private EntityTypeHandle m_EntityTypeHandle;
+        private ComponentTypeHandle<Car> m_CarTypeHandle;
+        private ComponentTypeHandle<PublicTransportLanePermissionState> m_PermissionStateTypeHandle;
         private int m_RefreshCursor;
         private int m_LastObservedRuntimeWorldGeneration = -1;
         private bool m_HasEvaluated;
@@ -91,21 +94,43 @@ namespace Traffic_Law_Enforcement
 
         protected override void OnUpdate()
         {
+            HandleRuntimeWorldReload();
+
+            EnforcementGameplaySettingsState settings = EnforcementGameplaySettingsService.Current;
+            bool enforcementEnabled = Mod.IsPublicTransportLaneEnforcementEnabled;
+            int settingsMask = enforcementEnabled
+                ? PublicTransportLanePolicy.GetPermissionSettingsMask(settings)
+                : 0;
+            bool fullRefreshRequested =
+                enforcementEnabled &&
+                (!m_HasEvaluated ||
+                    !m_LastEnforcementEnabled ||
+                    settingsMask != m_LastSettingsMask);
+
+            if (enforcementEnabled &&
+                !fullRefreshRequested &&
+                m_PendingRefreshVehicles.Length == 0 &&
+                m_ChangedCarQuery.IsEmptyIgnoreFilter &&
+                m_PendingExitQuery.IsEmptyIgnoreFilter &&
+                m_TrackedWithoutProfileQuery.IsEmptyIgnoreFilter)
+            {
+                return;
+            }
+
             m_CarData.Update(this);
             m_CarLaneData.Update(this);
             m_PathOwnerData.Update(this);
             m_CurrentLaneData.Update(this);
             m_ProfileData.Update(this);
-            HandleRuntimeWorldReload();
             m_TypeLookups.Update(this);
             m_PermissionStateData.Update(this);
             m_PendingExitData.Update(this);
             m_NavigationLaneData.Update(this);
             m_ConnectionLaneData.Update(this);
             m_EdgeLaneData.Update(this);
-
-            EnforcementGameplaySettingsState settings = EnforcementGameplaySettingsService.Current;
-            bool enforcementEnabled = Mod.IsPublicTransportLaneEnforcementEnabled;
+            m_EntityTypeHandle = GetEntityTypeHandle();
+            m_CarTypeHandle = GetComponentTypeHandle<Car>(true);
+            m_PermissionStateTypeHandle = GetComponentTypeHandle<PublicTransportLanePermissionState>(true);
 
             if (!enforcementEnabled)
             {
@@ -119,12 +144,6 @@ namespace Traffic_Law_Enforcement
                 m_LastEnforcementEnabled = false;
                 return;
             }
-
-            int settingsMask = PublicTransportLanePolicy.GetPermissionSettingsMask(settings);
-            bool fullRefreshRequested =
-                !m_HasEvaluated ||
-                !m_LastEnforcementEnabled ||
-                settingsMask != m_LastSettingsMask;
 
             if (fullRefreshRequested && m_PendingRefreshVehicles.Length == 0)
             {
@@ -181,8 +200,6 @@ namespace Traffic_Law_Enforcement
                 EntityManager.RemoveComponent<PublicTransportLanePermissionState>(m_TrackedQuery);
             }
 
-            Mod.log.Info(
-                $"[SAVELOAD] PublicTransportLanePermissionSystem runtime reset: generation={currentGeneration}");
         }
 
         private bool IsPublicOnlyLane(Entity laneEntity)
@@ -241,17 +258,21 @@ namespace Traffic_Law_Enforcement
         {
             ClearPendingRefresh();
 
-            NativeArray<Entity> vehicles = m_AllCarsQuery.ToEntityArray(Allocator.Temp);
+            NativeArray<ArchetypeChunk> chunks = m_AllCarsQuery.ToArchetypeChunkArray(Allocator.Temp);
             try
             {
-                for (int index = 0; index < vehicles.Length; index += 1)
+                for (int chunkIndex = 0; chunkIndex < chunks.Length; chunkIndex += 1)
                 {
-                    m_PendingRefreshVehicles.Add(vehicles[index]);
+                    NativeArray<Entity> vehicles = chunks[chunkIndex].GetNativeArray(m_EntityTypeHandle);
+                    for (int index = 0; index < vehicles.Length; index += 1)
+                    {
+                        m_PendingRefreshVehicles.Add(vehicles[index]);
+                    }
                 }
             }
             finally
             {
-                vehicles.Dispose();
+                chunks.Dispose();
             }
         }
 
@@ -302,57 +323,36 @@ namespace Traffic_Law_Enforcement
                 return;
             }
 
-            NativeArray<Entity> vehicles = query.ToEntityArray(Allocator.Temp);
-            NativeArray<Car> cars = query.ToComponentDataArray<Car>(Allocator.Temp);
-
+            NativeArray<ArchetypeChunk> chunks = query.ToArchetypeChunkArray(Allocator.Temp);
             try
             {
-                for (int index = 0; index < vehicles.Length; index += 1)
+                for (int chunkIndex = 0; chunkIndex < chunks.Length; chunkIndex += 1)
                 {
-                    Entity vehicle = vehicles[index];
-                    if (!m_ProcessedThisFrame.Add(vehicle))
-                    {
-                        continue;
-                    }
+                    ArchetypeChunk chunk = chunks[chunkIndex];
+                    NativeArray<Entity> vehicles = chunk.GetNativeArray(m_EntityTypeHandle);
+                    NativeArray<Car> cars = chunk.GetNativeArray(ref m_CarTypeHandle);
 
-                    EvaluateVehicle(vehicle, cars[index]);
+                    for (int index = 0; index < vehicles.Length; index += 1)
+                    {
+                        Entity vehicle = vehicles[index];
+                        if (!m_ProcessedThisFrame.Add(vehicle))
+                        {
+                            continue;
+                        }
+
+                        EvaluateVehicle(vehicle, cars[index]);
+                    }
                 }
             }
             finally
             {
-                vehicles.Dispose();
-                cars.Dispose();
+                chunks.Dispose();
             }
         }
 
         private void EvaluatePendingExitVehiclesDeduplicated()
         {
-            if (m_PendingExitQuery.IsEmptyIgnoreFilter)
-            {
-                return;
-            }
-
-            NativeArray<Entity> vehicles = m_PendingExitQuery.ToEntityArray(Allocator.Temp);
-            NativeArray<Car> cars = m_PendingExitQuery.ToComponentDataArray<Car>(Allocator.Temp);
-
-            try
-            {
-                for (int index = 0; index < vehicles.Length; index += 1)
-                {
-                    Entity vehicle = vehicles[index];
-                    if (!m_ProcessedThisFrame.Add(vehicle))
-                    {
-                        continue;
-                    }
-
-                    EvaluateVehicle(vehicle, cars[index]);
-                }
-            }
-            finally
-            {
-                vehicles.Dispose();
-                cars.Dispose();
-            }
+            EvaluateQueryDeduplicated(m_PendingExitQuery);
         }
 
         private void RestoreVehiclesMissingProfileDeduplicated()
@@ -362,29 +362,32 @@ namespace Traffic_Law_Enforcement
                 return;
             }
 
-            NativeArray<Entity> vehicles = m_TrackedWithoutProfileQuery.ToEntityArray(Allocator.Temp);
-            NativeArray<Car> cars = m_TrackedWithoutProfileQuery.ToComponentDataArray<Car>(Allocator.Temp);
-            NativeArray<PublicTransportLanePermissionState> states =
-                m_TrackedWithoutProfileQuery.ToComponentDataArray<PublicTransportLanePermissionState>(Allocator.Temp);
-
+            NativeArray<ArchetypeChunk> chunks = m_TrackedWithoutProfileQuery.ToArchetypeChunkArray(Allocator.Temp);
             try
             {
-                for (int index = 0; index < vehicles.Length; index += 1)
+                for (int chunkIndex = 0; chunkIndex < chunks.Length; chunkIndex += 1)
                 {
-                    Entity vehicle = vehicles[index];
-                    if (!m_ProcessedThisFrame.Add(vehicle))
-                    {
-                        continue;
-                    }
+                    ArchetypeChunk chunk = chunks[chunkIndex];
+                    NativeArray<Entity> vehicles = chunk.GetNativeArray(m_EntityTypeHandle);
+                    NativeArray<Car> cars = chunk.GetNativeArray(ref m_CarTypeHandle);
+                    NativeArray<PublicTransportLanePermissionState> states =
+                        chunk.GetNativeArray(ref m_PermissionStateTypeHandle);
 
-                    RestoreVehicle(vehicle, cars[index], states[index], removeState: true);
+                    for (int index = 0; index < vehicles.Length; index += 1)
+                    {
+                        Entity vehicle = vehicles[index];
+                        if (!m_ProcessedThisFrame.Add(vehicle))
+                        {
+                            continue;
+                        }
+
+                        RestoreVehicle(vehicle, cars[index], states[index], removeState: true);
+                    }
                 }
             }
             finally
             {
-                vehicles.Dispose();
-                cars.Dispose();
-                states.Dispose();
+                chunks.Dispose();
             }
         }
 
@@ -449,6 +452,9 @@ namespace Traffic_Law_Enforcement
             bool hasPendingExit = m_PendingExitData.TryGetComponent(
                 vehicle,
                 out PublicTransportLanePendingExit pendingExit);
+            bool shouldLogPathObsoleteTrace =
+                EnforcementLoggingPolicy.ShouldLogVehicleSpecificPathObsoleteSource(
+                    vehicle);
 
             bool permissionBeingRevoked = !canUsePublicTransportLane;
 
@@ -459,6 +465,7 @@ namespace Traffic_Law_Enforcement
 
             bool currentlyHasPublicTransportLaneFlag =
                 (car.m_Flags & CarFlags.UsePublicTransportLanes) != 0;
+            string obsoleteLoggingRole = null;
 
             bool immediatePublicTransportEntryPlanned =
                 permissionBeingRevoked &&
@@ -501,7 +508,10 @@ namespace Traffic_Law_Enforcement
                         vehicle,
                         car,
                         "pt-pending-exit-grace-granted",
-                        PublicTransportLanePolicy.DescribeVehicleRole(vehicle, ref m_TypeLookups),
+                        shouldLogPathObsoleteTrace
+                            ? obsoleteLoggingRole ??=
+                                PublicTransportLanePolicy.DescribeVehicleRole(vehicle, ref m_TypeLookups)
+                            : null,
                         $"currentLane={currentLaneEntity}, originalMask={originalMask}, engineUseFlag={(car.m_Flags & CarFlags.UsePublicTransportLanes) != 0}, canUsePublicTransportLane={canUsePublicTransportLane}");
                 }
 
@@ -528,7 +538,10 @@ namespace Traffic_Law_Enforcement
                         vehicle,
                         car,
                         "pt-pending-exit-safe-lane-reached",
-                        PublicTransportLanePolicy.DescribeVehicleRole(vehicle, ref m_TypeLookups),
+                        shouldLogPathObsoleteTrace
+                            ? obsoleteLoggingRole ??=
+                                PublicTransportLanePolicy.DescribeVehicleRole(vehicle, ref m_TypeLookups)
+                            : null,
                         $"currentLane={currentLaneEntity}, graceGrantedLane={pendingExit.m_LaneWhenGraceGranted}, originalMask={originalMask}, engineUseFlag={(car.m_Flags & CarFlags.UsePublicTransportLanes) != 0}, canUsePublicTransportLane={canUsePublicTransportLane}");
                 }
                 else
@@ -576,7 +589,6 @@ namespace Traffic_Law_Enforcement
 
             if (obsoleteRelevantFlagsChanged || emergencyTransition)
             {
-                string role = PublicTransportLanePolicy.DescribeVehicleRole(vehicle, ref m_TypeLookups);
                 string reason = obsoleteRelevantFlagsChanged
                     ? "pt-permission-capability-changed"
                     : "emergency-state-changed";
@@ -588,7 +600,15 @@ namespace Traffic_Law_Enforcement
                     $"engineUseFlag={(car.m_Flags & CarFlags.UsePublicTransportLanes) != 0}, " +
                     $"enginePreferFlag={(car.m_Flags & CarFlags.PreferPublicTransportLanes) != 0}";
 
-                MarkPathObsolete(vehicle, car, reason, role, extra);
+                MarkPathObsolete(
+                    vehicle,
+                    car,
+                    reason,
+                    shouldLogPathObsoleteTrace
+                        ? obsoleteLoggingRole ??=
+                            PublicTransportLanePolicy.DescribeVehicleRole(vehicle, ref m_TypeLookups)
+                        : null,
+                    extra);
             }
         }
 
@@ -599,23 +619,26 @@ namespace Traffic_Law_Enforcement
                 return;
             }
 
-            NativeArray<Entity> vehicles = m_TrackedQuery.ToEntityArray(Allocator.Temp);
-            NativeArray<Car> cars = m_TrackedQuery.ToComponentDataArray<Car>(Allocator.Temp);
-            NativeArray<PublicTransportLanePermissionState> states =
-                m_TrackedQuery.ToComponentDataArray<PublicTransportLanePermissionState>(Allocator.Temp);
-
+            NativeArray<ArchetypeChunk> chunks = m_TrackedQuery.ToArchetypeChunkArray(Allocator.Temp);
             try
             {
-                for (int index = 0; index < vehicles.Length; index += 1)
+                for (int chunkIndex = 0; chunkIndex < chunks.Length; chunkIndex += 1)
                 {
-                    RestoreVehicle(vehicles[index], cars[index], states[index], removeState: false);
+                    ArchetypeChunk chunk = chunks[chunkIndex];
+                    NativeArray<Entity> vehicles = chunk.GetNativeArray(m_EntityTypeHandle);
+                    NativeArray<Car> cars = chunk.GetNativeArray(ref m_CarTypeHandle);
+                    NativeArray<PublicTransportLanePermissionState> states =
+                        chunk.GetNativeArray(ref m_PermissionStateTypeHandle);
+
+                    for (int index = 0; index < vehicles.Length; index += 1)
+                    {
+                        RestoreVehicle(vehicles[index], cars[index], states[index], removeState: false);
+                    }
                 }
             }
             finally
             {
-                vehicles.Dispose();
-                cars.Dispose();
-                states.Dispose();
+                chunks.Dispose();
             }
 
             EntityManager.RemoveComponent<PublicTransportLanePermissionState>(m_TrackedQuery);
@@ -636,7 +659,10 @@ namespace Traffic_Law_Enforcement
 
             if (hadModPermissionChange || hadTrackedEmergency)
             {
-                string role = PublicTransportLanePolicy.DescribeVehicleRole(vehicle, ref m_TypeLookups);
+                string role =
+                    EnforcementLoggingPolicy.ShouldLogVehicleSpecificPathObsoleteSource(vehicle)
+                        ? PublicTransportLanePolicy.DescribeVehicleRole(vehicle, ref m_TypeLookups)
+                        : null;
                 string reason = hadModPermissionChange
                     ? "clear-mod-pt-policy-state"
                     : "restore-emergency-state";

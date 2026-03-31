@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Text;
 using Colossal.Localization;
 using Game;
 using Game.Common;
@@ -47,6 +48,10 @@ namespace Traffic_Law_Enforcement
         private TimeSystem m_TimeSystem;
         private EntityQuery m_ChirperAccountQuery;
         private EntityQuery m_InfoviewPrefabQuery;
+        private long m_LastProcessedMonthIndex = long.MinValue;
+        private int m_LastObservedRuntimeWorldGeneration = -1;
+        private bool m_HasProcessedTrackingState;
+        private bool m_LastProcessedEnforcementEnabled;
 
         protected override void OnCreate()
         {
@@ -98,23 +103,56 @@ namespace Traffic_Law_Enforcement
 
         protected override void OnUpdate()
         {
-            if (!EnforcementGameTime.TryUpdateFromTimeSystem(m_TimeSystem, logOnInitialization: true, out _))
+            if (!EnforcementGameTime.IsInitialized)
             {
                 return;
             }
 
             long currentTimestampMonthTicks = EnforcementGameTime.CurrentTimestampMonthTicks;
             long currentMonthIndex = EnforcementGameTime.GetMonthIndex(currentTimestampMonthTicks);
+            int currentGeneration = EnforcementSaveDataSystem.RuntimeWorldGeneration;
+            if (m_LastObservedRuntimeWorldGeneration != currentGeneration)
+            {
+                m_LastObservedRuntimeWorldGeneration = currentGeneration;
+                m_LastProcessedMonthIndex = long.MinValue;
+                m_HasProcessedTrackingState = false;
+            }
+
+            bool hasPendingManualPreviewRequests =
+                MonthlyEnforcementChirperService.HasPendingManualPreviewRequests();
 
             if (!Mod.IsEnforcementEnabled)
             {
-                ClearPendingManualPreviewRequests();
+                if (!hasPendingManualPreviewRequests &&
+                    m_HasProcessedTrackingState &&
+                    !m_LastProcessedEnforcementEnabled &&
+                    currentMonthIndex == m_LastProcessedMonthIndex)
+                {
+                    return;
+                }
+
+                if (hasPendingManualPreviewRequests)
+                {
+                    ClearPendingManualPreviewRequests();
+                }
 
                 if (MonthlyEnforcementChirperService.ResetTrackingToCurrentMonth(currentMonthIndex))
                 {
                     Mod.log.Info($"Monthly chirper tracking reset while enforcement disabled. month={currentMonthIndex}");
                 }
 
+                m_LastProcessedMonthIndex = currentMonthIndex;
+                m_LastProcessedEnforcementEnabled = false;
+                m_HasProcessedTrackingState = true;
+
+                return;
+            }
+
+            if (m_HasProcessedTrackingState &&
+                m_LastProcessedEnforcementEnabled &&
+                currentMonthIndex == m_LastProcessedMonthIndex &&
+                !hasPendingManualPreviewRequests)
+            {
                 return;
             }
 
@@ -132,6 +170,10 @@ namespace Traffic_Law_Enforcement
             {
                 TryPublishCurrentPeriodPreview(currentTimestampMonthTicks, openPanel: true, out _);
             }
+
+            m_LastProcessedMonthIndex = currentMonthIndex;
+            m_LastProcessedEnforcementEnabled = true;
+            m_HasProcessedTrackingState = true;
         }
 
         public bool TryPublishManualPreviewNow(out string failureReason)
@@ -517,32 +559,45 @@ namespace Traffic_Law_Enforcement
 
         private void ClearPendingManualPreviewRequests()
         {
-            while (MonthlyEnforcementChirperService.TryConsumeManualPreviewRequest())
+            while (MonthlyEnforcementChirperService.HasPendingManualPreviewRequests() &&
+                MonthlyEnforcementChirperService.TryConsumeManualPreviewRequest())
             {
             }
         }
 
         private InfoviewPrefab ResolveFallbackInfoviewPrefab()
         {
-            using (NativeArray<Entity> chirperAccounts = m_ChirperAccountQuery.ToEntityArray(Allocator.Temp))
+            EntityTypeHandle entityTypeHandle = GetEntityTypeHandle();
+
+            using (NativeArray<ArchetypeChunk> chirperAccountChunks = m_ChirperAccountQuery.ToArchetypeChunkArray(Allocator.Temp))
             {
-                for (int i = 0; i < chirperAccounts.Length; i++)
+                for (int chunkIndex = 0; chunkIndex < chirperAccountChunks.Length; chunkIndex += 1)
                 {
-                    if (m_PrefabSystem.TryGetPrefab(chirperAccounts[i], out ChirperAccount chirperAccount) &&
-                        chirperAccount?.m_InfoView != null)
+                    NativeArray<Entity> chirperAccounts =
+                        chirperAccountChunks[chunkIndex].GetNativeArray(entityTypeHandle);
+                    for (int index = 0; index < chirperAccounts.Length; index += 1)
                     {
-                        return chirperAccount.m_InfoView;
+                        if (m_PrefabSystem.TryGetPrefab(chirperAccounts[index], out ChirperAccount chirperAccount) &&
+                            chirperAccount?.m_InfoView != null)
+                        {
+                            return chirperAccount.m_InfoView;
+                        }
                     }
                 }
             }
 
-            using (NativeArray<Entity> infoviewPrefabs = m_InfoviewPrefabQuery.ToEntityArray(Allocator.Temp))
+            using (NativeArray<ArchetypeChunk> infoviewPrefabChunks = m_InfoviewPrefabQuery.ToArchetypeChunkArray(Allocator.Temp))
             {
-                for (int i = 0; i < infoviewPrefabs.Length; i++)
+                for (int chunkIndex = 0; chunkIndex < infoviewPrefabChunks.Length; chunkIndex += 1)
                 {
-                    if (m_PrefabSystem.TryGetPrefab(infoviewPrefabs[i], out InfoviewPrefab infoviewPrefab))
+                    NativeArray<Entity> infoviewPrefabs =
+                        infoviewPrefabChunks[chunkIndex].GetNativeArray(entityTypeHandle);
+                    for (int index = 0; index < infoviewPrefabs.Length; index += 1)
                     {
-                        return infoviewPrefab;
+                        if (m_PrefabSystem.TryGetPrefab(infoviewPrefabs[index], out InfoviewPrefab infoviewPrefab))
+                        {
+                            return infoviewPrefab;
+                        }
                     }
                 }
             }
@@ -643,35 +698,43 @@ namespace Traffic_Law_Enforcement
 
         private string BuildLocalizedMessage(string localeId, MonthlyEnforcementReport report, long periodStartMonthTicks, long periodEndMonthTicks)
         {
-            return string.Join(
-                "\n",
+            StringBuilder message = new StringBuilder(320);
+            message.Append(
                 FormatLocalizedTextForLocale(
                     localeId,
                     kReportHeaderFormatLocaleId,
                     FormatPeriodPoint(localeId, periodStartMonthTicks),
                     FormatPeriodPoint(localeId, periodEndMonthTicks),
-                    report.TotalViolationCount),
+                    report.TotalViolationCount));
+            message.Append('\n');
+            message.Append(
                 BuildLocalizedStatisticsLine(
                     localeId,
                     kTotalLineFormatLocaleId,
                     report.m_TotalActualPathCount,
                     report.m_TotalPathRequestCount,
                     report.m_TotalActualOrAvoidedPathCount,
-                    report.m_TotalFineAmount),
+                    report.m_TotalFineAmount));
+            message.Append('\n');
+            message.Append(
                 BuildLocalizedStatisticsLine(
                     localeId,
                     kPublicTransportLaneLineFormatLocaleId,
                     report.m_PublicTransportLaneCount,
                     report.m_TotalPathRequestCount,
                     report.m_PublicTransportLaneActualOrAvoidedPathCount,
-                    report.m_PublicTransportLaneFineAmount),
+                    report.m_PublicTransportLaneFineAmount));
+            message.Append('\n');
+            message.Append(
                 BuildLocalizedStatisticsLine(
                     localeId,
                     kMidBlockLineFormatLocaleId,
                     report.m_MidBlockCrossingCount,
                     report.m_TotalPathRequestCount,
                     report.m_MidBlockCrossingActualOrAvoidedPathCount,
-                    report.m_MidBlockCrossingFineAmount),
+                    report.m_MidBlockCrossingFineAmount));
+            message.Append('\n');
+            message.Append(
                 BuildLocalizedStatisticsLine(
                     localeId,
                     kIntersectionLineFormatLocaleId,
@@ -679,6 +742,7 @@ namespace Traffic_Law_Enforcement
                     report.m_TotalPathRequestCount,
                     report.m_IntersectionMovementActualOrAvoidedPathCount,
                     report.m_IntersectionMovementFineAmount));
+            return message.ToString();
         }
 
         private string FormatPeriodPoint(string localeId, long monthTicks)

@@ -44,8 +44,6 @@ namespace Traffic_Law_Enforcement
             BurstLoggingService.Reset();
             FocusedLoggingService.Reset();
             ObsoleteAttemptCorrelationService.Reset();
-            SaveLoadTraceService.Reset();
-            SaveLoadTracePatches.Apply();
             m_Setting = new Setting(this);
             Settings = m_Setting;
             AssetDatabase.global.LoadSettings(nameof(Traffic_Law_Enforcement), m_Setting, new Setting(this));
@@ -58,8 +56,7 @@ namespace Traffic_Law_Enforcement
             RegisterTextLocales();
             BudgetUIPatches.Apply();
             VehicleUtilsPatches.Apply();
-            PathfindSetupSystemPatches.Apply();
-            PathfindCandidateProbePatches.Apply();
+            FocusedRouteDiagnosticsPatchController.Sync();
             IntersectionMovementPathfindingPenaltyPatches.Apply();
             IntersectionMovementPathfindingPenaltyReflectionPatches.Apply();
             updateSystem.UpdateAfter<EnforcementSaveDataSystem, EnforcementGameTimeSystem>(SystemUpdatePhase.GameSimulation);
@@ -74,7 +71,6 @@ namespace Traffic_Law_Enforcement
             updateSystem.UpdateAfter<RouteAttemptTrackingSystem, CarNavigationSystem>(SystemUpdatePhase.GameSimulation);
             updateSystem.UpdateBefore<RouteAttemptTrackingSystem, RoutePenaltyRerouteLoggingSystem>(SystemUpdatePhase.GameSimulation);
             updateSystem.UpdateBefore<RouteAttemptTrackingSystem, PublicTransportLaneViolationApplySystem>(SystemUpdatePhase.GameSimulation);
-            updateSystem.UpdateAfter<SettingsChangeLoggingSystem, EnforcementGameTimeSystem>(SystemUpdatePhase.GameSimulation);
             updateSystem.UpdateAfter<MonthlyEnforcementChirperSystem, EnforcementGameTimeSystem>(SystemUpdatePhase.GameSimulation);
             updateSystem.UpdateBefore<MonthlyEnforcementChirperSystem, CreateChirpSystem>(SystemUpdatePhase.GameSimulation);
             updateSystem.UpdateAfter<VehicleLaneHistorySystem, EnforcementGameTimeSystem>(SystemUpdatePhase.GameSimulation);
@@ -100,12 +96,9 @@ namespace Traffic_Law_Enforcement
             BurstLoggingService.Reset();
             FocusedLoggingService.Reset();
             ObsoleteAttemptCorrelationService.Reset();
-            SaveLoadTracePatches.Remove();
-            SaveLoadTraceService.Reset();
             BudgetUIPatches.Remove();
+            FocusedRouteDiagnosticsPatchController.RemoveAll();
             VehicleUtilsPatches.Remove();
-            PathfindSetupSystemPatches.Remove();
-            PathfindCandidateProbePatches.Remove();
             IntersectionMovementPathfindingPenaltyPatches.Remove();
             IntersectionMovementPathfindingPenaltyReflectionPatches.Remove();
             if (m_Setting != null)
@@ -343,8 +336,7 @@ namespace Traffic_Law_Enforcement
                 $"modVersion={CurrentModVersion}, " +
                 $"gameVersion={CurrentGameVersion}, " +
                 $"assemblyVersion={assemblyVersion}, " +
-                $"assetPath={FirstNonBlank(modAssetPath, "unknown")}, " +
-                SaveLoadTraceService.DescribePendingLoad());
+                $"assetPath={FirstNonBlank(modAssetPath, "unknown")}");
         }
 
         private void ResolveAndCacheModMetadata(string modAssetPath)

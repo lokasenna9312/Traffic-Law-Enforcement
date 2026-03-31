@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Game.Buildings;
 using Game.Common;
 using Game.Net;
@@ -20,6 +21,12 @@ namespace Traffic_Law_Enforcement
         public ComponentLookup<ParkingLane> ParkingLaneData;
         public ComponentLookup<GarageLane> GarageLaneData;
         public ComponentLookup<ConnectionLane> ConnectionLaneData;
+        public Dictionary<Entity, string> LaneDisplayTextCache;
+        public Dictionary<Entity, string> RoadNameCache;
+        public Dictionary<Entity, string> NamedEntityCache;
+        public Dictionary<Entity, string> RenderedNameCache;
+        public Dictionary<Entity, string> CustomNameCache;
+        public Dictionary<Entity, string> RouteNameCache;
     }
 
     internal static class SelectedObjectDisplayFormatter
@@ -31,6 +38,12 @@ namespace Traffic_Law_Enforcement
                 return FormatEntityOrNone(Entity.Null);
             }
 
+            if (context.LaneDisplayTextCache != null &&
+                context.LaneDisplayTextCache.TryGetValue(lane, out string cachedLaneText))
+            {
+                return cachedLaneText;
+            }
+
             string roadName = BuildRoadNameFromLane(lane, ref context);
             string ptSuffix = IsPublicTransportOnlyLane(lane, ref context)
                 ? " [PT]"
@@ -39,27 +52,30 @@ namespace Traffic_Law_Enforcement
                 ? FormatEntityOrNone(lane)
                 : roadName;
 
+            string laneText;
             if (context.ConnectionLaneData.HasComponent(lane))
             {
-                return $"{prefix}, connection{ptSuffix}";
+                laneText = $"{prefix}, connection{ptSuffix}";
             }
-
-            if (context.ParkingLaneData.HasComponent(lane))
+            else if (context.ParkingLaneData.HasComponent(lane))
             {
-                return $"{prefix}, parking{ptSuffix}";
+                laneText = $"{prefix}, parking{ptSuffix}";
             }
-
-            if (context.GarageLaneData.HasComponent(lane))
+            else if (context.GarageLaneData.HasComponent(lane))
             {
-                return $"{prefix}, garage{ptSuffix}";
+                laneText = $"{prefix}, garage{ptSuffix}";
             }
-
-            if (TryBuildLaneOrdinal(lane, out int laneNumber, out int laneCount, ref context))
+            else if (TryBuildLaneOrdinal(lane, out int laneNumber, out int laneCount, ref context))
             {
-                return $"{prefix}, {laneNumber}/{laneCount}{ptSuffix}";
+                laneText = $"{prefix}, {laneNumber}/{laneCount}{ptSuffix}";
+            }
+            else
+            {
+                laneText = prefix + ptSuffix;
             }
 
-            return prefix + ptSuffix;
+            EnsureCache(ref context.LaneDisplayTextCache).TryAdd(lane, laneText);
+            return laneText;
         }
 
         internal static bool TryBuildLaneOrdinal(Entity lane, out int laneNumber, out int laneCount, ref SelectedObjectDisplayFormatterContext context)
@@ -96,10 +112,23 @@ namespace Traffic_Law_Enforcement
 
         internal static string FormatRoadName(Entity roadEntity, ref SelectedObjectDisplayFormatterContext context)
         {
+            if (roadEntity == Entity.Null)
+            {
+                return FormatEntityOrNone(Entity.Null);
+            }
+
+            if (context.RoadNameCache != null &&
+                context.RoadNameCache.TryGetValue(roadEntity, out string cachedRoadName))
+            {
+                return cachedRoadName;
+            }
+
             string renderedName = TryGetRenderedName(roadEntity, ref context);
-            return string.IsNullOrWhiteSpace(renderedName)
+            string roadName = string.IsNullOrWhiteSpace(renderedName)
                 ? FormatEntityOrNone(roadEntity)
                 : renderedName;
+            EnsureCache(ref context.RoadNameCache).TryAdd(roadEntity, roadName);
+            return roadName;
         }
 
         internal static string TryGetLaneOwnerName(Entity lane, ref SelectedObjectDisplayFormatterContext context)
@@ -128,11 +157,19 @@ namespace Traffic_Law_Enforcement
 
         internal static string FormatNamedEntity(Entity entity, ref SelectedObjectDisplayFormatterContext context)
         {
+            if (context.NamedEntityCache != null &&
+                context.NamedEntityCache.TryGetValue(entity, out string cachedNamedEntity))
+            {
+                return cachedNamedEntity;
+            }
+
             string entityText = FormatEntityOrNone(entity);
             string renderedName = TryGetRenderedName(entity, ref context);
-            return string.IsNullOrWhiteSpace(renderedName)
+            string namedEntity = string.IsNullOrWhiteSpace(renderedName)
                 ? entityText
                 : $"{entityText} \"{renderedName}\"";
+            EnsureCache(ref context.NamedEntityCache).TryAdd(entity, namedEntity);
+            return namedEntity;
         }
 
         internal static string FormatEntityOrNone(Entity entity)
@@ -149,10 +186,18 @@ namespace Traffic_Law_Enforcement
                 return string.Empty;
             }
 
+            if (context.RenderedNameCache != null &&
+                context.RenderedNameCache.TryGetValue(entity, out string cachedRenderedName))
+            {
+                return cachedRenderedName;
+            }
+
             string renderedName = context.NameSystem.GetRenderedLabelName(entity);
-            return string.IsNullOrWhiteSpace(renderedName)
+            string normalizedRenderedName = string.IsNullOrWhiteSpace(renderedName)
                 ? string.Empty
                 : renderedName.Trim();
+            EnsureCache(ref context.RenderedNameCache).TryAdd(entity, normalizedRenderedName);
+            return normalizedRenderedName;
         }
 
         internal static string TryGetCustomName(Entity entity, ref SelectedObjectDisplayFormatterContext context)
@@ -162,10 +207,19 @@ namespace Traffic_Law_Enforcement
                 return string.Empty;
             }
 
-            return context.NameSystem.TryGetCustomName(entity, out string customName) &&
+            if (context.CustomNameCache != null &&
+                context.CustomNameCache.TryGetValue(entity, out string cachedCustomName))
+            {
+                return cachedCustomName;
+            }
+
+            string normalizedCustomName =
+                context.NameSystem.TryGetCustomName(entity, out string customName) &&
                 !string.IsNullOrWhiteSpace(customName)
                     ? customName.Trim()
                     : string.Empty;
+            EnsureCache(ref context.CustomNameCache).TryAdd(entity, normalizedCustomName);
+            return normalizedCustomName;
         }
 
         internal static string TryBuildRouteName(Entity routeEntity, ref SelectedObjectDisplayFormatterContext context)
@@ -175,6 +229,12 @@ namespace Traffic_Law_Enforcement
                 !context.EntityManager.HasComponent<Game.Prefabs.PrefabRef>(routeEntity))
             {
                 return string.Empty;
+            }
+
+            if (context.RouteNameCache != null &&
+                context.RouteNameCache.TryGetValue(routeEntity, out string cachedRouteName))
+            {
+                return cachedRouteName;
             }
 
             Game.Prefabs.PrefabRef prefabRef = context.EntityManager.GetComponentData<Game.Prefabs.PrefabRef>(routeEntity);
@@ -193,9 +253,21 @@ namespace Traffic_Law_Enforcement
                 routeNumberText = string.Empty;
             }
 
-            return string.IsNullOrWhiteSpace(routeNumberText)
+            string routeName = string.IsNullOrWhiteSpace(routeNumberText)
                 ? routePrefab.name
                 : $"{routePrefab.name} {routeNumberText}";
+            EnsureCache(ref context.RouteNameCache).TryAdd(routeEntity, routeName);
+            return routeName;
+        }
+
+        private static Dictionary<Entity, string> EnsureCache(ref Dictionary<Entity, string> cache)
+        {
+            if (cache == null)
+            {
+                cache = new Dictionary<Entity, string>();
+            }
+
+            return cache;
         }
 
         internal static bool TryGetRoadEntityFromAddressable(Entity entity, out Entity road, ref SelectedObjectDisplayFormatterContext context)

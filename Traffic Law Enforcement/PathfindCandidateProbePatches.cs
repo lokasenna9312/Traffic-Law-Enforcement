@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Linq;
 using System.Reflection;
 using System.Text;
 using Colossal.Mathematics;
@@ -48,17 +47,25 @@ namespace Traffic_Law_Enforcement
 
             public string BuildKey()
             {
-                return string.Join(
-                    "|",
-                    EdgeOwner.Index,
-                    EdgeId.m_Index,
-                    HasNextEdge ? NextEdgeId.m_Index : -1,
-                    (int)Methods,
-                    AccessRequirement,
-                    (int)Flags,
-                    (int)Rules,
-                    math.round(EdgeDelta.x * 100f),
-                    math.round(EdgeDelta.y * 100f));
+                StringBuilder builder = new StringBuilder(64);
+                builder.Append(EdgeOwner.Index);
+                builder.Append('|');
+                builder.Append(EdgeId.m_Index);
+                builder.Append('|');
+                builder.Append(HasNextEdge ? NextEdgeId.m_Index : -1);
+                builder.Append('|');
+                builder.Append((int)Methods);
+                builder.Append('|');
+                builder.Append(AccessRequirement);
+                builder.Append('|');
+                builder.Append((int)Flags);
+                builder.Append('|');
+                builder.Append((int)Rules);
+                builder.Append('|');
+                builder.Append(math.round(EdgeDelta.x * 100f));
+                builder.Append('|');
+                builder.Append(math.round(EdgeDelta.y * 100f));
+                return builder.ToString();
             }
         }
 
@@ -66,6 +73,8 @@ namespace Traffic_Law_Enforcement
         {
             private readonly Dictionary<string, CandidateInfo> m_BestCandidates =
                 new Dictionary<string, CandidateInfo>(StringComparer.Ordinal);
+            private readonly List<CandidateInfo> m_SortedCandidates =
+                new List<CandidateInfo>(MaxCandidateEntriesPerRequest);
 
             public ProbeExecutionContext(ProbeRequestInfo request)
             {
@@ -93,17 +102,23 @@ namespace Traffic_Law_Enforcement
 
                 if (m_BestCandidates.Count >= MaxCandidateEntriesPerRequest)
                 {
-                    KeyValuePair<string, CandidateInfo> worstCandidate =
-                        m_BestCandidates
-                            .OrderByDescending(pair => pair.Value.TotalCost)
-                            .First();
+                    string worstCandidateKey = null;
+                    float worstCandidateCost = float.MinValue;
+                    foreach (KeyValuePair<string, CandidateInfo> pair in m_BestCandidates)
+                    {
+                        if (pair.Value.TotalCost > worstCandidateCost)
+                        {
+                            worstCandidateKey = pair.Key;
+                            worstCandidateCost = pair.Value.TotalCost;
+                        }
+                    }
 
-                    if (candidate.TotalCost >= worstCandidate.Value.TotalCost)
+                    if (candidate.TotalCost >= worstCandidateCost)
                     {
                         return;
                     }
 
-                    m_BestCandidates.Remove(worstCandidate.Key);
+                    m_BestCandidates.Remove(worstCandidateKey);
                 }
 
                 m_BestCandidates[key] = candidate;
@@ -118,13 +133,32 @@ namespace Traffic_Law_Enforcement
                 }
                 else
                 {
-                    candidateSummary = string.Join(
-                        "; ",
-                        m_BestCandidates
-                            .Values
-                            .OrderBy(candidate => candidate.TotalCost)
-                            .Take(MaxLoggedCandidatesPerRequest)
-                            .Select((candidate, index) => FormatCandidate(index + 1, candidate)));
+                    StringBuilder builder = new StringBuilder(256);
+                    m_SortedCandidates.Clear();
+                    foreach (CandidateInfo candidate in m_BestCandidates.Values)
+                    {
+                        m_SortedCandidates.Add(candidate);
+                    }
+
+                    m_SortedCandidates.Sort(CompareCandidateCostAscending);
+                    int ordinal = 1;
+                    for (int index = 0; index < m_SortedCandidates.Count; index += 1)
+                    {
+                        if (ordinal > MaxLoggedCandidatesPerRequest)
+                        {
+                            break;
+                        }
+
+                        if (builder.Length > 0)
+                        {
+                            builder.Append("; ");
+                        }
+
+                        builder.Append(FormatCandidate(ordinal, m_SortedCandidates[index]));
+                        ordinal += 1;
+                    }
+
+                    candidateSummary = builder.ToString();
                 }
 
                 return
@@ -135,6 +169,11 @@ namespace Traffic_Law_Enforcement
                     $"endTargets={Request.EndPreview}, " +
                     $"candidateProposals={CandidateProposalCount}, " +
                     $"bestCandidates={candidateSummary}";
+            }
+
+            private static int CompareCandidateCostAscending(CandidateInfo left, CandidateInfo right)
+            {
+                return left.TotalCost.CompareTo(right.TotalCost);
             }
 
             private static string FormatCandidate(int ordinal, CandidateInfo candidate)
@@ -188,10 +227,7 @@ namespace Traffic_Law_Enforcement
                 method.GetParameters().Length == 3 &&
                 method.GetParameters()[0].ParameterType == typeof(PathfindActionData).MakeByRefType());
 
-        private static readonly MethodInfo[] s_AddHeapDataMethods = AccessTools
-            .GetDeclaredMethods(s_PathfindExecutorType)
-            .Where(method => method.Name == "AddHeapData")
-            .ToArray();
+        private static readonly MethodInfo[] s_AddHeapDataMethods = GetAddHeapDataMethods();
 
         private static readonly MethodInfo s_CalculateCostMethod = AccessTools.FirstMethod(
             s_PathfindExecutorType,
@@ -214,6 +250,8 @@ namespace Traffic_Law_Enforcement
 
         [ThreadStatic]
         private static PendingCandidate? s_PendingCandidate;
+
+        internal static bool IsApplied => s_Harmony != null;
 
         public static void Apply()
         {
@@ -272,6 +310,36 @@ namespace Traffic_Law_Enforcement
                 s_Harmony = null;
                 Mod.log.Error(ex, "Failed to apply pathfind candidate probe patches.");
             }
+        }
+
+        private static MethodInfo[] GetAddHeapDataMethods()
+        {
+            if (s_PathfindExecutorType == null)
+            {
+                return Array.Empty<MethodInfo>();
+            }
+
+            List<MethodInfo> methods = new List<MethodInfo>();
+            foreach (MethodInfo method in AccessTools.GetDeclaredMethods(s_PathfindExecutorType))
+            {
+                if (method.Name == "AddHeapData")
+                {
+                    methods.Add(method);
+                }
+            }
+
+            if (methods.Count == 0)
+            {
+                return Array.Empty<MethodInfo>();
+            }
+
+            MethodInfo[] result = new MethodInfo[methods.Count];
+            for (int index = 0; index < methods.Count; index += 1)
+            {
+                result[index] = methods[index];
+            }
+
+            return result;
         }
 
         public static void Remove()
@@ -584,14 +652,28 @@ namespace Traffic_Law_Enforcement
                 return;
             }
 
-            string registeredKeys = string.Join(
-                " || ",
-                s_RequestRegistry.Keys.Take(3));
+            StringBuilder registeredKeys = new StringBuilder(96);
+            int sampleCount = 0;
+            foreach (string key in s_RequestRegistry.Keys)
+            {
+                if (sampleCount >= 3)
+                {
+                    break;
+                }
+
+                if (sampleCount > 0)
+                {
+                    registeredKeys.Append(" || ");
+                }
+
+                registeredKeys.Append(key);
+                sampleCount += 1;
+            }
 
             Mod.log.Info(
                 $"FOCUSED_ROUTE_CANDIDATE_MISS: requestKey={requestKey}, " +
                 $"registeredKeyCount={s_RequestRegistry.Count}, " +
-                $"registeredSample={(registeredKeys.Length == 0 ? "none" : registeredKeys)}");
+                $"registeredSample={(registeredKeys.Length == 0 ? "none" : registeredKeys.ToString())}");
         }
     }
 }

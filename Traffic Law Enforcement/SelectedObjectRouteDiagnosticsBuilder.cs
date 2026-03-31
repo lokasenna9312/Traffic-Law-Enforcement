@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Text;
 using Game.Common;
 using Game.Net;
 using Game.Pathfind;
@@ -94,6 +95,7 @@ namespace Traffic_Law_Enforcement
             bool tleReady,
             Entity vehicle,
             Entity currentLaneEntity,
+            bool includeDebugFields,
             ref SelectedObjectRouteDiagnosticsContext context)
         {
             if (!tleReady ||
@@ -118,8 +120,9 @@ namespace Traffic_Law_Enforcement
 
             bool hasNavigationLanes =
                 context.NavigationLaneData.TryGetBuffer(vehicle, out DynamicBuffer<CarNavigationLane> navigationLanes);
-            bool hasPathElements =
-                context.PathElementData.TryGetBuffer(vehicle, out DynamicBuffer<PathElement> pathElements);
+            DynamicBuffer<PathElement> pathElements = default;
+            bool hasPathElements = includeDebugFields &&
+                context.PathElementData.TryGetBuffer(vehicle, out pathElements);
 
             RoutePenaltyInspectionResult inspection =
                 RoutePenaltyInspection.InspectCurrentRoute(
@@ -128,7 +131,12 @@ namespace Traffic_Law_Enforcement
                     navigationLanes,
                     hasNavigationLanes,
                     ref context.InspectionContext,
-                    captureDebugStrings: true);
+                    captureBreakdown: includeDebugFields,
+                    captureTagSummary: true);
+            string plannedPenaltiesText = includeDebugFields
+                ? NormalizeInspectionText(inspection.Breakdown)
+                : string.Empty;
+            string penaltyTagsText = NormalizeInspectionText(inspection.Tags);
 
             return new SelectedObjectRouteDiagnosticsData(
                 hasDiagnostics: true,
@@ -139,15 +147,27 @@ namespace Traffic_Law_Enforcement
                 currentTargetText: BuildCurrentTargetText(targetEntity, ref context),
                 currentRouteText: BuildCurrentRouteText(currentRouteEntity, ref context),
                 targetRoadText: BuildTargetRoadText(targetEntity, ref context),
-                startOwnerRoadText: BuildRouteLaneOwnerRoadText(targetEntity, useStartLane: true, ref context),
-                endOwnerRoadText: BuildRouteLaneOwnerRoadText(targetEntity, useStartLane: false, ref context),
-                directConnectText: BuildCurrentToTargetStartDirectConnectText(currentLaneEntity, targetEntity, navigationLanes, hasNavigationLanes, ref context),
-                fullPathToTargetStartText: BuildFullPathToTargetStartText(currentLaneEntity, targetEntity, navigationLanes, hasNavigationLanes, pathElements, hasPathElements, ref context),
-                navigationLanesText: BuildNavigationLanesText(currentLaneEntity, navigationLanes, hasNavigationLanes, ref context),
-                plannedPenaltiesText: NormalizeInspectionText(inspection.Breakdown),
-                penaltyTagsText: NormalizeInspectionText(inspection.Tags),
-                explanationText: BuildRouteDecisionExplanation(vehicle, currentLaneEntity, hasCurrentTarget, targetEntity, hasCurrentRoute, inspection, ref context),
-                waypointRouteLaneText: BuildWaypointRouteLaneText(targetEntity, ref context),
+                startOwnerRoadText: includeDebugFields
+                    ? BuildRouteLaneOwnerRoadText(targetEntity, useStartLane: true, ref context)
+                    : string.Empty,
+                endOwnerRoadText: includeDebugFields
+                    ? BuildRouteLaneOwnerRoadText(targetEntity, useStartLane: false, ref context)
+                    : string.Empty,
+                directConnectText: includeDebugFields
+                    ? BuildCurrentToTargetStartDirectConnectText(currentLaneEntity, targetEntity, navigationLanes, hasNavigationLanes, ref context)
+                    : string.Empty,
+                fullPathToTargetStartText: includeDebugFields
+                    ? BuildFullPathToTargetStartText(currentLaneEntity, targetEntity, navigationLanes, hasNavigationLanes, pathElements, hasPathElements, ref context)
+                    : string.Empty,
+                navigationLanesText: includeDebugFields
+                    ? BuildNavigationLanesText(currentLaneEntity, navigationLanes, hasNavigationLanes, ref context)
+                    : string.Empty,
+                plannedPenaltiesText: plannedPenaltiesText,
+                penaltyTagsText: includeDebugFields ? penaltyTagsText : string.Empty,
+                explanationText: BuildRouteDecisionExplanation(vehicle, currentLaneEntity, hasCurrentTarget, targetEntity, hasCurrentRoute, inspection, penaltyTagsText, ref context),
+                waypointRouteLaneText: includeDebugFields
+                    ? BuildWaypointRouteLaneText(targetEntity, ref context)
+                    : string.Empty,
                 connectedStopText: BuildConnectedStopText(targetEntity, ref context));
         }
 
@@ -158,9 +178,7 @@ namespace Traffic_Law_Enforcement
                 return "none";
             }
 
-            List<string> lines = new List<string>(maxPreviewLanes + 2);
             int totalUpcoming = 0;
-
             for (int index = 0; index < navigationLanes.Length; index++)
             {
                 Entity lane = navigationLanes[index].m_Lane;
@@ -175,12 +193,6 @@ namespace Traffic_Law_Enforcement
                 }
 
                 totalUpcoming += 1;
-                if (lines.Count >= maxPreviewLanes)
-                {
-                    continue;
-                }
-
-                lines.Add($"{lines.Count + 1}. {SelectedObjectDisplayFormatter.BuildLaneDisplayText(lane, ref context.Formatter)}");
             }
 
             if (totalUpcoming == 0)
@@ -188,14 +200,41 @@ namespace Traffic_Law_Enforcement
                 return "none";
             }
 
-            List<string> summary = new List<string>(lines.Count + 2) { $"{totalUpcoming} total" };
-            summary.AddRange(lines);
-            if (totalUpcoming > lines.Count)
+            StringBuilder summary = new StringBuilder(64);
+            summary.Append(totalUpcoming).Append(" total");
+
+            int previewCount = 0;
+            for (int index = 0; index < navigationLanes.Length && previewCount < maxPreviewLanes; index++)
             {
-                summary.Add($"(+{totalUpcoming - lines.Count} more)");
+                Entity lane = navigationLanes[index].m_Lane;
+                if (lane == Entity.Null)
+                {
+                    continue;
+                }
+
+                if (index == 0 && lane == currentLaneEntity)
+                {
+                    continue;
+                }
+
+                previewCount += 1;
+                summary
+                    .Append('\n')
+                    .Append(previewCount)
+                    .Append(". ")
+                    .Append(SelectedObjectDisplayFormatter.BuildLaneDisplayText(lane, ref context.Formatter));
             }
 
-            return string.Join("\n", summary.ToArray());
+            if (totalUpcoming > previewCount)
+            {
+                summary
+                    .Append('\n')
+                    .Append("(+")
+                    .Append(totalUpcoming - previewCount)
+                    .Append(" more)");
+            }
+
+            return summary.ToString();
         }
 
         private static string BuildCurrentTargetText(Entity targetEntity, ref SelectedObjectRouteDiagnosticsContext context)
@@ -398,8 +437,9 @@ namespace Traffic_Law_Enforcement
                 return SelectedObjectBridgeSystem.LocalizeText(SelectedObjectBridgeSystem.kRouteDirectConnectNoPreviewLocaleId, "No, no current navigation preview reaches the target start lane.");
             }
 
-            List<Entity> upcomingLanes = new List<Entity>(navigationLanes.Length);
             bool skippedLeadingCurrentLane = false;
+            Entity firstUpcomingLane = Entity.Null;
+            int upcomingIndex = 0;
 
             for (int index = 0; index < navigationLanes.Length; index++)
             {
@@ -417,28 +457,25 @@ namespace Traffic_Law_Enforcement
                     continue;
                 }
 
-                upcomingLanes.Add(lane);
-            }
-
-            if (upcomingLanes.Count == 0)
-            {
-                return SelectedObjectBridgeSystem.LocalizeText(SelectedObjectBridgeSystem.kRouteDirectConnectNoPreviewLocaleId, "No, no current navigation preview reaches the target start lane.");
-            }
-
-            if (upcomingLanes[0] == routeLane.m_StartLane)
-            {
-                return SelectedObjectBridgeSystem.LocalizeText(SelectedObjectBridgeSystem.kRouteDirectConnectNextHopLocaleId, "Yes, the next hop reaches the target start lane.");
-            }
-
-            for (int index = 1; index < upcomingLanes.Count; index++)
-            {
-                if (upcomingLanes[index] == routeLane.m_StartLane)
+                if (firstUpcomingLane == Entity.Null)
                 {
+                    firstUpcomingLane = lane;
+                }
+
+                if (lane == routeLane.m_StartLane)
+                {
+                    if (upcomingIndex == 0)
+                    {
+                        return SelectedObjectBridgeSystem.LocalizeText(SelectedObjectBridgeSystem.kRouteDirectConnectNextHopLocaleId, "Yes, the next hop reaches the target start lane.");
+                    }
+
                     return string.Format(
                         SelectedObjectBridgeSystem.LocalizeText(SelectedObjectBridgeSystem.kRouteDirectConnectViaFormatLocaleId, "No, reaches the target start lane after {0} intermediate lane(s) via {1}."),
-                        index,
-                        SelectedObjectDisplayFormatter.BuildLaneDisplayText(upcomingLanes[0], ref context.Formatter));
+                        upcomingIndex,
+                        SelectedObjectDisplayFormatter.BuildLaneDisplayText(firstUpcomingLane, ref context.Formatter));
                 }
+
+                upcomingIndex += 1;
             }
 
             return SelectedObjectBridgeSystem.LocalizeText(SelectedObjectBridgeSystem.kRouteDirectConnectNoPreviewLocaleId, "No, no current navigation preview reaches the target start lane.");
@@ -483,7 +520,7 @@ namespace Traffic_Law_Enforcement
             return SelectedObjectBridgeSystem.LocalizeText(SelectedObjectBridgeSystem.kRouteFullPathMissingLocaleId, "No, current full path does not contain the target start lane.");
         }
 
-        private static string BuildRouteDecisionExplanation(Entity vehicle, Entity currentLaneEntity, bool hasCurrentTarget, Entity targetEntity, bool hasCurrentRoute, RoutePenaltyInspectionResult inspection, ref SelectedObjectRouteDiagnosticsContext context)
+        private static string BuildRouteDecisionExplanation(Entity vehicle, Entity currentLaneEntity, bool hasCurrentTarget, Entity targetEntity, bool hasCurrentRoute, RoutePenaltyInspectionResult inspection, string penaltyTagsText, ref SelectedObjectRouteDiagnosticsContext context)
         {
             if (!hasCurrentRoute)
             {
@@ -495,23 +532,28 @@ namespace Traffic_Law_Enforcement
                 return SelectedObjectBridgeSystem.LocalizeText(SelectedObjectBridgeSystem.kRouteExplanationNoCurrentTargetLocaleId, "No current target is attached to this vehicle.");
             }
 
-            List<string> parts = new List<string>(3);
+            StringBuilder explanation = new StringBuilder(192);
             bool hasPrimaryExplanation = false;
 
             if (TryHasWaypointRouteLaneMismatch(targetEntity, currentLaneEntity, ref context))
             {
-                parts.Add(SelectedObjectBridgeSystem.LocalizeText(SelectedObjectBridgeSystem.kRouteExplanationWaypointAlignmentLocaleId, "Vehicle is aligning for the next waypoint / stop approach lane."));
+                AppendExplanationPart(
+                    explanation,
+                    SelectedObjectBridgeSystem.LocalizeText(
+                        SelectedObjectBridgeSystem.kRouteExplanationWaypointAlignmentLocaleId,
+                        "Vehicle is aligning for the next waypoint / stop approach lane."));
                 hasPrimaryExplanation = true;
             }
 
             if (inspection.Profile.HasAnyPenalty)
             {
-                string tagSummary = NormalizeInspectionText(inspection.Tags);
                 string format =
-                    parts.Count == 0
+                    explanation.Length == 0
                         ? SelectedObjectBridgeSystem.LocalizeText(SelectedObjectBridgeSystem.kRouteExplanationPenaltyPrimaryFormatLocaleId, "Current planned route contains deterrence tags: {0}.")
                         : SelectedObjectBridgeSystem.LocalizeText(SelectedObjectBridgeSystem.kRouteExplanationPenaltyModifierFormatLocaleId, "Current planned route also contains deterrence tags: {0}.");
-                parts.Add(string.Format(format, tagSummary));
+                AppendExplanationPart(
+                    explanation,
+                    string.Format(format, penaltyTagsText));
                 hasPrimaryExplanation = true;
             }
 
@@ -519,15 +561,38 @@ namespace Traffic_Law_Enforcement
                 inspection.PublicTransportLanePolicyResolved &&
                 inspection.AllowedOnPublicTransportLane)
             {
-                parts.Add(SelectedObjectBridgeSystem.LocalizeText(SelectedObjectBridgeSystem.kRouteExplanationPtPermissiveLocaleId, "PT-lane policy is currently permissive for this vehicle."));
+                AppendExplanationPart(
+                    explanation,
+                    SelectedObjectBridgeSystem.LocalizeText(
+                        SelectedObjectBridgeSystem.kRouteExplanationPtPermissiveLocaleId,
+                        "PT-lane policy is currently permissive for this vehicle."));
             }
 
             if (!hasPrimaryExplanation)
             {
-                parts.Add(SelectedObjectBridgeSystem.LocalizeText(SelectedObjectBridgeSystem.kRouteExplanationGenericFallbackLocaleId, "No route-target mismatch or current TLE penalty tag was identified; current behavior is most likely vanilla lane-group alignment."));
+                AppendExplanationPart(
+                    explanation,
+                    SelectedObjectBridgeSystem.LocalizeText(
+                        SelectedObjectBridgeSystem.kRouteExplanationGenericFallbackLocaleId,
+                        "No route-target mismatch or current TLE penalty tag was identified; current behavior is most likely vanilla lane-group alignment."));
             }
 
-            return string.Join(" ", parts.ToArray());
+            return explanation.ToString();
+        }
+
+        private static void AppendExplanationPart(StringBuilder explanation, string part)
+        {
+            if (string.IsNullOrWhiteSpace(part))
+            {
+                return;
+            }
+
+            if (explanation.Length > 0)
+            {
+                explanation.Append(' ');
+            }
+
+            explanation.Append(part);
         }
 
         private static bool TryHasWaypointRouteLaneMismatch(Entity targetEntity, Entity currentLaneEntity, ref SelectedObjectRouteDiagnosticsContext context)

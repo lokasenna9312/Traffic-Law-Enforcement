@@ -1,6 +1,6 @@
 using Game;
-using Game.Pathfind;
 using Game.Prefabs;
+using Game.Pathfind;
 using Game.Vehicles;
 using Unity.Collections;
 using Unity.Entities;
@@ -45,11 +45,11 @@ namespace Traffic_Law_Enforcement
     {
         private EntityQuery m_PathfindCarDataQuery;
         private EntityQuery m_UncachedPathfindCarDataQuery;
+        private EntityTypeHandle m_EntityTypeHandle;
         private ComponentLookup<OriginalPathfindCarData> m_OriginalPathfindCarDataLookup;
-        private PrefabSystem m_PrefabSystem;
         private int m_LastMidBlockPenalty = int.MinValue;
-        private int m_LastPrefabCount = -1;
         private bool m_LastEnforcementEnabled;
+        private int m_LastObservedRuntimeWorldGeneration = -1;
         private bool m_HasApplied;
 
         protected override void OnCreate()
@@ -68,24 +68,29 @@ namespace Traffic_Law_Enforcement
                 },
             });
             m_OriginalPathfindCarDataLookup = GetComponentLookup<OriginalPathfindCarData>();
-            m_PrefabSystem = World.GetOrCreateSystemManaged<PrefabSystem>();
             RequireForUpdate(m_PathfindCarDataQuery);
         }
 
         protected override void OnUpdate()
         {
-            m_OriginalPathfindCarDataLookup.Update(this);
+            int currentGeneration = EnforcementSaveDataSystem.RuntimeWorldGeneration;
+            bool runtimeReloaded = currentGeneration != m_LastObservedRuntimeWorldGeneration;
+            if (runtimeReloaded)
+            {
+                m_LastObservedRuntimeWorldGeneration = currentGeneration;
+                m_HasApplied = false;
+            }
 
-            int prefabCount = m_PathfindCarDataQuery.CalculateEntityCount();
             bool enforcementEnabled = Mod.IsMidBlockCrossingEnforcementEnabled;
             int midBlockPenalty = enforcementEnabled
                 ? EnforcementPenaltyService.GetMidBlockCrossingFine()
                 : 0;
+            bool hasUncachedPrefabs = !m_UncachedPathfindCarDataQuery.IsEmptyIgnoreFilter;
 
             bool needsApply =
                 !m_HasApplied ||
-                prefabCount != m_LastPrefabCount ||
-                !m_UncachedPathfindCarDataQuery.IsEmptyIgnoreFilter ||
+                runtimeReloaded ||
+                hasUncachedPrefabs ||
                 enforcementEnabled != m_LastEnforcementEnabled ||
                 midBlockPenalty != m_LastMidBlockPenalty;
 
@@ -94,8 +99,11 @@ namespace Traffic_Law_Enforcement
                 return;
             }
 
+            int prefabCount = m_PathfindCarDataQuery.CalculateEntityCount();
+            m_OriginalPathfindCarDataLookup.Update(this);
+            m_EntityTypeHandle = GetEntityTypeHandle();
+
             m_LastMidBlockPenalty = midBlockPenalty;
-            m_LastPrefabCount = prefabCount;
             m_LastEnforcementEnabled = enforcementEnabled;
             m_HasApplied = true;
 
@@ -114,18 +122,21 @@ namespace Traffic_Law_Enforcement
         private void ApplyOverrides(int midBlockPenalty)
         
         {
-            NativeArray<Entity> prefabs = m_PathfindCarDataQuery.ToEntityArray(Allocator.Temp);
-
+            NativeArray<ArchetypeChunk> chunks = m_PathfindCarDataQuery.ToArchetypeChunkArray(Allocator.Temp);
             try
             {
-                for (int index = 0; index < prefabs.Length; index++)
+                for (int chunkIndex = 0; chunkIndex < chunks.Length; chunkIndex += 1)
                 {
-                    ApplyOverrides(prefabs[index], midBlockPenalty);
+                    NativeArray<Entity> prefabs = chunks[chunkIndex].GetNativeArray(m_EntityTypeHandle);
+                    for (int index = 0; index < prefabs.Length; index += 1)
+                    {
+                        ApplyOverrides(prefabs[index], midBlockPenalty);
+                    }
                 }
             }
             finally
             {
-                prefabs.Dispose();
+                chunks.Dispose();
             }
         }
 

@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using Game.Debug;
 using Unity.Entities;
+using UnityEngine;
 using UnityEngine.Rendering;
 using Entity = Unity.Entities.Entity;
 
@@ -9,6 +10,56 @@ namespace Traffic_Law_Enforcement
     [DebugContainer]
     public static class TrafficLawEnforcementDebugUI
     {
+        private struct FocusedLoggingDebugState
+        {
+            public string WindowStatusText;
+            public string WatchedVehicleCountText;
+            public string WatchedVehiclesText;
+            public string SelectedVehicleText;
+            public string SelectedRoleText;
+            public string SelectedWatchStatusText;
+        }
+
+        private static int s_CachedSelectedObjectSnapshotFrame = -1;
+        private static bool s_CachedSelectedObjectSnapshotAvailable;
+        private static SelectedObjectDebugSnapshot s_CachedSelectedObjectSnapshot;
+        private static int s_CachedSummarySelectedObjectSnapshotFrame = -1;
+        private static bool s_CachedSummarySelectedObjectSnapshotAvailable;
+        private static SelectedObjectDebugSnapshot s_CachedSummarySelectedObjectSnapshot;
+        private static int s_CachedDebugSelectedObjectSnapshotFrame = -1;
+        private static bool s_CachedDebugSelectedObjectSnapshotAvailable;
+        private static SelectedObjectDebugSnapshot s_CachedDebugSelectedObjectSnapshot;
+        private static int s_CachedLaneDetailsSelectedObjectSnapshotFrame = -1;
+        private static bool s_CachedLaneDetailsSelectedObjectSnapshotAvailable;
+        private static SelectedObjectDebugSnapshot s_CachedLaneDetailsSelectedObjectSnapshot;
+        private static int s_CachedVehicleSnapshotFrame = -1;
+        private static bool s_CachedVehicleSnapshotAvailable;
+        private static SelectedObjectDebugSnapshot s_CachedVehicleSnapshot;
+        private static int s_CachedApplicableSummaryTleSnapshotFrame = -1;
+        private static bool s_CachedApplicableSummaryTleSnapshotAvailable;
+        private static SelectedObjectDebugSnapshot s_CachedApplicableSummaryTleSnapshot;
+        private static int s_CachedApplicableDebugTleSnapshotFrame = -1;
+        private static bool s_CachedApplicableDebugTleSnapshotAvailable;
+        private static SelectedObjectDebugSnapshot s_CachedApplicableDebugTleSnapshot;
+        private static int s_CachedReadyTleSummarySnapshotFrame = -1;
+        private static bool s_CachedReadyTleSummarySnapshotAvailable;
+        private static SelectedObjectDebugSnapshot s_CachedReadyTleSummarySnapshot;
+        private static int s_CachedReadyTleLaneSnapshotFrame = -1;
+        private static bool s_CachedReadyTleLaneSnapshotAvailable;
+        private static SelectedObjectDebugSnapshot s_CachedReadyTleLaneSnapshot;
+        private static int s_CachedRouteDiagnosticsSnapshotFrame = -1;
+        private static bool s_CachedRouteDiagnosticsSnapshotAvailable;
+        private static SelectedObjectDebugSnapshot s_CachedRouteDiagnosticsSnapshot;
+        private static int s_CachedSelectedObjectBridgeSystemFrame = -1;
+        private static SelectedObjectBridgeSystem s_CachedSelectedObjectBridgeSystem;
+        private static bool s_CachedSelectedObjectBridgeSystemAvailable;
+        private static int s_CachedSelectedReadyRoadVehicleFrame = -1;
+        private static bool s_CachedSelectedReadyRoadVehicleAvailable;
+        private static SelectedObjectDebugSnapshot s_CachedSelectedReadyRoadVehicleSnapshot;
+        private static Entity s_CachedSelectedReadyRoadVehicle;
+        private static int s_CachedFocusedLoggingStateFrame = -1;
+        private static FocusedLoggingDebugState s_CachedFocusedLoggingState;
+
         [DebugTab("Traffic Law Enforcement", -910)]
         private static List<DebugUI.Widget> BuildTrafficLawEnforcementDebugUI()
         {
@@ -667,7 +718,7 @@ namespace Traffic_Law_Enforcement
 
         private static string GetPublicTransportLanePolicyText()
         {
-            return GetVehicleInfoText(
+            return GetSummaryVehicleInfoText(
                 snapshot => string.IsNullOrWhiteSpace(snapshot.PublicTransportLanePolicyText)
                     ? "Unavailable"
                     : snapshot.PublicTransportLanePolicyText);
@@ -675,7 +726,7 @@ namespace Traffic_Law_Enforcement
 
         private static string GetHasTrafficLawProfileText()
         {
-            return GetVehicleInfoText(
+            return GetSummaryVehicleInfoText(
                 snapshot => snapshot.HasTrafficLawProfile.ToString());
         }
 
@@ -687,7 +738,7 @@ namespace Traffic_Law_Enforcement
 
         private static string GetRuntimeFamilyText()
         {
-            return GetRawClassificationText(
+            return GetDebugVehicleInfoText(
                 snapshot => snapshot.RuntimeFamilyText);
         }
 
@@ -711,13 +762,13 @@ namespace Traffic_Law_Enforcement
 
         private static string GetRawTransportTypeText()
         {
-            return GetRawClassificationText(
+            return GetDebugVehicleInfoText(
                 snapshot => snapshot.RawTransportTypeText);
         }
 
         private static string GetRawTrackTypeText()
         {
-            return GetRawClassificationText(
+            return GetDebugVehicleInfoText(
                 snapshot => snapshot.RawTrackTypeText);
         }
 
@@ -735,43 +786,43 @@ namespace Traffic_Law_Enforcement
 
         private static string GetRailSubtypeSourceText()
         {
-            return GetRawClassificationText(
+            return GetDebugVehicleInfoText(
                 snapshot => snapshot.RailSubtypeSourceText);
         }
 
         private static string GetCurrentLaneEntityText()
         {
-            return GetReadyTleText(
+            return GetReadyTleLaneText(
                 snapshot => FormatEntity(snapshot.CurrentLaneEntity));
         }
 
         private static string GetPreviousLaneEntityText()
         {
-            return GetReadyTleText(
+            return GetReadyTleLaneText(
                 snapshot => FormatEntity(snapshot.PreviousLaneEntity));
         }
 
         private static string GetLaneChangeCountText()
         {
-            return GetReadyTleText(
+            return GetReadyTleLaneText(
                 snapshot => snapshot.LaneChangeCount.ToString());
         }
 
         private static string GetPublicTransportLaneViolationActiveText()
         {
-            return GetReadyTleText(
+            return GetReadyTleSummaryText(
                 snapshot => snapshot.PublicTransportLaneViolationActive.ToString());
         }
 
         private static string GetPendingExitActiveText()
         {
-            return GetReadyTleText(
+            return GetReadyTleSummaryText(
                 snapshot => snapshot.PendingExitActive.ToString());
         }
 
         private static string GetPermissionStateSummaryText()
         {
-            return GetApplicableTleText(
+            return GetApplicableDebugTleText(
                 snapshot => string.IsNullOrWhiteSpace(snapshot.PermissionStateSummary)
                     ? "Unavailable"
                     : snapshot.PermissionStateSummary);
@@ -923,10 +974,15 @@ namespace Traffic_Law_Enforcement
                 return "Not applicable";
             }
 
+            if (!TryGetApplicableSummaryTleSnapshot(out snapshot))
+            {
+                return "Unavailable";
+            }
+
             return formatter(snapshot);
         }
 
-        private static string GetVehicleInfoText(
+        private static string GetApplicableDebugTleText(
             System.Func<SelectedObjectDebugSnapshot, string> formatter)
         {
             if (!TryGetSelectedObjectSnapshot(out SelectedObjectDebugSnapshot snapshot))
@@ -934,7 +990,58 @@ namespace Traffic_Law_Enforcement
                 return "Unavailable";
             }
 
-            if (!snapshot.IsVehicle)
+            if (snapshot.TleApplicability == SelectedObjectTleApplicability.NotApplicable)
+            {
+                return "Not applicable";
+            }
+
+            if (!TryGetApplicableDebugTleSnapshot(out snapshot))
+            {
+                return "Unavailable";
+            }
+
+            return formatter(snapshot);
+        }
+
+        private static string GetVehicleInfoText(
+            System.Func<SelectedObjectDebugSnapshot, string> formatter)
+        {
+            if (!TryGetVehicleSnapshot(out SelectedObjectDebugSnapshot snapshot))
+            {
+                return "Unavailable";
+            }
+
+            return formatter(snapshot);
+        }
+
+        private static string GetSummaryVehicleInfoText(
+            System.Func<SelectedObjectDebugSnapshot, string> formatter)
+        {
+            if (!TryGetVehicleSnapshot(out SelectedObjectDebugSnapshot _) ||
+                !TryGetSummarySelectedObjectSnapshot(out SelectedObjectDebugSnapshot snapshot))
+            {
+                return "Unavailable";
+            }
+
+            return formatter(snapshot);
+        }
+
+        private static string GetDebugVehicleInfoText(
+            System.Func<SelectedObjectDebugSnapshot, string> formatter)
+        {
+            if (!TryGetVehicleSnapshot(out SelectedObjectDebugSnapshot _) ||
+                !TryGetDebugSelectedObjectSnapshot(out SelectedObjectDebugSnapshot snapshot))
+            {
+                return "Unavailable";
+            }
+
+            return formatter(snapshot);
+        }
+
+        private static string GetRawClassificationText(
+            System.Func<SelectedObjectDebugSnapshot, string> formatter)
+        {
+            if (!TryGetVehicleSnapshot(out SelectedObjectDebugSnapshot snapshot))
             {
                 return "Unavailable";
             }
@@ -944,58 +1051,87 @@ namespace Traffic_Law_Enforcement
 
         private static string GetFocusedLoggingWindowStatusText()
         {
-            return FocusedLoggingService.IsWindowVisible
-                ? "Visible"
-                : "Hidden";
+            return GetFocusedLoggingState().WindowStatusText;
         }
 
         private static string GetFocusedLoggingWatchedVehicleCountText()
         {
-            return FocusedLoggingService.WatchedVehicleCount.ToString();
+            return GetFocusedLoggingState().WatchedVehicleCountText;
         }
 
         private static string GetFocusedLoggingWatchedVehiclesText()
         {
-            string summary = FocusedLoggingService.DescribeWatchedVehicles();
-            return string.IsNullOrWhiteSpace(summary)
-                ? "None"
-                : summary;
+            return GetFocusedLoggingState().WatchedVehiclesText;
         }
 
         private static string GetFocusedLoggingSelectedVehicleText()
         {
-            return TryGetSelectedReadyRoadVehicle(
-                    out SelectedObjectDebugSnapshot _,
-                    out Entity vehicle)
-                ? FocusedLoggingService.FormatEntity(vehicle)
-                : "None";
+            return GetFocusedLoggingState().SelectedVehicleText;
         }
 
         private static string GetFocusedLoggingSelectedRoleText()
         {
-            return TryGetSelectedReadyRoadVehicle(
-                    out SelectedObjectDebugSnapshot snapshot,
-                    out Entity _)
-                ? string.IsNullOrWhiteSpace(snapshot.RoleText)
-                    ? "Unavailable"
-                    : snapshot.RoleText.Trim()
-                : "Unavailable";
+            return GetFocusedLoggingState().SelectedRoleText;
         }
 
         private static string GetFocusedLoggingSelectedWatchStatusText()
         {
-            return TryGetSelectedReadyRoadVehicle(
-                    out SelectedObjectDebugSnapshot _,
-                    out Entity vehicle)
-                ? FocusedLoggingService.IsWatched(vehicle)
-                    ? "Watched"
-                    : "Not watched"
-                : "Unavailable";
+            return GetFocusedLoggingState().SelectedWatchStatusText;
         }
 
         private static string GetFocusedLoggingNoteText()
         {
             return "Focused logging only records log types enabled in Debug options.";
+        }
+
+        private static FocusedLoggingDebugState GetFocusedLoggingState()
+        {
+            int currentFrame = Time.frameCount;
+            if (s_CachedFocusedLoggingStateFrame == currentFrame)
+            {
+                return s_CachedFocusedLoggingState;
+            }
+
+            bool windowVisible = FocusedLoggingService.IsWindowVisible;
+            int watchedVehicleCount = FocusedLoggingService.WatchedVehicleCount;
+            FocusedLoggingDebugState state = new FocusedLoggingDebugState
+            {
+                WindowStatusText = windowVisible
+                    ? "Visible"
+                    : "Hidden",
+                WatchedVehicleCountText = watchedVehicleCount.ToString(),
+            };
+
+            string watchedVehiclesSummary =
+                watchedVehicleCount > 0
+                    ? FocusedLoggingService.DescribeWatchedVehicles()
+                    : string.Empty;
+            state.WatchedVehiclesText = string.IsNullOrWhiteSpace(watchedVehiclesSummary)
+                ? "None"
+                : watchedVehiclesSummary;
+
+            if (TryGetSelectedReadyRoadVehicle(
+                    out SelectedObjectDebugSnapshot snapshot,
+                    out Entity vehicle))
+            {
+                state.SelectedVehicleText = FocusedLoggingService.FormatEntity(vehicle);
+                state.SelectedRoleText = string.IsNullOrWhiteSpace(snapshot.RoleText)
+                    ? "Unavailable"
+                    : snapshot.RoleText.Trim();
+                state.SelectedWatchStatusText = FocusedLoggingService.IsWatched(vehicle)
+                    ? "Watched"
+                    : "Not watched";
+            }
+            else
+            {
+                state.SelectedVehicleText = "None";
+                state.SelectedRoleText = "Unavailable";
+                state.SelectedWatchStatusText = "Unavailable";
+            }
+
+            s_CachedFocusedLoggingStateFrame = currentFrame;
+            s_CachedFocusedLoggingState = state;
+            return state;
         }
 
         private static void WatchSelectedRoadVehicle()
@@ -1018,15 +1154,21 @@ namespace Traffic_Law_Enforcement
             }
         }
 
-        private static string GetReadyTleText(
+        private static string GetReadyTleSummaryText(
             System.Func<SelectedObjectDebugSnapshot, string> formatter)
         {
-            if (!TryGetSelectedObjectSnapshot(out SelectedObjectDebugSnapshot snapshot))
+            if (!TryGetReadyTleSummarySnapshot(out SelectedObjectDebugSnapshot snapshot))
             {
                 return "Unavailable";
             }
 
-            if (snapshot.TleApplicability != SelectedObjectTleApplicability.ApplicableReady)
+            return formatter(snapshot);
+        }
+
+        private static string GetReadyTleLaneText(
+            System.Func<SelectedObjectDebugSnapshot, string> formatter)
+        {
+            if (!TryGetReadyTleLaneSnapshot(out SelectedObjectDebugSnapshot snapshot))
             {
                 return "Unavailable";
             }
@@ -1037,13 +1179,7 @@ namespace Traffic_Law_Enforcement
         private static string GetRouteDiagnosticsText(
             System.Func<SelectedObjectDebugSnapshot, string> formatter)
         {
-            if (!TryGetSelectedObjectSnapshot(out SelectedObjectDebugSnapshot snapshot))
-            {
-                return "Unavailable";
-            }
-
-            if (snapshot.TleApplicability != SelectedObjectTleApplicability.ApplicableReady ||
-                !snapshot.HasRouteDiagnostics)
+            if (!TryGetRouteDiagnosticsSnapshot(out SelectedObjectDebugSnapshot snapshot))
             {
                 return "Unavailable";
             }
@@ -1057,13 +1193,7 @@ namespace Traffic_Law_Enforcement
         private static string GetRouteDiagnosticsOptionalText(
             System.Func<SelectedObjectDebugSnapshot, string> formatter)
         {
-            if (!TryGetSelectedObjectSnapshot(out SelectedObjectDebugSnapshot snapshot))
-            {
-                return "Unavailable";
-            }
-
-            if (snapshot.TleApplicability != SelectedObjectTleApplicability.ApplicableReady ||
-                !snapshot.HasRouteDiagnostics)
+            if (!TryGetRouteDiagnosticsSnapshot(out SelectedObjectDebugSnapshot snapshot))
             {
                 return "Unavailable";
             }
@@ -1074,59 +1204,326 @@ namespace Traffic_Law_Enforcement
                 : text.Trim();
         }
 
-        private static string GetRawClassificationText(
-            System.Func<SelectedObjectDebugSnapshot, string> formatter)
-        {
-            if (!TryGetSelectedObjectSnapshot(out SelectedObjectDebugSnapshot snapshot))
-            {
-                return "Unavailable";
-            }
-
-            if (!snapshot.IsVehicle)
-            {
-                return "Unavailable";
-            }
-
-            return formatter(snapshot);
-        }
-
         private static bool TryGetSelectedObjectSnapshot(
             out SelectedObjectDebugSnapshot snapshot)
         {
+            int currentFrame = Time.frameCount;
+            if (s_CachedSelectedObjectSnapshotFrame == currentFrame)
+            {
+                snapshot = s_CachedSelectedObjectSnapshot;
+                return s_CachedSelectedObjectSnapshotAvailable;
+            }
+
+            bool hasSnapshot = false;
+            SelectedObjectDebugSnapshot resolvedSnapshot = default;
+
+            if (TryGetSelectedObjectBridgeSystem(out SelectedObjectBridgeSystem bridgeSystem) &&
+                bridgeSystem.HasSnapshot)
+            {
+                resolvedSnapshot = bridgeSystem.CurrentSnapshot;
+                hasSnapshot = true;
+            }
+
+            s_CachedSelectedObjectSnapshotFrame = currentFrame;
+            s_CachedSelectedObjectSnapshotAvailable = hasSnapshot;
+            s_CachedSelectedObjectSnapshot = resolvedSnapshot;
+            snapshot = resolvedSnapshot;
+            return hasSnapshot;
+        }
+
+        private static bool TryGetSummarySelectedObjectSnapshot(
+            out SelectedObjectDebugSnapshot snapshot)
+        {
+            int currentFrame = Time.frameCount;
+            if (s_CachedSummarySelectedObjectSnapshotFrame == currentFrame)
+            {
+                snapshot = s_CachedSummarySelectedObjectSnapshot;
+                return s_CachedSummarySelectedObjectSnapshotAvailable;
+            }
+
+            bool hasSnapshot = false;
+            SelectedObjectDebugSnapshot resolvedSnapshot = default;
+
+            if (TryGetSelectedObjectBridgeSystem(out SelectedObjectBridgeSystem bridgeSystem))
+            {
+                SelectedObjectBridgeSystem.RequestSummarySnapshot();
+                if (bridgeSystem.HasSnapshot)
+                {
+                    resolvedSnapshot = bridgeSystem.CurrentSnapshot;
+                    hasSnapshot = true;
+                }
+            }
+
+            s_CachedSummarySelectedObjectSnapshotFrame = currentFrame;
+            s_CachedSummarySelectedObjectSnapshotAvailable = hasSnapshot;
+            s_CachedSummarySelectedObjectSnapshot = resolvedSnapshot;
+            snapshot = resolvedSnapshot;
+            return hasSnapshot;
+        }
+
+        private static bool TryGetDebugSelectedObjectSnapshot(
+            out SelectedObjectDebugSnapshot snapshot)
+        {
+            int currentFrame = Time.frameCount;
+            if (s_CachedDebugSelectedObjectSnapshotFrame == currentFrame)
+            {
+                snapshot = s_CachedDebugSelectedObjectSnapshot;
+                return s_CachedDebugSelectedObjectSnapshotAvailable;
+            }
+
+            bool hasSnapshot = false;
+            SelectedObjectDebugSnapshot resolvedSnapshot = default;
+
+            if (TryGetSelectedObjectBridgeSystem(out SelectedObjectBridgeSystem bridgeSystem))
+            {
+                SelectedObjectBridgeSystem.RequestDebugFieldsSnapshot();
+                if (bridgeSystem.HasSnapshot)
+                {
+                    resolvedSnapshot = bridgeSystem.CurrentSnapshot;
+                    hasSnapshot = true;
+                }
+            }
+
+            s_CachedDebugSelectedObjectSnapshotFrame = currentFrame;
+            s_CachedDebugSelectedObjectSnapshotAvailable = hasSnapshot;
+            s_CachedDebugSelectedObjectSnapshot = resolvedSnapshot;
+            snapshot = resolvedSnapshot;
+            return hasSnapshot;
+        }
+
+        private static bool TryGetLaneDetailsSelectedObjectSnapshot(
+            out SelectedObjectDebugSnapshot snapshot)
+        {
+            int currentFrame = Time.frameCount;
+            if (s_CachedLaneDetailsSelectedObjectSnapshotFrame == currentFrame)
+            {
+                snapshot = s_CachedLaneDetailsSelectedObjectSnapshot;
+                return s_CachedLaneDetailsSelectedObjectSnapshotAvailable;
+            }
+
+            bool hasSnapshot = false;
+            SelectedObjectDebugSnapshot resolvedSnapshot = default;
+
+            if (TryGetSelectedObjectBridgeSystem(out SelectedObjectBridgeSystem bridgeSystem))
+            {
+                SelectedObjectBridgeSystem.RequestLaneDetailsSnapshot();
+                if (bridgeSystem.HasSnapshot)
+                {
+                    resolvedSnapshot = bridgeSystem.CurrentSnapshot;
+                    hasSnapshot = true;
+                }
+            }
+
+            s_CachedLaneDetailsSelectedObjectSnapshotFrame = currentFrame;
+            s_CachedLaneDetailsSelectedObjectSnapshotAvailable = hasSnapshot;
+            s_CachedLaneDetailsSelectedObjectSnapshot = resolvedSnapshot;
+            snapshot = resolvedSnapshot;
+            return hasSnapshot;
+        }
+
+        private static bool TryGetVehicleSnapshot(
+            out SelectedObjectDebugSnapshot snapshot)
+        {
+            int currentFrame = Time.frameCount;
+            if (s_CachedVehicleSnapshotFrame == currentFrame)
+            {
+                snapshot = s_CachedVehicleSnapshot;
+                return s_CachedVehicleSnapshotAvailable;
+            }
+
+            bool hasVehicleSnapshot =
+                TryGetSelectedObjectSnapshot(out SelectedObjectDebugSnapshot selectedSnapshot) &&
+                selectedSnapshot.IsVehicle;
+
+            s_CachedVehicleSnapshotFrame = currentFrame;
+            s_CachedVehicleSnapshotAvailable = hasVehicleSnapshot;
+            s_CachedVehicleSnapshot = selectedSnapshot;
+            snapshot = selectedSnapshot;
+            return hasVehicleSnapshot;
+        }
+
+        private static bool TryGetApplicableSummaryTleSnapshot(
+            out SelectedObjectDebugSnapshot snapshot)
+        {
+            int currentFrame = Time.frameCount;
+            if (s_CachedApplicableSummaryTleSnapshotFrame == currentFrame)
+            {
+                snapshot = s_CachedApplicableSummaryTleSnapshot;
+                return s_CachedApplicableSummaryTleSnapshotAvailable;
+            }
+
+            bool hasApplicableSelection =
+                TryGetSelectedObjectSnapshot(out SelectedObjectDebugSnapshot selectedSnapshot) &&
+                selectedSnapshot.TleApplicability != SelectedObjectTleApplicability.NotApplicable;
+            bool hasApplicableSummaryTleSnapshot =
+                hasApplicableSelection &&
+                TryGetSummarySelectedObjectSnapshot(out selectedSnapshot) &&
+                selectedSnapshot.TleApplicability != SelectedObjectTleApplicability.NotApplicable;
+
+            s_CachedApplicableSummaryTleSnapshotFrame = currentFrame;
+            s_CachedApplicableSummaryTleSnapshotAvailable = hasApplicableSummaryTleSnapshot;
+            s_CachedApplicableSummaryTleSnapshot = selectedSnapshot;
+            snapshot = selectedSnapshot;
+            return hasApplicableSummaryTleSnapshot;
+        }
+
+        private static bool TryGetApplicableDebugTleSnapshot(
+            out SelectedObjectDebugSnapshot snapshot)
+        {
+            int currentFrame = Time.frameCount;
+            if (s_CachedApplicableDebugTleSnapshotFrame == currentFrame)
+            {
+                snapshot = s_CachedApplicableDebugTleSnapshot;
+                return s_CachedApplicableDebugTleSnapshotAvailable;
+            }
+
+            bool hasApplicableSelection =
+                TryGetSelectedObjectSnapshot(out SelectedObjectDebugSnapshot selectedSnapshot) &&
+                selectedSnapshot.TleApplicability != SelectedObjectTleApplicability.NotApplicable;
+            bool hasApplicableDebugTleSnapshot =
+                hasApplicableSelection &&
+                TryGetDebugSelectedObjectSnapshot(out selectedSnapshot) &&
+                selectedSnapshot.TleApplicability != SelectedObjectTleApplicability.NotApplicable;
+
+            s_CachedApplicableDebugTleSnapshotFrame = currentFrame;
+            s_CachedApplicableDebugTleSnapshotAvailable = hasApplicableDebugTleSnapshot;
+            s_CachedApplicableDebugTleSnapshot = selectedSnapshot;
+            snapshot = selectedSnapshot;
+            return hasApplicableDebugTleSnapshot;
+        }
+
+        private static bool TryGetReadyTleSummarySnapshot(
+            out SelectedObjectDebugSnapshot snapshot)
+        {
+            int currentFrame = Time.frameCount;
+            if (s_CachedReadyTleSummarySnapshotFrame == currentFrame)
+            {
+                snapshot = s_CachedReadyTleSummarySnapshot;
+                return s_CachedReadyTleSummarySnapshotAvailable;
+            }
+
+            bool hasReadySelection =
+                TryGetSelectedObjectSnapshot(out SelectedObjectDebugSnapshot selectedSnapshot) &&
+                selectedSnapshot.TleApplicability == SelectedObjectTleApplicability.ApplicableReady;
+            bool hasReadyTleSummarySnapshot =
+                hasReadySelection &&
+                TryGetSummarySelectedObjectSnapshot(out selectedSnapshot) &&
+                selectedSnapshot.TleApplicability == SelectedObjectTleApplicability.ApplicableReady;
+
+            s_CachedReadyTleSummarySnapshotFrame = currentFrame;
+            s_CachedReadyTleSummarySnapshotAvailable = hasReadyTleSummarySnapshot;
+            s_CachedReadyTleSummarySnapshot = selectedSnapshot;
+            snapshot = selectedSnapshot;
+            return hasReadyTleSummarySnapshot;
+        }
+
+        private static bool TryGetReadyTleLaneSnapshot(
+            out SelectedObjectDebugSnapshot snapshot)
+        {
+            int currentFrame = Time.frameCount;
+            if (s_CachedReadyTleLaneSnapshotFrame == currentFrame)
+            {
+                snapshot = s_CachedReadyTleLaneSnapshot;
+                return s_CachedReadyTleLaneSnapshotAvailable;
+            }
+
+            bool hasReadySelection =
+                TryGetSelectedObjectSnapshot(out SelectedObjectDebugSnapshot selectedSnapshot) &&
+                selectedSnapshot.TleApplicability == SelectedObjectTleApplicability.ApplicableReady;
+            bool hasReadyTleLaneSnapshot =
+                hasReadySelection &&
+                TryGetLaneDetailsSelectedObjectSnapshot(out selectedSnapshot) &&
+                selectedSnapshot.TleApplicability == SelectedObjectTleApplicability.ApplicableReady;
+
+            s_CachedReadyTleLaneSnapshotFrame = currentFrame;
+            s_CachedReadyTleLaneSnapshotAvailable = hasReadyTleLaneSnapshot;
+            s_CachedReadyTleLaneSnapshot = selectedSnapshot;
+            snapshot = selectedSnapshot;
+            return hasReadyTleLaneSnapshot;
+        }
+
+        private static bool TryGetRouteDiagnosticsSnapshot(
+            out SelectedObjectDebugSnapshot snapshot)
+        {
+            int currentFrame = Time.frameCount;
+            if (s_CachedRouteDiagnosticsSnapshotFrame == currentFrame)
+            {
+                snapshot = s_CachedRouteDiagnosticsSnapshot;
+                return s_CachedRouteDiagnosticsSnapshotAvailable;
+            }
+
+            bool hasReadySelection =
+                TryGetSelectedObjectSnapshot(out SelectedObjectDebugSnapshot readySnapshot) &&
+                readySnapshot.TleApplicability == SelectedObjectTleApplicability.ApplicableReady;
+            bool hasRouteDiagnosticsSnapshot = false;
+
+            if (hasReadySelection &&
+                TryGetSelectedObjectBridgeSystem(out SelectedObjectBridgeSystem bridgeSystem))
+            {
+                SelectedObjectBridgeSystem.RequestRouteDiagnosticsSnapshot();
+                if (bridgeSystem.HasSnapshot)
+                {
+                    readySnapshot = bridgeSystem.CurrentSnapshot;
+                    hasRouteDiagnosticsSnapshot =
+                        readySnapshot.TleApplicability == SelectedObjectTleApplicability.ApplicableReady &&
+                        readySnapshot.HasRouteDiagnostics;
+                }
+            }
+
+            s_CachedRouteDiagnosticsSnapshotFrame = currentFrame;
+            s_CachedRouteDiagnosticsSnapshotAvailable = hasRouteDiagnosticsSnapshot;
+            s_CachedRouteDiagnosticsSnapshot = readySnapshot;
+            snapshot = readySnapshot;
+            return hasRouteDiagnosticsSnapshot;
+        }
+
+        private static bool TryGetSelectedObjectBridgeSystem(
+            out SelectedObjectBridgeSystem bridgeSystem)
+        {
+            int currentFrame = Time.frameCount;
+            if (s_CachedSelectedObjectBridgeSystemFrame == currentFrame)
+            {
+                bridgeSystem = s_CachedSelectedObjectBridgeSystem;
+                return s_CachedSelectedObjectBridgeSystemAvailable;
+            }
+
             World world = World.DefaultGameObjectInjectionWorld;
-            if (world == null)
-            {
-                snapshot = default;
-                return false;
-            }
+            bridgeSystem =
+                world?.GetExistingSystemManaged<SelectedObjectBridgeSystem>();
 
-            SelectedObjectBridgeSystem bridgeSystem =
-                world.GetExistingSystemManaged<SelectedObjectBridgeSystem>();
-
-            if (bridgeSystem == null || !bridgeSystem.HasSnapshot)
-            {
-                snapshot = default;
-                return false;
-            }
-
-            snapshot = bridgeSystem.CurrentSnapshot;
-            return true;
+            s_CachedSelectedObjectBridgeSystemFrame = currentFrame;
+            s_CachedSelectedObjectBridgeSystem = bridgeSystem;
+            s_CachedSelectedObjectBridgeSystemAvailable = bridgeSystem != null;
+            return s_CachedSelectedObjectBridgeSystemAvailable;
         }
 
         private static bool TryGetSelectedReadyRoadVehicle(
             out SelectedObjectDebugSnapshot snapshot,
             out Entity vehicle)
         {
-            vehicle = Entity.Null;
-            if (!TryGetSelectedObjectSnapshot(out snapshot) ||
-                snapshot.TleApplicability != SelectedObjectTleApplicability.ApplicableReady ||
-                snapshot.ResolvedVehicleEntity == Entity.Null)
+            int currentFrame = Time.frameCount;
+            if (s_CachedSelectedReadyRoadVehicleFrame == currentFrame)
             {
-                return false;
+                snapshot = s_CachedSelectedReadyRoadVehicleSnapshot;
+                vehicle = s_CachedSelectedReadyRoadVehicle;
+                return s_CachedSelectedReadyRoadVehicleAvailable;
             }
 
-            vehicle = snapshot.ResolvedVehicleEntity;
-            return true;
+            bool hasReadyRoadVehicle =
+                TryGetSelectedObjectSnapshot(out SelectedObjectDebugSnapshot selectedSnapshot) &&
+                selectedSnapshot.TleApplicability == SelectedObjectTleApplicability.ApplicableReady &&
+                selectedSnapshot.ResolvedVehicleEntity != Entity.Null;
+
+            s_CachedSelectedReadyRoadVehicleFrame = currentFrame;
+            s_CachedSelectedReadyRoadVehicleAvailable = hasReadyRoadVehicle;
+            s_CachedSelectedReadyRoadVehicleSnapshot = selectedSnapshot;
+            s_CachedSelectedReadyRoadVehicle =
+                hasReadyRoadVehicle
+                    ? selectedSnapshot.ResolvedVehicleEntity
+                    : Entity.Null;
+            snapshot = selectedSnapshot;
+            vehicle = s_CachedSelectedReadyRoadVehicle;
+            return hasReadyRoadVehicle;
         }
 
         private static string FormatEntity(Entity entity)

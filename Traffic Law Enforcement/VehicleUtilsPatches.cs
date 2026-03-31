@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Reflection;
+using System.Text;
 using Game;
 using Game.Pathfind;
 using Game.Vehicles;
@@ -27,10 +27,7 @@ namespace Traffic_Law_Enforcement
         private static readonly Type s_PathfindExecutorType =
             AccessTools.Inner(typeof(PathfindJobs), "PathfindExecutor");
 
-        private static readonly MethodInfo[] s_SetupPathfindMethods = AccessTools
-            .GetDeclaredMethods(typeof(VehicleUtils))
-            .Where(IsSetupPathfindCandidate)
-            .ToArray();
+        private static readonly MethodInfo[] s_SetupPathfindMethods = GetSetupPathfindMethods();
 
         private static readonly MethodInfo s_CalculateCostMethod = AccessTools.FirstMethod(
             s_PathfindExecutorType,
@@ -70,9 +67,20 @@ namespace Traffic_Law_Enforcement
                         s_Harmony.Patch(setupPathfindMethod, prefix: prefix);
                     }
 
+                    StringBuilder patchedMethods = new StringBuilder(s_SetupPathfindMethods.Length * 48);
+                    for (int index = 0; index < s_SetupPathfindMethods.Length; index += 1)
+                    {
+                        if (index > 0)
+                        {
+                            patchedMethods.Append("; ");
+                        }
+
+                        patchedMethods.Append(FormatMethodSignature(s_SetupPathfindMethods[index]));
+                    }
+
                     Mod.log.Info(
                         $"VehicleUtils.SetupPathfind patch applied to {s_SetupPathfindMethods.Length} overload(s): " +
-                        string.Join("; ", s_SetupPathfindMethods.Select(FormatMethodSignature)));
+                        patchedMethods);
                 }
 
                 HarmonyMethod calculateCostPostfix = new HarmonyMethod(typeof(VehicleUtilsPatches), nameof(CalculateCostPostfix));
@@ -107,6 +115,31 @@ namespace Traffic_Law_Enforcement
             s_HasCachedPenaltyValues = false;
         }
 
+        private static MethodInfo[] GetSetupPathfindMethods()
+        {
+            List<MethodInfo> methods = new List<MethodInfo>();
+            foreach (MethodInfo method in AccessTools.GetDeclaredMethods(typeof(VehicleUtils)))
+            {
+                if (IsSetupPathfindCandidate(method))
+                {
+                    methods.Add(method);
+                }
+            }
+
+            if (methods.Count == 0)
+            {
+                return Array.Empty<MethodInfo>();
+            }
+
+            MethodInfo[] result = new MethodInfo[methods.Count];
+            for (int index = 0; index < methods.Count; index += 1)
+            {
+                result[index] = methods[index];
+            }
+
+            return result;
+        }
+
         private static void SetupPathfindPrefix(ref SetupQueueItem item)
         {
             World world = World.DefaultGameObjectInjectionWorld;
@@ -122,7 +155,10 @@ namespace Traffic_Law_Enforcement
                 return;
             }
 
-            if (!s_LoggedFirstSetupPathfindInvocation)
+            bool focusedRouteDiagnosticsEnabled =
+                EnforcementLoggingPolicy.ShouldLogFocusedRouteRebuildDiagnostics();
+
+            if (focusedRouteDiagnosticsEnabled && !s_LoggedFirstSetupPathfindInvocation)
             {
                 s_LoggedFirstSetupPathfindInvocation = true;
                 Mod.log.Info(
@@ -155,8 +191,6 @@ namespace Traffic_Law_Enforcement
 
         private static void CalculateCostPostfix(ref float __result, RuleFlags rules, float2 delta, PathfindParameters ___m_Parameters)
         {
-            Entity focusedVehicle = ResolveFocusedVehicle(___m_Parameters);
-
             if (!s_CachedPublicTransportLaneEnforcementEnabled)
             {
                 return;
@@ -181,6 +215,7 @@ namespace Traffic_Law_Enforcement
 
             float addedPenalty = publicTransportPenalty * moneyWeight * math.abs(delta.y - delta.x);
 
+            Entity focusedVehicle = ResolveFocusedVehicle(___m_Parameters);
             if (ShouldLogFocusedPublicTransportLaneCost(focusedVehicle))
             {
                 LogFocusedPublicTransportLaneCost(
@@ -376,9 +411,23 @@ namespace Traffic_Law_Enforcement
         private static string FormatMethodSignature(MethodInfo method)
         {
             ParameterInfo[] parameters = method.GetParameters();
-            return $"{method.DeclaringType?.Name}.{method.Name}(" +
-                   string.Join(", ", parameters.Select(parameter => parameter.ParameterType.Name)) +
-                   ")";
+            StringBuilder signature = new StringBuilder(64);
+            signature.Append(method.DeclaringType?.Name);
+            signature.Append('.');
+            signature.Append(method.Name);
+            signature.Append('(');
+            for (int index = 0; index < parameters.Length; index += 1)
+            {
+                if (index > 0)
+                {
+                    signature.Append(", ");
+                }
+
+                signature.Append(parameters[index].ParameterType.Name);
+            }
+
+            signature.Append(')');
+            return signature.ToString();
         }
     }
 }

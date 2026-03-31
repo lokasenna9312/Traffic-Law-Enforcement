@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Text;
 using Unity.Entities;
 using Entity = Unity.Entities.Entity;
 
@@ -7,6 +8,10 @@ namespace Traffic_Law_Enforcement
     internal static class FocusedLoggingService
     {
         private static readonly HashSet<Entity> s_WatchedVehicles = new HashSet<Entity>();
+        private static readonly List<Entity> s_RemovedVehiclesBuffer = new List<Entity>();
+        private static readonly List<Entity> s_SortedWatchedVehiclesBuffer = new List<Entity>();
+        private static string s_WatchedVehicleSummary = string.Empty;
+        private static bool s_WatchedVehicleSummaryDirty = true;
         private static bool s_WindowVisible;
 
         internal static bool IsWindowVisible => s_WindowVisible;
@@ -18,7 +23,9 @@ namespace Traffic_Law_Enforcement
         internal static void Reset()
         {
             s_WatchedVehicles.Clear();
+            MarkWatchedVehiclesChanged();
             s_WindowVisible = false;
+            FocusedRouteDiagnosticsPatchController.Sync();
         }
 
         internal static void SetWindowVisible(bool visible)
@@ -41,6 +48,8 @@ namespace Traffic_Law_Enforcement
             bool added = s_WatchedVehicles.Add(vehicle);
             if (added)
             {
+                MarkWatchedVehiclesChanged();
+                FocusedRouteDiagnosticsPatchController.Sync();
                 Mod.log.Info($"[FocusedLogging] Added watched vehicle: {FormatEntity(vehicle)}");
             }
 
@@ -57,6 +66,8 @@ namespace Traffic_Law_Enforcement
             bool removed = s_WatchedVehicles.Remove(vehicle);
             if (removed)
             {
+                MarkWatchedVehiclesChanged();
+                FocusedRouteDiagnosticsPatchController.Sync();
                 Mod.log.Info($"[FocusedLogging] Removed watched vehicle: {FormatEntity(vehicle)}");
             }
 
@@ -101,7 +112,7 @@ namespace Traffic_Law_Enforcement
                 return 0;
             }
 
-            List<Entity> missingVehicles = null;
+            s_RemovedVehiclesBuffer.Clear();
             foreach (Entity vehicle in s_WatchedVehicles)
             {
                 if (vehicle != Entity.Null && entityManager.Exists(vehicle))
@@ -109,53 +120,82 @@ namespace Traffic_Law_Enforcement
                     continue;
                 }
 
-                (missingVehicles ??= new List<Entity>()).Add(vehicle);
+                s_RemovedVehiclesBuffer.Add(vehicle);
             }
 
-            if (missingVehicles == null)
+            if (s_RemovedVehiclesBuffer.Count == 0)
             {
                 return 0;
             }
 
-            for (int index = 0; index < missingVehicles.Count; index++)
+            for (int index = 0; index < s_RemovedVehiclesBuffer.Count; index++)
             {
-                s_WatchedVehicles.Remove(missingVehicles[index]);
+                s_WatchedVehicles.Remove(s_RemovedVehiclesBuffer[index]);
             }
 
+            MarkWatchedVehiclesChanged();
+            FocusedRouteDiagnosticsPatchController.Sync();
             Mod.log.Info(
-                $"[FocusedLogging] Pruned watched vehicles: removed={missingVehicles.Count}, remaining={s_WatchedVehicles.Count}");
+                $"[FocusedLogging] Pruned watched vehicles: removed={s_RemovedVehiclesBuffer.Count}, remaining={s_WatchedVehicles.Count}");
 
-            return missingVehicles.Count;
+            int removedCount = s_RemovedVehiclesBuffer.Count;
+            s_RemovedVehiclesBuffer.Clear();
+
+            return removedCount;
         }
 
         internal static string DescribeWatchedVehicles(int maxDisplayed = 6)
         {
             if (s_WatchedVehicles.Count == 0)
             {
+                s_WatchedVehicleSummary = string.Empty;
+                s_WatchedVehicleSummaryDirty = false;
                 return string.Empty;
             }
 
-            List<Entity> vehicles = new List<Entity>(s_WatchedVehicles);
-            vehicles.Sort(CompareEntities);
+            if (maxDisplayed == 6 && !s_WatchedVehicleSummaryDirty)
+            {
+                return s_WatchedVehicleSummary;
+            }
 
-            List<string> parts = new List<string>(vehicles.Count);
+            s_SortedWatchedVehiclesBuffer.Clear();
+            foreach (Entity vehicle in s_WatchedVehicles)
+            {
+                s_SortedWatchedVehiclesBuffer.Add(vehicle);
+            }
+
+            s_SortedWatchedVehiclesBuffer.Sort(CompareEntities);
+
+            StringBuilder summaryBuilder = new StringBuilder(s_SortedWatchedVehiclesBuffer.Count * 14);
             int displayed = 0;
-            for (int index = 0; index < vehicles.Count; index++)
+            for (int index = 0; index < s_SortedWatchedVehiclesBuffer.Count; index++)
             {
                 if (displayed >= maxDisplayed)
                 {
                     break;
                 }
 
-                parts.Add(FormatEntity(vehicles[index]));
+                if (displayed > 0)
+                {
+                    summaryBuilder.Append(", ");
+                }
+
+                summaryBuilder.Append(FormatEntity(s_SortedWatchedVehiclesBuffer[index]));
                 displayed += 1;
             }
 
-            string summary = string.Join(", ", parts.ToArray());
-            int remaining = vehicles.Count - displayed;
+            int remaining = s_SortedWatchedVehiclesBuffer.Count - displayed;
             if (remaining > 0)
             {
-                summary += $" (+{remaining} more)";
+                summaryBuilder.Append(" (+").Append(remaining).Append(" more)");
+            }
+
+            string summary = summaryBuilder.ToString();
+
+            if (maxDisplayed == 6)
+            {
+                s_WatchedVehicleSummary = summary;
+                s_WatchedVehicleSummaryDirty = false;
             }
 
             return summary;
@@ -178,8 +218,19 @@ namespace Traffic_Law_Enforcement
             int cleared = s_WatchedVehicles.Count;
             s_WatchedVehicles.Clear();
 
+            MarkWatchedVehiclesChanged();
+            FocusedRouteDiagnosticsPatchController.Sync();
             Mod.log.Info(
                 $"[FocusedLogging] Cleared watched vehicles: count={cleared}, reason={reason}");
+        }
+
+        private static void MarkWatchedVehiclesChanged()
+        {
+            s_WatchedVehicleSummaryDirty = true;
+            if (s_WatchedVehicles.Count == 0)
+            {
+                s_WatchedVehicleSummary = string.Empty;
+            }
         }
 
         private static int CompareEntities(Entity left, Entity right)

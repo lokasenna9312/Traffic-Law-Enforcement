@@ -22,7 +22,6 @@ namespace Traffic_Law_Enforcement {
         private bool m_HasDeserializedData;
         private bool m_ShouldClearLegacyRuntimeState;
         private bool m_PendingPostDeserializeApply;
-        private bool m_HasDeserializeBeenCalledForCurrentLoad;
         public static int RuntimeWorldGeneration { get; private set; }
         private EntityQuery m_PublicTransportLaneProfileQuery;
         private EntityQuery m_PersistedPublicTransportLaneAccessStateQuery;
@@ -402,14 +401,6 @@ namespace Traffic_Law_Enforcement {
                     trackingMidBlockCrossingActualOrAvoidedPathCount,
                     trackingIntersectionMovementActualOrAvoidedPathCount);
 
-            EnforcementLoggingPolicy.RecordSaveLoadInfo(
-                $@"[SAVELOAD] PolicyImpact tracking state read: version={version}, " +
-                $@"month={policyImpactMonthIndex}, " +
-                $@"totalPathRequests={trackingTotalPathRequestCount}, " +
-                $@"totalActualPaths={trackingTotalActualPathCount}, " +
-                $@"totalAvoidedPaths={trackingTotalAvoidedPathCount}, " +
-                $@"totalFineAmount={trackingTotalFineAmount}");
-
             if (migratedLegacyPathRequestTracking ||
                 HasInconsistentPathRequestTracking(
                     trackingState.m_TotalPathRequestCount,
@@ -579,10 +570,6 @@ namespace Traffic_Law_Enforcement {
 
         private static void AdvanceRuntimeWorldGeneration(Context context) {
             RuntimeWorldGeneration += 1;
-
-            EnforcementLoggingPolicy.RecordSaveLoadInfo(
-                $"[SAVELOAD] RuntimeWorldGeneration advanced: generation={RuntimeWorldGeneration}, " +
-                $"purpose={context.purpose}");
         }
 
         protected override void OnCreate() {
@@ -613,65 +600,37 @@ namespace Traffic_Law_Enforcement {
                 return;
             }
 
-            if (!m_HasDeserializeBeenCalledForCurrentLoad &&
-                EnforcementLoggingPolicy.ShouldLogSaveIdentification()) {
-                Mod.log.Info(
-                    $"[SAVELOAD] Loaded save without Traffic Law Enforcement save-data block: " +
-                    $"runtimeGeneration={RuntimeWorldGeneration}" +
-                    $"{EnforcementLoggingPolicy.FormatSaveIdentificationSuffix()}");
-            }
-
             ApplyLoadedStateToWorld();
             m_PendingPostDeserializeApply = false;
         }
 
         public void SetDefaults(Context context) {
-            EnforcementLoggingPolicy.RecordSaveLoadInfo(
-                $"[SAVELOAD] SetDefaults: purpose={context.purpose}, " +
-                $"willClearLegacyRuntimeState={context.purpose == Purpose.LoadGame}");
-
             AdvanceRuntimeWorldGeneration(context);
             ResetRuntimeState();
             EnforcementGameplaySettingsService.Apply(
                 CreateInitialGameplaySettings(context));
             m_LoadedPublicTransportLaneVehicleStates.Clear();
             m_HasDeserializedData = false;
-            m_HasDeserializeBeenCalledForCurrentLoad = false;
             m_ShouldClearLegacyRuntimeState =
                 context.purpose == Purpose.LoadGame;
             m_PendingPostDeserializeApply = true;
         }
 
         public void PreDeserialize(Context context) {
-            EnforcementLoggingPolicy.RecordSaveLoadInfo(
-                $"[SAVELOAD] PreDeserialize: purpose={context.purpose}");
-
             ResetRuntimeState();
 
             m_LoadedPublicTransportLaneVehicleStates.Clear();
             m_HasDeserializedData = false;
-            m_HasDeserializeBeenCalledForCurrentLoad = false;
             m_ShouldClearLegacyRuntimeState = false;
             m_PendingPostDeserializeApply = false;
         }
 
         public void PostDeserialize(Context context) {
-            EnforcementLoggingPolicy.RecordSaveLoadInfo(
-                $"[SAVELOAD] PostDeserialize: purpose={context.purpose}");
-
             m_PendingPostDeserializeApply = true;
         }
 
         public void Serialize<TWriter>(TWriter writer)
             where TWriter : IWriter {
-            EnforcementLoggingPolicy.RecordSaveLoadInfo(
-                $"[SAVELOAD] Serialize begin: version={kSerializationVersion}, " +
-                $"runtimeGeneration={RuntimeWorldGeneration}, " +
-                $"ptViolations={EnforcementTelemetry.GetStatisticsSnapshot().m_PublicTransportLaneViolationCount}, " +
-                $"type2States={m_PublicTransportLaneType2UsageStateQuery.CalculateEntityCount()}, " +
-                $"type3States={m_PublicTransportLaneType3UsageStateQuery.CalculateEntityCount()}, " +
-                $"type4States={m_PublicTransportLaneType4UsageStateQuery.CalculateEntityCount()}, " +
-                $"permissionStates={m_PublicTransportLanePermissionStateQuery.CalculateEntityCount()}");
             writer.Write(kSerializationVersion);
             writer.Write(string.IsNullOrWhiteSpace(Mod.CurrentModVersion) ? "unknown" : Mod.CurrentModVersion);
             writer.Write(string.IsNullOrWhiteSpace(Mod.CurrentGameVersion) ? "unknown" : Mod.CurrentGameVersion);
@@ -743,34 +702,17 @@ namespace Traffic_Law_Enforcement {
         public void Deserialize<TReader>(TReader reader)
             where TReader : IReader {
             reader.Read(out int version);
-            m_HasDeserializeBeenCalledForCurrentLoad = true;
-            EnforcementLoggingPolicy.RecordSaveLoadInfo(
-                $"[SAVELOAD] Deserialize begin: version={version}, " +
-                $"runtimeGeneration={RuntimeWorldGeneration}" +
-                $"{EnforcementLoggingPolicy.FormatSaveIdentificationSuffix()}");
             if (version < 3 || version > kSerializationVersion) {
                 Mod.log.Info(
                     $"Unsupported enforcement save-data version {version}. Falling back to defaults.");
                 return;
             }
 
-            string savedByModVersion = "unknown";
-            string savedByGameVersion = "unknown";
-
             if (version >= 11)
             {
-                reader.Read(out savedByModVersion);
-                reader.Read(out savedByGameVersion);
+                reader.Read(out string _);
+                reader.Read(out string _);
             }
-
-            Mod.log.Info(
-                "[MODINFO] Save compatibility: " +
-                $"currentModVersion={Mod.CurrentModVersion}, " +
-                $"currentGameVersion={Mod.CurrentGameVersion}, " +
-                $"savedByModVersion={savedByModVersion}, " +
-                $"savedByGameVersion={savedByGameVersion}, " +
-                $"saveDataVersion={version}, " +
-                SaveLoadTraceService.DescribePendingLoad());
 
             EnforcementGameplaySettingsState gameplaySettings = ReadGameplaySettings(reader, version);
 
@@ -785,8 +727,6 @@ namespace Traffic_Law_Enforcement {
             List<EnforcementRecord> records = new List<EnforcementRecord>();
             Dictionary<int, VehicleEnforcementRecord> vehicleRecords =
                 new Dictionary<int, VehicleEnforcementRecord>();
-            int migratedLegacyTimestampCount = 0;
-
             if (version >= 12) {
                 reader.Read(out int vehicleRecordCount);
                 for (int index = 0; index < vehicleRecordCount; index += 1) {
@@ -835,7 +775,6 @@ namespace Traffic_Law_Enforcement {
                     timestamps = new List<(string kind, int vehicleId,
                                            long timestampMonthTicks)>();
                 reader.Read(out int timestampCount);
-                migratedLegacyTimestampCount = timestampCount;
                 for (int index = 0; index < timestampCount; index += 1) {
                     reader.Read(out string kind);
                     reader.Read(out int vehicleId);
@@ -922,19 +861,6 @@ namespace Traffic_Law_Enforcement {
 
             ReadLoadedPublicTransportLaneVehicleStates(reader, version);
 
-            EnforcementLoggingPolicy.RecordSaveLoadInfo(
-                $"[SAVELOAD] Deserialize loaded: version={version}, " +
-                $"runtimeGeneration={RuntimeWorldGeneration}" +
-                $"{EnforcementLoggingPolicy.FormatSaveIdentificationSuffix()}, " +
-                $"loadedPtVehicleStates={m_LoadedPublicTransportLaneVehicleStates.Count}, " +
-                $"hasTrackingState={trackingState.HasValue}, " +
-                $"hasPolicyImpactTrackingState={policyImpactTrackingState.HasValue}, " +
-                $"records={records.Count}, migratedLegacyTimestamps={migratedLegacyTimestampCount}, fineIncomeEvents={fineIncomeEvents.Count}, " +
-                $"pathRequestEvents={policyImpactEventsReadResult.PathRequestEvents.Count}, actualViolationEvents={policyImpactEventsReadResult.ActualViolationEvents.Count}, " +
-                $"avoidedRerouteEvents={policyImpactEventsReadResult.AvoidedRerouteEvents.Count}, " +
-                $"totalFineAmount={totalFineAmount}, totalPathRequestCount={totalsReadResult.TotalPathRequestCount}, " +
-                $"totalActualPathCount={totalsReadResult.TotalActualPathCount}, totalAvoidedPathCount={totalsReadResult.TotalAvoidedPathCount}");
-
             m_PendingPostDeserializeApply = true;
         }
 
@@ -984,8 +910,6 @@ namespace Traffic_Law_Enforcement {
                         m_PersistedPublicTransportLaneAccessStateQuery);
             }
 
-            int appliedPublicTransportLaneStateCount = 0;
-
             for (int index = 0;
                  index < m_LoadedPublicTransportLaneVehicleStates.Count;
                  index += 1) {
@@ -1006,25 +930,9 @@ namespace Traffic_Law_Enforcement {
 
                 EntityManager.AddComponentData(loadedState.Vehicle,
                                                bootstrapState);
-                appliedPublicTransportLaneStateCount += 1;
             }
 
-            EnforcementLoggingPolicy.RecordSaveLoadInfo(
-                $"[SAVELOAD] Applied loaded PT vehicle states: loaded={m_LoadedPublicTransportLaneVehicleStates.Count}, " +
-                $"applied={appliedPublicTransportLaneStateCount}");
-
             m_LoadedPublicTransportLaneVehicleStates.Clear();
-
-            EnforcementLoggingPolicy.RecordSaveLoadInfo(
-                $"[SAVELOAD] ApplyLoadedStateToWorld complete: " +
-                $"appliedPtVehicleStates={appliedPublicTransportLaneStateCount}, " +
-                $"hasDeserializedData={m_HasDeserializedData}, " +
-                $"shouldClearLegacyRuntimeState={m_ShouldClearLegacyRuntimeState}, " +
-                $"ptViolations={m_PublicTransportLaneViolationQuery.CalculateEntityCount()}, " +
-                $"permissionStates={m_PublicTransportLanePermissionStateQuery.CalculateEntityCount()}, " +
-                $"type2States={m_PublicTransportLaneType2UsageStateQuery.CalculateEntityCount()}, " +
-                $"type3States={m_PublicTransportLaneType3UsageStateQuery.CalculateEntityCount()}, " +
-                $"type4States={m_PublicTransportLaneType4UsageStateQuery.CalculateEntityCount()}");
         }
 
         private Entity EnsureStatisticsEntity() {
@@ -1343,28 +1251,38 @@ namespace Traffic_Law_Enforcement {
         private void WriteLoadedPublicTransportLaneVehicleStates<TWriter>(
             TWriter writer)
             where TWriter : IWriter {
-            NativeArray<Entity> ptVehicles =
-                m_PublicTransportLaneProfileQuery.ToEntityArray(Allocator.Temp);
-            NativeArray<VehicleTrafficLawProfile> ptProfiles =
-                m_PublicTransportLaneProfileQuery
-                    .ToComponentDataArray<VehicleTrafficLawProfile>(
-                        Allocator.Temp);
+            EntityTypeHandle entityTypeHandle = GetEntityTypeHandle();
+            ComponentTypeHandle<VehicleTrafficLawProfile> profileTypeHandle =
+                GetComponentTypeHandle<VehicleTrafficLawProfile>(true);
+            NativeArray<ArchetypeChunk> chunks =
+                m_PublicTransportLaneProfileQuery.ToArchetypeChunkArray(
+                    Allocator.Temp);
 
             try {
-                writer.Write(ptVehicles.Length);
+                writer.Write(m_PublicTransportLaneProfileQuery
+                                 .CalculateEntityCount());
 
-                for (int index = 0; index < ptVehicles.Length; index += 1) {
-                    Entity vehicle = ptVehicles[index];
-                    VehicleTrafficLawProfile profile = ptProfiles[index];
+                for (int chunkIndex = 0; chunkIndex < chunks.Length;
+                     chunkIndex += 1) {
+                    ArchetypeChunk chunk = chunks[chunkIndex];
+                    NativeArray<Entity> vehicles =
+                        chunk.GetNativeArray(entityTypeHandle);
+                    NativeArray<VehicleTrafficLawProfile> profiles =
+                        chunk.GetNativeArray(ref profileTypeHandle);
 
-                    ((IWriter)writer).Write(vehicle);
-                    writer.Write(profile.m_ShouldTrack);
-                    writer.Write(profile.m_EmergencyVehicle);
-                    writer.Write((byte)profile.m_PublicTransportLaneAccessBits);
+                    for (int index = 0; index < vehicles.Length; index += 1) {
+                        Entity vehicle = vehicles[index];
+                        VehicleTrafficLawProfile profile = profiles[index];
+
+                        ((IWriter)writer).Write(vehicle);
+                        writer.Write(profile.m_ShouldTrack);
+                        writer.Write(profile.m_EmergencyVehicle);
+                        writer.Write(
+                            (byte)profile.m_PublicTransportLaneAccessBits);
+                    }
                 }
             } finally {
-                ptVehicles.Dispose();
-                ptProfiles.Dispose();
+                chunks.Dispose();
             }
         }
 

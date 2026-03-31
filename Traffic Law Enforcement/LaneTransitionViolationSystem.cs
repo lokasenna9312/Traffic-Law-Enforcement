@@ -13,6 +13,9 @@ namespace Traffic_Law_Enforcement
         private EntityQuery m_ChangedTransitionQuery;
         private EntityQuery m_EventBufferQuery;
         private Entity m_EventEntity;
+        private EntityTypeHandle m_EntityTypeHandle;
+        private ComponentTypeHandle<VehicleLaneHistory> m_HistoryTypeHandle;
+        private ComponentTypeHandle<CarCurrentLane> m_CurrentLaneTypeHandle;
         private ComponentLookup<Car> m_CarData;
         private ComponentLookup<CarLane> m_CarLaneData;
         private ComponentLookup<EdgeLane> m_EdgeLaneData;
@@ -67,27 +70,34 @@ namespace Traffic_Law_Enforcement
             }
 
             m_AnalysisStateData.Update(this);
+            m_EntityTypeHandle = GetEntityTypeHandle();
+            m_HistoryTypeHandle = GetComponentTypeHandle<VehicleLaneHistory>(true);
 
             bool enforcementActive =
                 Mod.IsMidBlockCrossingEnforcementEnabled ||
                 Mod.IsIntersectionMovementEnforcementEnabled;
 
-            NativeArray<Entity> vehicles = m_ChangedTransitionQuery.ToEntityArray(Allocator.Temp);
-            NativeArray<VehicleLaneHistory> histories =
-                m_ChangedTransitionQuery.ToComponentDataArray<VehicleLaneHistory>(Allocator.Temp);
-
+            NativeArray<ArchetypeChunk> chunks = m_ChangedTransitionQuery.ToArchetypeChunkArray(Allocator.Temp);
             try
             {
                 if (!enforcementActive)
                 {
-                    for (int index = 0; index < vehicles.Length; index += 1)
+                    for (int chunkIndex = 0; chunkIndex < chunks.Length; chunkIndex += 1)
                     {
-                        SyncAnalysisState(vehicles[index], histories[index]);
+                        ArchetypeChunk chunk = chunks[chunkIndex];
+                        NativeArray<Entity> vehicles = chunk.GetNativeArray(m_EntityTypeHandle);
+                        NativeArray<VehicleLaneHistory> histories = chunk.GetNativeArray(ref m_HistoryTypeHandle);
+
+                        for (int index = 0; index < vehicles.Length; index += 1)
+                        {
+                            SyncAnalysisState(vehicles[index], histories[index]);
+                        }
                     }
 
                     return;
                 }
 
+                m_CurrentLaneTypeHandle = GetComponentTypeHandle<CarCurrentLane>(true);
                 m_CarData.Update(this);
                 m_CarLaneData.Update(this);
                 m_EdgeLaneData.Update(this);
@@ -102,13 +112,18 @@ namespace Traffic_Law_Enforcement
 
                 DynamicBuffer<DetectedLaneTransitionViolation> events =
                     EntityManager.GetBuffer<DetectedLaneTransitionViolation>(m_EventEntity);
-                events.Clear();
-
-                NativeArray<CarCurrentLane> currentLanes =
-                    m_ChangedTransitionQuery.ToComponentDataArray<CarCurrentLane>(Allocator.Temp);
-
-                try
+                if (events.Length > 0)
                 {
+                    events.Clear();
+                }
+
+                for (int chunkIndex = 0; chunkIndex < chunks.Length; chunkIndex += 1)
+                {
+                    ArchetypeChunk chunk = chunks[chunkIndex];
+                    NativeArray<Entity> vehicles = chunk.GetNativeArray(m_EntityTypeHandle);
+                    NativeArray<VehicleLaneHistory> histories = chunk.GetNativeArray(ref m_HistoryTypeHandle);
+                    NativeArray<CarCurrentLane> currentLanes = chunk.GetNativeArray(ref m_CurrentLaneTypeHandle);
+
                     for (int index = 0; index < vehicles.Length; index += 1)
                     {
                         ProcessTransition(
@@ -118,15 +133,10 @@ namespace Traffic_Law_Enforcement
                             events);
                     }
                 }
-                finally
-                {
-                    currentLanes.Dispose();
-                }
             }
             finally
             {
-                vehicles.Dispose();
-                histories.Dispose();
+                chunks.Dispose();
             }
         }
 

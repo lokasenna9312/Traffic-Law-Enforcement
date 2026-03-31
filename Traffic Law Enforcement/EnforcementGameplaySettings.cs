@@ -204,17 +204,26 @@ namespace Traffic_Law_Enforcement
     public static class EnforcementGameplaySettingsService
     {
         private static EnforcementGameplaySettingsState s_Current = EnforcementGameplaySettingsState.CreateCodeDefaults();
+        private static int s_Version;
 
         public static EnforcementGameplaySettingsState Current => s_Current;
+        public static int Version => s_Version;
 
         public static void Apply(EnforcementGameplaySettingsState state)
         {
+            if (s_Current.EnablePublicTransportLaneEnforcement != state.EnablePublicTransportLaneEnforcement ||
+                s_Current.PublicTransportLaneFineAmount != state.PublicTransportLaneFineAmount)
+            {
+                VehicleUtilsPatches.InvalidateCachedPenaltyValues();
+            }
+
             s_Current = state;
+            s_Version += 1;
         }
 
         public static void ResetToCodeDefaults()
         {
-            s_Current = EnforcementGameplaySettingsState.CreateCodeDefaults();
+            Apply(EnforcementGameplaySettingsState.CreateCodeDefaults());
         }
     }
 }

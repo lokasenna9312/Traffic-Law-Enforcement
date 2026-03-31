@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using Game;
 using Game.City;
 using Game.Common;
@@ -26,7 +27,9 @@ namespace Traffic_Law_Enforcement
 
     public static class EnforcementFineMoneyService
     {
-        private static PendingFineMoneyCharge[] s_PendingCharges = new PendingFineMoneyCharge[32];
+        private const int DefaultPendingChargeCapacity = 32;
+        private static PendingFineMoneyCharge[] s_PendingCharges =
+            new PendingFineMoneyCharge[DefaultPendingChargeCapacity];
         private static readonly object s_SyncRoot = new object();
         private static int s_Head;
         private static int s_Count;
@@ -65,11 +68,40 @@ namespace Traffic_Law_Enforcement
             return false;
         }
 
+        public static bool HasPendingCharges
+        {
+            get
+            {
+                lock (s_SyncRoot)
+                {
+                    return s_Count > 0;
+                }
+            }
+        }
+
         public static void ClearPendingCharges()
         {
             lock (s_SyncRoot)
             {
-                s_PendingCharges = new PendingFineMoneyCharge[32];
+                if (s_Count == 0 &&
+                    s_Head == 0 &&
+                    s_PendingCharges.Length == DefaultPendingChargeCapacity)
+                {
+                    return;
+                }
+
+                if (s_PendingCharges.Length > DefaultPendingChargeCapacity)
+                {
+                    s_PendingCharges =
+                        new PendingFineMoneyCharge[
+                            DefaultPendingChargeCapacity];
+                }
+                else
+                {
+                    System.Array.Clear(
+                        s_PendingCharges, 0, s_PendingCharges.Length);
+                }
+
                 s_Head = 0;
                 s_Count = 0;
             }
@@ -110,6 +142,11 @@ namespace Traffic_Law_Enforcement
         }
 
         private static readonly List<FineIncomeEvent> s_RecentFineIncomeEvents = new List<FineIncomeEvent>();
+        private static readonly ReadOnlyCollection<FineIncomeEvent> s_RecentFineIncomeEventsView =
+            s_RecentFineIncomeEvents.AsReadOnly();
+        private static bool s_CurrentFineIncomeDirty = true;
+        private static long s_LastFineIncomeTimestampMonthTicks = long.MinValue;
+        private static long s_NextFineIncomeExpiryTimestampMonthTicks = long.MaxValue;
 
         public static int CurrentFineIncome { get; private set; }
         public static int CurrentPublicTransportLaneFineIncome { get; private set; }
@@ -124,15 +161,34 @@ namespace Traffic_Law_Enforcement
             }
 
             s_RecentFineIncomeEvents.Add(new FineIncomeEvent(timestampMonthTicks, amount, kind));
+            s_CurrentFineIncomeDirty = true;
         }
 
         public static void UpdateCurrentFineIncome(long currentTimestampMonthTicks)
         {
+            if (!s_CurrentFineIncomeDirty)
+            {
+                if (currentTimestampMonthTicks <= 0L)
+                {
+                    if (s_LastFineIncomeTimestampMonthTicks <= 0L)
+                    {
+                        return;
+                    }
+                }
+                else if (s_LastFineIncomeTimestampMonthTicks > 0L &&
+                         currentTimestampMonthTicks <
+                         s_NextFineIncomeExpiryTimestampMonthTicks)
+                {
+                    return;
+                }
+            }
+
             int rollingIncome = 0;
             int publicTransportLaneIncome = 0;
             int midBlockCrossingIncome = 0;
             int intersectionMovementIncome = 0;
             long cutoffTimestamp = currentTimestampMonthTicks - EnforcementGameTime.CurrentMonthTicksPerMonth;
+            long earliestRetainedTimestamp = long.MaxValue;
 
             for (int index = s_RecentFineIncomeEvents.Count - 1; index >= 0; index -= 1)
             {
@@ -141,6 +197,11 @@ namespace Traffic_Law_Enforcement
                 {
                     s_RecentFineIncomeEvents.RemoveAt(index);
                     continue;
+                }
+
+                if (entry.TimestampMonthTicks < earliestRetainedTimestamp)
+                {
+                    earliestRetainedTimestamp = entry.TimestampMonthTicks;
                 }
 
                 switch (entry.Kind)
@@ -162,6 +223,14 @@ namespace Traffic_Law_Enforcement
             CurrentPublicTransportLaneFineIncome = publicTransportLaneIncome;
             CurrentMidBlockCrossingFineIncome = midBlockCrossingIncome;
             CurrentIntersectionMovementFineIncome = intersectionMovementIncome;
+            s_LastFineIncomeTimestampMonthTicks = currentTimestampMonthTicks;
+            s_NextFineIncomeExpiryTimestampMonthTicks =
+                currentTimestampMonthTicks > 0L &&
+                earliestRetainedTimestamp != long.MaxValue
+                    ? earliestRetainedTimestamp +
+                      EnforcementGameTime.CurrentMonthTicksPerMonth
+                    : long.MaxValue;
+            s_CurrentFineIncomeDirty = false;
         }
 
         public static void LoadPersistentData(IEnumerable<FineIncomeEvent> fineIncomeEvents)
@@ -180,11 +249,13 @@ namespace Traffic_Law_Enforcement
                     s_RecentFineIncomeEvents.Add(entry);
                 }
             }
+
+            s_CurrentFineIncomeDirty = true;
         }
 
         public static IReadOnlyCollection<FineIncomeEvent> GetFineIncomeEventSnapshot()
         {
-            return s_RecentFineIncomeEvents.ToArray();
+            return s_RecentFineIncomeEventsView;
         }
 
         public static void ResetPersistentData()
@@ -194,6 +265,9 @@ namespace Traffic_Law_Enforcement
             CurrentPublicTransportLaneFineIncome = 0;
             CurrentMidBlockCrossingFineIncome = 0;
             CurrentIntersectionMovementFineIncome = 0;
+            s_CurrentFineIncomeDirty = false;
+            s_LastFineIncomeTimestampMonthTicks = long.MinValue;
+            s_NextFineIncomeExpiryTimestampMonthTicks = long.MaxValue;
         }
     }
 
@@ -249,6 +323,12 @@ namespace Traffic_Law_Enforcement
             if (city == Entity.Null)
             {
                 EnforcementFineMoneyService.ClearPendingCharges();
+                EnforcementBudgetUIService.UpdateCurrentFineIncome(currentTimestampMonthTicks);
+                return;
+            }
+
+            if (!EnforcementFineMoneyService.HasPendingCharges)
+            {
                 EnforcementBudgetUIService.UpdateCurrentFineIncome(currentTimestampMonthTicks);
                 return;
             }

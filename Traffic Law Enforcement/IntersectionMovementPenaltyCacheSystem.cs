@@ -7,7 +7,9 @@ namespace Traffic_Law_Enforcement
     {
         private bool m_LastEnabled;
         private int m_LastSettingsRevision;
+        private int m_LastSettingsVersion = -1;
         private long m_LastCacheClearDayTicks;
+        private long m_LastObservedDayTicks = long.MinValue;
 
         protected override void OnCreate()
         {
@@ -28,34 +30,57 @@ namespace Traffic_Law_Enforcement
 
                 m_LastEnabled = false;
                 m_LastSettingsRevision = 0;
+                m_LastSettingsVersion = -1;
                 m_LastCacheClearDayTicks = 0L;
+                m_LastObservedDayTicks = long.MinValue;
                 return;
             }
 
-            EnforcementGameplaySettingsState settings = EnforcementGameplaySettingsService.Current;
-
-            int settingsRevision = ComputeSettingsRevision(settings);
-            ulong worldRevision = (ulong)World.Unmanaged.SequenceNumber;
-
-            IntersectionMovementPenaltyCache.RefreshContext(
-                EntityManager,
-                EnforcementPenaltyService.GetIntersectionMovementFine(),
-                settingsRevision,
-                worldRevision);
-
+            int settingsVersion = EnforcementGameplaySettingsService.Version;
             long currentDayTicks = EnforcementGameTime.IsInitialized
                 ? EnforcementGameTime.CurrentTimestampDayTicks
                 : 0L;
+            if (m_LastEnabled &&
+                settingsVersion == m_LastSettingsVersion &&
+                currentDayTicks == m_LastObservedDayTicks)
+            {
+                return;
+            }
 
-            if (currentDayTicks > 0L &&
-                currentDayTicks - m_LastCacheClearDayTicks >= EnforcementGameTime.DayTicksPerDay * 2)
+            int settingsRevision = m_LastSettingsRevision;
+            bool settingsRevisionChanged = false;
+            if (!m_LastEnabled || settingsVersion != m_LastSettingsVersion)
+            {
+                settingsRevision = ComputeSettingsRevision(
+                    EnforcementGameplaySettingsService.Current);
+                settingsRevisionChanged =
+                    settingsRevision != m_LastSettingsRevision;
+            }
+
+            bool cacheExpired =
+                currentDayTicks > 0L &&
+                currentDayTicks - m_LastCacheClearDayTicks >=
+                EnforcementGameTime.DayTicksPerDay * 2;
+
+            if (cacheExpired)
             {
                 IntersectionMovementPenaltyCache.Clear();
                 m_LastCacheClearDayTicks = currentDayTicks;
             }
 
+            if (!m_LastEnabled || settingsRevisionChanged || cacheExpired)
+            {
+                IntersectionMovementPenaltyCache.RefreshContext(
+                    EntityManager,
+                    EnforcementPenaltyService.GetIntersectionMovementFine(),
+                    settingsRevision,
+                    (ulong)World.Unmanaged.SequenceNumber);
+            }
+
             m_LastEnabled = true;
             m_LastSettingsRevision = settingsRevision;
+            m_LastSettingsVersion = settingsVersion;
+            m_LastObservedDayTicks = currentDayTicks;
         }
 
         protected override void OnDestroy()

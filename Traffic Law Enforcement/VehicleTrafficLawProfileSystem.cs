@@ -17,6 +17,9 @@ namespace Traffic_Law_Enforcement
         private EntityQuery m_ProfileStateQuery;
         private EntityQuery m_PersistedWithoutProfileQuery;
         private EntityQuery m_PersistedStateQuery;
+        private EntityTypeHandle m_EntityTypeHandle;
+        private ComponentTypeHandle<Car> m_CarTypeHandle;
+        private ComponentTypeHandle<PersistedPublicTransportLaneAccessState> m_PersistedAccessStateTypeHandle;
         private NativeList<Entity> m_PendingRefreshVehicles;
         private const int kVehiclesPerFrame = 512;
         private int m_RefreshCursor;
@@ -24,10 +27,6 @@ namespace Traffic_Law_Enforcement
         private bool m_HasEvaluated;
         private int m_LastPermissionSettingsMask;
         private int m_LastObservedRuntimeWorldGeneration = -1;
-        private int m_LastLoggedPersistedCount = -1;
-        private int m_LastLoggedPersistedWithoutProfileCount = -1;
-        private int m_LastLoggedSeededCount = -1;
-        private int m_LastLoggedSeedPermissionSettingsMask = -1;
 
         protected override void OnCreate()
         {
@@ -74,20 +73,33 @@ namespace Traffic_Law_Enforcement
         protected override void OnUpdate()
         {
             HandleRuntimeWorldReload();
+            EnforcementGameplaySettingsState settings = EnforcementGameplaySettingsService.Current;
+            int permissionSettingsMask = PublicTransportLanePolicy.GetPermissionSettingsMask(settings);
+            bool fullRefresh =
+                !m_HasEvaluated ||
+                permissionSettingsMask != m_LastPermissionSettingsMask;
+
+            if (!m_ShouldAttemptPersistedSeed &&
+                !fullRefresh &&
+                m_PendingRefreshVehicles.Length == 0 &&
+                m_ChangedCarQuery.IsEmptyIgnoreFilter)
+            {
+                return;
+            }
+
             m_TypeLookups.Update(this);
             m_PersistedAccessStateData.Update(this);
             m_ProfileData.Update(this);
             m_CarData.Update(this);
-            EnforcementGameplaySettingsState settings = EnforcementGameplaySettingsService.Current;
+            m_EntityTypeHandle = GetEntityTypeHandle();
+            m_CarTypeHandle = GetComponentTypeHandle<Car>(true);
+            m_PersistedAccessStateTypeHandle =
+                GetComponentTypeHandle<PersistedPublicTransportLaneAccessState>(true);
 
-            int permissionSettingsMask = PublicTransportLanePolicy.GetPermissionSettingsMask(settings);
             if (m_ShouldAttemptPersistedSeed)
             {
                 SeedProfilesFromPersistedState(settings, permissionSettingsMask);
             }
-            bool fullRefresh =
-                !m_HasEvaluated ||
-                permissionSettingsMask != m_LastPermissionSettingsMask;
 
             if (fullRefresh && m_PendingRefreshVehicles.Length == 0)
             {
@@ -145,101 +157,72 @@ namespace Traffic_Law_Enforcement
             m_LastPermissionSettingsMask = 0;
             m_ShouldAttemptPersistedSeed = true;
 
-            m_LastLoggedPersistedCount = -1;
-            m_LastLoggedPersistedWithoutProfileCount = -1;
-            m_LastLoggedSeededCount = -1;
-            m_LastLoggedSeedPermissionSettingsMask = -1;
-
-            Mod.log.Info(
-                $"[SAVELOAD] VehicleTrafficLawProfileSystem runtime reset: generation={currentGeneration}");
         }
 
         private void SeedProfilesFromPersistedState(
             EnforcementGameplaySettingsState settings,
             int permissionSettingsMask)
         {
-            int persistedCount = m_PersistedStateQuery.CalculateEntityCount();
             int persistedWithoutProfileCount = m_PersistedWithoutProfileQuery.CalculateEntityCount();
             int seededCount = 0;
 
             if (persistedWithoutProfileCount > 0)
             {
-                NativeArray<Entity> vehicles =
-                    m_PersistedWithoutProfileQuery.ToEntityArray(Allocator.Temp);
-
+                NativeArray<ArchetypeChunk> chunks =
+                    m_PersistedWithoutProfileQuery.ToArchetypeChunkArray(Allocator.Temp);
                 try
                 {
-                    for (int index = 0; index < vehicles.Length; index += 1)
+                    for (int chunkIndex = 0; chunkIndex < chunks.Length; chunkIndex += 1)
                     {
-                        Entity vehicle = vehicles[index];
+                        ArchetypeChunk chunk = chunks[chunkIndex];
+                        NativeArray<Entity> vehicles = chunk.GetNativeArray(m_EntityTypeHandle);
+                        NativeArray<PersistedPublicTransportLaneAccessState> persistedStates =
+                            chunk.GetNativeArray(ref m_PersistedAccessStateTypeHandle);
 
-                        if (!m_CarData.TryGetComponent(vehicle, out Car car))
+                        for (int index = 0; index < vehicles.Length; index += 1)
                         {
-                            continue;
-                        }
+                            Entity vehicle = vehicles[index];
+                            PersistedPublicTransportLaneAccessState persisted = persistedStates[index];
 
-                        if (!m_PersistedAccessStateData.TryGetComponent(
-                                vehicle,
-                                out PersistedPublicTransportLaneAccessState persisted))
-                        {
-                            continue;
-                        }
+                            PublicTransportLaneVehicleCategory authorizedCategories =
+                                PublicTransportLanePolicy.GetVanillaAuthorizedCategories(
+                                    vehicle,
+                                    ref m_TypeLookups);
 
-                        PublicTransportLaneVehicleCategory authorizedCategories =
-                            PublicTransportLanePolicy.GetVanillaAuthorizedCategories(
-                                vehicle,
-                                ref m_TypeLookups);
+                            PublicTransportLaneFlagGrantExperimentRole additionalRole =
+                                PublicTransportLanePolicy.GetFlagGrantExperimentRole(
+                                    vehicle,
+                                    ref m_TypeLookups);
 
-                        PublicTransportLaneFlagGrantExperimentRole additionalRole =
-                            PublicTransportLanePolicy.GetFlagGrantExperimentRole(
-                                vehicle,
-                                ref m_TypeLookups);
-
-                        VehicleTrafficLawProfile seededProfile =
-                            new VehicleTrafficLawProfile
-                            {
-                                m_ShouldTrack = persisted.m_ShouldTrack,
-                                m_EmergencyVehicle = persisted.m_EmergencyVehicle,
-                                m_PublicTransportLaneAccessBits =
-                                    PublicTransportLanePolicy.ApplyConfiguredAccessBits(
-                                        persisted.m_AccessBits,
+                            VehicleTrafficLawProfile seededProfile =
+                                new VehicleTrafficLawProfile
+                                {
+                                    m_ShouldTrack = persisted.m_ShouldTrack,
+                                    m_EmergencyVehicle = persisted.m_EmergencyVehicle,
+                                    m_PublicTransportLaneAccessBits =
+                                        PublicTransportLanePolicy.ApplyConfiguredAccessBits(
+                                            persisted.m_AccessBits,
+                                            authorizedCategories,
+                                            additionalRole,
+                                            settings,
+                                            persisted.m_EmergencyVehicle != 0),
+                                    m_VanillaAuthorizedCategories =
                                         authorizedCategories,
+                                    m_AdditionalRole =
                                         additionalRole,
-                                        settings,
-                                        persisted.m_EmergencyVehicle != 0),
-                                m_VanillaAuthorizedCategories =
-                                    authorizedCategories,
-                                m_AdditionalRole =
-                                    additionalRole,
-                                m_PermissionSettingsMask = permissionSettingsMask,
-                            };
+                                    m_PermissionSettingsMask = permissionSettingsMask,
+                                };
 
-                        EntityManager.AddComponentData(vehicle, seededProfile);
-                        EntityManager.RemoveComponent<PersistedPublicTransportLaneAccessState>(vehicle);
-                        seededCount += 1;
+                            EntityManager.AddComponentData(vehicle, seededProfile);
+                            EntityManager.RemoveComponent<PersistedPublicTransportLaneAccessState>(vehicle);
+                            seededCount += 1;
+                        }
                     }
                 }
                 finally
                 {
-                    vehicles.Dispose();
+                    chunks.Dispose();
                 }
-            }
-
-            if (seededCount != m_LastLoggedSeededCount ||
-                persistedCount != m_LastLoggedPersistedCount ||
-                persistedWithoutProfileCount != m_LastLoggedPersistedWithoutProfileCount ||
-                permissionSettingsMask != m_LastLoggedSeedPermissionSettingsMask)
-            {
-                Mod.log.Info(
-                    $"[SAVELOAD] SeedProfilesFromPersistedState: seededProfiles={seededCount}, " +
-                    $"persistedStates={persistedCount}, " +
-                    $"persistedWithoutProfile={persistedWithoutProfileCount}, " +
-                    $"permissionSettingsMask={permissionSettingsMask}");
-
-                m_LastLoggedSeededCount = seededCount;
-                m_LastLoggedPersistedCount = persistedCount;
-                m_LastLoggedPersistedWithoutProfileCount = persistedWithoutProfileCount;
-                m_LastLoggedSeedPermissionSettingsMask = permissionSettingsMask;
             }
 
             if (persistedWithoutProfileCount == 0 && seededCount == 0)
@@ -252,17 +235,21 @@ namespace Traffic_Law_Enforcement
         {
             ClearPendingRefresh();
 
-            NativeArray<Entity> vehicles = m_AllCarsQuery.ToEntityArray(Allocator.Temp);
+            NativeArray<ArchetypeChunk> chunks = m_AllCarsQuery.ToArchetypeChunkArray(Allocator.Temp);
             try
             {
-                for (int index = 0; index < vehicles.Length; index += 1)
+                for (int chunkIndex = 0; chunkIndex < chunks.Length; chunkIndex += 1)
                 {
-                    m_PendingRefreshVehicles.Add(vehicles[index]);
+                    NativeArray<Entity> vehicles = chunks[chunkIndex].GetNativeArray(m_EntityTypeHandle);
+                    for (int index = 0; index < vehicles.Length; index += 1)
+                    {
+                        m_PendingRefreshVehicles.Add(vehicles[index]);
+                    }
                 }
             }
             finally
             {
-                vehicles.Dispose();
+                chunks.Dispose();
             }
         }
 
@@ -313,28 +300,28 @@ namespace Traffic_Law_Enforcement
                 return;
             }
 
-            NativeArray<Entity> vehicles = query.ToEntityArray(Allocator.Temp);
-
+            NativeArray<ArchetypeChunk> chunks = query.ToArchetypeChunkArray(Allocator.Temp);
             try
             {
-                for (int index = 0; index < vehicles.Length; index += 1)
+                for (int chunkIndex = 0; chunkIndex < chunks.Length; chunkIndex += 1)
                 {
-                    Entity vehicle = vehicles[index];
-                    if (!m_CarData.TryGetComponent(vehicle, out Car car))
-                    {
-                        continue;
-                    }
+                    ArchetypeChunk chunk = chunks[chunkIndex];
+                    NativeArray<Entity> vehicles = chunk.GetNativeArray(m_EntityTypeHandle);
+                    NativeArray<Car> cars = chunk.GetNativeArray(ref m_CarTypeHandle);
 
-                    EvaluateVehicle(
-                        vehicle,
-                        car,
-                        settings,
-                        permissionSettingsMask);
+                    for (int index = 0; index < vehicles.Length; index += 1)
+                    {
+                        EvaluateVehicle(
+                            vehicles[index],
+                            cars[index],
+                            settings,
+                            permissionSettingsMask);
+                    }
                 }
             }
             finally
             {
-                vehicles.Dispose();
+                chunks.Dispose();
             }
         }
 

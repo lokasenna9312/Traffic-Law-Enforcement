@@ -25,6 +25,8 @@ namespace Traffic_Law_Enforcement
         private ComponentLookup<PublicTransportLaneViolation> m_ViolationData;
         private ComponentLookup<VehicleTrafficLawProfile> m_ProfileData;
         private PublicTransportLaneVehicleTypeLookups m_TypeLookups;
+        private EntityTypeHandle m_EntityTypeHandle;
+        private ComponentTypeHandle<CarCurrentLane> m_CurrentLaneTypeHandle;
         private HashSet<Entity> m_ProcessedThisFrame;
         private bool m_HasEvaluated;
         private bool m_LastEnforcementEnabled;
@@ -77,6 +79,9 @@ namespace Traffic_Law_Enforcement
         protected override void OnUpdate()
         {
             EnforcementGameplaySettingsState settings = EnforcementGameplaySettingsService.Current;
+            bool observeType2Usage = EnforcementLoggingPolicy.ShouldLogType2Usage();
+            bool observeType3Usage = EnforcementLoggingPolicy.ShouldLogType3Usage();
+            bool observeType4Usage = EnforcementLoggingPolicy.ShouldLogType4Usage();
 
             bool enforcementEnabled = Mod.IsPublicTransportLaneEnforcementEnabled;
             if (!enforcementEnabled)
@@ -107,11 +112,20 @@ namespace Traffic_Law_Enforcement
                 return;
             }
 
-            m_CarData.Update(this);
-            m_CarLaneData.Update(this);
-            m_ProfileData.Update(this);
-            m_ViolationData.Update(this);
-            m_TypeLookups.Update(this);
+            if (!observeType2Usage && !m_Type2UsageQuery.IsEmptyIgnoreFilter)
+            {
+                EntityManager.RemoveComponent<PublicTransportLaneType2UsageState>(m_Type2UsageQuery);
+            }
+
+            if (!observeType3Usage && !m_Type3UsageQuery.IsEmptyIgnoreFilter)
+            {
+                EntityManager.RemoveComponent<PublicTransportLaneType3UsageState>(m_Type3UsageQuery);
+            }
+
+            if (!observeType4Usage && !m_Type4UsageQuery.IsEmptyIgnoreFilter)
+            {
+                EntityManager.RemoveComponent<PublicTransportLaneType4UsageState>(m_Type4UsageQuery);
+            }
 
             if (m_EventEntity == Entity.Null || !EntityManager.Exists(m_EventEntity))
             {
@@ -120,9 +134,28 @@ namespace Traffic_Law_Enforcement
 
             DynamicBuffer<DetectedPublicTransportLaneEvent> events =
                 EntityManager.GetBuffer<DetectedPublicTransportLaneEvent>(m_EventEntity);
-            events.Clear();
+            if (events.Length > 0)
+            {
+                events.Clear();
+            }
 
             bool fullRefresh = !m_HasEvaluated || !m_LastEnforcementEnabled;
+
+            if (!fullRefresh &&
+                m_PendingRefreshVehicles.Length == 0 &&
+                m_ChangedLaneQuery.IsEmptyIgnoreFilter &&
+                m_ChangedCarQuery.IsEmptyIgnoreFilter)
+            {
+                return;
+            }
+
+            m_CarData.Update(this);
+            m_CarLaneData.Update(this);
+            m_ProfileData.Update(this);
+            m_ViolationData.Update(this);
+            m_TypeLookups.Update(this);
+            m_EntityTypeHandle = GetEntityTypeHandle();
+            m_CurrentLaneTypeHandle = GetComponentTypeHandle<CarCurrentLane>(true);
 
             if (fullRefresh && m_PendingRefreshVehicles.Length == 0)
             {
@@ -131,7 +164,12 @@ namespace Traffic_Law_Enforcement
 
             if (m_PendingRefreshVehicles.Length > 0)
             {
-                ProcessRefreshBatch(settings, events);
+                ProcessRefreshBatch(
+                    settings,
+                    events,
+                    observeType2Usage,
+                    observeType3Usage,
+                    observeType4Usage);
 
                 if (m_PendingRefreshVehicles.Length == 0)
                 {
@@ -143,8 +181,20 @@ namespace Traffic_Law_Enforcement
             }
 
             BeginSteadyStateEvaluation();
-            EvaluateQueryDeduplicated(m_ChangedLaneQuery, settings, events);
-            EvaluateQueryDeduplicated(m_ChangedCarQuery, settings, events);
+            EvaluateQueryDeduplicated(
+                m_ChangedLaneQuery,
+                settings,
+                events,
+                observeType2Usage,
+                observeType3Usage,
+                observeType4Usage);
+            EvaluateQueryDeduplicated(
+                m_ChangedCarQuery,
+                settings,
+                events,
+                observeType2Usage,
+                observeType3Usage,
+                observeType4Usage);
 
             m_HasEvaluated = true;
             m_LastEnforcementEnabled = true;
@@ -164,17 +214,21 @@ namespace Traffic_Law_Enforcement
         {
             ClearPendingRefresh();
 
-            NativeArray<Entity> vehicles = m_CarQuery.ToEntityArray(Allocator.Temp);
+            NativeArray<ArchetypeChunk> chunks = m_CarQuery.ToArchetypeChunkArray(Allocator.Temp);
             try
             {
-                for (int index = 0; index < vehicles.Length; index += 1)
+                for (int chunkIndex = 0; chunkIndex < chunks.Length; chunkIndex += 1)
                 {
-                    m_PendingRefreshVehicles.Add(vehicles[index]);
+                    NativeArray<Entity> vehicles = chunks[chunkIndex].GetNativeArray(m_EntityTypeHandle);
+                    for (int index = 0; index < vehicles.Length; index += 1)
+                    {
+                        m_PendingRefreshVehicles.Add(vehicles[index]);
+                    }
                 }
             }
             finally
             {
-                vehicles.Dispose();
+                chunks.Dispose();
             }
         }
 
@@ -190,7 +244,10 @@ namespace Traffic_Law_Enforcement
 
         private void ProcessRefreshBatch(
             EnforcementGameplaySettingsState settings,
-            DynamicBuffer<DetectedPublicTransportLaneEvent> events)
+            DynamicBuffer<DetectedPublicTransportLaneEvent> events,
+            bool observeType2Usage,
+            bool observeType3Usage,
+            bool observeType4Usage)
         {
             int end = System.Math.Min(
                 m_RefreshCursor + kVehiclesPerFrame,
@@ -207,7 +264,14 @@ namespace Traffic_Law_Enforcement
                 }
 
                 CarCurrentLane currentLane = EntityManager.GetComponentData<CarCurrentLane>(vehicle);
-                EvaluateVehicle(vehicle, currentLane, settings, events);
+                EvaluateVehicle(
+                    vehicle,
+                    currentLane,
+                    settings,
+                    events,
+                    observeType2Usage,
+                    observeType3Usage,
+                    observeType4Usage);
             }
 
             m_RefreshCursor = end;
@@ -226,38 +290,59 @@ namespace Traffic_Law_Enforcement
         private void EvaluateQueryDeduplicated(
             EntityQuery query,
             EnforcementGameplaySettingsState settings,
-            DynamicBuffer<DetectedPublicTransportLaneEvent> events)
+            DynamicBuffer<DetectedPublicTransportLaneEvent> events,
+            bool observeType2Usage,
+            bool observeType3Usage,
+            bool observeType4Usage)
         {
-            NativeArray<Entity> vehicles = query.ToEntityArray(Allocator.Temp);
-            NativeArray<CarCurrentLane> currentLanes = query.ToComponentDataArray<CarCurrentLane>(Allocator.Temp);
-
+            NativeArray<ArchetypeChunk> chunks = query.ToArchetypeChunkArray(Allocator.Temp);
             try
             {
-                for (int index = 0; index < vehicles.Length; index += 1)
+                for (int chunkIndex = 0; chunkIndex < chunks.Length; chunkIndex += 1)
                 {
-                    Entity vehicle = vehicles[index];
-                    if (!m_ProcessedThisFrame.Add(vehicle))
-                    {
-                        continue;
-                    }
+                    ArchetypeChunk chunk = chunks[chunkIndex];
+                    NativeArray<Entity> vehicles = chunk.GetNativeArray(m_EntityTypeHandle);
+                    NativeArray<CarCurrentLane> currentLanes = chunk.GetNativeArray(ref m_CurrentLaneTypeHandle);
 
-                    EvaluateVehicle(vehicle, currentLanes[index], settings, events);
+                    for (int index = 0; index < vehicles.Length; index += 1)
+                    {
+                        Entity vehicle = vehicles[index];
+                        if (!m_ProcessedThisFrame.Add(vehicle))
+                        {
+                            continue;
+                        }
+
+                        EvaluateVehicle(
+                            vehicle,
+                            currentLanes[index],
+                            settings,
+                            events,
+                            observeType2Usage,
+                            observeType3Usage,
+                            observeType4Usage);
+                    }
                 }
             }
             finally
             {
-                vehicles.Dispose();
-                currentLanes.Dispose();
+                chunks.Dispose();
             }
         }
 
-        private void EvaluateVehicle(Entity vehicle, CarCurrentLane currentLane, EnforcementGameplaySettingsState settings, DynamicBuffer<DetectedPublicTransportLaneEvent> events)
+        private void EvaluateVehicle(
+            Entity vehicle,
+            CarCurrentLane currentLane,
+            EnforcementGameplaySettingsState settings,
+            DynamicBuffer<DetectedPublicTransportLaneEvent> events,
+            bool observeType2Usage,
+            bool observeType3Usage,
+            bool observeType4Usage)
         {
             Entity laneEntity = currentLane.m_Lane;
             bool isViolation = false;
-            bool shouldLogType2Usage = false;
-            bool shouldLogType3Usage = false;
-            bool shouldLogType4Usage = false;
+            bool shouldTrackType2Usage = false;
+            bool shouldTrackType3Usage = false;
+            bool shouldTrackType4Usage = false;
 
             if (laneEntity != Entity.Null &&
                 m_CarLaneData.TryGetComponent(laneEntity, out CarLane laneData) &&
@@ -277,19 +362,26 @@ namespace Traffic_Law_Enforcement
 
                     isViolation = !configuredModAllowsAccess;
 
-                    bool isType2 = PublicTransportLanePolicy.IsType2(bits);
-                    bool isType3 = PublicTransportLanePolicy.IsType3(bits);
-                    bool isType4 = PublicTransportLanePolicy.IsType4(bits);
+                    if (observeType2Usage)
+                    {
+                        shouldTrackType2Usage = PublicTransportLanePolicy.IsType2(bits);
+                    }
 
-                    shouldLogType2Usage = isType2;
-                    shouldLogType3Usage = isType3;
-                    shouldLogType4Usage = isType4;
+                    if (observeType3Usage)
+                    {
+                        shouldTrackType3Usage = PublicTransportLanePolicy.IsType3(bits);
+                    }
+
+                    if (observeType4Usage)
+                    {
+                        shouldTrackType4Usage = PublicTransportLanePolicy.IsType4(bits);
+                    }
                 }
             }
 
-            UpdateType2UsageObservation(vehicle, laneEntity, shouldLogType2Usage, events);
-            UpdateType3UsageObservation(vehicle, laneEntity, shouldLogType3Usage, events);
-            UpdateType4UsageObservation(vehicle, laneEntity, shouldLogType4Usage, events);
+            UpdateType2UsageObservation(vehicle, laneEntity, shouldTrackType2Usage, events);
+            UpdateType3UsageObservation(vehicle, laneEntity, shouldTrackType3Usage, events);
+            UpdateType4UsageObservation(vehicle, laneEntity, shouldTrackType4Usage, events);
 
             // --- Violation tracing and logging ---
             bool hasViolation = m_ViolationData.HasComponent(vehicle);

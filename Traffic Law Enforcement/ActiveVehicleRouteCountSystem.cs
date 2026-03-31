@@ -15,6 +15,7 @@ namespace Traffic_Law_Enforcement
             m_ActiveVehicleRouteQuery = GetEntityQuery(
                 ComponentType.ReadOnly<Car>(),
                 ComponentType.ReadOnly<CarCurrentLane>());
+            Enabled = false;
         }
 
         protected override void OnUpdate()

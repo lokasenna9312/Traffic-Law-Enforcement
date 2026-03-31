@@ -34,7 +34,9 @@ namespace Traffic_Law_Enforcement
         canBeEmpty: false)]
     public class Setting : ModSetting
     {
-        // --- Debug logging toggles for save/load ---
+        private static string s_ModLogPath;
+        private bool m_EnableFocusedRouteRebuildDiagnosticsLogging;
+
         public const string kCurrentSaveTab = "CurrentSave";
         public const string kNewSaveDefaultsTab = "NewSaveDefaults";
         public const string kPolicyImpactTab = "PolicyImpact";
@@ -635,17 +637,25 @@ namespace Traffic_Law_Enforcement
         public bool EnablePathObsoleteSourceLogging { get; set; }
 
         [Exclude]
-        [SettingsUIHidden]
-        [SettingsUISection(kDebugTab, kDebugLoggingGroup)]
-        public bool EnableSaveIdentificationLogging { get; set; }
-
-        [Exclude]
         [SettingsUISection(kDebugTab, kDebugLoggingGroup)]
         public bool EnableAllVehicleRouteSelectionChangeLogging { get; set; }
 
         [Exclude]
         [SettingsUISection(kDebugTab, kFocusedLoggingGroup)]
-        public bool EnableFocusedRouteRebuildDiagnosticsLogging { get; set; }
+        public bool EnableFocusedRouteRebuildDiagnosticsLogging
+        {
+            get => m_EnableFocusedRouteRebuildDiagnosticsLogging;
+            set
+            {
+                if (m_EnableFocusedRouteRebuildDiagnosticsLogging == value)
+                {
+                    return;
+                }
+
+                m_EnableFocusedRouteRebuildDiagnosticsLogging = value;
+                FocusedRouteDiagnosticsPatchController.Sync(value);
+            }
+        }
 
         [Exclude]
         [SettingsUISection(kDebugTab, kFocusedLoggingGroup)]
@@ -667,7 +677,7 @@ namespace Traffic_Law_Enforcement
 
         [Exclude]
         [SettingsUISection(kDebugTab, kLogPathGroup)]
-        public string ModLogPath => GetModLogPath();
+        public string ModLogPath => s_ModLogPath ?? (s_ModLogPath = GetModLogPath());
 
         [Exclude]
         [SettingsUIButton]
@@ -695,7 +705,6 @@ namespace Traffic_Law_Enforcement
             EnableType4PublicTransportLaneUsageLogging = false;
             EnablePathfindingPenaltyDiagnosticLogging = false;
             EnablePathObsoleteSourceLogging = false;
-            EnableSaveIdentificationLogging = true;
             EnableAllVehicleRouteSelectionChangeLogging = false;
             EnableFocusedRouteRebuildDiagnosticsLogging = false;
             EnableFocusedVehicleOnlyRouteLogging = false;

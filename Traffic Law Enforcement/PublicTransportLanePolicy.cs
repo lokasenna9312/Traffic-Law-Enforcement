@@ -3,6 +3,7 @@ using Game.Prefabs;
 using Game.Simulation;
 using Game.Vehicles;
 using System.Collections.Generic;
+using System.Text;
 using Unity.Entities;
 using VehicleAmbulance = Game.Vehicles.Ambulance;
 using VehicleCargoTransport = Game.Vehicles.CargoTransport;
@@ -149,6 +150,8 @@ namespace Traffic_Law_Enforcement
     public static class PublicTransportLanePolicy
     {
         public const CarFlags PublicTransportLanePermissionMask = CarFlags.UsePublicTransportLanes | CarFlags.PreferPublicTransportLanes;
+        private static readonly Dictionary<int, string> s_VehicleRoleDescriptionCache =
+            new Dictionary<int, string>();
 
         public static bool CanUsePublicTransportLane(
             Entity vehicle,
@@ -526,31 +529,93 @@ namespace Traffic_Law_Enforcement
 
         public static string DescribeVehicleRole(Entity vehicle, ref PublicTransportLaneVehicleTypeLookups lookups)
         {
-            List<string> names = new List<string>(4);
-
             PublicTransportLaneVehicleCategory authorizedCategories = GetVanillaAuthorizedCategories(vehicle, ref lookups);
-            AppendAuthorizedCategoryNames(authorizedCategories, names);
-
             PublicTransportLaneFlagGrantExperimentRole additionalRole = GetFlagGrantExperimentRole(vehicle, ref lookups);
+            bool isEmergencyVehicle = EmergencyVehiclePolicy.IsEmergencyVehicle(vehicle, ref lookups);
+            int cacheKey =
+                CreateVehicleRoleDescriptionKey(
+                    authorizedCategories,
+                    additionalRole,
+                    isEmergencyVehicle);
+
+            if (s_VehicleRoleDescriptionCache.TryGetValue(cacheKey, out string cachedDescription))
+            {
+                return cachedDescription;
+            }
+
+            string description =
+                BuildVehicleRoleDescription(
+                    authorizedCategories,
+                    additionalRole,
+                    isEmergencyVehicle);
+            s_VehicleRoleDescriptionCache[cacheKey] = description;
+            return description;
+        }
+
+        private static string BuildVehicleRoleDescription(
+            PublicTransportLaneVehicleCategory authorizedCategories,
+            PublicTransportLaneFlagGrantExperimentRole additionalRole,
+            bool isEmergencyVehicle)
+        {
+            StringBuilder description = new StringBuilder(96);
+            bool hasAnyName = false;
+
+            AppendAuthorizedCategoryNames(
+                authorizedCategories,
+                description,
+                ref hasAnyName);
 
             if (additionalRole != PublicTransportLaneFlagGrantExperimentRole.None)
             {
-                var displayName = GetRoleDisplayNameEnglish(additionalRole);
-                names.Add(displayName);
+                AppendRoleDescriptionPart(
+                    description,
+                    GetRoleDisplayNameEnglish(additionalRole),
+                    ref hasAnyName);
             }
 
-            if (names.Count == 0)
+            if (!hasAnyName)
             {
-                names.Add("Unclassified road vehicle");
+                AppendRoleDescriptionPart(
+                    description,
+                    "Unclassified road vehicle",
+                    ref hasAnyName);
             }
 
-            string description = string.Join(", ", names);
-            if (EmergencyVehiclePolicy.IsEmergencyVehicle(vehicle, ref lookups))
+            if (isEmergencyVehicle)
             {
-                description += " [emergency]";
+                description.Append(" [emergency]");
             }
 
-            return description;
+            return description.ToString();
+        }
+
+        private static int CreateVehicleRoleDescriptionKey(
+            PublicTransportLaneVehicleCategory categories,
+            PublicTransportLaneFlagGrantExperimentRole role,
+            bool isEmergencyVehicle)
+        {
+            return ((int)categories << 8) |
+                ((int)role << 1) |
+                (isEmergencyVehicle ? 1 : 0);
+        }
+
+        private static void AppendRoleDescriptionPart(
+            StringBuilder description,
+            string part,
+            ref bool hasAnyName)
+        {
+            if (string.IsNullOrWhiteSpace(part))
+            {
+                return;
+            }
+
+            if (hasAnyName)
+            {
+                description.Append(", ");
+            }
+
+            description.Append(part);
+            hasAnyName = true;
         }
 
         public static PublicTransportLaneVehicleCategory GetVanillaAuthorizedCategories(Entity vehicle, ref PublicTransportLaneVehicleTypeLookups lookups)
@@ -672,56 +737,89 @@ namespace Traffic_Law_Enforcement
             return categories;
         }
 
-        private static void AppendAuthorizedCategoryNames(PublicTransportLaneVehicleCategory categories, List<string> names)
+        private static void AppendAuthorizedCategoryNames(
+            PublicTransportLaneVehicleCategory categories,
+            StringBuilder description,
+            ref bool hasAnyName)
         {
             if ((categories & PublicTransportLaneVehicleCategory.RoadPublicTransportVehicle) != 0)
             {
-                names.Add("Road public transport vehicles");
+                AppendRoleDescriptionPart(
+                    description,
+                    "Road public transport vehicles",
+                    ref hasAnyName);
             }
 
             if ((categories & PublicTransportLaneVehicleCategory.Taxi) != 0)
             {
-                names.Add("Taxis");
+                AppendRoleDescriptionPart(
+                    description,
+                    "Taxis",
+                    ref hasAnyName);
             }
 
             if ((categories & PublicTransportLaneVehicleCategory.PoliceCar) != 0)
             {
-                names.Add("Police cars");
+                AppendRoleDescriptionPart(
+                    description,
+                    "Police cars",
+                    ref hasAnyName);
             }
 
             if ((categories & PublicTransportLaneVehicleCategory.FireEngine) != 0)
             {
-                names.Add("Fire engines");
+                AppendRoleDescriptionPart(
+                    description,
+                    "Fire engines",
+                    ref hasAnyName);
             }
 
             if ((categories & PublicTransportLaneVehicleCategory.Ambulance) != 0)
             {
-                names.Add("Ambulances");
+                AppendRoleDescriptionPart(
+                    description,
+                    "Ambulances",
+                    ref hasAnyName);
             }
 
             if ((categories & PublicTransportLaneVehicleCategory.GarbageTruck) != 0)
             {
-                names.Add("Garbage trucks");
+                AppendRoleDescriptionPart(
+                    description,
+                    "Garbage trucks",
+                    ref hasAnyName);
             }
 
             if ((categories & PublicTransportLaneVehicleCategory.PostVan) != 0)
             {
-                names.Add("Post vans");
+                AppendRoleDescriptionPart(
+                    description,
+                    "Post vans",
+                    ref hasAnyName);
             }
 
             if ((categories & PublicTransportLaneVehicleCategory.RoadMaintenanceVehicle) != 0)
             {
-                names.Add("Road maintenance vehicles");
+                AppendRoleDescriptionPart(
+                    description,
+                    "Road maintenance vehicles",
+                    ref hasAnyName);
             }
 
             if ((categories & PublicTransportLaneVehicleCategory.Snowplow) != 0)
             {
-                names.Add("Snowplows");
+                AppendRoleDescriptionPart(
+                    description,
+                    "Snowplows",
+                    ref hasAnyName);
             }
 
             if ((categories & PublicTransportLaneVehicleCategory.VehicleMaintenanceVehicle) != 0)
             {
-                names.Add("Vehicle maintenance vehicles");
+                AppendRoleDescriptionPart(
+                    description,
+                    "Vehicle maintenance vehicles",
+                    ref hasAnyName);
             }
         }
     }

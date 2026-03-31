@@ -12,6 +12,8 @@ namespace Traffic_Law_Enforcement
         private EntityQuery m_CarQuery;
         private EntityQuery m_NewCarQuery;
         private EntityQuery m_ChangedLaneQuery;
+        private EntityTypeHandle m_EntityTypeHandle;
+        private ComponentTypeHandle<CarCurrentLane> m_CurrentLaneTypeHandle;
         private ComponentLookup<Owner> m_OwnerData;
         private ComponentLookup<VehicleLaneHistory> m_HistoryData;
 
@@ -45,8 +47,16 @@ namespace Traffic_Law_Enforcement
 
         protected override void OnUpdate()
         {
+            if (m_NewCarQuery.IsEmptyIgnoreFilter &&
+                m_ChangedLaneQuery.IsEmptyIgnoreFilter)
+            {
+                return;
+            }
+
             m_OwnerData.Update(this);
             m_HistoryData.Update(this);
+            m_EntityTypeHandle = GetEntityTypeHandle();
+            m_CurrentLaneTypeHandle = GetComponentTypeHandle<CarCurrentLane>(true);
 
             ProcessQuery(m_NewCarQuery);
             ProcessQuery(m_ChangedLaneQuery);
@@ -54,20 +64,29 @@ namespace Traffic_Law_Enforcement
 
         private void ProcessQuery(EntityQuery query)
         {
-            NativeArray<Entity> vehicles = query.ToEntityArray(Allocator.Temp);
-            NativeArray<CarCurrentLane> currentLanes = query.ToComponentDataArray<CarCurrentLane>(Allocator.Temp);
+            if (query.IsEmptyIgnoreFilter)
+            {
+                return;
+            }
 
+            NativeArray<ArchetypeChunk> chunks = query.ToArchetypeChunkArray(Allocator.Temp);
             try
             {
-                for (int index = 0; index < vehicles.Length; index++)
+                for (int chunkIndex = 0; chunkIndex < chunks.Length; chunkIndex += 1)
                 {
-                    UpdateHistory(vehicles[index], currentLanes[index]);
+                    ArchetypeChunk chunk = chunks[chunkIndex];
+                    NativeArray<Entity> vehicles = chunk.GetNativeArray(m_EntityTypeHandle);
+                    NativeArray<CarCurrentLane> currentLanes = chunk.GetNativeArray(ref m_CurrentLaneTypeHandle);
+
+                    for (int index = 0; index < vehicles.Length; index += 1)
+                    {
+                        UpdateHistory(vehicles[index], currentLanes[index]);
+                    }
                 }
             }
             finally
             {
-                vehicles.Dispose();
-                currentLanes.Dispose();
+                chunks.Dispose();
             }
         }
 
