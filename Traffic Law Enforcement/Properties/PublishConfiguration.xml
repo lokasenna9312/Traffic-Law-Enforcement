@@ -116,6 +116,7 @@ The following options can be configured either for the currently loaded save fil
 	<Screenshot Value="Properties/Screenshots/07.jpg" />
 	<Screenshot Value="Properties/Screenshots/08.jpg" />
 	<Screenshot Value="Properties/Screenshots/09.jpg" />
+	<Screenshot Value="Properties/Screenshots/10.jpg" />
 	<!--Tag, can be set multiple times-->
 	<Tag Value="" />
 	<!--Link to the forum post where the mod can be discussed-->
