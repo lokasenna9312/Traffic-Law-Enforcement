@@ -206,6 +206,7 @@ namespace Traffic_Law_Enforcement
         private bool m_LastPanelRouteDiagnosticsCollapsed = true;
         private bool m_LastPanelLaneDetailsReady = true;
         private bool m_LastPanelRouteDiagnosticsReady = true;
+        private bool m_CollapsedFastPathApplied;
 
         public override GameMode gameMode => GameMode.Game;
 
@@ -354,6 +355,7 @@ namespace Traffic_Law_Enforcement
             if (!m_IsPanelEnabled)
             {
                 m_HasCachedPanelState = false;
+                m_CollapsedFastPathApplied = false;
                 m_VisibleBinding.Update(false);
                 return;
             }
@@ -363,9 +365,11 @@ namespace Traffic_Law_Enforcement
             if (m_IsCollapsed)
             {
                 m_HasCachedPanelState = false;
-                UpdateBindings(BuildCollapsedState());
+                ApplyCollapsedBindings();
                 return;
             }
+
+            m_CollapsedFastPathApplied = false;
 
             if (m_SelectedObjectBridgeSystem == null)
             {
@@ -803,6 +807,7 @@ namespace Traffic_Law_Enforcement
         private void HandleCloseRequested()
         {
             m_IsPanelEnabled = false;
+            m_CollapsedFastPathApplied = false;
             SelectedObjectBridgeSystem.SetDetailedSnapshotConsumerActive(false);
             SelectedObjectBridgeSystem.SetLaneDetailsConsumerActive(false);
             SelectedObjectBridgeSystem.SetRouteDiagnosticsConsumerActive(false);
@@ -818,7 +823,16 @@ namespace Traffic_Law_Enforcement
             }
 
             m_IsCollapsed = !m_IsCollapsed;
-            m_CollapsedBinding.Update(m_IsCollapsed);
+            m_HasCachedPanelState = false;
+            if (m_IsCollapsed)
+            {
+                ApplyCollapsedBindings();
+            }
+            else
+            {
+                m_CollapsedFastPathApplied = false;
+                m_CollapsedBinding.Update(false);
+            }
         }
 
         private void ToggleLaneDetailsCollapsed()
@@ -1055,6 +1069,19 @@ namespace Traffic_Law_Enforcement
                 Visible = true,
                 Compact = false
             };
+        }
+
+        private void ApplyCollapsedBindings()
+        {
+            if (m_CollapsedFastPathApplied)
+            {
+                return;
+            }
+
+            m_VisibleBinding.Update(true);
+            m_CompactBinding.Update(false);
+            m_CollapsedBinding.Update(true);
+            m_CollapsedFastPathApplied = true;
         }
 
         private bool CanMarkPathObsolete(SelectedObjectDebugSnapshot snapshot)
