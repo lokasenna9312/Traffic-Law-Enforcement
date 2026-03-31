@@ -582,6 +582,19 @@ namespace Traffic_Law_Enforcement
                     currentTargetEntity,
                     currentRouteEntity,
                     currentPathFlags);
+            bool canReuseSummaryPresentation =
+                CanReuseSummaryPresentationFields(
+                    resolveResult,
+                    tleApplicability);
+            bool canReuseEnforcementSummary =
+                tleApplicable &&
+                (includeSummaryFields || includePermissionStateSummary) &&
+                CanReuseEnforcementSummary(
+                    resolveResult,
+                    tleApplicability,
+                    hasTrafficLawProfile,
+                    lastReason,
+                    includePermissionStateSummary);
 
             if (CanReuseDetailedSnapshot(
                     resolveResult,
@@ -660,18 +673,43 @@ namespace Traffic_Law_Enforcement
             SelectedObjectEnforcementSummaryData enforcementSummary = default;
             if (tleApplicable && (includeSummaryFields || includePermissionStateSummary))
             {
-                SelectedObjectEnforcementSummaryContext enforcementSummaryContext =
-                    CreateEnforcementSummaryContext();
-                enforcementSummary =
-                    SelectedObjectEnforcementSummaryBuilder.Build(
-                        resolveResult,
-                        tleApplicable,
-                        hasTrafficLawProfile,
-                        vehicle,
-                        lastReason,
-                        includePermissionStateSummary,
-                        ref enforcementSummaryContext);
+                if (canReuseEnforcementSummary)
+                {
+                    enforcementSummary =
+                        BuildEnforcementSummaryFromSnapshot(
+                            m_CurrentSnapshot,
+                            includePermissionStateSummary);
+                }
+                else
+                {
+                    SelectedObjectEnforcementSummaryContext enforcementSummaryContext =
+                        CreateEnforcementSummaryContext();
+                    enforcementSummary =
+                        SelectedObjectEnforcementSummaryBuilder.Build(
+                            resolveResult,
+                            tleApplicable,
+                            hasTrafficLawProfile,
+                            vehicle,
+                            lastReason,
+                            includePermissionStateSummary,
+                            ref enforcementSummaryContext);
+                }
             }
+
+            string summaryClassificationText =
+                canReuseSummaryPresentation
+                    ? m_CurrentSnapshot.SummaryClassificationText
+                    : BuildSummaryClassificationText(resolveResult);
+            string summaryTleStatusText =
+                canReuseSummaryPresentation
+                    ? m_CurrentSnapshot.SummaryTleStatusText
+                    : BuildSummaryTleStatusText(resolveResult, tleApplicability);
+            string roleText =
+                !includeRoleText
+                    ? string.Empty
+                    : canReuseSummaryPresentation
+                    ? m_CurrentSnapshot.RoleText
+                    : BuildRoleText(resolveResult);
 
             string currentRouteColorText =
                 includeRouteDiagnosticsDisplayFields &&
@@ -731,12 +769,12 @@ namespace Traffic_Law_Enforcement
                 includeGeneralDebugFields ? BuildRawTransportTypeText(resolveResult) : string.Empty,
                 includeGeneralDebugFields ? BuildRawTrackTypeText(resolveResult) : string.Empty,
                 includeGeneralDebugFields ? BuildRailSubtypeSourceText(resolveResult) : string.Empty,
-                BuildSummaryClassificationText(resolveResult),
-                BuildSummaryTleStatusText(resolveResult, tleApplicability),
+                summaryClassificationText,
+                summaryTleStatusText,
                 enforcementSummary.CompactLastReasonText,
                 enforcementSummary.CompactRepeatPenaltyText,
                 resolveResult.IsVehicle && hasVehicleEntity ? vehicle.Index : -1,
-                includeRoleText ? BuildRoleText(resolveResult) : string.Empty,
+                roleText,
                 enforcementSummary.PublicTransportLanePolicyText,
                 hasTrafficLawProfile,
                 currentLaneEntity,
@@ -787,6 +825,63 @@ namespace Traffic_Law_Enforcement
                 tleApplicability == m_CurrentSnapshot.TleApplicability &&
                 currentLaneEntity == m_CurrentSnapshot.CurrentLaneEntity &&
                 previousLaneEntity == m_CurrentSnapshot.PreviousLaneEntity;
+        }
+
+        private static SelectedObjectEnforcementSummaryData BuildEnforcementSummaryFromSnapshot(
+            SelectedObjectDebugSnapshot snapshot,
+            bool includePermissionStateSummary)
+        {
+            return new SelectedObjectEnforcementSummaryData(
+                snapshot.CompactLastReasonText,
+                snapshot.CompactRepeatPenaltyText,
+                snapshot.PublicTransportLanePolicyText,
+                includePermissionStateSummary
+                    ? snapshot.PermissionStateSummary
+                    : string.Empty);
+        }
+
+        private bool CanReuseSummaryPresentationFields(
+            SelectedObjectResolveResult resolveResult,
+            SelectedObjectTleApplicability tleApplicability)
+        {
+            return m_HasSnapshot &&
+                resolveResult.IsVehicle &&
+                !string.IsNullOrEmpty(m_CurrentSnapshot.SummaryClassificationText) &&
+                !string.IsNullOrEmpty(m_CurrentSnapshot.SummaryTleStatusText) &&
+                resolveResult.ResolveState == m_CurrentSnapshot.ResolveState &&
+                resolveResult.VehicleKind == m_CurrentSnapshot.VehicleKind &&
+                tleApplicability == m_CurrentSnapshot.TleApplicability &&
+                resolveResult.SourceSelectedEntity == m_CurrentSnapshot.SourceSelectedEntity &&
+                resolveResult.ResolvedVehicleEntity == m_CurrentSnapshot.ResolvedVehicleEntity &&
+                resolveResult.PrefabEntity == m_CurrentSnapshot.PrefabEntity &&
+                resolveResult.HasPrefabRef == m_CurrentSnapshot.HasPrefabRef &&
+                resolveResult.IsVehicle == m_CurrentSnapshot.IsVehicle &&
+                resolveResult.IsCar == m_CurrentSnapshot.IsCar &&
+                resolveResult.IsTrain == m_CurrentSnapshot.IsTrain &&
+                resolveResult.IsParked == m_CurrentSnapshot.IsParked;
+        }
+
+        private bool CanReuseEnforcementSummary(
+            SelectedObjectResolveResult resolveResult,
+            SelectedObjectTleApplicability tleApplicability,
+            bool hasTrafficLawProfile,
+            string lastReason,
+            bool includePermissionStateSummary)
+        {
+            return m_HasSnapshot &&
+                !includePermissionStateSummary &&
+                !string.IsNullOrEmpty(m_CurrentSnapshot.CompactLastReasonText) &&
+                resolveResult.ResolveState == m_CurrentSnapshot.ResolveState &&
+                resolveResult.VehicleKind == m_CurrentSnapshot.VehicleKind &&
+                tleApplicability == m_CurrentSnapshot.TleApplicability &&
+                resolveResult.SourceSelectedEntity == m_CurrentSnapshot.SourceSelectedEntity &&
+                resolveResult.ResolvedVehicleEntity == m_CurrentSnapshot.ResolvedVehicleEntity &&
+                resolveResult.IsVehicle == m_CurrentSnapshot.IsVehicle &&
+                hasTrafficLawProfile == m_CurrentSnapshot.HasTrafficLawProfile &&
+                string.Equals(
+                    lastReason ?? string.Empty,
+                    m_CurrentSnapshot.LastReason ?? string.Empty,
+                    System.StringComparison.Ordinal);
         }
 
         private bool CanReuseDetailedSnapshot(
