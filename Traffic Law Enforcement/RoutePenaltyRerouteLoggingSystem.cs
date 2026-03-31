@@ -322,6 +322,11 @@ namespace Traffic_Law_Enforcement
             int logsEmitted = 0;
             int routeSelectionLogsEmitted = 0;
             int routeSelectionLogsDropped = 0;
+            int rerouteSummaryCount = 0;
+            int rerouteSummaryAvoidedPenalty = 0;
+            int rerouteSummaryPublicTransport = 0;
+            int rerouteSummaryMidBlock = 0;
+            int rerouteSummaryIntersection = 0;
             foreach (KeyValuePair<Entity, CandidateChangeReason> candidate in m_CandidateVehicles)
             {
                 Entity vehicle = candidate.Key;
@@ -374,26 +379,75 @@ namespace Traffic_Law_Enforcement
                 if (m_LastSnapshots.TryGetValue(vehicle, out RoutePenaltyInspectionResult previousSnapshot))
                 {
                     rerouteDetected = ShouldLogReroute(previousSnapshot, snapshot);
-                    if (rerouteDetected)
-                    {
-                        RecordRerouteTelemetry(vehicle, previousSnapshot, snapshot);
+                if (rerouteDetected)
+                {
+                    RecordRerouteTelemetry(vehicle, previousSnapshot, snapshot);
 
-                        if (estimatedRerouteLoggingEnabled &&
-                            allowVehicleSpecificVisibleLogs &&
-                            (watchedVehicle || logsEmitted < rerouteLogLimit))
+                    bool allowPublicTransportLaneComparison =
+                        previousSnapshot.PublicTransportLanePolicyResolved &&
+                        snapshot.PublicTransportLanePolicyResolved;
+
+                    int previousComparablePenalty =
+                        CalculateComparableTotalPenalty(
+                            previousSnapshot,
+                            allowPublicTransportLaneComparison);
+
+                    int currentComparablePenalty =
+                        CalculateComparableTotalPenalty(
+                            snapshot,
+                            allowPublicTransportLaneComparison);
+
+                    int avoidedPenalty = previousComparablePenalty - currentComparablePenalty;
+
+                    bool avoidedPublicTransportLanePenalty =
+                        allowPublicTransportLaneComparison &&
+                        previousSnapshot.Profile.PublicTransportLaneSegments >
+                        snapshot.Profile.PublicTransportLaneSegments;
+
+                    bool avoidedMidBlockPenalty =
+                        previousSnapshot.Profile.MidBlockTransitions >
+                        snapshot.Profile.MidBlockTransitions;
+
+                    bool avoidedIntersectionPenalty =
+                        previousSnapshot.Profile.IntersectionTransitions >
+                        snapshot.Profile.IntersectionTransitions;
+
+                    if (estimatedRerouteLoggingEnabled &&
+                        allowVehicleSpecificVisibleLogs &&
+                        (watchedVehicle || logsEmitted < rerouteLogLimit))
+                    {
+                        if (watchedVehicle)
                         {
                             LogReroute(
                                 vehicle,
                                 previousSnapshot,
                                 snapshot,
                                 watchedVehicle);
+                        }
+                        else
+                        {
+                            rerouteSummaryCount += 1;
+                            rerouteSummaryAvoidedPenalty += avoidedPenalty;
 
-                            if (!watchedVehicle)
+                            if (avoidedPublicTransportLanePenalty)
                             {
-                                logsEmitted += 1;
+                                rerouteSummaryPublicTransport += 1;
                             }
+
+                            if (avoidedMidBlockPenalty)
+                            {
+                                rerouteSummaryMidBlock += 1;
+                            }
+
+                            if (avoidedIntersectionPenalty)
+                            {
+                                rerouteSummaryIntersection += 1;
+                            }
+
+                            logsEmitted += 1;
                         }
                     }
+                }
 
                     m_LastSnapshots[vehicle] = snapshot;
                 }
@@ -488,6 +542,19 @@ namespace Traffic_Law_Enforcement
                 {
                     m_LastRouteSelectionSnapshots[vehicle] = routeSelectionSnapshot;
                 }
+            }
+
+            if (rerouteSummaryCount > 0)
+            {
+                string rerouteSummaryMessage =
+                    $"[REROUTE_SUMMARY] count={rerouteSummaryCount}, " +
+                    $"avoidedPenalty={rerouteSummaryAvoidedPenalty}, " +
+                    $"avoidedPT={rerouteSummaryPublicTransport}, " +
+                    $"avoidedMidBlock={rerouteSummaryMidBlock}, " +
+                    $"avoidedIntersection={rerouteSummaryIntersection}";
+
+                EnforcementTelemetry.RecordEvent(rerouteSummaryMessage);
+                Mod.log.Info(rerouteSummaryMessage);
             }
 
             if (trackRouteSelectionChanges && routeSelectionLogsDropped > 0)
