@@ -2082,7 +2082,6 @@ namespace Traffic_Law_Enforcement
                     vehicleProfile.m_PublicTransportLaneAccessBits);
 
             bool interestingNonWatchedCase =
-                unauthorizedPublicTransportLane ||
                 permissionChangedByMod ||
                 (!hasResolvedPublicTransportLanePolicy && hasProfile);
 
