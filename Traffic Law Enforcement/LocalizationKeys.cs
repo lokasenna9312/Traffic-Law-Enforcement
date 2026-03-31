@@ -119,6 +119,8 @@ namespace Traffic_Law_Enforcement
 
             AddOption(map, setting, nameof(Setting.EnableEstimatedRerouteLogging));
             AddOption(map, setting, nameof(Setting.EnableEnforcementEventLogging));
+            AddOption(map, setting, nameof(Setting.EnablePolicyImpactSummaryLogging));
+            AddOption(map, setting, nameof(Setting.EnableFineIncomeLogging));
             AddOption(map, setting, nameof(Setting.EnablePathfindingPenaltyDiagnosticLogging));
             AddOption(map, setting, nameof(Setting.EnableType2PublicTransportLaneUsageLogging));
             AddOption(map, setting, nameof(Setting.EnableType3PublicTransportLaneUsageLogging));

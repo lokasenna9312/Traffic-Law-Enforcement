@@ -144,9 +144,13 @@ namespace Traffic_Law_Enforcement
         private static readonly List<FineIncomeEvent> s_RecentFineIncomeEvents = new List<FineIncomeEvent>();
         private static readonly ReadOnlyCollection<FineIncomeEvent> s_RecentFineIncomeEventsView =
             s_RecentFineIncomeEvents.AsReadOnly();
+        private static readonly long FineIncomeLogIntervalStopwatchTicks =
+            (long)System.Diagnostics.Stopwatch.Frequency;
         private static bool s_CurrentFineIncomeDirty = true;
         private static long s_LastFineIncomeTimestampMonthTicks = long.MinValue;
         private static long s_NextFineIncomeExpiryTimestampMonthTicks = long.MaxValue;
+        private static int s_PendingBatchSinceLastLog;
+        private static long s_LastFineIncomeLogTimestampStopwatchTicks = long.MinValue;
 
         public static int CurrentFineIncome { get; private set; }
         public static int CurrentPublicTransportLaneFineIncome { get; private set; }
@@ -233,6 +237,43 @@ namespace Traffic_Law_Enforcement
             s_CurrentFineIncomeDirty = false;
         }
 
+        public static void AccumulateFineIncomeLogBatch(int amount)
+        {
+            if (amount <= 0)
+            {
+                return;
+            }
+
+            s_PendingBatchSinceLastLog += amount;
+        }
+
+        public static void TryLogFineIncomeSummary(long currentTimestampMonthTicks)
+        {
+            if (!EnforcementLoggingPolicy.ShouldLogFineIncomeSummary() ||
+                s_PendingBatchSinceLastLog <= 0)
+            {
+                return;
+            }
+
+            long nowStopwatchTicks = System.Diagnostics.Stopwatch.GetTimestamp();
+            if (s_LastFineIncomeLogTimestampStopwatchTicks != long.MinValue &&
+                nowStopwatchTicks - s_LastFineIncomeLogTimestampStopwatchTicks <
+                FineIncomeLogIntervalStopwatchTicks)
+            {
+                return;
+            }
+
+            Mod.log.Info(
+                $"[ENFORCEMENT_FINE_SUMMARY] batchSinceLastLog={s_PendingBatchSinceLastLog}, " +
+                $"rolling1m={CurrentFineIncome}, PT={CurrentPublicTransportLaneFineIncome}, " +
+                $"MidBlock={CurrentMidBlockCrossingFineIncome}, " +
+                $"Intersection={CurrentIntersectionMovementFineIncome}, " +
+                $"monthTicks={currentTimestampMonthTicks}");
+
+            s_PendingBatchSinceLastLog = 0;
+            s_LastFineIncomeLogTimestampStopwatchTicks = nowStopwatchTicks;
+        }
+
         public static void LoadPersistentData(IEnumerable<FineIncomeEvent> fineIncomeEvents)
         {
             ResetPersistentData();
@@ -251,6 +292,8 @@ namespace Traffic_Law_Enforcement
             }
 
             s_CurrentFineIncomeDirty = true;
+            s_PendingBatchSinceLastLog = 0;
+            s_LastFineIncomeLogTimestampStopwatchTicks = long.MinValue;
         }
 
         public static IReadOnlyCollection<FineIncomeEvent> GetFineIncomeEventSnapshot()
@@ -268,6 +311,8 @@ namespace Traffic_Law_Enforcement
             s_CurrentFineIncomeDirty = false;
             s_LastFineIncomeTimestampMonthTicks = long.MinValue;
             s_NextFineIncomeExpiryTimestampMonthTicks = long.MaxValue;
+            s_PendingBatchSinceLastLog = 0;
+            s_LastFineIncomeLogTimestampStopwatchTicks = long.MinValue;
         }
     }
 
@@ -395,14 +440,12 @@ namespace Traffic_Law_Enforcement
                         }
                     }
                 }
+
+                EnforcementBudgetUIService.AccumulateFineIncomeLogBatch(collectedFineIncome);
             }
 
             EnforcementBudgetUIService.UpdateCurrentFineIncome(currentTimestampMonthTicks);
-
-            if (collectedFineIncome > 0 && EnforcementLoggingPolicy.ShouldLogEnforcementEvents())
-            {
-                Mod.log.Info($"Traffic law enforcement fine income recorded. batch={collectedFineIncome}, rolling1m={EnforcementBudgetUIService.CurrentFineIncome}, PTLane1m={EnforcementBudgetUIService.CurrentPublicTransportLaneFineIncome}, midBlock1m={EnforcementBudgetUIService.CurrentMidBlockCrossingFineIncome}, intersection1m={EnforcementBudgetUIService.CurrentIntersectionMovementFineIncome}, monthTicks={currentTimestampMonthTicks}");
-            }
+            EnforcementBudgetUIService.TryLogFineIncomeSummary(currentTimestampMonthTicks);
         }
         
         private void ClearFrameBatches()

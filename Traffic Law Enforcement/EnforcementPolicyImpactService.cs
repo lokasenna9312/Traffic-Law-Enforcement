@@ -194,8 +194,79 @@ namespace Traffic_Law_Enforcement
         }
     }
 
+    internal readonly struct EnforcementSummaryLogSnapshot : IEquatable<EnforcementSummaryLogSnapshot>
+    {
+        public readonly int Routes;
+        public readonly int ViolationTotal;
+        public readonly int AvoidanceTotal;
+        public readonly int PublicTransportViolationCount;
+        public readonly int MidBlockViolationCount;
+        public readonly int IntersectionViolationCount;
+        public readonly int PublicTransportAvoidanceCount;
+        public readonly int MidBlockAvoidanceCount;
+        public readonly int IntersectionAvoidanceCount;
+
+        public EnforcementSummaryLogSnapshot(
+            int routes,
+            int violationTotal,
+            int avoidanceTotal,
+            int publicTransportViolationCount,
+            int midBlockViolationCount,
+            int intersectionViolationCount,
+            int publicTransportAvoidanceCount,
+            int midBlockAvoidanceCount,
+            int intersectionAvoidanceCount)
+        {
+            Routes = routes;
+            ViolationTotal = violationTotal;
+            AvoidanceTotal = avoidanceTotal;
+            PublicTransportViolationCount = publicTransportViolationCount;
+            MidBlockViolationCount = midBlockViolationCount;
+            IntersectionViolationCount = intersectionViolationCount;
+            PublicTransportAvoidanceCount = publicTransportAvoidanceCount;
+            MidBlockAvoidanceCount = midBlockAvoidanceCount;
+            IntersectionAvoidanceCount = intersectionAvoidanceCount;
+        }
+
+        public bool Equals(EnforcementSummaryLogSnapshot other)
+        {
+            return Routes == other.Routes &&
+                ViolationTotal == other.ViolationTotal &&
+                AvoidanceTotal == other.AvoidanceTotal &&
+                PublicTransportViolationCount == other.PublicTransportViolationCount &&
+                MidBlockViolationCount == other.MidBlockViolationCount &&
+                IntersectionViolationCount == other.IntersectionViolationCount &&
+                PublicTransportAvoidanceCount == other.PublicTransportAvoidanceCount &&
+                MidBlockAvoidanceCount == other.MidBlockAvoidanceCount &&
+                IntersectionAvoidanceCount == other.IntersectionAvoidanceCount;
+        }
+
+        public override bool Equals(object obj)
+        {
+            return obj is EnforcementSummaryLogSnapshot other &&
+                Equals(other);
+        }
+
+        public override int GetHashCode()
+        {
+            int hash = Routes;
+            hash = (hash * 397) ^ ViolationTotal;
+            hash = (hash * 397) ^ AvoidanceTotal;
+            hash = (hash * 397) ^ PublicTransportViolationCount;
+            hash = (hash * 397) ^ MidBlockViolationCount;
+            hash = (hash * 397) ^ IntersectionViolationCount;
+            hash = (hash * 397) ^ PublicTransportAvoidanceCount;
+            hash = (hash * 397) ^ MidBlockAvoidanceCount;
+            hash = (hash * 397) ^ IntersectionAvoidanceCount;
+            return hash;
+        }
+    }
+
     public static class EnforcementPolicyImpactService
     {
+        private static readonly long SummaryLogIntervalStopwatchTicks =
+            (long)System.Diagnostics.Stopwatch.Frequency;
+
         public static int GetActiveVehicleRouteCount()
         {
             World world = World.DefaultGameObjectInjectionWorld;
@@ -370,6 +441,9 @@ namespace Traffic_Law_Enforcement
         private static string s_CachedPublicTransportLaneStatisticsLine = string.Empty;
         private static string s_CachedMidBlockCrossingStatisticsLine = string.Empty;
         private static string s_CachedIntersectionMovementStatisticsLine = string.Empty;
+        private static bool s_HasLastEmittedSummaryLogSnapshot;
+        private static EnforcementSummaryLogSnapshot s_LastEmittedSummaryLogSnapshot;
+        private static long s_LastSummaryLogTimestampStopwatchTicks = long.MinValue;
 
         private enum StatisticsAvailabilityState : byte
         {
@@ -422,6 +496,56 @@ namespace Traffic_Law_Enforcement
             return true;
         }
 
+        private static void TryLogPolicyImpactSummary()
+        {
+            if (!EnforcementLoggingPolicy.ShouldLogPolicyImpactSummary())
+            {
+                return;
+            }
+
+            RollingWindowSnapshot rollingWindowSnapshot = GetRollingWindowSnapshot();
+            EnforcementSummaryLogSnapshot summarySnapshot =
+                new EnforcementSummaryLogSnapshot(
+                    rollingWindowSnapshot.TotalPathRequestCount,
+                    rollingWindowSnapshot.TotalActualPathCount,
+                    rollingWindowSnapshot.TotalAvoidedPathCount,
+                    rollingWindowSnapshot.PublicTransportLaneActualCount,
+                    rollingWindowSnapshot.MidBlockCrossingActualCount,
+                    rollingWindowSnapshot.IntersectionMovementActualCount,
+                    rollingWindowSnapshot.PublicTransportLaneAvoidedEventCount,
+                    rollingWindowSnapshot.MidBlockCrossingAvoidedEventCount,
+                    rollingWindowSnapshot.IntersectionMovementAvoidedEventCount);
+
+            if (s_HasLastEmittedSummaryLogSnapshot &&
+                summarySnapshot.Equals(s_LastEmittedSummaryLogSnapshot))
+            {
+                return;
+            }
+
+            long nowStopwatchTicks = System.Diagnostics.Stopwatch.GetTimestamp();
+            if (s_LastSummaryLogTimestampStopwatchTicks != long.MinValue &&
+                nowStopwatchTicks - s_LastSummaryLogTimestampStopwatchTicks <
+                SummaryLogIntervalStopwatchTicks)
+            {
+                return;
+            }
+
+            Mod.log.Info(
+                $"[ENFORCEMENT_SUMMARY] routes={summarySnapshot.Routes}, " +
+                $"violations={summarySnapshot.ViolationTotal} " +
+                $"(PT={summarySnapshot.PublicTransportViolationCount}, " +
+                $"MidBlock={summarySnapshot.MidBlockViolationCount}, " +
+                $"Intersection={summarySnapshot.IntersectionViolationCount}), " +
+                $"avoidances={summarySnapshot.AvoidanceTotal} " +
+                $"(PT={summarySnapshot.PublicTransportAvoidanceCount}, " +
+                $"MidBlock={summarySnapshot.MidBlockAvoidanceCount}, " +
+                $"Intersection={summarySnapshot.IntersectionAvoidanceCount})");
+
+            s_HasLastEmittedSummaryLogSnapshot = true;
+            s_LastEmittedSummaryLogSnapshot = summarySnapshot;
+            s_LastSummaryLogTimestampStopwatchTicks = nowStopwatchTicks;
+        }
+
         public static void ResetPersistentData()
         {
             s_HasTrackingState = false;
@@ -465,6 +589,9 @@ namespace Traffic_Law_Enforcement
             s_LastSnapshotTimestampMonthTicks = -1L;
             s_NextRollingWindowPruneTimestampMonthTicks = long.MaxValue;
             s_RollingWindowSnapshotDirty = true;
+            s_HasLastEmittedSummaryLogSnapshot = false;
+            s_LastEmittedSummaryLogSnapshot = default;
+            s_LastSummaryLogTimestampStopwatchTicks = long.MinValue;
         }
 
         public static void LoadPersistentData(PersistentDataSnapshot data)
@@ -568,6 +695,9 @@ namespace Traffic_Law_Enforcement
             s_CachedRollingWindowSnapshot = default;
             s_LastSnapshotTimestampMonthTicks = -1L;
             s_RollingWindowSnapshotDirty = true;
+            s_HasLastEmittedSummaryLogSnapshot = false;
+            s_LastEmittedSummaryLogSnapshot = default;
+            s_LastSummaryLogTimestampStopwatchTicks = long.MinValue;
         }
 
         public static PersistentTotalsSnapshot GetPersistentTotalsSnapshot()
@@ -605,18 +735,7 @@ namespace Traffic_Law_Enforcement
             }
 
             UpdateRollingWindowData();
-
-            if (EnforcementLoggingPolicy.EnableEnforcementEventLogging)
-            {
-                RollingWindowSnapshot snapshot = GetRollingWindowSnapshot();
-                int violationTotal = snapshot.TotalActualPathCount;
-                int avoidanceTotal = snapshot.TotalAvoidedPathCount;
-                int vehicleRouteDenominator = snapshot.TotalPathRequestCount;
-
-                Mod.log.Info($"[RouteCount] vehicleRouteDenominator={vehicleRouteDenominator}, violationTotal={violationTotal}, avoidanceTotal={avoidanceTotal}");
-                Mod.log.Info($"[ViolationCount] PublicTransport={snapshot.PublicTransportLaneActualCount}, MidBlock={snapshot.MidBlockCrossingActualCount}, Intersection={snapshot.IntersectionMovementActualCount}");
-                Mod.log.Info($"[AvoidanceCount] PublicTransport={snapshot.PublicTransportLaneAvoidedEventCount}, MidBlock={snapshot.MidBlockCrossingAvoidedEventCount}, Intersection={snapshot.IntersectionMovementAvoidedEventCount}");
-            }
+            TryLogPolicyImpactSummary();
 
             long currentMonthIndex = EnforcementGameTime.GetMonthIndex(EnforcementGameTime.CurrentTimestampMonthTicks);
             if (!s_HasTrackingState || currentMonthIndex != s_TrackingState.m_MonthIndex)

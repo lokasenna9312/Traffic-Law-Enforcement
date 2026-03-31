@@ -47,6 +47,7 @@ namespace Traffic_Law_Enforcement
             m_Setting = new Setting(this);
             Settings = m_Setting;
             AssetDatabase.global.LoadSettings(nameof(Traffic_Law_Enforcement), m_Setting, new Setting(this));
+            m_Setting.ApplyEnforcementLoggingMigrationIfNeeded();
             m_Setting.RegisterKeyBindings();
 
             ResolveAndCacheModMetadata(modAssetPath);

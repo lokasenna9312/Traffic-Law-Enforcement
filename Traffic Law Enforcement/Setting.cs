@@ -615,6 +615,17 @@ namespace Traffic_Law_Enforcement
         [SettingsUISection(kDebugTab, kDebugLoggingGroup)]
         public bool EnableEnforcementEventLogging { get; set; }
 
+        [Exclude]
+        [SettingsUISection(kDebugTab, kDebugLoggingGroup)]
+        public bool EnablePolicyImpactSummaryLogging { get; set; }
+
+        [Exclude]
+        [SettingsUISection(kDebugTab, kDebugLoggingGroup)]
+        public bool EnableFineIncomeLogging { get; set; }
+
+        [Exclude]
+        public bool HasMigratedEnforcementLoggingSummaryToggles { get; set; }
+
 
         [Exclude]
         [SettingsUISection(kDebugTab, kDebugLoggingGroup)]
@@ -700,6 +711,8 @@ namespace Traffic_Law_Enforcement
             // Keep debug logging opt-in by default.
             EnableEstimatedRerouteLogging = false;
             EnableEnforcementEventLogging = false;
+            EnablePolicyImpactSummaryLogging = false;
+            EnableFineIncomeLogging = false;
             EnableType2PublicTransportLaneUsageLogging = false;
             EnableType3PublicTransportLaneUsageLogging = false;
             EnableType4PublicTransportLaneUsageLogging = false;
@@ -708,7 +721,25 @@ namespace Traffic_Law_Enforcement
             EnableAllVehicleRouteSelectionChangeLogging = false;
             EnableFocusedRouteRebuildDiagnosticsLogging = false;
             EnableFocusedVehicleOnlyRouteLogging = false;
+            HasMigratedEnforcementLoggingSummaryToggles = false;
             ResetKeyBindings();
+        }
+
+        public void ApplyEnforcementLoggingMigrationIfNeeded()
+        {
+            if (HasMigratedEnforcementLoggingSummaryToggles)
+            {
+                return;
+            }
+
+            if (EnableEnforcementEventLogging)
+            {
+                EnablePolicyImpactSummaryLogging = true;
+                EnableFineIncomeLogging = true;
+            }
+
+            HasMigratedEnforcementLoggingSummaryToggles = true;
+            ApplyAndSave();
         }
 
         public EnforcementGameplaySettingsState GetNewSaveDefaultSettings()

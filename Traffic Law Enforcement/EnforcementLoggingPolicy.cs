@@ -10,6 +10,12 @@ namespace Traffic_Law_Enforcement
 
         public static bool EnableEnforcementEventLogging => Mod.Settings?.EnableEnforcementEventLogging ?? false;
 
+        public static bool EnablePolicyImpactSummaryLogging =>
+            Mod.Settings?.EnablePolicyImpactSummaryLogging ?? false;
+
+        public static bool EnableFineIncomeLogging =>
+            Mod.Settings?.EnableFineIncomeLogging ?? false;
+
         public static bool EnableType2PublicTransportLaneUsageLogging => Mod.Settings?.EnableType2PublicTransportLaneUsageLogging ?? false;
 
         public static bool EnableType3PublicTransportLaneUsageLogging => Mod.Settings?.EnableType3PublicTransportLaneUsageLogging ?? false;
@@ -37,6 +43,21 @@ namespace Traffic_Law_Enforcement
         public static bool ShouldLogEnforcementEvents()
         {
             return EnableEnforcementEventLogging;
+        }
+
+        public static bool ShouldLogVehicleSpecificEnforcementEvents()
+        {
+            return EnableEnforcementEventLogging;
+        }
+
+        public static bool ShouldLogPolicyImpactSummary()
+        {
+            return EnablePolicyImpactSummaryLogging;
+        }
+
+        public static bool ShouldLogFineIncomeSummary()
+        {
+            return EnableFineIncomeLogging;
         }
 
         public static bool ShouldLogType2Usage()
@@ -128,7 +149,9 @@ namespace Traffic_Law_Enforcement
 
         public static bool ShouldLogVehicleSpecificEnforcementEvent(Entity vehicle)
         {
-            return ShouldLogVehicleSpecificVisibleLog(ShouldLogEnforcementEvents(), vehicle);
+            return ShouldLogVehicleSpecificVisibleLog(
+                ShouldLogVehicleSpecificEnforcementEvents(),
+                vehicle);
         }
 
         public static bool ShouldLogVehicleSpecificType2Usage(Entity vehicle)
