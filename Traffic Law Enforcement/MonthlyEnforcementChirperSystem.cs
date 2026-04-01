@@ -315,7 +315,7 @@ namespace Traffic_Law_Enforcement
         private void PublishCompletedMonthReport(MonthlyEnforcementReport report)
         {
             bool updatedLocalization = EnsureReportLocalizationEntries(report, out bool addedLocalizationSource);
-            if (addedLocalizationSource)
+            if (addedLocalizationSource || updatedLocalization)
             {
                 ReloadActiveLocale();
             }
