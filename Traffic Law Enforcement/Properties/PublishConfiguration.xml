@@ -132,6 +132,7 @@ The following options can be configured either for the currently loaded save fil
 	<!--Change log for new version. Single line or multi line. Supports minimal markdown subset-->
 	<ChangeLog>
 - Fixed the bug that monthly Chirper messages were empty, and the Violation Rates and Supression Failure Rates were reset to 0 at the month-borders.
+- Reinstalled mid-block route cost penalty. It won't break havoc like 0.2.9 patch.
 	</ChangeLog>
 	<!--External link, can be set multiple times. supported types are "discord", "github", "youtube", "twitch", "x", "paypal", "patreon", "buymeacoffee", "kofi", "crowdin", "gitlab", "gofundme"-->
 	<ExternalLink Type="github" Url="https://github.com/lokasenna9312/Traffic-Law-Enforcement/" />
