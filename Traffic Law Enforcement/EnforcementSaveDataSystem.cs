@@ -867,6 +867,24 @@ namespace Traffic_Law_Enforcement {
             EnforcementPolicyImpactTrackingState? policyImpactTrackingState =
                 ReadPolicyImpactTrackingState(
                     reader, version, migratedLegacyPathRequestTracking);
+            if (ShouldHydratePolicyImpactTrackingStateFromMonthlyTracking(
+                    trackingState,
+                    policyImpactTrackingState))
+            {
+                policyImpactTrackingState =
+                    CreatePolicyImpactTrackingStateFromMonthlyTrackingState(
+                        trackingState.Value);
+
+                if (EnforcementLoggingPolicy.ShouldLogPolicyDiagnostics())
+                {
+                    Mod.log.Info(
+                        "[ENFORCEMENT_POLICY_STATE] " +
+                        $"phase=HydrateTrackingStateFromMonthlyChirper, trackingMonth={policyImpactTrackingState.Value.m_MonthIndex}, " +
+                        $"totalActual={policyImpactTrackingState.Value.m_TotalActualPathCount}, totalAvoided={policyImpactTrackingState.Value.m_TotalAvoidedPathCount}, " +
+                        $"totalDecision={policyImpactTrackingState.Value.m_TotalActualOrAvoidedPathCount}, totalFine={policyImpactTrackingState.Value.m_TotalFineAmount}");
+                }
+            }
+
             if (ShouldHydrateMonthlyTrackingStateFromPolicyImpact(
                     trackingState,
                     policyImpactTrackingState))
@@ -1077,6 +1095,29 @@ namespace Traffic_Law_Enforcement {
                    HasMeaningfulTrackingTotals(policyState);
         }
 
+        private static bool ShouldHydratePolicyImpactTrackingStateFromMonthlyTracking(
+            MonthlyEnforcementTrackingState? monthlyTrackingState,
+            EnforcementPolicyImpactTrackingState? policyImpactTrackingState)
+        {
+            if (!monthlyTrackingState.HasValue ||
+                !HasMeaningfulTrackingTotals(monthlyTrackingState.Value))
+            {
+                return false;
+            }
+
+            if (!policyImpactTrackingState.HasValue)
+            {
+                return true;
+            }
+
+            MonthlyEnforcementTrackingState trackingState =
+                monthlyTrackingState.Value;
+            EnforcementPolicyImpactTrackingState policyState =
+                policyImpactTrackingState.Value;
+            return trackingState.m_MonthIndex == policyState.m_MonthIndex &&
+                   !HasMeaningfulTrackingTotals(policyState);
+        }
+
         private static bool HasMeaningfulTrackingTotals(MonthlyEnforcementTrackingState trackingState)
         {
             return trackingState.m_TotalPathRequestCount > 0 ||
@@ -1107,6 +1148,30 @@ namespace Traffic_Law_Enforcement {
                 trackingState.m_IntersectionMovementActualCount,
                 trackingState.m_TotalFineAmount,
                 trackingState.m_TotalAvoidedPathCount,
+                trackingState.m_PublicTransportLaneFineAmount,
+                trackingState.m_MidBlockCrossingFineAmount,
+                trackingState.m_IntersectionMovementFineAmount,
+                trackingState.m_PublicTransportLaneAvoidedEventCount,
+                trackingState.m_MidBlockCrossingAvoidedEventCount,
+                trackingState.m_IntersectionMovementAvoidedEventCount,
+                trackingState.m_TotalActualOrAvoidedPathCount,
+                trackingState.m_PublicTransportLaneActualOrAvoidedPathCount,
+                trackingState.m_MidBlockCrossingActualOrAvoidedPathCount,
+                trackingState.m_IntersectionMovementActualOrAvoidedPathCount);
+        }
+
+        private static EnforcementPolicyImpactTrackingState CreatePolicyImpactTrackingStateFromMonthlyTrackingState(
+            MonthlyEnforcementTrackingState trackingState)
+        {
+            return new EnforcementPolicyImpactTrackingState(
+                trackingState.m_MonthIndex,
+                trackingState.m_TotalPathRequestCount,
+                trackingState.m_TotalActualPathCount,
+                trackingState.m_TotalAvoidedPathCount,
+                trackingState.m_TotalFineAmount,
+                trackingState.m_PublicTransportLaneCount,
+                trackingState.m_MidBlockCrossingCount,
+                trackingState.m_IntersectionMovementCount,
                 trackingState.m_PublicTransportLaneFineAmount,
                 trackingState.m_MidBlockCrossingFineAmount,
                 trackingState.m_IntersectionMovementFineAmount,
