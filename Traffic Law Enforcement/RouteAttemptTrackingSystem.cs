@@ -131,6 +131,7 @@ namespace Traffic_Law_Enforcement
                             else
                             {
                                 EnforcementPolicyImpactService.RecordPathRequest(vehicle.Index);
+                                PublicTransportLaneExitPressureTelemetry.TryRecordSubsequentPathRequest(vehicle);
                             }
                         }
 
@@ -179,6 +180,7 @@ namespace Traffic_Law_Enforcement
                         if (!wasPending && isPending)
                         {
                             EnforcementPolicyImpactService.RecordPathRequest(vehicle.Index);
+                            PublicTransportLaneExitPressureTelemetry.TryRecordSubsequentPathRequest(vehicle);
                         }
 
                         byte updatedWasPending = (byte)(isPending ? 1 : 0);

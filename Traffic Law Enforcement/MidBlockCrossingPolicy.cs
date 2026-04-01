@@ -56,16 +56,27 @@ namespace Traffic_Law_Enforcement
             Entity targetLane,
             out LaneTransitionViolationReasonCode reasonCode)
         {
-            if (!TryGetIllegalTransition(
+            reasonCode = LaneTransitionViolationReasonCode.None;
+
+            if (sourceLane == Entity.Null || targetLane == Entity.Null || sourceLane == targetLane)
+            {
+                return false;
+            }
+
+            if (TryDetectIllegalIngress(
                     entityManager,
                     sourceLane,
                     targetLane,
                     out reasonCode))
             {
-                return false;
+                return true;
             }
 
-            return IsAccessTransitionReason(reasonCode);
+            return TryDetectIllegalEgress(
+                entityManager,
+                sourceLane,
+                targetLane,
+                out reasonCode);
         }
 
         public static bool IsAccessTransitionReason(

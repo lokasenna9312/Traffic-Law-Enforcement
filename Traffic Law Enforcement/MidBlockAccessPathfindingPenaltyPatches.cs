@@ -13,6 +13,8 @@ namespace Traffic_Law_Enforcement
     {
         private const string HarmonyId =
             "Traffic_Law_Enforcement.MidBlockAccessPathfindingPenaltyPatches";
+        private const int MinimumBindingScore = 100;
+        private const int MinimumBindingScoreGap = 15;
 
         private static readonly Type s_PathfindExecutorType =
             AccessTools.Inner(typeof(PathfindJobs), "PathfindExecutor");
@@ -22,6 +24,8 @@ namespace Traffic_Law_Enforcement
         private static int s_SourceLaneArgIndex = -1;
         private static int s_TargetLaneArgIndex = -1;
         private static int s_LogCount;
+
+        internal static bool IsApplied => s_Harmony != null && s_TargetMethod != null;
 
         public static void Apply()
         {
@@ -47,11 +51,12 @@ namespace Traffic_Law_Enforcement
                     s_TargetLaneArgIndex < 0)
                 {
                     LogCandidateMethods();
-                    Mod.log.Info("Mid-block access pathfind hook skipped: no suitable transition-cost method found.");
+                    Mod.log.Info("Mid-block access pathfind hook skipped: no sufficiently confident transition-cost method found.");
                     return;
                 }
 
                 s_Harmony = new Harmony(HarmonyId);
+                s_LogCount = 0;
                 HarmonyMethod postfix =
                     new HarmonyMethod(
                         typeof(MidBlockAccessPathfindingPenaltyPatches),
@@ -81,6 +86,7 @@ namespace Traffic_Law_Enforcement
             s_TargetMethod = null;
             s_SourceLaneArgIndex = -1;
             s_TargetLaneArgIndex = -1;
+            s_LogCount = 0;
         }
 
         private static MethodInfo FindBestTransitionCostMethod(
@@ -92,8 +98,11 @@ namespace Traffic_Law_Enforcement
 
             MethodInfo bestMethod = null;
             int bestScore = int.MinValue;
+            int secondBestScore = int.MinValue;
             int bestSourceIndex = -1;
             int bestTargetIndex = -1;
+            bool bestSourceNameMatch = false;
+            bool bestTargetNameMatch = false;
 
             foreach (MethodInfo method in AccessTools.GetDeclaredMethods(s_PathfindExecutorType))
             {
@@ -127,19 +136,42 @@ namespace Traffic_Law_Enforcement
                     continue;
                 }
 
+                bool sourceNameMatch = IsSourceNameMatch(entityParams, sourceIndex);
+                bool targetNameMatch = IsTargetNameMatch(entityParams, targetIndex);
                 int score =
                     ScoreMethod(
                         method,
                         entityParams,
                         sourceIndex,
-                        targetIndex);
+                        targetIndex,
+                        sourceNameMatch,
+                        targetNameMatch);
                 if (score > bestScore)
                 {
+                    secondBestScore = bestScore;
                     bestScore = score;
                     bestMethod = method;
                     bestSourceIndex = sourceIndex;
                     bestTargetIndex = targetIndex;
+                    bestSourceNameMatch = sourceNameMatch;
+                    bestTargetNameMatch = targetNameMatch;
                 }
+                else if (score > secondBestScore)
+                {
+                    secondBestScore = score;
+                }
+            }
+
+            if (!HasHighConfidenceBinding(
+                    bestMethod,
+                    bestScore,
+                    secondBestScore,
+                    bestSourceNameMatch,
+                    bestTargetNameMatch))
+            {
+                sourceLaneArgIndex = -1;
+                targetLaneArgIndex = -1;
+                return null;
             }
 
             sourceLaneArgIndex = bestSourceIndex;
@@ -201,24 +233,31 @@ namespace Traffic_Law_Enforcement
             MethodInfo method,
             List<(int Index, string Name)> entityParams,
             int sourceIndex,
-            int targetIndex)
+            int targetIndex,
+            bool sourceNameMatch,
+            bool targetNameMatch)
         {
             int score = 0;
             string methodName = method.Name.ToLowerInvariant();
 
+            if (string.Equals(method.Name, "CalculateCost", StringComparison.Ordinal))
+            {
+                score += 60;
+            }
+
             if (methodName.Contains("cost"))
             {
-                score += 40;
+                score += 25;
             }
 
             if (methodName.Contains("transition"))
             {
-                score += 30;
+                score += 20;
             }
 
             if (methodName.Contains("connection"))
             {
-                score += 20;
+                score += 15;
             }
 
             if (methodName.Contains("lane"))
@@ -226,29 +265,99 @@ namespace Traffic_Law_Enforcement
                 score += 10;
             }
 
-            foreach ((int Index, string Name) entry in entityParams)
+            if (entityParams.Count == 2)
             {
-                string name = entry.Name.ToLowerInvariant();
-                if (entry.Index == sourceIndex &&
-                    (name.Contains("source") ||
-                     name.Contains("from") ||
-                     name.Contains("previous") ||
-                     name.Contains("prev")))
-                {
-                    score += 25;
-                }
+                score += 20;
+            }
 
-                if (entry.Index == targetIndex &&
-                    (name.Contains("target") ||
-                     name.Contains("to") ||
-                     name.Contains("next") ||
-                     name.Contains("connection")))
-                {
-                    score += 25;
-                }
+            if (sourceNameMatch)
+            {
+                score += 25;
+            }
+
+            if (targetNameMatch)
+            {
+                score += 25;
             }
 
             return score;
+        }
+
+        private static bool HasHighConfidenceBinding(
+            MethodInfo bestMethod,
+            int bestScore,
+            int secondBestScore,
+            bool sourceNameMatch,
+            bool targetNameMatch)
+        {
+            if (bestMethod == null)
+            {
+                return false;
+            }
+
+            if (!sourceNameMatch || !targetNameMatch)
+            {
+                Mod.log.Info(
+                    $"Mid-block access pathfind hook skipped: weak binding confidence for {DescribeMethod(bestMethod)} (sourceNameMatch={sourceNameMatch}, targetNameMatch={targetNameMatch}).");
+                return false;
+            }
+
+            if (bestScore < MinimumBindingScore)
+            {
+                Mod.log.Info(
+                    $"Mid-block access pathfind hook skipped: low binding score {bestScore} for {DescribeMethod(bestMethod)}.");
+                return false;
+            }
+
+            if (secondBestScore != int.MinValue &&
+                bestScore - secondBestScore < MinimumBindingScoreGap)
+            {
+                Mod.log.Info(
+                    $"Mid-block access pathfind hook skipped: ambiguous binding between candidates (bestScore={bestScore}, secondBestScore={secondBestScore}).");
+                return false;
+            }
+
+            return true;
+        }
+
+        private static bool IsSourceNameMatch(
+            List<(int Index, string Name)> entityParams,
+            int sourceIndex)
+        {
+            for (int index = 0; index < entityParams.Count; index += 1)
+            {
+                (int Index, string Name) entry = entityParams[index];
+                if (entry.Index == sourceIndex)
+                {
+                    string name = entry.Name.ToLowerInvariant();
+                    return name.Contains("source") ||
+                        name.Contains("from") ||
+                        name.Contains("previous") ||
+                        name.Contains("prev");
+                }
+            }
+
+            return false;
+        }
+
+        private static bool IsTargetNameMatch(
+            List<(int Index, string Name)> entityParams,
+            int targetIndex)
+        {
+            for (int index = 0; index < entityParams.Count; index += 1)
+            {
+                (int Index, string Name) entry = entityParams[index];
+                if (entry.Index == targetIndex)
+                {
+                    string name = entry.Name.ToLowerInvariant();
+                    return name.Contains("target") ||
+                        name.Contains("to") ||
+                        name.Contains("next") ||
+                        name.Contains("connection");
+                }
+            }
+
+            return false;
         }
 
         private static void LogCandidateMethods()

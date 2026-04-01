@@ -44,6 +44,7 @@ namespace Traffic_Law_Enforcement
             BurstLoggingService.Reset();
             FocusedLoggingService.Reset();
             ObsoleteAttemptCorrelationService.Reset();
+            PublicTransportLaneExitPressureTelemetry.Reset();
             m_Setting = new Setting(this);
             Settings = m_Setting;
             AssetDatabase.global.LoadSettings(nameof(Traffic_Law_Enforcement), m_Setting, new Setting(this));
@@ -60,7 +61,10 @@ namespace Traffic_Law_Enforcement
             FocusedRouteDiagnosticsPatchController.Sync();
             MidBlockAccessPathfindingPenaltyPatches.Apply();
             IntersectionMovementPathfindingPenaltyPatches.Apply();
-            IntersectionMovementPathfindingPenaltyReflectionPatches.Apply();
+            if (!IntersectionMovementPathfindingPenaltyPatches.IsApplied)
+            {
+                IntersectionMovementPathfindingPenaltyReflectionPatches.Apply();
+            }
             updateSystem.UpdateAfter<EnforcementSaveDataSystem, EnforcementGameTimeSystem>(SystemUpdatePhase.GameSimulation);
             updateSystem.UpdateBefore<EnforcementSaveDataSystem, VehicleTrafficLawProfileSystem>(SystemUpdatePhase.GameSimulation);
             updateSystem.UpdateBefore<VehicleTrafficLawProfileSystem, PublicTransportLanePermissionSystem>(SystemUpdatePhase.GameSimulation);
@@ -98,6 +102,7 @@ namespace Traffic_Law_Enforcement
             BurstLoggingService.Reset();
             FocusedLoggingService.Reset();
             ObsoleteAttemptCorrelationService.Reset();
+            PublicTransportLaneExitPressureTelemetry.Reset();
             BudgetUIPatches.Remove();
             FocusedRouteDiagnosticsPatchController.RemoveAll();
             VehicleUtilsPatches.Remove();

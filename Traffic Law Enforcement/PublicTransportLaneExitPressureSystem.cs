@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Game;
 using Game.Pathfind;
 using Game.Vehicles;
@@ -7,6 +8,134 @@ using Entity = Unity.Entities.Entity;
 
 namespace Traffic_Law_Enforcement
 {
+    public static class PublicTransportLaneExitPressureTelemetry
+    {
+        private static readonly HashSet<Entity> s_AwaitingPathRequestVehicles = new HashSet<Entity>();
+        private static int s_AppliedCount;
+        private static int s_SkippedAlreadyObsoleteCount;
+        private static int s_SkippedPendingPathOwnerCount;
+        private static int s_SkippedMissingPathOwnerCount;
+        private static int s_CorrelatedPathRequestCount;
+        private static int s_LastObservedRuntimeWorldGeneration = int.MinValue;
+
+        public static int AppliedCount
+        {
+            get
+            {
+                EnsureCurrentWorld();
+                return s_AppliedCount;
+            }
+        }
+
+        public static int SkippedAlreadyObsoleteCount
+        {
+            get
+            {
+                EnsureCurrentWorld();
+                return s_SkippedAlreadyObsoleteCount;
+            }
+        }
+
+        public static int SkippedPendingPathOwnerCount
+        {
+            get
+            {
+                EnsureCurrentWorld();
+                return s_SkippedPendingPathOwnerCount;
+            }
+        }
+
+        public static int SkippedMissingPathOwnerCount
+        {
+            get
+            {
+                EnsureCurrentWorld();
+                return s_SkippedMissingPathOwnerCount;
+            }
+        }
+
+        public static int CorrelatedPathRequestCount
+        {
+            get
+            {
+                EnsureCurrentWorld();
+                return s_CorrelatedPathRequestCount;
+            }
+        }
+
+        public static int AwaitingPathRequestCount
+        {
+            get
+            {
+                EnsureCurrentWorld();
+                return s_AwaitingPathRequestVehicles.Count;
+            }
+        }
+
+        public static void Reset()
+        {
+            ResetForGeneration(EnforcementSaveDataSystem.RuntimeWorldGeneration);
+        }
+
+        public static void RecordApplied(Entity vehicle)
+        {
+            EnsureCurrentWorld();
+            s_AppliedCount += 1;
+            if (vehicle != Entity.Null)
+            {
+                s_AwaitingPathRequestVehicles.Add(vehicle);
+            }
+        }
+
+        public static void RecordSkippedAlreadyObsolete()
+        {
+            EnsureCurrentWorld();
+            s_SkippedAlreadyObsoleteCount += 1;
+        }
+
+        public static void RecordSkippedPendingPathOwner()
+        {
+            EnsureCurrentWorld();
+            s_SkippedPendingPathOwnerCount += 1;
+        }
+
+        public static void RecordSkippedMissingPathOwner()
+        {
+            EnsureCurrentWorld();
+            s_SkippedMissingPathOwnerCount += 1;
+        }
+
+        public static void TryRecordSubsequentPathRequest(Entity vehicle)
+        {
+            EnsureCurrentWorld();
+            if (vehicle != Entity.Null &&
+                s_AwaitingPathRequestVehicles.Remove(vehicle))
+            {
+                s_CorrelatedPathRequestCount += 1;
+            }
+        }
+
+        private static void EnsureCurrentWorld()
+        {
+            int currentGeneration = EnforcementSaveDataSystem.RuntimeWorldGeneration;
+            if (s_LastObservedRuntimeWorldGeneration != currentGeneration)
+            {
+                ResetForGeneration(currentGeneration);
+            }
+        }
+
+        private static void ResetForGeneration(int generation)
+        {
+            s_LastObservedRuntimeWorldGeneration = generation;
+            s_AppliedCount = 0;
+            s_SkippedAlreadyObsoleteCount = 0;
+            s_SkippedPendingPathOwnerCount = 0;
+            s_SkippedMissingPathOwnerCount = 0;
+            s_CorrelatedPathRequestCount = 0;
+            s_AwaitingPathRequestVehicles.Clear();
+        }
+    }
+
     public partial class PublicTransportLaneExitPressureSystem : GameSystemBase
     {
         private EntityQuery m_ViolationQuery;
@@ -203,10 +332,17 @@ namespace Traffic_Law_Enforcement
         {
             if (!m_PathOwnerData.TryGetComponent(vehicle, out pathOwner))
             {
+                PublicTransportLaneExitPressureTelemetry.RecordSkippedMissingPathOwner();
                 return false;
             }
 
-            return (pathOwner.m_State & PathFlags.Pending) == 0;
+            if ((pathOwner.m_State & PathFlags.Pending) != 0)
+            {
+                PublicTransportLaneExitPressureTelemetry.RecordSkippedPendingPathOwner();
+                return false;
+            }
+
+            return true;
         }
 
         private bool TryApplyExitPressurePathObsolete(
@@ -217,11 +353,13 @@ namespace Traffic_Law_Enforcement
             stateBefore = pathOwner.m_State;
             if ((pathOwner.m_State & PathFlags.Obsolete) != 0)
             {
+                PublicTransportLaneExitPressureTelemetry.RecordSkippedAlreadyObsolete();
                 return false;
             }
 
             pathOwner.m_State |= PathFlags.Obsolete;
             EntityManager.SetComponentData(vehicle, pathOwner);
+            PublicTransportLaneExitPressureTelemetry.RecordApplied(vehicle);
             return true;
         }
 
