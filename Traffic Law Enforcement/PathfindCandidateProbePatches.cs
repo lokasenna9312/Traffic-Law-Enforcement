@@ -20,8 +20,7 @@ namespace Traffic_Law_Enforcement
         private const string HarmonyId = "Traffic_Law_Enforcement.PathfindCandidateProbePatches";
         private const int MaxCandidateEntriesPerRequest = 8;
         private const int MaxLoggedCandidatesPerRequest = 4;
-        private const int MaxIntersectionProbeLogsPerRequest = 8;
-        private const int MaxBaselineIntersectionProbeLogsPerRequest = 2;
+        private const int MaxDetailedIntersectionLikeLogs = 8;
         private const string IntersectionProbePrefix = "[IM-AHD-PROBE]";
 
         private sealed class ProbeRequestInfo
@@ -78,8 +77,6 @@ namespace Traffic_Law_Enforcement
         {
             private readonly Dictionary<string, CandidateInfo> m_BestCandidates =
                 new Dictionary<string, CandidateInfo>(StringComparer.Ordinal);
-            private readonly HashSet<string> m_LoggedIntersectionTransitionKeys =
-                new HashSet<string>(StringComparer.Ordinal);
             private readonly List<CandidateInfo> m_SortedCandidates =
                 new List<CandidateInfo>(MaxCandidateEntriesPerRequest);
 
@@ -101,8 +98,6 @@ namespace Traffic_Law_Enforcement
             public int IntersectionLikeWithConnectionLaneCount { get; private set; }
 
             public int IntersectionLikeWithoutConnectionLaneCount { get; private set; }
-
-            private int LoggedIntersectionSampleCount { get; set; }
 
             public void RecordCandidate(CandidateInfo candidate)
             {
@@ -163,29 +158,6 @@ namespace Traffic_Law_Enforcement
                 {
                     IllegalLikeSampleCount += 1;
                 }
-
-                if (LoggedIntersectionSampleCount >= MaxIntersectionProbeLogsPerRequest)
-                {
-                    return;
-                }
-
-                bool shouldLogSample =
-                    sample.IntersectionLike ||
-                    sample.IllegalLike ||
-                    LoggedIntersectionSampleCount < MaxBaselineIntersectionProbeLogsPerRequest;
-                if (!shouldLogSample)
-                {
-                    return;
-                }
-
-                string key = sample.BuildKey();
-                if (!m_LoggedIntersectionTransitionKeys.Add(key))
-                {
-                    return;
-                }
-
-                LoggedIntersectionSampleCount += 1;
-                Mod.log.Info(sample.BuildLogLine(Request.Vehicle));
             }
 
             public string BuildLogLine()
@@ -234,19 +206,6 @@ namespace Traffic_Law_Enforcement
                     $"candidateProposals={CandidateProposalCount}, " +
                     $"bestCandidates={candidateSummary}";
             }
-
-            public string BuildIntersectionSummaryLine()
-            {
-                return
-                    $"{IntersectionProbePrefix} summary " +
-                    $"veh={FocusedLoggingService.FormatEntity(Request.Vehicle)} " +
-                    $"totalSamples={TransitionSampleCount} " +
-                    $"intersectionLike={IntersectionLikeSampleCount} " +
-                    $"illegalLike={IllegalLikeSampleCount} " +
-                    $"intersectionLikeWithConnectionLane={IntersectionLikeWithConnectionLaneCount} " +
-                    $"intersectionLikeWithoutConnectionLane={IntersectionLikeWithoutConnectionLaneCount}";
-            }
-
             private static int CompareCandidateCostAscending(CandidateInfo left, CandidateInfo right)
             {
                 return left.TotalCost.CompareTo(right.TotalCost);
@@ -323,18 +282,6 @@ namespace Traffic_Law_Enforcement
                 IllegalLike = illegalLike;
             }
 
-            public string BuildKey()
-            {
-                return
-                    FromEdge.m_Index.ToString() + "|" +
-                    ToEdge.m_Index.ToString() + "|" +
-                    FromOwner.Index.ToString() + "|" +
-                    ToOwner.Index.ToString() + "|" +
-                    ((uint)FromCarLaneFlags).ToString() + "|" +
-                    ((uint)ToCarLaneFlags).ToString() + "|" +
-                    ((uint)ToConnectionLaneFlags).ToString();
-            }
-
             public string BuildLogLine(Entity vehicle)
             {
                 return
@@ -348,9 +295,7 @@ namespace Traffic_Law_Enforcement
                     $"toCarLaneFlags={FormatCarLaneFlags(HasToCarLane, ToCarLaneFlags)} " +
                     $"sideConnection={SideConnection.ToString().ToLowerInvariant()} " +
                     $"forbidden={Forbidden.ToString().ToLowerInvariant()} " +
-                    $"turnHint={TurnHint} " +
-                    $"illegalLike={IllegalLike.ToString().ToLowerInvariant()} " +
-                    $"toConnectionLaneFlags={FormatConnectionLaneFlags(HasToConnectionLane, ToConnectionLaneFlags)}";
+                    $"turnHint={TurnHint}";
             }
         }
 
@@ -387,6 +332,7 @@ namespace Traffic_Law_Enforcement
                 method.GetParameters()[0].ParameterType == typeof(PathfindActionData).MakeByRefType());
 
         private static readonly MethodInfo[] s_AddHeapDataMethods = GetAddHeapDataMethods();
+        private static readonly MethodInfo s_ExactIntersectionAddHeapDataMethod = FindExactIntersectionAddHeapDataMethod();
 
         private static readonly MethodInfo s_CalculateCostMethod = AccessTools.FirstMethod(
             s_PathfindExecutorType,
@@ -403,6 +349,13 @@ namespace Traffic_Law_Enforcement
 
         private static int s_RequestMatchMissLogCount;
         private static bool s_LoggedFirstWorkerExecuteInvocation;
+        private static int s_DetailedIntersectionLikeLogCount;
+        private static long s_TotalHits;
+        private static long s_AfterVehicleFilterHits;
+        private static long s_BothSidesHaveOwnerHits;
+        private static long s_BothSidesHaveCarLaneHits;
+        private static long s_IntersectionLikeHits;
+        private static long s_LastSummaryLoggedAtTotalHits;
 
         [ThreadStatic]
         private static ProbeExecutionContext s_CurrentContext;
@@ -423,6 +376,7 @@ namespace Traffic_Law_Enforcement
             {
                 if (s_PathfindExecutorType == null ||
                     s_WorkerExecuteMethod == null ||
+                    s_ExactIntersectionAddHeapDataMethod == null ||
                     s_CalculateCostMethod == null ||
                     s_ReleaseMethod == null ||
                     s_AddHeapDataMethods.Length == 0)
@@ -432,6 +386,7 @@ namespace Traffic_Law_Enforcement
                 }
 
                 s_Harmony = new Harmony(HarmonyId);
+                ResetIntersectionProbeDiagnostics();
                 s_Harmony.Patch(
                     s_WorkerExecuteMethod,
                     prefix: new HarmonyMethod(typeof(PathfindCandidateProbePatches), nameof(WorkerExecutePrefix)),
@@ -461,6 +416,8 @@ namespace Traffic_Law_Enforcement
                     s_ReleaseMethod,
                     postfix: new HarmonyMethod(typeof(PathfindCandidateProbePatches), nameof(ReleasePostfix)));
 
+                Mod.log.Info(
+                    $"{IntersectionProbePrefix} installed target=PathfindExecutor.AddHeapData exact=true signature={DescribeMethod(s_ExactIntersectionAddHeapDataMethod)}");
                 Mod.log.Info(
                     $"Pathfind candidate probe patches applied. workerTarget={s_WorkerExecuteMethod}");
             }
@@ -508,6 +465,7 @@ namespace Traffic_Law_Enforcement
                 return;
             }
 
+            MaybeLogIntersectionProbeSummary(force: true);
             s_Harmony.UnpatchAll(HarmonyId);
             s_Harmony = null;
             s_RequestRegistry.Clear();
@@ -515,6 +473,7 @@ namespace Traffic_Law_Enforcement
             s_LoggedFirstWorkerExecuteInvocation = false;
             s_CurrentContext = null;
             s_PendingCandidate = null;
+            ResetIntersectionProbeDiagnostics();
         }
 
         internal static void RegisterWatchedRequest(
@@ -629,6 +588,13 @@ namespace Traffic_Law_Enforcement
             Bounds3 ___m_EndBounds,
             float ___m_HeuristicCostFactor)
         {
+            long totalHits = System.Threading.Interlocked.Increment(ref s_TotalHits);
+            ProbeExecutionContext currentContext = s_CurrentContext;
+            if (currentContext != null)
+            {
+                System.Threading.Interlocked.Increment(ref s_AfterVehicleFilterHits);
+            }
+
             CapturePendingCandidate(
                 edge,
                 id,
@@ -643,10 +609,13 @@ namespace Traffic_Law_Enforcement
                 ___m_HeuristicCostFactor);
 
             CaptureIntersectionTransitionSample(
+                currentContext,
                 id,
                 id2,
                 edge,
                 ___m_PathfindData);
+
+            MaybeLogIntersectionProbeSummary(force: false, totalHitsOverride: totalHits);
         }
 
         private static void CapturePendingCandidate(
@@ -732,18 +701,18 @@ namespace Traffic_Law_Enforcement
             }
 
             Mod.log.Info(s_CurrentContext.BuildLogLine());
-            Mod.log.Info(s_CurrentContext.BuildIntersectionSummaryLine());
             s_CurrentContext = null;
             s_PendingCandidate = null;
         }
 
         private static void CaptureIntersectionTransitionSample(
+            ProbeExecutionContext currentContext,
             EdgeID id,
             EdgeID id2,
             PathfindEdge edge,
             UnsafePathfindData pathfindData)
         {
-            if (s_CurrentContext == null)
+            if (currentContext == null)
             {
                 return;
             }
@@ -762,10 +731,22 @@ namespace Traffic_Law_Enforcement
             EntityManager entityManager = world.EntityManager;
             Entity fromOwner = edge.m_Owner;
             Entity toOwner = pathfindData.m_Edges[id2.m_Index].m_Owner;
+            if (fromOwner == Entity.Null || toOwner == Entity.Null)
+            {
+                return;
+            }
+
+            System.Threading.Interlocked.Increment(ref s_BothSidesHaveOwnerHits);
 
             bool hasFromCarLane = TryGetCarLane(entityManager, fromOwner, out CarLane fromCarLane);
             bool hasToCarLane = TryGetCarLane(entityManager, toOwner, out CarLane toCarLane);
             bool hasToConnectionLane = TryGetConnectionLane(entityManager, toOwner, out ConnectionLane toConnectionLane);
+            if (!hasFromCarLane || !hasToCarLane)
+            {
+                return;
+            }
+
+            System.Threading.Interlocked.Increment(ref s_BothSidesHaveCarLaneHits);
 
             CarLaneFlags fromCarLaneFlags =
                 hasFromCarLane
@@ -795,6 +776,10 @@ namespace Traffic_Law_Enforcement
                 sideConnection &&
                 (toMovement != LaneMovement.None ||
                  (toCarLaneFlags & CarLaneFlags.Approach) != 0);
+            if (intersectionLike)
+            {
+                System.Threading.Interlocked.Increment(ref s_IntersectionLikeHits);
+            }
 
             bool illegalLike =
                 intersectionLike &&
@@ -803,7 +788,7 @@ namespace Traffic_Law_Enforcement
                   toMovement != LaneMovement.None &&
                   (fromMovement & toMovement) == LaneMovement.None));
 
-            s_CurrentContext.RecordIntersectionSample(
+            IntersectionTransitionSample sample =
                 new IntersectionTransitionSample(
                     id,
                     id2,
@@ -819,7 +804,13 @@ namespace Traffic_Law_Enforcement
                     forbidden,
                     turnHint,
                     intersectionLike,
-                    illegalLike));
+                    illegalLike);
+            currentContext.RecordIntersectionSample(sample);
+
+            if (intersectionLike)
+            {
+                TryLogDetailedIntersectionLikeSample(currentContext.Request.Vehicle, sample);
+            }
         }
 
         private static bool TryGetCarLane(
@@ -876,6 +867,64 @@ namespace Traffic_Law_Enforcement
         private static string FormatConnectionLaneFlags(bool hasConnectionLane, ConnectionLaneFlags flags)
         {
             return hasConnectionLane ? flags.ToString() : "(no ConnectionLane)";
+        }
+
+        private static void ResetIntersectionProbeDiagnostics()
+        {
+            s_DetailedIntersectionLikeLogCount = 0;
+            s_TotalHits = 0;
+            s_AfterVehicleFilterHits = 0;
+            s_BothSidesHaveOwnerHits = 0;
+            s_BothSidesHaveCarLaneHits = 0;
+            s_IntersectionLikeHits = 0;
+            s_LastSummaryLoggedAtTotalHits = -1;
+        }
+
+        private static void TryLogDetailedIntersectionLikeSample(
+            Entity vehicle,
+            IntersectionTransitionSample sample)
+        {
+            int logIndex = System.Threading.Interlocked.Increment(ref s_DetailedIntersectionLikeLogCount);
+            if (logIndex > MaxDetailedIntersectionLikeLogs)
+            {
+                return;
+            }
+
+            Mod.log.Info(sample.BuildLogLine(vehicle));
+        }
+
+        private static void MaybeLogIntersectionProbeSummary(bool force, long? totalHitsOverride = null)
+        {
+            long totalHits = totalHitsOverride ?? System.Threading.Interlocked.Read(ref s_TotalHits);
+            if (!force &&
+                totalHits != 1 &&
+                totalHits != 64 &&
+                (totalHits == 0 || totalHits % 4096 != 0))
+            {
+                return;
+            }
+
+            if (!force)
+            {
+                long previous = System.Threading.Interlocked.Exchange(ref s_LastSummaryLoggedAtTotalHits, totalHits);
+                if (previous == totalHits)
+                {
+                    return;
+                }
+            }
+
+            Mod.log.Info(BuildIntersectionProbeSummaryLine());
+        }
+
+        private static string BuildIntersectionProbeSummaryLine()
+        {
+            return
+                $"{IntersectionProbePrefix} summary " +
+                $"totalHits={System.Threading.Interlocked.Read(ref s_TotalHits)} " +
+                $"afterVehicleFilter={System.Threading.Interlocked.Read(ref s_AfterVehicleFilterHits)} " +
+                $"bothSidesHaveOwner={System.Threading.Interlocked.Read(ref s_BothSidesHaveOwnerHits)} " +
+                $"bothSidesHaveCarLane={System.Threading.Interlocked.Read(ref s_BothSidesHaveCarLaneHits)} " +
+                $"intersectionLike={System.Threading.Interlocked.Read(ref s_IntersectionLikeHits)}";
         }
 
         private static float CalculateTotalCost(
@@ -982,6 +1031,80 @@ namespace Traffic_Law_Enforcement
                 $"FOCUSED_ROUTE_CANDIDATE_MISS: requestKey={requestKey}, " +
                 $"registeredKeyCount={s_RequestRegistry.Count}, " +
                 $"registeredSample={(registeredKeys.Length == 0 ? "none" : registeredKeys.ToString())}");
+        }
+
+        private static MethodInfo FindExactIntersectionAddHeapDataMethod()
+        {
+            if (s_PathfindExecutorType == null)
+            {
+                return null;
+            }
+
+            foreach (MethodInfo method in AccessTools.GetDeclaredMethods(s_PathfindExecutorType))
+            {
+                if (!IsExactIntersectionAddHeapDataMethod(method))
+                {
+                    continue;
+                }
+
+                return method;
+            }
+
+            return null;
+        }
+
+        private static bool IsExactIntersectionAddHeapDataMethod(MethodInfo method)
+        {
+            if (method == null ||
+                method.IsStatic ||
+                method.ReturnType != typeof(void) ||
+                !string.Equals(method.Name, "AddHeapData", StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            ParameterInfo[] parameters = method.GetParameters();
+            if (parameters.Length != 11)
+            {
+                return false;
+            }
+
+            return parameters[0].ParameterType == typeof(int) &&
+                parameters[1].ParameterType == typeof(EdgeID) &&
+                parameters[2].ParameterType == typeof(EdgeID) &&
+                parameters[3].ParameterType == typeof(PathfindEdge).MakeByRefType() &&
+                parameters[4].ParameterType == typeof(EdgeFlags) &&
+                parameters[5].ParameterType == typeof(RuleFlags) &&
+                parameters[6].ParameterType == typeof(float) &&
+                parameters[7].ParameterType == typeof(float) &&
+                parameters[8].ParameterType.Name == "FullNode" &&
+                parameters[9].ParameterType == typeof(float2) &&
+                parameters[10].ParameterType.Name == "PathfindItemFlags";
+        }
+
+        private static string DescribeMethod(MethodInfo method)
+        {
+            if (method == null)
+            {
+                return "null";
+            }
+
+            ParameterInfo[] parameters = method.GetParameters();
+            StringBuilder parameterList = new StringBuilder(parameters.Length * 24);
+            for (int index = 0; index < parameters.Length; index += 1)
+            {
+                if (index > 0)
+                {
+                    parameterList.Append(", ");
+                }
+
+                ParameterInfo parameter = parameters[index];
+                parameterList.Append(parameter.ParameterType.Name);
+                parameterList.Append(' ');
+                parameterList.Append(parameter.Name);
+            }
+
+            return $"{method.DeclaringType?.FullName}.{method.Name}({parameterList})";
         }
     }
 }
