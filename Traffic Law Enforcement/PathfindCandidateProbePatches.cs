@@ -4,12 +4,14 @@ using System.Collections.Generic;
 using System.Reflection;
 using System.Text;
 using Colossal.Mathematics;
+using Game.Net;
 using Game.Pathfind;
 using HarmonyLib;
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
 using Unity.Collections.LowLevel.Unsafe;
+using PathfindEdge = Game.Pathfind.Edge;
 
 namespace Traffic_Law_Enforcement
 {
@@ -18,6 +20,9 @@ namespace Traffic_Law_Enforcement
         private const string HarmonyId = "Traffic_Law_Enforcement.PathfindCandidateProbePatches";
         private const int MaxCandidateEntriesPerRequest = 8;
         private const int MaxLoggedCandidatesPerRequest = 4;
+        private const int MaxIntersectionProbeLogsPerRequest = 8;
+        private const int MaxBaselineIntersectionProbeLogsPerRequest = 2;
+        private const string IntersectionProbePrefix = "[IM-AHD-PROBE]";
 
         private sealed class ProbeRequestInfo
         {
@@ -73,6 +78,8 @@ namespace Traffic_Law_Enforcement
         {
             private readonly Dictionary<string, CandidateInfo> m_BestCandidates =
                 new Dictionary<string, CandidateInfo>(StringComparer.Ordinal);
+            private readonly HashSet<string> m_LoggedIntersectionTransitionKeys =
+                new HashSet<string>(StringComparer.Ordinal);
             private readonly List<CandidateInfo> m_SortedCandidates =
                 new List<CandidateInfo>(MaxCandidateEntriesPerRequest);
 
@@ -84,6 +91,18 @@ namespace Traffic_Law_Enforcement
             public ProbeRequestInfo Request { get; }
 
             public int CandidateProposalCount { get; private set; }
+
+            public int TransitionSampleCount { get; private set; }
+
+            public int IntersectionLikeSampleCount { get; private set; }
+
+            public int IllegalLikeSampleCount { get; private set; }
+
+            public int IntersectionLikeWithConnectionLaneCount { get; private set; }
+
+            public int IntersectionLikeWithoutConnectionLaneCount { get; private set; }
+
+            private int LoggedIntersectionSampleCount { get; set; }
 
             public void RecordCandidate(CandidateInfo candidate)
             {
@@ -122,6 +141,51 @@ namespace Traffic_Law_Enforcement
                 }
 
                 m_BestCandidates[key] = candidate;
+            }
+
+            public void RecordIntersectionSample(IntersectionTransitionSample sample)
+            {
+                TransitionSampleCount += 1;
+                if (sample.IntersectionLike)
+                {
+                    IntersectionLikeSampleCount += 1;
+                    if (sample.HasToConnectionLane)
+                    {
+                        IntersectionLikeWithConnectionLaneCount += 1;
+                    }
+                    else
+                    {
+                        IntersectionLikeWithoutConnectionLaneCount += 1;
+                    }
+                }
+
+                if (sample.IllegalLike)
+                {
+                    IllegalLikeSampleCount += 1;
+                }
+
+                if (LoggedIntersectionSampleCount >= MaxIntersectionProbeLogsPerRequest)
+                {
+                    return;
+                }
+
+                bool shouldLogSample =
+                    sample.IntersectionLike ||
+                    sample.IllegalLike ||
+                    LoggedIntersectionSampleCount < MaxBaselineIntersectionProbeLogsPerRequest;
+                if (!shouldLogSample)
+                {
+                    return;
+                }
+
+                string key = sample.BuildKey();
+                if (!m_LoggedIntersectionTransitionKeys.Add(key))
+                {
+                    return;
+                }
+
+                LoggedIntersectionSampleCount += 1;
+                Mod.log.Info(sample.BuildLogLine(Request.Vehicle));
             }
 
             public string BuildLogLine()
@@ -171,6 +235,18 @@ namespace Traffic_Law_Enforcement
                     $"bestCandidates={candidateSummary}";
             }
 
+            public string BuildIntersectionSummaryLine()
+            {
+                return
+                    $"{IntersectionProbePrefix} summary " +
+                    $"veh={FocusedLoggingService.FormatEntity(Request.Vehicle)} " +
+                    $"totalSamples={TransitionSampleCount} " +
+                    $"intersectionLike={IntersectionLikeSampleCount} " +
+                    $"illegalLike={IllegalLikeSampleCount} " +
+                    $"intersectionLikeWithConnectionLane={IntersectionLikeWithConnectionLaneCount} " +
+                    $"intersectionLikeWithoutConnectionLane={IntersectionLikeWithoutConnectionLaneCount}";
+            }
+
             private static int CompareCandidateCostAscending(CandidateInfo left, CandidateInfo right)
             {
                 return left.TotalCost.CompareTo(right.TotalCost);
@@ -192,6 +268,89 @@ namespace Traffic_Law_Enforcement
                     $"baseBefore={candidate.BaseCostBefore:0.###}, edgeCost={candidate.EdgeCostAdded:0.###}, " +
                     $"factor={candidate.CostFactor:0.###}, baseAfter={candidate.BaseCostAfter:0.###}, " +
                     $"total={candidate.TotalCost:0.###}";
+            }
+        }
+
+        private readonly struct IntersectionTransitionSample
+        {
+            public readonly EdgeID FromEdge;
+            public readonly EdgeID ToEdge;
+            public readonly Entity FromOwner;
+            public readonly Entity ToOwner;
+            public readonly bool HasFromCarLane;
+            public readonly CarLaneFlags FromCarLaneFlags;
+            public readonly bool HasToCarLane;
+            public readonly CarLaneFlags ToCarLaneFlags;
+            public readonly bool HasToConnectionLane;
+            public readonly ConnectionLaneFlags ToConnectionLaneFlags;
+            public readonly bool SideConnection;
+            public readonly bool Forbidden;
+            public readonly string TurnHint;
+            public readonly bool IntersectionLike;
+            public readonly bool IllegalLike;
+
+            public IntersectionTransitionSample(
+                EdgeID fromEdge,
+                EdgeID toEdge,
+                Entity fromOwner,
+                Entity toOwner,
+                bool hasFromCarLane,
+                CarLaneFlags fromCarLaneFlags,
+                bool hasToCarLane,
+                CarLaneFlags toCarLaneFlags,
+                bool hasToConnectionLane,
+                ConnectionLaneFlags toConnectionLaneFlags,
+                bool sideConnection,
+                bool forbidden,
+                string turnHint,
+                bool intersectionLike,
+                bool illegalLike)
+            {
+                FromEdge = fromEdge;
+                ToEdge = toEdge;
+                FromOwner = fromOwner;
+                ToOwner = toOwner;
+                HasFromCarLane = hasFromCarLane;
+                FromCarLaneFlags = fromCarLaneFlags;
+                HasToCarLane = hasToCarLane;
+                ToCarLaneFlags = toCarLaneFlags;
+                HasToConnectionLane = hasToConnectionLane;
+                ToConnectionLaneFlags = toConnectionLaneFlags;
+                SideConnection = sideConnection;
+                Forbidden = forbidden;
+                TurnHint = turnHint ?? "none";
+                IntersectionLike = intersectionLike;
+                IllegalLike = illegalLike;
+            }
+
+            public string BuildKey()
+            {
+                return
+                    FromEdge.m_Index.ToString() + "|" +
+                    ToEdge.m_Index.ToString() + "|" +
+                    FromOwner.Index.ToString() + "|" +
+                    ToOwner.Index.ToString() + "|" +
+                    ((uint)FromCarLaneFlags).ToString() + "|" +
+                    ((uint)ToCarLaneFlags).ToString() + "|" +
+                    ((uint)ToConnectionLaneFlags).ToString();
+            }
+
+            public string BuildLogLine(Entity vehicle)
+            {
+                return
+                    $"{IntersectionProbePrefix} " +
+                    $"veh={FocusedLoggingService.FormatEntity(vehicle)} " +
+                    $"fromEdge={FromEdge.m_Index} " +
+                    $"toEdge={ToEdge.m_Index} " +
+                    $"fromOwner={FocusedLoggingService.FormatEntity(FromOwner)} " +
+                    $"toOwner={FocusedLoggingService.FormatEntity(ToOwner)} " +
+                    $"fromCarLaneFlags={FormatCarLaneFlags(HasFromCarLane, FromCarLaneFlags)} " +
+                    $"toCarLaneFlags={FormatCarLaneFlags(HasToCarLane, ToCarLaneFlags)} " +
+                    $"sideConnection={SideConnection.ToString().ToLowerInvariant()} " +
+                    $"forbidden={Forbidden.ToString().ToLowerInvariant()} " +
+                    $"turnHint={TurnHint} " +
+                    $"illegalLike={IllegalLike.ToString().ToLowerInvariant()} " +
+                    $"toConnectionLaneFlags={FormatConnectionLaneFlags(HasToConnectionLane, ToConnectionLaneFlags)}";
             }
         }
 
@@ -434,7 +593,7 @@ namespace Traffic_Law_Enforcement
 
         private static void AddHeapDataSinglePrefix(
             EdgeID id,
-            Edge edge,
+            PathfindEdge edge,
             EdgeFlags flags,
             RuleFlags rules,
             float baseCost,
@@ -460,12 +619,13 @@ namespace Traffic_Law_Enforcement
         private static void AddHeapDataNextPrefix(
             EdgeID id,
             EdgeID id2,
-            Edge edge,
+            PathfindEdge edge,
             EdgeFlags flags,
             RuleFlags rules,
             float baseCost,
             float costFactor,
             float2 edgeDelta,
+            UnsafePathfindData ___m_PathfindData,
             Bounds3 ___m_EndBounds,
             float ___m_HeuristicCostFactor)
         {
@@ -481,10 +641,16 @@ namespace Traffic_Law_Enforcement
                 edgeDelta,
                 ___m_EndBounds,
                 ___m_HeuristicCostFactor);
+
+            CaptureIntersectionTransitionSample(
+                id,
+                id2,
+                edge,
+                ___m_PathfindData);
         }
 
         private static void CapturePendingCandidate(
-            Edge edge,
+            PathfindEdge edge,
             EdgeID id,
             EdgeID id2,
             bool hasNextEdge,
@@ -566,8 +732,150 @@ namespace Traffic_Law_Enforcement
             }
 
             Mod.log.Info(s_CurrentContext.BuildLogLine());
+            Mod.log.Info(s_CurrentContext.BuildIntersectionSummaryLine());
             s_CurrentContext = null;
             s_PendingCandidate = null;
+        }
+
+        private static void CaptureIntersectionTransitionSample(
+            EdgeID id,
+            EdgeID id2,
+            PathfindEdge edge,
+            UnsafePathfindData pathfindData)
+        {
+            if (s_CurrentContext == null)
+            {
+                return;
+            }
+
+            if (id2.m_Index < 0 || id2.m_Index >= pathfindData.m_Edges.Length)
+            {
+                return;
+            }
+
+            World world = World.DefaultGameObjectInjectionWorld;
+            if (world == null)
+            {
+                return;
+            }
+
+            EntityManager entityManager = world.EntityManager;
+            Entity fromOwner = edge.m_Owner;
+            Entity toOwner = pathfindData.m_Edges[id2.m_Index].m_Owner;
+
+            bool hasFromCarLane = TryGetCarLane(entityManager, fromOwner, out CarLane fromCarLane);
+            bool hasToCarLane = TryGetCarLane(entityManager, toOwner, out CarLane toCarLane);
+            bool hasToConnectionLane = TryGetConnectionLane(entityManager, toOwner, out ConnectionLane toConnectionLane);
+
+            CarLaneFlags fromCarLaneFlags =
+                hasFromCarLane
+                    ? fromCarLane.m_Flags
+                    : default;
+            CarLaneFlags toCarLaneFlags =
+                hasToCarLane
+                    ? toCarLane.m_Flags
+                    : default;
+            ConnectionLaneFlags toConnectionLaneFlags =
+                hasToConnectionLane
+                    ? toConnectionLane.m_Flags
+                    : default;
+
+            bool sideConnection =
+                hasToCarLane &&
+                (toCarLaneFlags & CarLaneFlags.SideConnection) != 0;
+            bool forbidden =
+                hasToCarLane &&
+                (toCarLaneFlags & CarLaneFlags.Forbidden) != 0;
+            LaneMovement fromMovement = IntersectionMovementPolicy.GetMovement(fromCarLaneFlags);
+            LaneMovement toMovement = IntersectionMovementPolicy.GetMovement(toCarLaneFlags);
+            string turnHint = BuildTurnHint(toCarLaneFlags, toMovement);
+
+            bool intersectionLike =
+                hasToCarLane &&
+                sideConnection &&
+                (toMovement != LaneMovement.None ||
+                 (toCarLaneFlags & CarLaneFlags.Approach) != 0);
+
+            bool illegalLike =
+                intersectionLike &&
+                (forbidden ||
+                 (fromMovement != LaneMovement.None &&
+                  toMovement != LaneMovement.None &&
+                  (fromMovement & toMovement) == LaneMovement.None));
+
+            s_CurrentContext.RecordIntersectionSample(
+                new IntersectionTransitionSample(
+                    id,
+                    id2,
+                    fromOwner,
+                    toOwner,
+                    hasFromCarLane,
+                    fromCarLaneFlags,
+                    hasToCarLane,
+                    toCarLaneFlags,
+                    hasToConnectionLane,
+                    toConnectionLaneFlags,
+                    sideConnection,
+                    forbidden,
+                    turnHint,
+                    intersectionLike,
+                    illegalLike));
+        }
+
+        private static bool TryGetCarLane(
+            EntityManager entityManager,
+            Entity entity,
+            out CarLane carLane)
+        {
+            carLane = default;
+            if (entity == Entity.Null || !entityManager.Exists(entity) || !entityManager.HasComponent<CarLane>(entity))
+            {
+                return false;
+            }
+
+            carLane = entityManager.GetComponentData<CarLane>(entity);
+            return true;
+        }
+
+        private static bool TryGetConnectionLane(
+            EntityManager entityManager,
+            Entity entity,
+            out ConnectionLane connectionLane)
+        {
+            connectionLane = default;
+            if (entity == Entity.Null || !entityManager.Exists(entity) || !entityManager.HasComponent<ConnectionLane>(entity))
+            {
+                return false;
+            }
+
+            connectionLane = entityManager.GetComponentData<ConnectionLane>(entity);
+            return true;
+        }
+
+        private static string BuildTurnHint(
+            CarLaneFlags flags,
+            LaneMovement movement)
+        {
+            string movementText = IntersectionMovementPolicy.FormatMovement(movement);
+            bool approach = (flags & CarLaneFlags.Approach) != 0;
+            if (!approach)
+            {
+                return movementText;
+            }
+
+            return movement == LaneMovement.None
+                ? "approach"
+                : movementText + "+approach";
+        }
+
+        private static string FormatCarLaneFlags(bool hasCarLane, CarLaneFlags flags)
+        {
+            return hasCarLane ? flags.ToString() : "(no CarLane)";
+        }
+
+        private static string FormatConnectionLaneFlags(bool hasConnectionLane, ConnectionLaneFlags flags)
+        {
+            return hasConnectionLane ? flags.ToString() : "(no ConnectionLane)";
         }
 
         private static float CalculateTotalCost(
