@@ -11,6 +11,7 @@ namespace Traffic_Law_Enforcement
     public static class PublicTransportLaneExitPressureTelemetry
     {
         private static readonly HashSet<Entity> s_AwaitingPathRequestVehicles = new HashSet<Entity>();
+        private static readonly List<Entity> s_MissingAwaitingPathRequestVehicles = new List<Entity>();
         private static int s_AppliedCount;
         private static int s_SkippedAlreadyObsoleteCount;
         private static int s_SkippedPendingPathOwnerCount;
@@ -115,6 +116,32 @@ namespace Traffic_Law_Enforcement
             }
         }
 
+        public static void PruneMissingVehicles(EntityManager entityManager)
+        {
+            EnsureCurrentWorld();
+            if (s_AwaitingPathRequestVehicles.Count == 0)
+            {
+                return;
+            }
+
+            s_MissingAwaitingPathRequestVehicles.Clear();
+            foreach (Entity vehicle in s_AwaitingPathRequestVehicles)
+            {
+                if (!entityManager.Exists(vehicle))
+                {
+                    s_MissingAwaitingPathRequestVehicles.Add(vehicle);
+                }
+            }
+
+            for (int index = 0; index < s_MissingAwaitingPathRequestVehicles.Count; index += 1)
+            {
+                s_AwaitingPathRequestVehicles.Remove(
+                    s_MissingAwaitingPathRequestVehicles[index]);
+            }
+
+            s_MissingAwaitingPathRequestVehicles.Clear();
+        }
+
         private static void EnsureCurrentWorld()
         {
             int currentGeneration = EnforcementSaveDataSystem.RuntimeWorldGeneration;
@@ -173,6 +200,9 @@ namespace Traffic_Law_Enforcement
             {
                 return;
             }
+
+            PublicTransportLaneExitPressureTelemetry.PruneMissingVehicles(
+                EntityManager);
 
             long thresholdDayTicks = GetExitPressureThresholdDayTicks();
             long currentDayTicks = EnforcementGameTime.CurrentTimestampDayTicks;

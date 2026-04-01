@@ -1575,6 +1575,23 @@ namespace Traffic_Law_Enforcement
             long trackingMonthEndTimestamp =
                 EnforcementGameTime.GetMonthTickAtMonthIndex(
                     s_TrackingState.m_MonthIndex + 1L);
+            long currentTimestampMonthTicks =
+                EnforcementGameTime.CurrentTimestampMonthTicks;
+
+            if (monthOffset == 1L &&
+                currentTimestampMonthTicks > trackingMonthEndTimestamp)
+            {
+                if (EnforcementLoggingPolicy.ShouldLogPolicyDiagnostics())
+                {
+                    Mod.log.Info(
+                        "[ENFORCEMENT_POLICY_STATE] " +
+                        $"phase=RepairSuspiciousTrackingBaselineSkipped, reason=trackedMonthPartiallyPruned, trackingMonth={s_TrackingState.m_MonthIndex}, currentMonth={currentMonthIndex}, " +
+                        $"currentMonthTicks={currentTimestampMonthTicks}, trackedMonthEnd={trackingMonthEndTimestamp}");
+                }
+
+                return false;
+            }
+
             RollingWindowSnapshot trackedMonthSnapshot =
                 BuildSnapshotForEventWindow(
                     trackingMonthStartTimestamp,

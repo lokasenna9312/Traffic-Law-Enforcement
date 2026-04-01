@@ -1110,12 +1110,12 @@ namespace Traffic_Law_Enforcement {
                 return true;
             }
 
-            MonthlyEnforcementTrackingState trackingState =
-                monthlyTrackingState.Value;
             EnforcementPolicyImpactTrackingState policyState =
                 policyImpactTrackingState.Value;
-            return trackingState.m_MonthIndex == policyState.m_MonthIndex &&
-                   !HasMeaningfulTrackingTotals(policyState);
+            // Legacy monthly tracking may still carry the only meaningful
+            // in-progress month baseline even when the newer policy-impact
+            // tracking exists as a default/empty state with a mismatched month.
+            return !HasMeaningfulTrackingTotals(policyState);
         }
 
         private static bool HasMeaningfulTrackingTotals(MonthlyEnforcementTrackingState trackingState)
