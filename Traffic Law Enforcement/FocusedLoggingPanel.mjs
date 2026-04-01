@@ -40,6 +40,7 @@ const watchSelectedEnabledBinding = api.bindValue(group, "watchSelectedEnabled",
 const unwatchSelectedEnabledBinding = api.bindValue(group, "unwatchSelectedEnabled", false);
 const clearWatchedEnabledBinding = api.bindValue(group, "clearWatchedEnabled", false);
 const toggleBurstLoggingEnabledBinding = api.bindValue(group, "toggleBurstLoggingEnabled", false);
+const entityReferencePattern = /#\d+:v\d+/g;
 
 const initialPosition = { x: 0.6, y: 0.54 };
 const panelWidth = "420px";
@@ -73,6 +74,33 @@ const styles = {
         fontSize: "14px",
         lineHeight: 1.35,
         wordBreak: "break-word",
+    },
+    watchedVehiclesValue: {
+        flex: 1,
+        minWidth: 0,
+        display: "flex",
+        flexWrap: "wrap",
+        alignItems: "baseline",
+        color: "#ffffff",
+        fontSize: "14px",
+        lineHeight: 1.35,
+        wordBreak: "normal",
+        overflowWrap: "normal",
+    },
+    entityItem: {
+        display: "inline-flex",
+        whiteSpace: "nowrap",
+    },
+    entityLink: {
+        display: "inline",
+        color: "#9fd6ff",
+        fontSize: "14px",
+        lineHeight: 1.35,
+        fontWeight: 700,
+        cursor: "pointer",
+        textDecoration: "underline",
+        textUnderlineOffset: "2px",
+        whiteSpace: "nowrap",
     },
     message: {
         marginTop: "6px",
@@ -187,6 +215,85 @@ function Row(props) {
     );
 }
 
+function parseWatchedVehicles(text) {
+    if (!text) {
+        return {
+            entities: [],
+            suffix: "",
+        };
+    }
+
+    entityReferencePattern.lastIndex = 0;
+
+    const entities = [];
+    let lastMatch = null;
+    let match = entityReferencePattern.exec(text);
+    while (match) {
+        entities.push(match[0]);
+        lastMatch = match;
+        match = entityReferencePattern.exec(text);
+    }
+
+    if (!entities.length || !lastMatch) {
+        return {
+            entities: [],
+            suffix: text,
+        };
+    }
+
+    const suffixStart = lastMatch.index + lastMatch[0].length;
+    const suffix = text.slice(suffixStart).replace(/^\s*,?\s*/, "");
+    return {
+        entities,
+        suffix,
+    };
+}
+
+function WatchedVehiclesRow(props) {
+    if (!props.value) {
+        return null;
+    }
+
+    const parsed = parseWatchedVehicles(props.value);
+    if (!parsed.entities.length) {
+        return h(Row, props);
+    }
+
+    return h(
+        "div",
+        { style: styles.row },
+        h("div", { style: styles.label }, props.label),
+        h(
+            "div",
+            { style: styles.watchedVehiclesValue },
+            parsed.entities.map(function (entity, index) {
+                const isLast = index === parsed.entities.length - 1 && !parsed.suffix;
+                return h(
+                    "span",
+                    {
+                        key: index,
+                        style: styles.entityItem,
+                    },
+                    h(
+                        "span",
+                        {
+                            style: styles.entityLink,
+                            onMouseDown: stopEvent,
+                            onClick: function (event) {
+                                stopEvent(event);
+                                props.onSelectEntity(entity);
+                            },
+                        },
+                        entity
+                    ),
+                    !isLast ? h("span", null, ", ") : null
+                );
+            }),
+            parsed.suffix ? h("span", null, parsed.suffix) : null
+        )
+    );
+}
+
 function ActionButton(props) {
     const style = props.disabled
         ? Object.assign({}, styles.button, styles.disabledButton)
@@ -284,6 +391,10 @@ function FocusedLoggingPanel() {
         api.trigger(group, "toggleBurstLogging");
     }, []);
 
+    const onSelectWatchedVehicle = React.useCallback(function (entityText) {
+        api.trigger(group, "selectWatchedVehicle", entityText || "");
+    }, []);
+
     if (!visible) {
         return null;
     }
@@ -314,7 +425,11 @@ function FocusedLoggingPanel() {
                     h(Row, { label: selectedRoleLabelText, value: selectedRole }),
                     h(Row, { label: selectedWatchStatusLabelText, value: selectedWatchStatus }),
                     h(Row, { label: watchedCountLabelText, value: watchedCount }),
-                    h(Row, { label: watchedVehiclesLabelText, value: watchedVehicles })
+                    h(WatchedVehiclesRow, {
+                        label: watchedVehiclesLabelText,
+                        value: watchedVehicles,
+                        onSelectEntity: onSelectWatchedVehicle,
+                    })
                 ),
                 message ? h("div", { style: styles.message }, message) : null,
                 h(

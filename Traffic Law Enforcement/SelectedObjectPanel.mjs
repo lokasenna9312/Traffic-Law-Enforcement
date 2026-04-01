@@ -23,6 +23,7 @@ const messageBinding = api.bindValue(group, "message", "");
 const tleStatusBinding = api.bindValue(group, "tleStatus", "");
 const roleBinding = api.bindValue(group, "role", "");
 const publicTransportLanePolicyBinding = api.bindValue(group, "publicTransportLanePolicy", "");
+const focusLogStatusBinding = api.bindValue(group, "focusLogStatus", "");
 const vehicleIndexBinding = api.bindValue(group, "vehicleIndex", "");
 const violationPendingBinding = api.bindValue(group, "violationPending", "");
 const totalsBinding = api.bindValue(group, "totals", "");
@@ -49,6 +50,7 @@ const violationsFinesLabelTextBinding = api.bindValue(group, "violationsFinesLab
 const lastReasonLabelTextBinding = api.bindValue(group, "lastReasonLabelText", "");
 const repeatPenaltyLabelTextBinding = api.bindValue(group, "repeatPenaltyLabelText", "");
 const publicTransportLanePolicyLabelTextBinding = api.bindValue(group, "publicTransportLanePolicyLabelText", "");
+const focusLogStatusLabelTextBinding = api.bindValue(group, "focusLogStatusLabelText", "");
 const footerTextBinding = api.bindValue(group, "footerText", "");
 const expandSectionTooltipTextBinding = api.bindValue(group, "expandSectionTooltipText", "");
 const collapseSectionTooltipTextBinding = api.bindValue(group, "collapseSectionTooltipText", "");
@@ -480,6 +482,7 @@ function SelectedObjectPanel() {
     const tleStatus = api.useValue(tleStatusBinding);
     const role = api.useValue(roleBinding);
     const publicTransportLanePolicy = api.useValue(publicTransportLanePolicyBinding);
+    const focusLogStatus = api.useValue(focusLogStatusBinding);
     const vehicleIndex = api.useValue(vehicleIndexBinding);
     const violationPending = api.useValue(violationPendingBinding);
     const totals = api.useValue(totalsBinding);
@@ -506,6 +509,7 @@ function SelectedObjectPanel() {
     const lastReasonLabelText = api.useValue(lastReasonLabelTextBinding);
     const repeatPenaltyLabelText = api.useValue(repeatPenaltyLabelTextBinding);
     const publicTransportLanePolicyLabelText = api.useValue(publicTransportLanePolicyLabelTextBinding);
+    const focusLogStatusLabelText = api.useValue(focusLogStatusLabelTextBinding);
     const footerText = api.useValue(footerTextBinding);
     const expandSectionTooltipText = api.useValue(expandSectionTooltipTextBinding);
     const collapseSectionTooltipText = api.useValue(collapseSectionTooltipTextBinding);
@@ -712,7 +716,8 @@ function SelectedObjectPanel() {
                         h(
                             "div",
                             { style: styles.rows, key: "rows" },
-                            h(Row, { label: tleStatusLabelText, value: tleStatus })
+                            h(Row, { label: tleStatusLabelText, value: tleStatus }),
+                            h(Row, { label: focusLogStatusLabelText, value: focusLogStatus })
                         ),
                     ],
               ]
@@ -736,6 +741,7 @@ function SelectedObjectPanel() {
                       { style: styles.rows },
                       h(Row, { label: tleStatusLabelText, value: tleStatus }),
                       h(Row, { label: roleLabelText, value: role }),
+                      h(Row, { label: focusLogStatusLabelText, value: focusLogStatus }),
                       h(Row, { label: activeFlagsLabelText, value: violationPending }),
                       h(Row, { label: violationsFinesLabelText, value: totals }),
                       h(Row, { label: lastReasonLabelText, value: lastReason }),
