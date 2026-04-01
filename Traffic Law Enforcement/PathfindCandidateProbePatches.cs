@@ -374,14 +374,45 @@ namespace Traffic_Law_Enforcement
 
             try
             {
-                if (s_PathfindExecutorType == null ||
-                    s_WorkerExecuteMethod == null ||
-                    s_ExactIntersectionAddHeapDataMethod == null ||
-                    s_CalculateCostMethod == null ||
-                    s_ReleaseMethod == null ||
-                    s_AddHeapDataMethods.Length == 0)
+                Mod.log.Info($"{IntersectionProbePrefix} begin install");
+
+                if (s_PathfindExecutorType == null)
                 {
-                    Mod.log.Warn("Pathfind candidate probe patch skipped: target methods not found.");
+                    LogInstallFailed("resolve-executor", "PathfindExecutor type not found");
+                    return;
+                }
+
+                if (s_AddHeapDataMethods.Length == 0)
+                {
+                    LogInstallFailed("reflect-target", "no AddHeapData candidates found");
+                    return;
+                }
+
+                if (s_ExactIntersectionAddHeapDataMethod == null)
+                {
+                    LogAddHeapDataCandidates();
+                    LogInstallFailed("reflect-target", "exact 11-argument AddHeapData overload not found");
+                    return;
+                }
+
+                Mod.log.Info(
+                    $"{IntersectionProbePrefix} reflected target={DescribeMethod(s_ExactIntersectionAddHeapDataMethod)}");
+
+                if (s_WorkerExecuteMethod == null)
+                {
+                    LogInstallFailed("resolve-helper", "PathfindWorkerJob.Execute target not found");
+                    return;
+                }
+
+                if (s_CalculateCostMethod == null)
+                {
+                    LogInstallFailed("resolve-helper", "CalculateCost helper target not found");
+                    return;
+                }
+
+                if (s_ReleaseMethod == null)
+                {
+                    LogInstallFailed("resolve-helper", "Release helper target not found");
                     return;
                 }
 
@@ -417,13 +448,14 @@ namespace Traffic_Law_Enforcement
                     postfix: new HarmonyMethod(typeof(PathfindCandidateProbePatches), nameof(ReleasePostfix)));
 
                 Mod.log.Info(
-                    $"{IntersectionProbePrefix} installed target=PathfindExecutor.AddHeapData exact=true signature={DescribeMethod(s_ExactIntersectionAddHeapDataMethod)}");
+                    $"{IntersectionProbePrefix} patch applied exact=true");
                 Mod.log.Info(
                     $"Pathfind candidate probe patches applied. workerTarget={s_WorkerExecuteMethod}");
             }
             catch (Exception ex)
             {
                 s_Harmony = null;
+                LogInstallFailed("patch-apply", ex.GetType().Name + ": " + ex.Message);
                 Mod.log.Error(ex, "Failed to apply pathfind candidate probe patches.");
             }
         }
@@ -1031,6 +1063,22 @@ namespace Traffic_Law_Enforcement
                 $"FOCUSED_ROUTE_CANDIDATE_MISS: requestKey={requestKey}, " +
                 $"registeredKeyCount={s_RequestRegistry.Count}, " +
                 $"registeredSample={(registeredKeys.Length == 0 ? "none" : registeredKeys.ToString())}");
+        }
+
+        private static void LogInstallFailed(string stage, string reason)
+        {
+            Mod.log.Info(
+                $"{IntersectionProbePrefix} install failed stage={stage} reason={reason}");
+        }
+
+        private static void LogAddHeapDataCandidates()
+        {
+            for (int index = 0; index < s_AddHeapDataMethods.Length; index += 1)
+            {
+                MethodInfo candidate = s_AddHeapDataMethods[index];
+                Mod.log.Info(
+                    $"{IntersectionProbePrefix} candidate[{index}]={DescribeMethod(candidate)}");
+            }
         }
 
         private static MethodInfo FindExactIntersectionAddHeapDataMethod()
