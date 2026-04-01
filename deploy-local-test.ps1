@@ -31,15 +31,13 @@ Get-ChildItem -Path $buildOutput -Filter '*.dll' | ForEach-Object {
     Copy-Item $_.FullName $deployRoot -Force
 }
 
-
 Get-ChildItem -Path $buildOutput -Filter '*.pdb' | ForEach-Object {
     Copy-Item $_.FullName $deployRoot -Force
 }
 
-# mod.json 복사 추가
-$modJsonPath = Join-Path $buildOutput 'mod.json'
-if (Test-Path $modJsonPath) {
-    Copy-Item $modJsonPath $deployRoot -Force
+$publishConfigPath = Join-Path $workspaceRoot 'Traffic Law Enforcement\Properties\PublishConfiguration.xml'
+if (Test-Path $publishConfigPath) {
+    Copy-Item $publishConfigPath $deployRoot -Force
 }
 
 Write-Output "Deployed local smoke-test files to: $deployRoot"

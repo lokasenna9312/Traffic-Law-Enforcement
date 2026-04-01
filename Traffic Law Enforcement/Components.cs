@@ -31,8 +31,10 @@ namespace Traffic_Law_Enforcement
 
     public struct PublicTransportLanePermissionState : IComponentData
     {
+        public PublicTransportLaneAccessBits m_PublicTransportLaneAccessBits;
         public CarFlags m_OriginalPublicTransportLaneFlags;
         public byte m_EmergencyActive;
+        public byte m_ImmediateEntryGraceConsumed;
     }
 
     public struct PublicTransportLaneType3UsageState : IComponentData

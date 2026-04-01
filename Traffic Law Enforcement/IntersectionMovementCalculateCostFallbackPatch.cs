@@ -72,27 +72,20 @@ namespace Traffic_Law_Enforcement
                 return;
             }
 
-            List<Entity> entityArgs = new List<Entity>(4);
-            for (int index = 0; index < __args.Length; index += 1)
-            {
-                if (__args[index] is Entity entity && entity != Entity.Null)
-                {
-                    entityArgs.Add(entity);
-                }
-            }
-
-            if (entityArgs.Count < 2)
-            {
-                return;
-            }
-
             EntityManager entityManager = world.EntityManager;
-            for (int sourceIndex = 0; sourceIndex < entityArgs.Count - 1; sourceIndex += 1)
+            for (int sourceIndex = 0; sourceIndex < __args.Length - 1; sourceIndex += 1)
             {
-                for (int targetIndex = sourceIndex + 1; targetIndex < entityArgs.Count; targetIndex += 1)
+                if (!(__args[sourceIndex] is Entity sourceLane) || sourceLane == Entity.Null)
                 {
-                    Entity sourceLane = entityArgs[sourceIndex];
-                    Entity targetLane = entityArgs[targetIndex];
+                    continue;
+                }
+
+                for (int targetIndex = sourceIndex + 1; targetIndex < __args.Length; targetIndex += 1)
+                {
+                    if (!(__args[targetIndex] is Entity targetLane) || targetLane == Entity.Null)
+                    {
+                        continue;
+                    }
 
                     if (!IntersectionMovementPolicy.TryGetIllegalIntersectionMovement(
                             entityManager,

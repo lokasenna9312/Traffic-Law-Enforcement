@@ -13,6 +13,9 @@ namespace Traffic_Law_Enforcement
         private EntityQuery m_ChangedTransitionQuery;
         private EntityQuery m_EventBufferQuery;
         private Entity m_EventEntity;
+        private EntityTypeHandle m_EntityTypeHandle;
+        private ComponentTypeHandle<VehicleLaneHistory> m_HistoryTypeHandle;
+        private ComponentTypeHandle<CarCurrentLane> m_CurrentLaneTypeHandle;
         private ComponentLookup<Car> m_CarData;
         private ComponentLookup<CarLane> m_CarLaneData;
         private ComponentLookup<EdgeLane> m_EdgeLaneData;
@@ -67,27 +70,34 @@ namespace Traffic_Law_Enforcement
             }
 
             m_AnalysisStateData.Update(this);
+            m_EntityTypeHandle = GetEntityTypeHandle();
+            m_HistoryTypeHandle = GetComponentTypeHandle<VehicleLaneHistory>(true);
 
             bool enforcementActive =
                 Mod.IsMidBlockCrossingEnforcementEnabled ||
                 Mod.IsIntersectionMovementEnforcementEnabled;
 
-            NativeArray<Entity> vehicles = m_ChangedTransitionQuery.ToEntityArray(Allocator.Temp);
-            NativeArray<VehicleLaneHistory> histories =
-                m_ChangedTransitionQuery.ToComponentDataArray<VehicleLaneHistory>(Allocator.Temp);
-
+            NativeArray<ArchetypeChunk> chunks = m_ChangedTransitionQuery.ToArchetypeChunkArray(Allocator.Temp);
             try
             {
                 if (!enforcementActive)
                 {
-                    for (int index = 0; index < vehicles.Length; index += 1)
+                    for (int chunkIndex = 0; chunkIndex < chunks.Length; chunkIndex += 1)
                     {
-                        SyncAnalysisState(vehicles[index], histories[index]);
+                        ArchetypeChunk chunk = chunks[chunkIndex];
+                        NativeArray<Entity> vehicles = chunk.GetNativeArray(m_EntityTypeHandle);
+                        NativeArray<VehicleLaneHistory> histories = chunk.GetNativeArray(ref m_HistoryTypeHandle);
+
+                        for (int index = 0; index < vehicles.Length; index += 1)
+                        {
+                            SyncAnalysisState(vehicles[index], histories[index]);
+                        }
                     }
 
                     return;
                 }
 
+                m_CurrentLaneTypeHandle = GetComponentTypeHandle<CarCurrentLane>(true);
                 m_CarData.Update(this);
                 m_CarLaneData.Update(this);
                 m_EdgeLaneData.Update(this);
@@ -102,13 +112,18 @@ namespace Traffic_Law_Enforcement
 
                 DynamicBuffer<DetectedLaneTransitionViolation> events =
                     EntityManager.GetBuffer<DetectedLaneTransitionViolation>(m_EventEntity);
-                events.Clear();
-
-                NativeArray<CarCurrentLane> currentLanes =
-                    m_ChangedTransitionQuery.ToComponentDataArray<CarCurrentLane>(Allocator.Temp);
-
-                try
+                if (events.Length > 0)
                 {
+                    events.Clear();
+                }
+
+                for (int chunkIndex = 0; chunkIndex < chunks.Length; chunkIndex += 1)
+                {
+                    ArchetypeChunk chunk = chunks[chunkIndex];
+                    NativeArray<Entity> vehicles = chunk.GetNativeArray(m_EntityTypeHandle);
+                    NativeArray<VehicleLaneHistory> histories = chunk.GetNativeArray(ref m_HistoryTypeHandle);
+                    NativeArray<CarCurrentLane> currentLanes = chunk.GetNativeArray(ref m_CurrentLaneTypeHandle);
+
                     for (int index = 0; index < vehicles.Length; index += 1)
                     {
                         ProcessTransition(
@@ -118,15 +133,10 @@ namespace Traffic_Law_Enforcement
                             events);
                     }
                 }
-                finally
-                {
-                    currentLanes.Dispose();
-                }
             }
             finally
             {
-                vehicles.Dispose();
-                histories.Dispose();
+                chunks.Dispose();
             }
         }
 
@@ -188,7 +198,7 @@ namespace Traffic_Law_Enforcement
             }
 
             bool logIntersectionCandidate =
-                EnforcementLoggingPolicy.ShouldLogEnforcementEvents() &&
+                EnforcementLoggingPolicy.ShouldLogVehicleSpecificEnforcementEvent(vehicle) &&
                 Mod.IsIntersectionMovementEnforcementEnabled &&
                 (currentLane.m_LaneFlags & Game.Vehicles.CarLaneFlags.Connection) != 0 &&
                 m_IntersectionTransitionDiagnosticCount < MaxIntersectionTransitionDiagnostics;
@@ -237,122 +247,15 @@ namespace Traffic_Law_Enforcement
             }
         }
 
-        private bool TryDetectMidBlockCrossing(VehicleLaneHistory history, out LaneTransitionViolationReasonCode reasonCode)
+        private bool TryDetectMidBlockCrossing(
+            VehicleLaneHistory history,
+            out LaneTransitionViolationReasonCode reasonCode)
         {
-            reasonCode = LaneTransitionViolationReasonCode.None;
-
-            if (m_EdgeLaneData.HasComponent(history.m_PreviousLane) &&
-                m_EdgeLaneData.HasComponent(history.m_CurrentLane))
-            {
-                if (!m_CarLaneData.TryGetComponent(history.m_PreviousLane, out CarLane previousCarLane) ||
-                    !m_CarLaneData.TryGetComponent(history.m_CurrentLane, out CarLane currentCarLane))
-                {
-                    return false;
-                }
-
-                EdgeLane previousEdgeLane = m_EdgeLaneData[history.m_PreviousLane];
-                EdgeLane currentEdgeLane = m_EdgeLaneData[history.m_CurrentLane];
-                bool sameOwner =
-                    history.m_PreviousLaneOwner == history.m_CurrentLaneOwner &&
-                    history.m_CurrentLaneOwner != Entity.Null;
-                bool oppositeDirections = IsOppositeDirection(previousEdgeLane, currentEdgeLane);
-                bool sameCarriageway =
-                    previousCarLane.m_CarriagewayGroup == currentCarLane.m_CarriagewayGroup;
-
-                if (sameOwner && oppositeDirections && sameCarriageway)
-                {
-                    reasonCode = LaneTransitionViolationReasonCode.OppositeFlowSameRoadSegment;
-                    return true;
-                }
-            }
-
-            if (!m_EdgeLaneData.HasComponent(history.m_PreviousLane) ||
-                !m_CarLaneData.TryGetComponent(history.m_PreviousLane, out CarLane sourceLane))
-            {
-                return TryDetectOutboundAccessCrossing(history, out reasonCode);
-            }
-
-            if (!LaneAllowsSideAccess(sourceLane))
-            {
-                if (m_GarageLaneData.HasComponent(history.m_CurrentLane))
-                {
-                    reasonCode = LaneTransitionViolationReasonCode.EnteredGarageAccessWithoutSideAccess;
-                    return true;
-                }
-
-                if (m_ParkingLaneData.HasComponent(history.m_CurrentLane))
-                {
-                    reasonCode = LaneTransitionViolationReasonCode.EnteredParkingAccessWithoutSideAccess;
-                    return true;
-                }
-
-                if (m_ConnectionLaneData.TryGetComponent(history.m_CurrentLane, out ConnectionLane connectionLane))
-                {
-                    if ((connectionLane.m_Flags & ConnectionLaneFlags.Parking) != 0)
-                    {
-                        reasonCode = LaneTransitionViolationReasonCode.EnteredParkingConnectionWithoutSideAccess;
-                        return true;
-                    }
-
-                    if ((connectionLane.m_Flags & ConnectionLaneFlags.Road) == 0)
-                    {
-                        reasonCode = LaneTransitionViolationReasonCode.EnteredBuildingAccessConnectionWithoutSideAccess;
-                        return true;
-                    }
-                }
-            }
-
-            return TryDetectOutboundAccessCrossing(history, out reasonCode);
-        }
-
-        private bool TryDetectOutboundAccessCrossing(VehicleLaneHistory history, out LaneTransitionViolationReasonCode reasonCode)
-        {
-            reasonCode = LaneTransitionViolationReasonCode.None;
-
-            if (!IsAccessOrigin(history.m_PreviousLane))
-            {
-                return false;
-            }
-
-            if (!m_EdgeLaneData.HasComponent(history.m_CurrentLane) ||
-                !m_CarLaneData.TryGetComponent(history.m_CurrentLane, out CarLane targetLane))
-            {
-                return false;
-            }
-
-            if (LaneAllowsSideAccess(targetLane))
-            {
-                return false;
-            }
-
-            if (m_ParkingLaneData.HasComponent(history.m_PreviousLane))
-            {
-                reasonCode = LaneTransitionViolationReasonCode.ExitedParkingAccessWithoutSideAccess;
-                return true;
-            }
-
-            if (m_GarageLaneData.HasComponent(history.m_PreviousLane))
-            {
-                reasonCode = LaneTransitionViolationReasonCode.ExitedGarageAccessWithoutSideAccess;
-                return true;
-            }
-
-            if (m_ConnectionLaneData.TryGetComponent(history.m_PreviousLane, out ConnectionLane connectionLane))
-            {
-                if ((connectionLane.m_Flags & ConnectionLaneFlags.Parking) != 0)
-                {
-                    reasonCode = LaneTransitionViolationReasonCode.ExitedParkingConnectionWithoutSideAccess;
-                    return true;
-                }
-
-                if ((connectionLane.m_Flags & ConnectionLaneFlags.Road) == 0)
-                {
-                    reasonCode = LaneTransitionViolationReasonCode.ExitedBuildingAccessConnectionWithoutSideAccess;
-                    return true;
-                }
-            }
-
-            return false;
+            return MidBlockCrossingPolicy.TryGetIllegalTransition(
+                EntityManager,
+                history.m_PreviousLane,
+                history.m_CurrentLane,
+                out reasonCode);
         }
 
         private bool TryDetectIntersectionMovementViolation(VehicleLaneHistory history, CarCurrentLane currentLane, out LaneMovement actualMovement, out LaneMovement allowedMovement)

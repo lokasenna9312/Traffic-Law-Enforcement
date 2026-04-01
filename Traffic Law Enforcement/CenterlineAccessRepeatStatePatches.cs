@@ -26,7 +26,7 @@ namespace Traffic_Law_Enforcement
             {
                 dictionary.Remove(vehicle);
 
-                if (EnforcementLoggingPolicy.ShouldLogEnforcementEvents())
+                if (EnforcementLoggingPolicy.ShouldLogVehicleSpecificEnforcementEvent(vehicle))
                 {
                     Mod.log.Info($"Reset CENTERLINE repeat invalidation state after path refresh: vehicle={vehicle}, pathState={pathOwner.m_State}");
                 }

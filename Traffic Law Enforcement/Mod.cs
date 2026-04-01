@@ -10,6 +10,8 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using UnityEngine;
+using System.Reflection;
+using System.Xml.Linq;
 
 namespace Traffic_Law_Enforcement
 {
@@ -22,38 +24,59 @@ namespace Traffic_Law_Enforcement
         public static bool IsPublicTransportLaneEnforcementEnabled => EnforcementGameplaySettingsService.Current.EnablePublicTransportLaneEnforcement;
         public static bool IsMidBlockCrossingEnforcementEnabled => EnforcementGameplaySettingsService.Current.EnableMidBlockCrossingEnforcement;
         public static bool IsIntersectionMovementEnforcementEnabled => EnforcementGameplaySettingsService.Current.EnableIntersectionMovementEnforcement;
+        public static string CurrentModDisplayName { get; private set; } = "unknown";
+        public static string CurrentModVersion { get; private set; } = "unknown";
+        public static string CurrentGameVersion { get; private set; } = "unknown";
         private Setting m_Setting;
 
         public void OnLoad(UpdateSystem updateSystem)
         {
             log.Info(nameof(OnLoad));
 
+            string modAssetPath = null;
             if (GameManager.instance.modManager.TryGetExecutableAsset(this, out var asset))
+            {
+                modAssetPath = asset.path;
                 log.Info($"Current mod asset at {asset.path}");
+            }
 
             EnforcementGameTime.Reset();
-
+            BurstLoggingService.Reset();
+            FocusedLoggingService.Reset();
+            ObsoleteAttemptCorrelationService.Reset();
+            PublicTransportLaneExitPressureTelemetry.Reset();
             m_Setting = new Setting(this);
             Settings = m_Setting;
             AssetDatabase.global.LoadSettings(nameof(Traffic_Law_Enforcement), m_Setting, new Setting(this));
+            m_Setting.ApplyEnforcementLoggingMigrationIfNeeded();
+            m_Setting.RegisterKeyBindings();
+
+            ResolveAndCacheModMetadata(modAssetPath);
+            LogModVersionInfo(modAssetPath);
+
             m_Setting.RegisterInOptionsUI();
             RegisterTextLocales();
             BudgetUIPatches.Apply();
             VehicleUtilsPatches.Apply();
-            IntersectionMovementPathfindPatches.Apply();
-            IntersectionMovementPathfindReflectionPatches.Apply();
+            FocusedRouteDiagnosticsPatchController.Sync();
+            MidBlockAccessPathfindingPenaltyPatches.Apply();
+            IntersectionMovementPathfindingPenaltyPatches.Apply();
+            if (!IntersectionMovementPathfindingPenaltyPatches.IsApplied)
+            {
+                IntersectionMovementPathfindingPenaltyReflectionPatches.Apply();
+            }
             updateSystem.UpdateAfter<EnforcementSaveDataSystem, EnforcementGameTimeSystem>(SystemUpdatePhase.GameSimulation);
+            updateSystem.UpdateBefore<EnforcementSaveDataSystem, VehicleTrafficLawProfileSystem>(SystemUpdatePhase.GameSimulation);
             updateSystem.UpdateBefore<VehicleTrafficLawProfileSystem, PublicTransportLanePermissionSystem>(SystemUpdatePhase.GameSimulation);
             updateSystem.UpdateBefore<VehicleTrafficLawProfileSystem, CarNavigationSystem>(SystemUpdatePhase.GameSimulation);
-            updateSystem.UpdateBefore<PathfindingMoneyPenaltySystem, CarNavigationSystem>(SystemUpdatePhase.GameSimulation);
+            updateSystem.UpdateBefore<MidBlockPathfindingBiasSystem, CarNavigationSystem>(SystemUpdatePhase.GameSimulation);
             updateSystem.UpdateBefore<PublicTransportLanePermissionSystem, CarNavigationSystem>(SystemUpdatePhase.GameSimulation);
             updateSystem.UpdateBefore<PublicTransportLanePermissionSystem, PublicTransportLaneViolationSystem>(SystemUpdatePhase.GameSimulation);
             updateSystem.UpdateBefore<IntersectionMovementPenaltyCacheSystem, CarNavigationSystem>(SystemUpdatePhase.GameSimulation);
-            updateSystem.UpdateAfter<CenterlineAccessObsoleteSystem, PublicTransportLanePermissionSystem>(SystemUpdatePhase.GameSimulation);
-            updateSystem.UpdateAfter<CenterlineAccessObsoleteSystem, PublicTransportLaneExitPressureSystem>(SystemUpdatePhase.GameSimulation);
-            updateSystem.UpdateBefore<CenterlineAccessObsoleteSystem, CarNavigationSystem>(SystemUpdatePhase.GameSimulation);
             updateSystem.UpdateAfter<EnforcementGameTimeSystem, CarNavigationSystem>(SystemUpdatePhase.GameSimulation);
-            updateSystem.UpdateAfter<SettingsChangeLoggingSystem, EnforcementGameTimeSystem>(SystemUpdatePhase.GameSimulation);
+            updateSystem.UpdateAfter<RouteAttemptTrackingSystem, CarNavigationSystem>(SystemUpdatePhase.GameSimulation);
+            updateSystem.UpdateBefore<RouteAttemptTrackingSystem, RoutePenaltyRerouteLoggingSystem>(SystemUpdatePhase.GameSimulation);
+            updateSystem.UpdateBefore<RouteAttemptTrackingSystem, PublicTransportLaneViolationApplySystem>(SystemUpdatePhase.GameSimulation);
             updateSystem.UpdateAfter<MonthlyEnforcementChirperSystem, EnforcementGameTimeSystem>(SystemUpdatePhase.GameSimulation);
             updateSystem.UpdateBefore<MonthlyEnforcementChirperSystem, CreateChirpSystem>(SystemUpdatePhase.GameSimulation);
             updateSystem.UpdateAfter<VehicleLaneHistorySystem, EnforcementGameTimeSystem>(SystemUpdatePhase.GameSimulation);
@@ -66,15 +89,26 @@ namespace Traffic_Law_Enforcement
             updateSystem.UpdateAfter<LaneTransitionViolationApplySystem, LaneTransitionViolationSystem>(SystemUpdatePhase.GameSimulation);
             updateSystem.UpdateAfter<EnforcementFineMoneySystem, PublicTransportLaneViolationApplySystem>(SystemUpdatePhase.GameSimulation);
             updateSystem.UpdateAfter<EnforcementFineMoneySystem, LaneTransitionViolationApplySystem>(SystemUpdatePhase.GameSimulation);
+            updateSystem.UpdateAfter<SelectedObjectBridgeSystem, VehicleLaneHistorySystem>(SystemUpdatePhase.GameSimulation);
+            updateSystem.UpdateAfter<SelectedObjectBridgeSystem, PublicTransportLaneViolationApplySystem>(SystemUpdatePhase.GameSimulation);
+            updateSystem.UpdateAfter<SelectedObjectBridgeSystem, LaneTransitionViolationApplySystem>(SystemUpdatePhase.GameSimulation);
+            updateSystem.UpdateAt<SelectedObjectPanelUISystem>(SystemUpdatePhase.UIUpdate);
+            updateSystem.UpdateAt<FocusedLoggingPanelUISystem>(SystemUpdatePhase.UIUpdate);
         }
 
         public void OnDispose()
         {
             log.Info(nameof(OnDispose));
+            BurstLoggingService.Reset();
+            FocusedLoggingService.Reset();
+            ObsoleteAttemptCorrelationService.Reset();
+            PublicTransportLaneExitPressureTelemetry.Reset();
             BudgetUIPatches.Remove();
+            FocusedRouteDiagnosticsPatchController.RemoveAll();
             VehicleUtilsPatches.Remove();
-            IntersectionMovementPathfindPatches.Remove();
-            IntersectionMovementPathfindReflectionPatches.Remove();
+            MidBlockAccessPathfindingPenaltyPatches.Remove();
+            IntersectionMovementPathfindingPenaltyPatches.Remove();
+            IntersectionMovementPathfindingPenaltyReflectionPatches.Remove();
             if (m_Setting != null)
             {
                 m_Setting.UnregisterInOptionsUI();
@@ -108,7 +142,7 @@ namespace Traffic_Law_Enforcement
 
             foreach (string filePath in files)
             {
-                string localeId = Path.GetFileNameWithoutExtension(filePath);
+                string localeId = NormalizeLocaleId(Path.GetFileNameWithoutExtension(filePath));
 
                 if (string.Equals(localeId, "en-US", StringComparison.OrdinalIgnoreCase))
                 {
@@ -119,7 +153,7 @@ namespace Traffic_Law_Enforcement
 
             foreach (string filePath in files)
             {
-                string localeId = Path.GetFileNameWithoutExtension(filePath);
+                string localeId = NormalizeLocaleId(Path.GetFileNameWithoutExtension(filePath));
                 Dictionary<string, string> entries = PropertiesLocaleSource.LoadKeyValueFile(filePath);
 
                 ValidateTextLocaleFile(localeId, entries, englishEntries, keyMap);
@@ -133,6 +167,21 @@ namespace Traffic_Law_Enforcement
 
                 localizationManager.AddSource(localeId, new PropertiesLocaleSource(filePath, keyMap));
                 log.Info($"Registered locale {localeId} from {Path.GetFileName(filePath)}");
+            }
+        }
+
+        private static string NormalizeLocaleId(string localeId)
+        {
+            switch (localeId)
+            {
+                case "zh-CN":
+                    return "zh-HANS";
+
+                case "zh-TW":
+                    return "zh-HANT";
+
+                default:
+                    return localeId;
             }
         }
 
@@ -153,12 +202,63 @@ namespace Traffic_Law_Enforcement
                     systemLanguage = SystemLanguage.Korean;
                     return true;
 
+                case "de-DE":
+                    localizedName = "Deutsch";
+                    systemLanguage = SystemLanguage.German;
+                    return true;
+
+                case "es-ES":
+                    localizedName = "Español";
+                    systemLanguage = SystemLanguage.Spanish;
+                    return true;
+
+                case "fr-FR":
+                    localizedName = "Français";
+                    systemLanguage = SystemLanguage.French;
+                    return true;
+
+                case "it-IT":
+                    localizedName = "Italiano";
+                    systemLanguage = SystemLanguage.Italian;
+                    return true;
+
+                case "ja-JP":
+                    localizedName = "日本語";
+                    systemLanguage = SystemLanguage.Japanese;
+                    return true;
+
+                case "pl-PL":
+                    localizedName = "Polski";
+                    systemLanguage = SystemLanguage.Polish;
+                    return true;
+
+                case "pt-BR":
+                    localizedName = "Português (Brasil)";
+                    systemLanguage = SystemLanguage.Portuguese;
+                    return true;
+
+                case "ru-RU":
+                    localizedName = "Русский";
+                    systemLanguage = SystemLanguage.Russian;
+                    return true;
+
+                case "zh-HANS":
+                    localizedName = "简体中文";
+                    systemLanguage = SystemLanguage.ChineseSimplified;
+                    return true;
+
+                case "zh-HANT":
+                    localizedName = "繁體中文";
+                    systemLanguage = SystemLanguage.ChineseTraditional;
+                    return true;
+
                 default:
                     localizedName = localeId;
                     systemLanguage = SystemLanguage.English;
                     return true;
             }
         }
+
         private string GetLocalizationDirectory()
         {
             if (GameManager.instance.modManager.TryGetExecutableAsset(this, out var asset) &&
@@ -232,5 +332,94 @@ namespace Traffic_Law_Enforcement
                 log.Warn($"[{localeId}] Extra locale key not present in en-US: {extraKey}");
             }
         }
+
+        private void LogModVersionInfo(string modAssetPath)
+        {
+            Assembly assembly = typeof(Mod).Assembly;
+            string assemblyVersion = assembly.GetName().Version?.ToString() ?? "unknown";
+
+            log.Info(
+                "[MODINFO] " +
+                $"name={CurrentModDisplayName}, " +
+                $"modVersion={CurrentModVersion}, " +
+                $"gameVersion={CurrentGameVersion}, " +
+                $"assemblyVersion={assemblyVersion}, " +
+                $"assetPath={FirstNonBlank(modAssetPath, "unknown")}");
+        }
+
+        private void ResolveAndCacheModMetadata(string modAssetPath)
+        {
+            Assembly assembly = typeof(Mod).Assembly;
+            string assemblyVersion = assembly.GetName().Version?.ToString();
+
+            string modRootDirectory = GetModRootDirectory(modAssetPath);
+
+            CurrentModDisplayName =
+                ReadPublishConfigurationValue(modRootDirectory, "DisplayName") ??
+                "unknown";
+
+            CurrentModVersion =
+                ReadPublishConfigurationValue(modRootDirectory, "ModVersion") ??
+                assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ??
+                assembly.GetCustomAttribute<AssemblyFileVersionAttribute>()?.Version ??
+                assemblyVersion ??
+                "unknown";
+
+            CurrentGameVersion =
+                ReadPublishConfigurationValue(modRootDirectory, "GameVersion") ??
+                "unknown";
+        }
+
+        private static string GetModRootDirectory(string modAssetPath)
+        {
+            if (string.IsNullOrWhiteSpace(modAssetPath))
+            {
+                return null;
+            }
+
+            return File.Exists(modAssetPath)
+                ? Path.GetDirectoryName(modAssetPath)
+                : modAssetPath;
+        }
+
+        private static string ReadPublishConfigurationValue(string modRootDirectory, string elementName)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(modRootDirectory) || string.IsNullOrWhiteSpace(elementName))
+                {
+                    return null;
+                }
+
+                string publishConfigurationPath = Path.Combine(modRootDirectory, "PublishConfiguration.xml");
+                if (!File.Exists(publishConfigurationPath))
+                {
+                    return null;
+                }
+
+                XElement root = XDocument.Load(publishConfigurationPath).Root;
+                XElement element = root?.Element(elementName);
+                return element?.Attribute("Value")?.Value;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private static string FirstNonBlank(params string[] values)
+        {
+            for (int index = 0; index < values.Length; index += 1)
+            {
+                string value = values[index];
+                if (!string.IsNullOrWhiteSpace(value))
+                {
+                    return value;
+                }
+            }
+
+            return null;
+        }
     }
 }
+

@@ -1,14 +1,18 @@
 using System.Collections.Generic;
 using Colossal.Serialization.Entities;
 using Game;
+using Game.Vehicles;
 using Game.Serialization;
+using Game.Simulation;
+using Unity.Collections;
 using Unity.Entities;
-
-namespace Traffic_Law_Enforcement
-{
-    public partial class EnforcementSaveDataSystem : GameSystemBase, IDefaultSerializable, ISerializable, IPreDeserialize, IPostDeserialize
-    {
-        private const int kSerializationVersion = 7;
+namespace Traffic_Law_Enforcement {
+    public partial class EnforcementSaveDataSystem : GameSystemBase,
+                                                     IDefaultSerializable,
+                                                     ISerializable,
+                                                     IPreDeserialize,
+                                                     IPostDeserialize {
+        private const int kSerializationVersion = 12;
 
         private EntityQuery m_StatisticsQuery;
         private EntityQuery m_PublicTransportLaneViolationQuery;
@@ -19,316 +23,231 @@ namespace Traffic_Law_Enforcement
         private bool m_HasDeserializedData;
         private bool m_ShouldClearLegacyRuntimeState;
         private bool m_PendingPostDeserializeApply;
+        public static int RuntimeWorldGeneration { get; private set; }
+        private EntityQuery m_PublicTransportLaneProfileQuery;
+        private EntityQuery m_PersistedPublicTransportLaneAccessStateQuery;
 
-        protected override void OnCreate()
-        {
-            base.OnCreate();
-            m_StatisticsQuery = GetEntityQuery(ComponentType.ReadWrite<TrafficLawEnforcementStatistics>());
-            m_PublicTransportLaneViolationQuery = GetEntityQuery(ComponentType.ReadOnly<PublicTransportLaneViolation>());
-            m_PublicTransportLanePermissionStateQuery = GetEntityQuery(ComponentType.ReadOnly<PublicTransportLanePermissionState>());
-            m_PublicTransportLaneType2UsageStateQuery = GetEntityQuery(ComponentType.ReadOnly<PublicTransportLaneType2UsageState>());
-            m_PublicTransportLaneType3UsageStateQuery = GetEntityQuery(ComponentType.ReadOnly<PublicTransportLaneType3UsageState>());
-            m_PublicTransportLaneType4UsageStateQuery = GetEntityQuery(ComponentType.ReadOnly<PublicTransportLaneType4UsageState>());
+        private readonly List<LoadedPublicTransportLaneVehicleState>
+            m_LoadedPublicTransportLaneVehicleStates =
+                new List<LoadedPublicTransportLaneVehicleState>();
+
+        private struct LoadedPublicTransportLaneVehicleState {
+            public Entity Vehicle;
+            public byte ShouldTrack;
+            public byte EmergencyVehicle;
+            public PublicTransportLaneAccessBits AccessBits;
         }
 
-        protected override void OnUpdate()
-        {
-            if (!m_PendingPostDeserializeApply)
-            {
-                return;
-            }
+        private readonly struct MonthlyTrackingReadResult {
+            public readonly MonthlyEnforcementTrackingState? TrackingState;
+            public readonly bool MigratedLegacyPathRequestTracking;
 
-            ApplyLoadedStateToWorld();
-            m_PendingPostDeserializeApply = false;
-        }
-
-        public void SetDefaults(Context context)
-        {
-            ResetRuntimeState();
-            EnforcementGameplaySettingsService.Apply(CreateInitialGameplaySettings(context));
-            m_HasDeserializedData = false;
-            m_ShouldClearLegacyRuntimeState = context.purpose == Purpose.LoadGame;
-            m_PendingPostDeserializeApply = true;
-        }
-
-        public void PreDeserialize(Context context)
-        {
-            ResetRuntimeState();
-            m_HasDeserializedData = false;
-            m_ShouldClearLegacyRuntimeState = false;
-            m_PendingPostDeserializeApply = false;
-        }
-
-        public void PostDeserialize(Context context)
-        {
-            m_PendingPostDeserializeApply = true;
-        }
-
-        public void Serialize<TWriter>(TWriter writer) where TWriter : IWriter
-        {
-            writer.Write(kSerializationVersion);
-            WriteGameplaySettings(writer, EnforcementGameplaySettingsService.Current);
-
-            TrafficLawEnforcementStatistics statistics = EnforcementTelemetry.GetStatisticsSnapshot();
-            writer.Write(statistics.m_PublicTransportLaneViolationCount);
-            writer.Write(statistics.m_ActivePublicTransportLaneViolatorCount);
-            writer.Write(statistics.m_MidBlockCrossingViolationCount);
-            writer.Write(statistics.m_IntersectionMovementViolationCount);
-            writer.Write(EnforcementTelemetry.TotalFineAmount);
-
-            IReadOnlyDictionary<int, (int violationCount, int fineTotal)> vehiclePenaltySnapshot = EnforcementTelemetry.GetVehiclePenaltySnapshot();
-            writer.Write(vehiclePenaltySnapshot.Count);
-            foreach (KeyValuePair<int, (int violationCount, int fineTotal)> pair in vehiclePenaltySnapshot)
-            {
-                writer.Write(pair.Key);
-                writer.Write(pair.Value.violationCount);
-                writer.Write(pair.Value.fineTotal);
-            }
-
-            IReadOnlyCollection<EnforcementRecord> recentRecords = EnforcementTelemetry.GetRecentRecordsSnapshot();
-            writer.Write(recentRecords.Count);
-            foreach (EnforcementRecord record in recentRecords)
-            {
-                writer.Write(record.Kind);
-                writer.Write(record.VehicleId);
-                writer.Write(record.LaneId);
-                writer.Write(record.FineAmount);
-                writer.Write(record.Reason);
-            }
-
-            IReadOnlyCollection<(string kind, int vehicleId, long timestampMonthTicks)> violationTimestamps = EnforcementTelemetry.GetViolationTimestampSnapshot();
-            writer.Write(violationTimestamps.Count);
-            foreach ((string kind, int vehicleId, long timestampMonthTicks) entry in violationTimestamps)
-            {
-                writer.Write(entry.kind);
-                writer.Write(entry.vehicleId);
-                writer.Write(entry.timestampMonthTicks);
-            }
-
-            IReadOnlyCollection<EnforcementBudgetUIService.FineIncomeEvent> fineIncomeEvents = EnforcementBudgetUIService.GetFineIncomeEventSnapshot();
-            writer.Write(fineIncomeEvents.Count);
-            foreach (EnforcementBudgetUIService.FineIncomeEvent entry in fineIncomeEvents)
-            {
-                writer.Write(entry.TimestampMonthTicks);
-                writer.Write(entry.Amount);
-                writer.Write(entry.Kind);
-            }
-
-            bool hasTrackingState = MonthlyEnforcementChirperService.TryGetTrackingState(out MonthlyEnforcementTrackingState trackingState);
-            writer.Write(hasTrackingState);
-            if (hasTrackingState)
-            {
-                writer.Write(trackingState.m_MonthIndex);
-                writer.Write(trackingState.m_TotalPathRequestCount);
-                writer.Write(trackingState.m_PublicTransportLaneCount);
-                writer.Write(trackingState.m_MidBlockCrossingCount);
-                writer.Write(trackingState.m_IntersectionMovementCount);
-                writer.Write(trackingState.m_TotalFineAmount);
-                writer.Write(trackingState.m_TotalAvoidedPathCount);
-                writer.Write(trackingState.m_PublicTransportLaneFineAmount);
-                writer.Write(trackingState.m_MidBlockCrossingFineAmount);
-                writer.Write(trackingState.m_IntersectionMovementFineAmount);
-                writer.Write(trackingState.m_PublicTransportLaneAvoidedEventCount);
-                writer.Write(trackingState.m_MidBlockCrossingAvoidedEventCount);
-                writer.Write(trackingState.m_IntersectionMovementAvoidedEventCount);
-            }
-
-            IReadOnlyCollection<MonthlyEnforcementReport> reports = MonthlyEnforcementChirperService.GetReportHistorySnapshot();
-            writer.Write(reports.Count);
-            foreach (MonthlyEnforcementReport report in reports)
-            {
-                writer.Write(report.m_MonthIndex);
-                writer.Write(report.m_TotalPathRequestCount);
-                writer.Write(report.m_PublicTransportLaneCount);
-                writer.Write(report.m_MidBlockCrossingCount);
-                writer.Write(report.m_IntersectionMovementCount);
-                writer.Write(report.m_TotalFineAmount);
-                writer.Write(report.m_TotalAvoidedPathCount);
-                writer.Write(report.m_PublicTransportLaneFineAmount);
-                writer.Write(report.m_MidBlockCrossingFineAmount);
-                writer.Write(report.m_IntersectionMovementFineAmount);
-                writer.Write(report.m_PublicTransportLaneAvoidedEventCount);
-                writer.Write(report.m_MidBlockCrossingAvoidedEventCount);
-                writer.Write(report.m_IntersectionMovementAvoidedEventCount);
-            }
-
-            bool hasPolicyImpactTrackingState = EnforcementPolicyImpactService.TryGetTrackingState(out EnforcementPolicyImpactTrackingState policyImpactTrackingState);
-            writer.Write(hasPolicyImpactTrackingState);
-            if (hasPolicyImpactTrackingState)
-            {
-                writer.Write(policyImpactTrackingState.m_MonthIndex);
-                writer.Write(policyImpactTrackingState.m_TotalPathRequestCount);
-                writer.Write(policyImpactTrackingState.m_TotalActualPathCount);
-                writer.Write(policyImpactTrackingState.m_TotalAvoidedPathCount);
-                writer.Write(policyImpactTrackingState.m_TotalFineAmount);
-                writer.Write(policyImpactTrackingState.m_PublicTransportLaneActualCount);
-                writer.Write(policyImpactTrackingState.m_MidBlockCrossingActualCount);
-                writer.Write(policyImpactTrackingState.m_IntersectionMovementActualCount);
-                writer.Write(policyImpactTrackingState.m_PublicTransportLaneFineAmount);
-                writer.Write(policyImpactTrackingState.m_MidBlockCrossingFineAmount);
-                writer.Write(policyImpactTrackingState.m_IntersectionMovementFineAmount);
-                writer.Write(policyImpactTrackingState.m_PublicTransportLaneAvoidedEventCount);
-                writer.Write(policyImpactTrackingState.m_MidBlockCrossingAvoidedEventCount);
-                writer.Write(policyImpactTrackingState.m_IntersectionMovementAvoidedEventCount);
-            }
-
-            EnforcementPolicyImpactService.PersistentTotalsSnapshot totals = EnforcementPolicyImpactService.GetPersistentTotalsSnapshot();
-            writer.Write(totals.TotalPathRequestCount);
-            writer.Write(totals.TotalActualPathCount);
-            writer.Write(totals.TotalAvoidedPathCount);
-            writer.Write(totals.TotalFineAmount);
-            writer.Write(totals.PublicTransportLaneActualCount);
-            writer.Write(totals.MidBlockCrossingActualCount);
-            writer.Write(totals.IntersectionMovementActualCount);
-            writer.Write(totals.PublicTransportLaneFineAmount);
-            writer.Write(totals.MidBlockCrossingFineAmount);
-            writer.Write(totals.IntersectionMovementFineAmount);
-            writer.Write(totals.PublicTransportLaneAvoidedEventCount);
-            writer.Write(totals.MidBlockCrossingAvoidedEventCount);
-            writer.Write(totals.IntersectionMovementAvoidedEventCount);
-
-            IReadOnlyCollection<PathRequestEvent> pathRequestEvents = EnforcementPolicyImpactService.GetPathRequestEventSnapshot();
-            writer.Write(pathRequestEvents.Count);
-            foreach (PathRequestEvent entry in pathRequestEvents)
-            {
-                writer.Write(entry.TimestampMonthTicks);
-            }
-
-            IReadOnlyCollection<ActualViolationEvent> actualViolationEvents = EnforcementPolicyImpactService.GetActualViolationEventSnapshot();
-            writer.Write(actualViolationEvents.Count);
-            foreach (ActualViolationEvent entry in actualViolationEvents)
-            {
-                writer.Write(entry.TimestampMonthTicks);
-                writer.Write(entry.Kind);
-                writer.Write(entry.FineAmount);
-            }
-
-            IReadOnlyCollection<AvoidedRerouteEvent> avoidedRerouteEvents = EnforcementPolicyImpactService.GetAvoidedRerouteEventSnapshot();
-            writer.Write(avoidedRerouteEvents.Count);
-            foreach (AvoidedRerouteEvent entry in avoidedRerouteEvents)
-            {
-                writer.Write(entry.TimestampMonthTicks);
-                writer.Write(entry.AvoidedPublicTransportLanePenalty);
-                writer.Write(entry.AvoidedMidBlockPenalty);
-                writer.Write(entry.AvoidedIntersectionPenalty);
+            public MonthlyTrackingReadResult(
+                MonthlyEnforcementTrackingState? trackingState,
+                bool migratedLegacyPathRequestTracking) {
+                TrackingState = trackingState;
+                MigratedLegacyPathRequestTracking =
+                    migratedLegacyPathRequestTracking;
             }
         }
 
-        public void Deserialize<TReader>(TReader reader) where TReader : IReader
-        {
-            reader.Read(out int version);
-            if (version != 3 && version != 4 && version != 5 && version != kSerializationVersion)
-            {
-                Mod.log.Info($"Unsupported enforcement save-data version {version}. Falling back to defaults.");
-                return;
+        private readonly struct PolicyImpactPersistentTotalsReadResult {
+            public readonly int TotalPathRequestCount;
+            public readonly int TotalActualPathCount;
+            public readonly int TotalAvoidedPathCount;
+            public readonly int TotalPolicyImpactFineAmount;
+            public readonly int PublicTransportLaneActualCount;
+            public readonly int MidBlockCrossingActualCount;
+            public readonly int IntersectionMovementActualCount;
+            public readonly int PublicTransportLaneFineAmount;
+            public readonly int MidBlockCrossingFineAmount;
+            public readonly int IntersectionMovementFineAmount;
+            public readonly int PublicTransportLaneAvoidedEventCount;
+            public readonly int MidBlockCrossingAvoidedEventCount;
+            public readonly int IntersectionMovementAvoidedEventCount;
+            public readonly int TotalActualOrAvoidedPathCount;
+            public readonly int PublicTransportLaneActualOrAvoidedPathCount;
+            public readonly int MidBlockCrossingActualOrAvoidedPathCount;
+            public readonly int IntersectionMovementActualOrAvoidedPathCount;
+
+            public PolicyImpactPersistentTotalsReadResult(
+                int totalPathRequestCount, int totalActualPathCount,
+                int totalAvoidedPathCount, int totalPolicyImpactFineAmount,
+                int publicTransportLaneActualCount,
+                int midBlockCrossingActualCount,
+                int intersectionMovementActualCount,
+                int publicTransportLaneFineAmount,
+                int midBlockCrossingFineAmount,
+                int intersectionMovementFineAmount,
+                int publicTransportLaneAvoidedEventCount,
+                int midBlockCrossingAvoidedEventCount,
+                int intersectionMovementAvoidedEventCount,
+                int totalActualOrAvoidedPathCount,
+                int publicTransportLaneActualOrAvoidedPathCount,
+                int midBlockCrossingActualOrAvoidedPathCount,
+                int intersectionMovementActualOrAvoidedPathCount) {
+                TotalPathRequestCount = totalPathRequestCount;
+                TotalActualPathCount = totalActualPathCount;
+                TotalAvoidedPathCount = totalAvoidedPathCount;
+                TotalPolicyImpactFineAmount = totalPolicyImpactFineAmount;
+                PublicTransportLaneActualCount = publicTransportLaneActualCount;
+                MidBlockCrossingActualCount = midBlockCrossingActualCount;
+                IntersectionMovementActualCount =
+                    intersectionMovementActualCount;
+                PublicTransportLaneFineAmount = publicTransportLaneFineAmount;
+                MidBlockCrossingFineAmount = midBlockCrossingFineAmount;
+                IntersectionMovementFineAmount = intersectionMovementFineAmount;
+                PublicTransportLaneAvoidedEventCount =
+                    publicTransportLaneAvoidedEventCount;
+                MidBlockCrossingAvoidedEventCount =
+                    midBlockCrossingAvoidedEventCount;
+                IntersectionMovementAvoidedEventCount =
+                    intersectionMovementAvoidedEventCount;
+                TotalActualOrAvoidedPathCount = totalActualOrAvoidedPathCount;
+                PublicTransportLaneActualOrAvoidedPathCount =
+                    publicTransportLaneActualOrAvoidedPathCount;
+                MidBlockCrossingActualOrAvoidedPathCount =
+                    midBlockCrossingActualOrAvoidedPathCount;
+                IntersectionMovementActualOrAvoidedPathCount =
+                    intersectionMovementActualOrAvoidedPathCount;
             }
+        }
 
-            EnforcementGameplaySettingsState gameplaySettings = ReadGameplaySettings(reader, version);
+        private readonly struct PolicyImpactEventsReadResult {
+            public readonly List<PathRequestEvent> PathRequestEvents;
+            public readonly List<ActualViolationEvent> ActualViolationEvents;
+            public readonly List<AvoidedRerouteEvent> AvoidedRerouteEvents;
 
-            TrafficLawEnforcementStatistics statistics = default;
-            reader.Read(out statistics.m_PublicTransportLaneViolationCount);
-            reader.Read(out statistics.m_ActivePublicTransportLaneViolatorCount);
-            reader.Read(out statistics.m_MidBlockCrossingViolationCount);
-            reader.Read(out statistics.m_IntersectionMovementViolationCount);
-            reader.Read(out int totalFineAmount);
-
-            Dictionary<int, int> vehicleViolationCounts = new Dictionary<int, int>();
-            Dictionary<int, int> vehicleFineTotals = new Dictionary<int, int>();
-            reader.Read(out int vehiclePenaltyCount);
-            for (int index = 0; index < vehiclePenaltyCount; index += 1)
-            {
-                reader.Read(out int vehicleId);
-                reader.Read(out int violationCount);
-                reader.Read(out int fineTotal);
-                vehicleViolationCounts[vehicleId] = violationCount;
-                vehicleFineTotals[vehicleId] = fineTotal;
+            public PolicyImpactEventsReadResult(
+                List<PathRequestEvent> pathRequestEvents,
+                List<ActualViolationEvent> actualViolationEvents,
+                List<AvoidedRerouteEvent> avoidedRerouteEvents) {
+                PathRequestEvents = pathRequestEvents;
+                ActualViolationEvents = actualViolationEvents;
+                AvoidedRerouteEvents = avoidedRerouteEvents;
             }
+        }
 
-            List<EnforcementRecord> records = new List<EnforcementRecord>();
-            reader.Read(out int recordCount);
-            for (int index = 0; index < recordCount; index += 1)
-            {
-                reader.Read(out string kind);
-                reader.Read(out int vehicleId);
-                reader.Read(out int laneId);
-                reader.Read(out int fineAmount);
-                reader.Read(out string reason);
-                records.Add(new EnforcementRecord(kind, vehicleId, laneId, fineAmount, reason));
-            }
-
-            List<(string kind, int vehicleId, long timestampMonthTicks)> timestamps = new List<(string kind, int vehicleId, long timestampMonthTicks)>();
-            reader.Read(out int timestampCount);
-            for (int index = 0; index < timestampCount; index += 1)
-            {
-                reader.Read(out string kind);
-                reader.Read(out int vehicleId);
-                reader.Read(out long timestampMonthTicks);
-                timestamps.Add((kind, vehicleId, timestampMonthTicks));
-            }
-
-            List<EnforcementBudgetUIService.FineIncomeEvent> fineIncomeEvents = new List<EnforcementBudgetUIService.FineIncomeEvent>();
-            reader.Read(out int fineIncomeCount);
-            for (int index = 0; index < fineIncomeCount; index += 1)
-            {
-                reader.Read(out long timestampMonthTicks);
-                reader.Read(out int amount);
-                reader.Read(out string kind);
-                fineIncomeEvents.Add(new EnforcementBudgetUIService.FineIncomeEvent(timestampMonthTicks, amount, kind));
-            }
-
+        private static MonthlyTrackingReadResult
+        ReadMonthlyEnforcementTrackingState<TReader>(TReader reader,
+                                                     int version)
+            where TReader : IReader {
             bool migratedLegacyPathRequestTracking = version < 4;
-            MonthlyEnforcementTrackingState? trackingState = null;
+
             reader.Read(out bool hasTrackingState);
-            if (hasTrackingState)
-            {
-                reader.Read(out long monthIndex);
-                int trackingTotalPathRequestCount = 0;
-                if (version >= 4)
-                {
-                    reader.Read(out trackingTotalPathRequestCount);
-                }
-                reader.Read(out int publicTransportLaneCount);
-                reader.Read(out int midBlockCrossingCount);
-                reader.Read(out int intersectionMovementCount);
-                reader.Read(out int trackingFineAmount);
-                reader.Read(out int trackingTotalAvoidedPathCount);
-                reader.Read(out int trackingPublicTransportLaneFineAmount);
-                reader.Read(out int trackingMidBlockCrossingFineAmount);
-                reader.Read(out int trackingIntersectionMovementFineAmount);
-                reader.Read(out int trackingPublicTransportLaneAvoidedEventCount);
-                reader.Read(out int trackingMidBlockCrossingAvoidedEventCount);
-                reader.Read(out int trackingIntersectionMovementAvoidedEventCount);
-                trackingState = new MonthlyEnforcementTrackingState(
-                    monthIndex,
-                    trackingTotalPathRequestCount,
-                    publicTransportLaneCount,
-                    midBlockCrossingCount,
-                    intersectionMovementCount,
-                    trackingFineAmount,
-                    trackingTotalAvoidedPathCount,
+            if (!hasTrackingState) {
+                return new MonthlyTrackingReadResult(
+                    null, migratedLegacyPathRequestTracking);
+            }
+            reader.Read(out long monthIndex);
+
+            int trackingTotalPathRequestCount = 0;
+            if (version >= 4) {
+                reader.Read(out trackingTotalPathRequestCount);
+            }
+
+            int trackingTotalActualPathCount = 0;
+            if (version >= 9) {
+                reader.Read(out trackingTotalActualPathCount);
+            }
+
+            reader.Read(out int publicTransportLaneCount);
+            reader.Read(out int midBlockCrossingCount);
+            reader.Read(out int intersectionMovementCount);
+            reader.Read(out int trackingFineAmount);
+            reader.Read(out int trackingTotalAvoidedPathCount);
+            reader.Read(out int trackingPublicTransportLaneFineAmount);
+            reader.Read(out int trackingMidBlockCrossingFineAmount);
+            reader.Read(out int trackingIntersectionMovementFineAmount);
+            reader.Read(out int trackingPublicTransportLaneAvoidedEventCount);
+            reader.Read(out int trackingMidBlockCrossingAvoidedEventCount);
+            reader.Read(out int trackingIntersectionMovementAvoidedEventCount);
+
+            int trackingTotalActualOrAvoidedPathCount;
+            int trackingPublicTransportLaneActualOrAvoidedPathCount;
+            int trackingMidBlockCrossingActualOrAvoidedPathCount;
+            int trackingIntersectionMovementActualOrAvoidedPathCount;
+
+            if (version >= 10) {
+                reader.Read(out trackingTotalActualOrAvoidedPathCount);
+                reader.Read(
+                    out trackingPublicTransportLaneActualOrAvoidedPathCount);
+                reader.Read(
+                    out trackingMidBlockCrossingActualOrAvoidedPathCount);
+                reader.Read(
+                    out trackingIntersectionMovementActualOrAvoidedPathCount);
+            } else {
+                trackingTotalActualOrAvoidedPathCount =
+                    trackingTotalActualPathCount +
+                    trackingTotalAvoidedPathCount;
+                trackingPublicTransportLaneActualOrAvoidedPathCount =
+                    publicTransportLaneCount +
+                    trackingPublicTransportLaneAvoidedEventCount;
+                trackingMidBlockCrossingActualOrAvoidedPathCount =
+                    midBlockCrossingCount +
+                    trackingMidBlockCrossingAvoidedEventCount;
+                trackingIntersectionMovementActualOrAvoidedPathCount =
+                    intersectionMovementCount +
+                    trackingIntersectionMovementAvoidedEventCount;
+            }
+
+            if (version < 9) {
+                trackingTotalActualPathCount = publicTransportLaneCount +
+                                               midBlockCrossingCount +
+                                               intersectionMovementCount;
+            }
+
+            MonthlyEnforcementTrackingState trackingState =
+                new MonthlyEnforcementTrackingState(
+                    monthIndex, trackingTotalPathRequestCount,
+                    trackingTotalActualPathCount, publicTransportLaneCount,
+                    midBlockCrossingCount, intersectionMovementCount,
+                    trackingFineAmount, trackingTotalAvoidedPathCount,
                     trackingPublicTransportLaneFineAmount,
                     trackingMidBlockCrossingFineAmount,
                     trackingIntersectionMovementFineAmount,
                     trackingPublicTransportLaneAvoidedEventCount,
                     trackingMidBlockCrossingAvoidedEventCount,
-                    trackingIntersectionMovementAvoidedEventCount);
+                    trackingIntersectionMovementAvoidedEventCount,
+                    trackingTotalActualOrAvoidedPathCount,
+                    trackingPublicTransportLaneActualOrAvoidedPathCount,
+                    trackingMidBlockCrossingActualOrAvoidedPathCount,
+                    trackingIntersectionMovementActualOrAvoidedPathCount);
 
-                if (migratedLegacyPathRequestTracking || HasInconsistentPathRequestTracking(trackingState.Value.m_TotalPathRequestCount, trackingState.Value.m_PublicTransportLaneCount + trackingState.Value.m_MidBlockCrossingCount + trackingState.Value.m_IntersectionMovementCount, trackingState.Value.m_TotalAvoidedPathCount, trackingState.Value.m_TotalFineAmount))
-                {
-                    trackingState = null;
-                }
+            if (migratedLegacyPathRequestTracking ||
+                HasInconsistentPathRequestTracking(
+                    trackingState.m_TotalPathRequestCount,
+                    trackingState.m_TotalActualPathCount,
+                    trackingState.m_TotalAvoidedPathCount,
+                    trackingState.m_TotalFineAmount)) {
+                return new MonthlyTrackingReadResult(
+                    null, migratedLegacyPathRequestTracking);
             }
 
-            List<MonthlyEnforcementReport> reports = new List<MonthlyEnforcementReport>();
+            return new MonthlyTrackingReadResult(
+                trackingState, migratedLegacyPathRequestTracking);
+        }
+
+        private static List<MonthlyEnforcementReport>
+        ReadMonthlyEnforcementReports<TReader>(TReader reader, int version)
+            where TReader : IReader {
+            List<MonthlyEnforcementReport> reports =
+                new List<MonthlyEnforcementReport>();
+
             reader.Read(out int reportCount);
-            for (int index = 0; index < reportCount; index += 1)
-            {
+            for (int index = 0; index < reportCount; index += 1) {
                 reader.Read(out long monthIndex);
+
                 int reportTotalPathRequestCount = 0;
-                if (version >= 4)
-                {
+                if (version >= 4) {
                     reader.Read(out reportTotalPathRequestCount);
                 }
+
+                int reportTotalActualPathCount = 0;
+                if (version >= 9) {
+                    reader.Read(out reportTotalActualPathCount);
+                }
+
                 reader.Read(out int publicTransportLaneCount);
                 reader.Read(out int midBlockCrossingCount);
                 reader.Read(out int intersectionMovementCount);
@@ -339,64 +258,142 @@ namespace Traffic_Law_Enforcement
                 reader.Read(out int reportIntersectionMovementFineAmount);
                 reader.Read(out int reportPublicTransportLaneAvoidedEventCount);
                 reader.Read(out int reportMidBlockCrossingAvoidedEventCount);
-                reader.Read(out int reportIntersectionMovementAvoidedEventCount);
+                reader.Read(
+                    out int reportIntersectionMovementAvoidedEventCount);
+
+                int reportTotalActualOrAvoidedPathCount;
+                int reportPublicTransportLaneActualOrAvoidedPathCount;
+                int reportMidBlockCrossingActualOrAvoidedPathCount;
+                int reportIntersectionMovementActualOrAvoidedPathCount;
+
+                if (version >= 10) {
+                    reader.Read(out reportTotalActualOrAvoidedPathCount);
+                    reader.Read(
+                        out reportPublicTransportLaneActualOrAvoidedPathCount);
+                    reader.Read(
+                        out reportMidBlockCrossingActualOrAvoidedPathCount);
+                    reader.Read(
+                        out reportIntersectionMovementActualOrAvoidedPathCount);
+                } else {
+                    reportTotalActualOrAvoidedPathCount =
+                        reportTotalActualPathCount +
+                        reportTotalAvoidedPathCount;
+                    reportPublicTransportLaneActualOrAvoidedPathCount =
+                        publicTransportLaneCount +
+                        reportPublicTransportLaneAvoidedEventCount;
+                    reportMidBlockCrossingActualOrAvoidedPathCount =
+                        midBlockCrossingCount +
+                        reportMidBlockCrossingAvoidedEventCount;
+                    reportIntersectionMovementActualOrAvoidedPathCount =
+                        intersectionMovementCount +
+                        reportIntersectionMovementAvoidedEventCount;
+                }
+
+                if (version < 9) {
+                    reportTotalActualPathCount = publicTransportLaneCount +
+                                                 midBlockCrossingCount +
+                                                 intersectionMovementCount;
+                }
+
                 reports.Add(new MonthlyEnforcementReport(
-                    monthIndex,
-                    reportTotalPathRequestCount,
-                    publicTransportLaneCount,
-                    midBlockCrossingCount,
-                    intersectionMovementCount,
-                    reportFineAmount,
-                    reportTotalAvoidedPathCount,
+                    monthIndex, reportTotalPathRequestCount,
+                    reportTotalActualPathCount, publicTransportLaneCount,
+                    midBlockCrossingCount, intersectionMovementCount,
+                    reportFineAmount, reportTotalAvoidedPathCount,
                     reportPublicTransportLaneFineAmount,
                     reportMidBlockCrossingFineAmount,
                     reportIntersectionMovementFineAmount,
                     reportPublicTransportLaneAvoidedEventCount,
                     reportMidBlockCrossingAvoidedEventCount,
-                    reportIntersectionMovementAvoidedEventCount));
+                    reportIntersectionMovementAvoidedEventCount,
+                    reportTotalActualOrAvoidedPathCount,
+                    reportPublicTransportLaneActualOrAvoidedPathCount,
+                    reportMidBlockCrossingActualOrAvoidedPathCount,
+                    reportIntersectionMovementActualOrAvoidedPathCount));
             }
 
-            EnforcementPolicyImpactTrackingState? policyImpactTrackingState = null;
-            int totalPathRequestCount = 0;
-            int totalActualPathCount = 0;
-            int totalAvoidedPathCount = 0;
-            int totalPolicyImpactFineAmount = 0;
-            int publicTransportLaneActualCount = 0;
-            int midBlockCrossingActualCount = 0;
-            int intersectionMovementActualCount = 0;
-            int publicTransportLaneFineAmount = 0;
-            int midBlockCrossingFineAmount = 0;
-            int intersectionMovementFineAmount = 0;
-            int publicTransportLaneAvoidedEventCount = 0;
-            int midBlockCrossingAvoidedEventCount = 0;
-            int intersectionMovementAvoidedEventCount = 0;
+            return reports;
+        }
 
+        private static EnforcementPolicyImpactTrackingState? ReadPolicyImpactTrackingState<
+            TReader>(TReader reader, int version,
+                     bool migratedLegacyPathRequestTracking)
+            where TReader : IReader {
             reader.Read(out bool hasPolicyImpactTrackingState);
-            if (hasPolicyImpactTrackingState)
-            {
-                reader.Read(out long policyImpactMonthIndex);
-                int trackingTotalPathRequestCount = 0;
-                if (version >= 4)
+            if (!hasPolicyImpactTrackingState) {
+                if (EnforcementLoggingPolicy.ShouldLogPolicyDiagnostics())
                 {
-                    reader.Read(out trackingTotalPathRequestCount);
+                    Mod.log.Info(
+                        "[ENFORCEMENT_POLICY_TRACKING_IO] " +
+                        $"phase=ReadMissing, version={version}");
                 }
-                reader.Read(out int trackingTotalActualPathCount);
-                reader.Read(out int trackingTotalAvoidedPathCount);
-                reader.Read(out int trackingTotalFineAmount);
-                reader.Read(out int trackingPublicTransportLaneActualCount);
-                reader.Read(out int trackingMidBlockCrossingActualCount);
-                reader.Read(out int trackingIntersectionMovementActualCount);
-                reader.Read(out int trackingPublicTransportLaneFineAmount);
-                reader.Read(out int trackingMidBlockCrossingFineAmount);
-                reader.Read(out int trackingIntersectionMovementFineAmount);
-                reader.Read(out int trackingPublicTransportLaneAvoidedEventCount);
-                reader.Read(out int trackingMidBlockCrossingAvoidedEventCount);
-                reader.Read(out int trackingIntersectionMovementAvoidedEventCount);
-                policyImpactTrackingState = new EnforcementPolicyImpactTrackingState(
-                    policyImpactMonthIndex,
-                    trackingTotalPathRequestCount,
-                    trackingTotalActualPathCount,
-                    trackingTotalAvoidedPathCount,
+
+                return null;
+            }
+
+            reader.Read(out long policyImpactMonthIndex);
+
+            int trackingTotalPathRequestCount = 0;
+            if (version >= 4) {
+                reader.Read(out trackingTotalPathRequestCount);
+            }
+
+            int trackingTotalActualPathCount = 0;
+            if (version >= 8) {
+                reader.Read(out trackingTotalActualPathCount);
+            }
+
+            reader.Read(out int trackingTotalAvoidedPathCount);
+            reader.Read(out int trackingTotalFineAmount);
+            reader.Read(out int trackingPublicTransportLaneActualCount);
+            reader.Read(out int trackingMidBlockCrossingActualCount);
+            reader.Read(out int trackingIntersectionMovementActualCount);
+            reader.Read(out int trackingPublicTransportLaneFineAmount);
+            reader.Read(out int trackingMidBlockCrossingFineAmount);
+            reader.Read(out int trackingIntersectionMovementFineAmount);
+            reader.Read(out int trackingPublicTransportLaneAvoidedEventCount);
+            reader.Read(out int trackingMidBlockCrossingAvoidedEventCount);
+            reader.Read(out int trackingIntersectionMovementAvoidedEventCount);
+
+            int trackingTotalActualOrAvoidedPathCount;
+            int trackingPublicTransportLaneActualOrAvoidedPathCount;
+            int trackingMidBlockCrossingActualOrAvoidedPathCount;
+            int trackingIntersectionMovementActualOrAvoidedPathCount;
+
+            if (version >= 10) {
+                reader.Read(out trackingTotalActualOrAvoidedPathCount);
+                reader.Read(
+                    out trackingPublicTransportLaneActualOrAvoidedPathCount);
+                reader.Read(
+                    out trackingMidBlockCrossingActualOrAvoidedPathCount);
+                reader.Read(
+                    out trackingIntersectionMovementActualOrAvoidedPathCount);
+            } else {
+                trackingTotalActualOrAvoidedPathCount =
+                    trackingTotalActualPathCount +
+                    trackingTotalAvoidedPathCount;
+                trackingPublicTransportLaneActualOrAvoidedPathCount =
+                    trackingPublicTransportLaneActualCount +
+                    trackingPublicTransportLaneAvoidedEventCount;
+                trackingMidBlockCrossingActualOrAvoidedPathCount =
+                    trackingMidBlockCrossingActualCount +
+                    trackingMidBlockCrossingAvoidedEventCount;
+                trackingIntersectionMovementActualOrAvoidedPathCount =
+                    trackingIntersectionMovementActualCount +
+                    trackingIntersectionMovementAvoidedEventCount;
+            }
+
+            if (version < 8) {
+                trackingTotalActualPathCount =
+                    trackingPublicTransportLaneActualCount +
+                    trackingMidBlockCrossingActualCount +
+                    trackingIntersectionMovementActualCount;
+            }
+
+            EnforcementPolicyImpactTrackingState trackingState =
+                new EnforcementPolicyImpactTrackingState(
+                    policyImpactMonthIndex, trackingTotalPathRequestCount,
+                    trackingTotalActualPathCount, trackingTotalAvoidedPathCount,
                     trackingTotalFineAmount,
                     trackingPublicTransportLaneActualCount,
                     trackingMidBlockCrossingActualCount,
@@ -406,149 +403,670 @@ namespace Traffic_Law_Enforcement
                     trackingIntersectionMovementFineAmount,
                     trackingPublicTransportLaneAvoidedEventCount,
                     trackingMidBlockCrossingAvoidedEventCount,
-                    trackingIntersectionMovementAvoidedEventCount);
+                    trackingIntersectionMovementAvoidedEventCount,
+                    trackingTotalActualOrAvoidedPathCount,
+                    trackingPublicTransportLaneActualOrAvoidedPathCount,
+                    trackingMidBlockCrossingActualOrAvoidedPathCount,
+                    trackingIntersectionMovementActualOrAvoidedPathCount);
 
-                if (migratedLegacyPathRequestTracking || HasInconsistentPathRequestTracking(policyImpactTrackingState.Value.m_TotalPathRequestCount, policyImpactTrackingState.Value.m_TotalActualPathCount, policyImpactTrackingState.Value.m_TotalAvoidedPathCount, policyImpactTrackingState.Value.m_TotalFineAmount))
-                {
-                    policyImpactTrackingState = null;
-                }
+            if (EnforcementLoggingPolicy.ShouldLogPolicyDiagnostics())
+            {
+                Mod.log.Info(
+                    "[ENFORCEMENT_POLICY_TRACKING_IO] " +
+                    $"phase=Read, month={trackingState.m_MonthIndex}, path={trackingState.m_TotalPathRequestCount}, " +
+                    $"actual={trackingState.m_TotalActualPathCount}, avoided={trackingState.m_TotalAvoidedPathCount}, " +
+                    $"decision={trackingState.m_TotalActualOrAvoidedPathCount}, fine={trackingState.m_TotalFineAmount}");
             }
 
-            if (version >= 4)
-            {
+            if (migratedLegacyPathRequestTracking ||
+                HasInconsistentPathRequestTracking(
+                    trackingState.m_TotalPathRequestCount,
+                    trackingState.m_TotalActualPathCount,
+                    trackingState.m_TotalAvoidedPathCount,
+                    trackingState.m_TotalFineAmount)) {
+                if (EnforcementLoggingPolicy.ShouldLogPolicyDiagnostics())
+                {
+                    Mod.log.Info(
+                        "[ENFORCEMENT_POLICY_TRACKING_IO] " +
+                        $"phase=ReadDiscarded, migratedLegacyPathRequestTracking={migratedLegacyPathRequestTracking}, " +
+                        $"month={trackingState.m_MonthIndex}, path={trackingState.m_TotalPathRequestCount}, " +
+                        $"actual={trackingState.m_TotalActualPathCount}, avoided={trackingState.m_TotalAvoidedPathCount}, " +
+                        $"decision={trackingState.m_TotalActualOrAvoidedPathCount}, fine={trackingState.m_TotalFineAmount}");
+                }
+
+                return null;
+            }
+
+            return trackingState;
+        }
+
+        private static PolicyImpactPersistentTotalsReadResult
+        ReadPolicyImpactPersistentTotals<TReader>(TReader reader, int version)
+            where TReader : IReader {
+            int totalPathRequestCount = 0;
+            if (version >= 4) {
                 reader.Read(out totalPathRequestCount);
             }
-            reader.Read(out totalActualPathCount);
-            reader.Read(out totalAvoidedPathCount);
-            reader.Read(out totalPolicyImpactFineAmount);
-            reader.Read(out publicTransportLaneActualCount);
-            reader.Read(out midBlockCrossingActualCount);
-            reader.Read(out intersectionMovementActualCount);
-            reader.Read(out publicTransportLaneFineAmount);
-            reader.Read(out midBlockCrossingFineAmount);
-            reader.Read(out intersectionMovementFineAmount);
-            reader.Read(out publicTransportLaneAvoidedEventCount);
-            reader.Read(out midBlockCrossingAvoidedEventCount);
-            reader.Read(out intersectionMovementAvoidedEventCount);
 
-            List<PathRequestEvent> pathRequestEvents = new List<PathRequestEvent>();
-            List<ActualViolationEvent> actualViolationEvents = new List<ActualViolationEvent>();
-            List<AvoidedRerouteEvent> avoidedRerouteEvents = new List<AvoidedRerouteEvent>();
-            if (version >= 5)
-            {
-                reader.Read(out int pathRequestEventCount);
-                for (int index = 0; index < pathRequestEventCount; index += 1)
-                {
-                    reader.Read(out long timestampMonthTicks);
-                    pathRequestEvents.Add(new PathRequestEvent(timestampMonthTicks));
-                }
+            reader.Read(out int totalActualPathCount);
+            reader.Read(out int totalAvoidedPathCount);
+            reader.Read(out int totalPolicyImpactFineAmount);
+            reader.Read(out int publicTransportLaneActualCount);
+            reader.Read(out int midBlockCrossingActualCount);
+            reader.Read(out int intersectionMovementActualCount);
+            reader.Read(out int publicTransportLaneFineAmount);
+            reader.Read(out int midBlockCrossingFineAmount);
+            reader.Read(out int intersectionMovementFineAmount);
+            reader.Read(out int publicTransportLaneAvoidedEventCount);
+            reader.Read(out int midBlockCrossingAvoidedEventCount);
+            reader.Read(out int intersectionMovementAvoidedEventCount);
 
-                reader.Read(out int actualViolationEventCount);
-                for (int index = 0; index < actualViolationEventCount; index += 1)
-                {
-                    reader.Read(out long timestampMonthTicks);
-                    reader.Read(out string kind);
-                    reader.Read(out int fineAmount);
-                    actualViolationEvents.Add(new ActualViolationEvent(timestampMonthTicks, kind, fineAmount));
-                }
+            int totalActualOrAvoidedPathCount;
+            int publicTransportLaneActualOrAvoidedPathCount;
+            int midBlockCrossingActualOrAvoidedPathCount;
+            int intersectionMovementActualOrAvoidedPathCount;
 
-                reader.Read(out int avoidedRerouteEventCount);
-                for (int index = 0; index < avoidedRerouteEventCount; index += 1)
-                {
-                    reader.Read(out long timestampMonthTicks);
-                    reader.Read(out bool avoidedPublicTransportLanePenalty);
-                    reader.Read(out bool avoidedMidBlockPenalty);
-                    reader.Read(out bool avoidedIntersectionPenalty);
-                    avoidedRerouteEvents.Add(new AvoidedRerouteEvent(timestampMonthTicks, avoidedPublicTransportLanePenalty, avoidedMidBlockPenalty, avoidedIntersectionPenalty));
-                }
+            if (version >= 10) {
+                reader.Read(out totalActualOrAvoidedPathCount);
+                reader.Read(out publicTransportLaneActualOrAvoidedPathCount);
+                reader.Read(out midBlockCrossingActualOrAvoidedPathCount);
+                reader.Read(out intersectionMovementActualOrAvoidedPathCount);
+            } else {
+                totalActualOrAvoidedPathCount =
+                    totalActualPathCount + totalAvoidedPathCount;
+                publicTransportLaneActualOrAvoidedPathCount =
+                    publicTransportLaneActualCount +
+                    publicTransportLaneAvoidedEventCount;
+                midBlockCrossingActualOrAvoidedPathCount =
+                    midBlockCrossingActualCount +
+                    midBlockCrossingAvoidedEventCount;
+                intersectionMovementActualOrAvoidedPathCount =
+                    intersectionMovementActualCount +
+                    intersectionMovementAvoidedEventCount;
             }
 
-            EnforcementGameplaySettingsService.Apply(gameplaySettings);
-            EnforcementTelemetry.LoadPersistentData(statistics, totalFineAmount, vehicleFineTotals, vehicleViolationCounts, records, timestamps);
-            EnforcementBudgetUIService.LoadPersistentData(fineIncomeEvents);
-            MonthlyEnforcementChirperService.LoadPersistentData(trackingState, reports);
-            EnforcementPolicyImpactService.LoadPersistentData(
-                policyImpactTrackingState,
-                totalPathRequestCount,
-                totalActualPathCount,
-                totalAvoidedPathCount,
-                totalPolicyImpactFineAmount,
-                publicTransportLaneActualCount,
-                midBlockCrossingActualCount,
-                intersectionMovementActualCount,
-                publicTransportLaneFineAmount,
-                midBlockCrossingFineAmount,
-                intersectionMovementFineAmount,
+            return new PolicyImpactPersistentTotalsReadResult(
+                totalPathRequestCount, totalActualPathCount,
+                totalAvoidedPathCount, totalPolicyImpactFineAmount,
+                publicTransportLaneActualCount, midBlockCrossingActualCount,
+                intersectionMovementActualCount, publicTransportLaneFineAmount,
+                midBlockCrossingFineAmount, intersectionMovementFineAmount,
                 publicTransportLaneAvoidedEventCount,
                 midBlockCrossingAvoidedEventCount,
                 intersectionMovementAvoidedEventCount,
-                pathRequestEvents,
-                actualViolationEvents,
-                avoidedRerouteEvents);
+                totalActualOrAvoidedPathCount,
+                publicTransportLaneActualOrAvoidedPathCount,
+                midBlockCrossingActualOrAvoidedPathCount,
+                intersectionMovementActualOrAvoidedPathCount);
+        }
 
-            m_HasDeserializedData = true;
-            m_ShouldClearLegacyRuntimeState = false;
+        private static PolicyImpactEventsReadResult
+        ReadPolicyImpactEvents<TReader>(TReader reader, int version)
+            where TReader : IReader {
+            List<PathRequestEvent> pathRequestEvents =
+                new List<PathRequestEvent>();
+            List<ActualViolationEvent> actualViolationEvents =
+                new List<ActualViolationEvent>();
+            List<AvoidedRerouteEvent> avoidedRerouteEvents =
+                new List<AvoidedRerouteEvent>();
+
+            if (version >= 5) {
+                reader.Read(out int pathRequestEventCount);
+                for (int index = 0; index < pathRequestEventCount; index += 1) {
+                    reader.Read(out long timestampMonthTicks);
+
+                    long pathContextSequence = 0L;
+                    if (version >= 9) {
+                        reader.Read(out pathContextSequence);
+                    }
+
+                    pathRequestEvents.Add(new PathRequestEvent(
+                        timestampMonthTicks, pathContextSequence));
+                }
+
+                reader.Read(out int actualViolationEventCount);
+                for (int index = 0; index < actualViolationEventCount;
+                     index += 1) {
+                    reader.Read(out long timestampMonthTicks);
+
+                    long pathContextSequence = 0L;
+                    if (version >= 9) {
+                        reader.Read(out pathContextSequence);
+                    }
+
+                    reader.Read(out string kind);
+                    reader.Read(out int fineAmount);
+
+                    actualViolationEvents.Add(new ActualViolationEvent(
+                        timestampMonthTicks, pathContextSequence, kind,
+                        fineAmount));
+                }
+
+                reader.Read(out int avoidedRerouteEventCount);
+                for (int index = 0; index < avoidedRerouteEventCount;
+                     index += 1) {
+                    reader.Read(out long timestampMonthTicks);
+
+                    long pathContextSequence = 0L;
+                    if (version >= 9) {
+                        reader.Read(out pathContextSequence);
+                    }
+
+                    reader.Read(out bool avoidedPublicTransportLanePenalty);
+                    reader.Read(out bool avoidedMidBlockPenalty);
+                    reader.Read(out bool avoidedIntersectionPenalty);
+
+                    avoidedRerouteEvents.Add(new AvoidedRerouteEvent(
+                        timestampMonthTicks, pathContextSequence,
+                        avoidedPublicTransportLanePenalty,
+                        avoidedMidBlockPenalty, avoidedIntersectionPenalty));
+                }
+            }
+
+            return new PolicyImpactEventsReadResult(
+                pathRequestEvents, actualViolationEvents, avoidedRerouteEvents);
+        }
+
+        private void ReadLoadedPublicTransportLaneVehicleStates<TReader>(
+            TReader reader, int version)
+            where TReader : IReader {
+            m_LoadedPublicTransportLaneVehicleStates.Clear();
+
+            if (version < 8) {
+                return;
+            }
+
+            reader.Read(out int ptStateCount);
+
+            for (int index = 0; index < ptStateCount; index += 1) {
+                reader.Read(out Entity vehicle);
+                reader.Read(out byte shouldTrack);
+                reader.Read(out byte emergencyVehicle);
+                reader.Read(out byte accessBitsRaw);
+
+                m_LoadedPublicTransportLaneVehicleStates.Add(
+                    new LoadedPublicTransportLaneVehicleState {
+                        Vehicle = vehicle,
+                        ShouldTrack = shouldTrack,
+                        EmergencyVehicle = emergencyVehicle,
+                        AccessBits =
+                            (PublicTransportLaneAccessBits)accessBitsRaw,
+                    });
+            }
+        }
+
+        private static void AdvanceRuntimeWorldGeneration(Context context) {
+            RuntimeWorldGeneration += 1;
+        }
+
+        protected override void OnCreate() {
+            base.OnCreate();
+            m_StatisticsQuery = GetEntityQuery(
+                ComponentType.ReadWrite<TrafficLawEnforcementStatistics>());
+            m_PublicTransportLaneViolationQuery = GetEntityQuery(
+                ComponentType.ReadOnly<PublicTransportLaneViolation>());
+            m_PublicTransportLanePermissionStateQuery = GetEntityQuery(
+                ComponentType.ReadOnly<PublicTransportLanePermissionState>());
+            m_PublicTransportLaneType2UsageStateQuery = GetEntityQuery(
+                ComponentType.ReadOnly<PublicTransportLaneType2UsageState>());
+            m_PublicTransportLaneType3UsageStateQuery = GetEntityQuery(
+                ComponentType.ReadOnly<PublicTransportLaneType3UsageState>());
+            m_PublicTransportLaneType4UsageStateQuery = GetEntityQuery(
+                ComponentType.ReadOnly<PublicTransportLaneType4UsageState>());
+            m_PublicTransportLaneProfileQuery = GetEntityQuery(
+                ComponentType.ReadOnly<Car>(),
+                ComponentType.ReadOnly<VehicleTrafficLawProfile>());
+            m_PersistedPublicTransportLaneAccessStateQuery = GetEntityQuery(
+                ComponentType.ReadOnly<Car>(),
+                ComponentType
+                    .ReadOnly<PersistedPublicTransportLaneAccessState>());
+        }
+
+        protected override void OnUpdate() {
+            if (!m_PendingPostDeserializeApply) {
+                return;
+            }
+
+            ApplyLoadedStateToWorld();
+            m_PendingPostDeserializeApply = false;
+        }
+
+        public void SetDefaults(Context context) {
+            int previousGeneration = RuntimeWorldGeneration;
+            AdvanceRuntimeWorldGeneration(context);
+            LogSaveLifecycleHook(
+                "SetDefaults",
+                context,
+                $"runtimeWorldGeneration={previousGeneration}->{RuntimeWorldGeneration}");
+            ResetRuntimeState();
+            EnforcementGameplaySettingsService.Apply(
+                CreateInitialGameplaySettings(context));
+            m_LoadedPublicTransportLaneVehicleStates.Clear();
+            m_HasDeserializedData = false;
+            m_ShouldClearLegacyRuntimeState =
+                context.purpose == Purpose.LoadGame;
             m_PendingPostDeserializeApply = true;
         }
 
-        private void ApplyLoadedStateToWorld()
-        {
-            Entity statisticsEntity = EnsureStatisticsEntity();
-            EntityManager.SetComponentData(statisticsEntity, EnforcementTelemetry.GetStatisticsSnapshot());
+        public void PreDeserialize(Context context) {
+            LogSaveLifecycleHook("PreDeserialize", context);
+            ResetRuntimeState();
 
-            if (!m_PublicTransportLaneType2UsageStateQuery.IsEmptyIgnoreFilter)
-            {
-                EntityManager.RemoveComponent<PublicTransportLaneType2UsageState>(m_PublicTransportLaneType2UsageStateQuery);
-            }
-
-            if (!m_PublicTransportLaneType3UsageStateQuery.IsEmptyIgnoreFilter)
-            {
-                EntityManager.RemoveComponent<PublicTransportLaneType3UsageState>(m_PublicTransportLaneType3UsageStateQuery);
-            }
-
-            if (!m_PublicTransportLaneType4UsageStateQuery.IsEmptyIgnoreFilter)
-            {
-                EntityManager.RemoveComponent<PublicTransportLaneType4UsageState>(m_PublicTransportLaneType4UsageStateQuery);
-            }
-
-            if (!m_HasDeserializedData && m_ShouldClearLegacyRuntimeState)
-            {
-                if (!m_PublicTransportLaneViolationQuery.IsEmptyIgnoreFilter)
-                {
-                    EntityManager.RemoveComponent<PublicTransportLaneViolation>(m_PublicTransportLaneViolationQuery);
-                }
-
-                if (!m_PublicTransportLanePermissionStateQuery.IsEmptyIgnoreFilter)
-                {
-                    EntityManager.RemoveComponent<PublicTransportLanePermissionState>(m_PublicTransportLanePermissionStateQuery);
-                }
-            }
+            m_LoadedPublicTransportLaneVehicleStates.Clear();
+            m_HasDeserializedData = false;
+            m_ShouldClearLegacyRuntimeState = false;
+            m_PendingPostDeserializeApply = false;
         }
 
-        private Entity EnsureStatisticsEntity()
-        {
-            if (m_StatisticsQuery.IsEmptyIgnoreFilter)
+        public void PostDeserialize(Context context) {
+            LogSaveLifecycleHook(
+                "PostDeserialize",
+                context,
+                $"hasDeserializedData={m_HasDeserializedData}, loadedVehicleStates={m_LoadedPublicTransportLaneVehicleStates.Count}");
+            m_PendingPostDeserializeApply = true;
+        }
+
+        public void Serialize<TWriter>(TWriter writer)
+            where TWriter : IWriter {
+            if (!EnforcementGameTime.TryUpdateFromWorld(
+                    World,
+                    logOnInitialization: true,
+                    out string saveTimeFailureReason))
             {
+                Mod.log.Info(
+                    "[ENFORCEMENT_SAVE_HOOK] " +
+                    $"hook=SerializeTimeSyncSkipped, reason={saveTimeFailureReason}");
+            }
+            else
+            {
+                EnforcementPolicyImpactService.PrepareTrackingStateForPersistence();
+            }
+
+            writer.Write(kSerializationVersion);
+            writer.Write(string.IsNullOrWhiteSpace(Mod.CurrentModVersion) ? "unknown" : Mod.CurrentModVersion);
+            writer.Write(string.IsNullOrWhiteSpace(Mod.CurrentGameVersion) ? "unknown" : Mod.CurrentGameVersion);
+            WriteGameplaySettings(writer, EnforcementGameplaySettingsService.Current);
+
+            TrafficLawEnforcementStatistics statistics = EnforcementTelemetry.GetStatisticsSnapshot();
+            writer.Write(statistics.m_PublicTransportLaneViolationCount);
+            writer.Write(statistics.m_ActivePublicTransportLaneViolatorCount);
+            writer.Write(statistics.m_MidBlockCrossingViolationCount);
+            writer.Write(statistics.m_IntersectionMovementViolationCount);
+            writer.Write(EnforcementTelemetry.TotalFineAmount);
+
+            IReadOnlyDictionary<int, VehicleEnforcementRecord>
+                vehicleRecordSnapshot =
+                    EnforcementTelemetry.GetVehicleRecordSnapshot();
+            writer.Write(vehicleRecordSnapshot.Count);
+            foreach (KeyValuePair<int, VehicleEnforcementRecord> pair in
+                     vehicleRecordSnapshot) {
+                writer.Write(pair.Key);
+                WriteVehicleEnforcementRecord(writer, pair.Value);
+            }
+
+            IReadOnlyCollection<EnforcementRecord> recentRecords =
+                EnforcementTelemetry.GetRecentRecordsSnapshot();
+            writer.Write(recentRecords.Count);
+            foreach (EnforcementRecord record in recentRecords) {
+                writer.Write(record.Kind);
+                writer.Write(record.VehicleId);
+                writer.Write(record.LaneId);
+                writer.Write(record.FineAmount);
+                writer.Write(record.Reason);
+            }
+
+            IReadOnlyCollection<EnforcementBudgetUIService.FineIncomeEvent>
+                fineIncomeEvents =
+                    EnforcementBudgetUIService.GetFineIncomeEventSnapshot();
+            writer.Write(fineIncomeEvents.Count);
+            foreach (EnforcementBudgetUIService
+                         .FineIncomeEvent entry in fineIncomeEvents) {
+                writer.Write(entry.TimestampMonthTicks);
+                writer.Write(entry.Amount);
+                writer.Write(entry.Kind);
+            }
+
+            WriteMonthlyEnforcementTrackingState(writer);
+            IReadOnlyCollection<MonthlyEnforcementReport> reports =
+                MonthlyEnforcementChirperService.GetReportHistorySnapshot();
+            WriteMonthlyEnforcementReports(writer, reports);
+            WritePolicyImpactTrackingState(writer);
+            EnforcementPolicyImpactService.PersistentTotalsSnapshot totals =
+                EnforcementPolicyImpactService.GetPersistentTotalsSnapshot();
+            WritePolicyImpactPersistentTotals(writer, totals);
+
+            IReadOnlyCollection<PathRequestEvent> pathRequestEvents =
+                EnforcementPolicyImpactService.GetPathRequestEventSnapshot();
+            IReadOnlyCollection<ActualViolationEvent> actualViolationEvents =
+                EnforcementPolicyImpactService
+                    .GetActualViolationEventSnapshot();
+            IReadOnlyCollection<AvoidedRerouteEvent> avoidedRerouteEvents =
+                EnforcementPolicyImpactService.GetAvoidedRerouteEventSnapshot();
+
+            WritePolicyImpactEvents(writer, pathRequestEvents,
+                                    actualViolationEvents,
+                                    avoidedRerouteEvents);
+
+            WriteLoadedPublicTransportLaneVehicleStates(writer);
+        }
+
+        public void Deserialize<TReader>(TReader reader)
+            where TReader : IReader {
+            reader.Read(out int version);
+            if (version < 3 || version > kSerializationVersion) {
+                Mod.log.Info(
+                    $"Unsupported enforcement save-data version {version}. Falling back to defaults.");
+                return;
+            }
+
+            if (version >= 11)
+            {
+                reader.Read(out string _);
+                reader.Read(out string _);
+            }
+
+            EnforcementGameplaySettingsState gameplaySettings = ReadGameplaySettings(reader, version);
+
+            TrafficLawEnforcementStatistics statistics = default;
+            reader.Read(out statistics.m_PublicTransportLaneViolationCount);
+            reader.Read(
+                out statistics.m_ActivePublicTransportLaneViolatorCount);
+            reader.Read(out statistics.m_MidBlockCrossingViolationCount);
+            reader.Read(out statistics.m_IntersectionMovementViolationCount);
+            reader.Read(out int totalFineAmount);
+
+            List<EnforcementRecord> records = new List<EnforcementRecord>();
+            Dictionary<int, VehicleEnforcementRecord> vehicleRecords =
+                new Dictionary<int, VehicleEnforcementRecord>();
+            if (version >= 12) {
+                reader.Read(out int vehicleRecordCount);
+                for (int index = 0; index < vehicleRecordCount; index += 1) {
+                    reader.Read(out int vehicleId);
+                    vehicleRecords[vehicleId] =
+                        ReadVehicleEnforcementRecord(reader);
+                }
+
+                reader.Read(out int recordCount);
+                for (int index = 0; index < recordCount; index += 1) {
+                    reader.Read(out string kind);
+                    reader.Read(out int vehicleId);
+                    reader.Read(out int laneId);
+                    reader.Read(out int fineAmount);
+                    reader.Read(out string reason);
+                    records.Add(new EnforcementRecord(kind, vehicleId, laneId,
+                                                      fineAmount, reason));
+                }
+            } else {
+                Dictionary<int, int> vehicleViolationCounts =
+                    new Dictionary<int, int>();
+                Dictionary<int, int> vehicleFineTotals =
+                    new Dictionary<int, int>();
+
+                reader.Read(out int vehiclePenaltyCount);
+                for (int index = 0; index < vehiclePenaltyCount; index += 1) {
+                    reader.Read(out int vehicleId);
+                    reader.Read(out int violationCount);
+                    reader.Read(out int fineTotal);
+                    vehicleViolationCounts[vehicleId] = violationCount;
+                    vehicleFineTotals[vehicleId] = fineTotal;
+                }
+
+                reader.Read(out int recordCount);
+                for (int index = 0; index < recordCount; index += 1) {
+                    reader.Read(out string kind);
+                    reader.Read(out int vehicleId);
+                    reader.Read(out int laneId);
+                    reader.Read(out int fineAmount);
+                    reader.Read(out string reason);
+                    records.Add(new EnforcementRecord(kind, vehicleId, laneId,
+                                                      fineAmount, reason));
+                }
+
+                List<(string kind, int vehicleId, long timestampMonthTicks)>
+                    timestamps = new List<(string kind, int vehicleId,
+                                           long timestampMonthTicks)>();
+                reader.Read(out int timestampCount);
+                for (int index = 0; index < timestampCount; index += 1) {
+                    reader.Read(out string kind);
+                    reader.Read(out int vehicleId);
+                    reader.Read(out long timestampMonthTicks);
+                    timestamps.Add((kind, vehicleId, timestampMonthTicks));
+                }
+
+                vehicleRecords = MigrateLegacyVehicleEnforcementRecords(
+                    vehicleFineTotals,
+                    vehicleViolationCounts,
+                    records,
+                    timestamps);
+            }
+
+            List<EnforcementBudgetUIService.FineIncomeEvent> fineIncomeEvents =
+                new List<EnforcementBudgetUIService.FineIncomeEvent>();
+            reader.Read(out int fineIncomeCount);
+            for (int index = 0; index < fineIncomeCount; index += 1) {
+                reader.Read(out long timestampMonthTicks);
+                reader.Read(out int amount);
+                reader.Read(out string kind);
+                fineIncomeEvents.Add(
+                    new EnforcementBudgetUIService.FineIncomeEvent(
+                        timestampMonthTicks, amount, kind));
+            }
+
+            MonthlyTrackingReadResult monthlyTrackingReadResult =
+                ReadMonthlyEnforcementTrackingState(reader, version);
+
+            MonthlyEnforcementTrackingState? trackingState =
+                monthlyTrackingReadResult.TrackingState;
+
+            bool migratedLegacyPathRequestTracking =
+                monthlyTrackingReadResult.MigratedLegacyPathRequestTracking;
+
+            List<MonthlyEnforcementReport> reports =
+                ReadMonthlyEnforcementReports(reader, version);
+
+            EnforcementPolicyImpactTrackingState? policyImpactTrackingState =
+                ReadPolicyImpactTrackingState(
+                    reader, version, migratedLegacyPathRequestTracking);
+            if (ShouldHydratePolicyImpactTrackingStateFromMonthlyTracking(
+                    trackingState,
+                    policyImpactTrackingState))
+            {
+                policyImpactTrackingState =
+                    CreatePolicyImpactTrackingStateFromMonthlyTrackingState(
+                        trackingState.Value);
+
+                if (EnforcementLoggingPolicy.ShouldLogPolicyDiagnostics())
+                {
+                    Mod.log.Info(
+                        "[ENFORCEMENT_POLICY_STATE] " +
+                        $"phase=HydrateTrackingStateFromMonthlyChirper, trackingMonth={policyImpactTrackingState.Value.m_MonthIndex}, " +
+                        $"totalActual={policyImpactTrackingState.Value.m_TotalActualPathCount}, totalAvoided={policyImpactTrackingState.Value.m_TotalAvoidedPathCount}, " +
+                        $"totalDecision={policyImpactTrackingState.Value.m_TotalActualOrAvoidedPathCount}, totalFine={policyImpactTrackingState.Value.m_TotalFineAmount}");
+                }
+            }
+
+            if (ShouldHydrateMonthlyTrackingStateFromPolicyImpact(
+                    trackingState,
+                    policyImpactTrackingState))
+            {
+                trackingState = CreateMonthlyTrackingStateFromPolicyImpactTrackingState(
+                    policyImpactTrackingState.Value);
+
+                if (EnforcementLoggingPolicy.ShouldLogChirperDiagnostics())
+                {
+                    Mod.log.Info(
+                        "[ENFORCEMENT_CHIRPER_STATE] " +
+                        $"phase=HydrateTrackingStateFromPolicyImpact, trackingMonth={trackingState.Value.m_MonthIndex}, " +
+                        $"totalActual={trackingState.Value.m_TotalActualPathCount}, totalAvoided={trackingState.Value.m_TotalAvoidedPathCount}, " +
+                        $"totalDecision={trackingState.Value.m_TotalActualOrAvoidedPathCount}, totalFine={trackingState.Value.m_TotalFineAmount}");
+                }
+            }
+            PolicyImpactPersistentTotalsReadResult totalsReadResult =
+                ReadPolicyImpactPersistentTotals(reader, version);
+
+            PolicyImpactEventsReadResult policyImpactEventsReadResult =
+                ReadPolicyImpactEvents(reader, version);
+
+            EnforcementGameplaySettingsService.Apply(gameplaySettings);
+            EnforcementTelemetry.LoadPersistentData(
+                statistics,
+                totalFineAmount,
+                vehicleRecords,
+                records);
+            EnforcementBudgetUIService.LoadPersistentData(fineIncomeEvents);
+            MonthlyEnforcementChirperService.LoadPersistentData(trackingState,
+                                                                reports);
+            EnforcementPolicyImpactService.LoadPersistentData(
+                new EnforcementPolicyImpactService.PersistentDataSnapshot(
+                    policyImpactTrackingState,
+                    new EnforcementPolicyImpactService.PersistentTotalsSnapshot(
+                        totalsReadResult.TotalPathRequestCount,
+                        totalsReadResult.TotalActualPathCount,
+                        totalsReadResult.TotalAvoidedPathCount,
+                        totalsReadResult.TotalPolicyImpactFineAmount,
+                        totalsReadResult.PublicTransportLaneActualCount,
+                        totalsReadResult.MidBlockCrossingActualCount,
+                        totalsReadResult.IntersectionMovementActualCount,
+                        totalsReadResult.PublicTransportLaneFineAmount,
+                        totalsReadResult.MidBlockCrossingFineAmount,
+                        totalsReadResult.IntersectionMovementFineAmount,
+                        totalsReadResult.PublicTransportLaneAvoidedEventCount,
+                        totalsReadResult.MidBlockCrossingAvoidedEventCount,
+                        totalsReadResult.IntersectionMovementAvoidedEventCount,
+                        totalsReadResult.TotalActualOrAvoidedPathCount,
+                        totalsReadResult.PublicTransportLaneActualOrAvoidedPathCount,
+                        totalsReadResult.MidBlockCrossingActualOrAvoidedPathCount,
+                        totalsReadResult.IntersectionMovementActualOrAvoidedPathCount),
+                    policyImpactEventsReadResult.PathRequestEvents,
+                    policyImpactEventsReadResult.ActualViolationEvents,
+                    policyImpactEventsReadResult.AvoidedRerouteEvents));
+
+            Mod.log.Info(
+                "[ENFORCEMENT_SAVE_HOOK] hook=Deserialize, " +
+                $"fileVersion={version}, fineIncomeEvents={fineIncomeEvents.Count}, " +
+                $"reports={reports.Count}, pathRequests={policyImpactEventsReadResult.PathRequestEvents.Count}, " +
+                $"actualViolations={policyImpactEventsReadResult.ActualViolationEvents.Count}, " +
+                $"avoidedReroutes={policyImpactEventsReadResult.AvoidedRerouteEvents.Count}");
+
+            m_HasDeserializedData = true;
+            m_ShouldClearLegacyRuntimeState = false;
+
+            ReadLoadedPublicTransportLaneVehicleStates(reader, version);
+
+            m_PendingPostDeserializeApply = true;
+        }
+
+        private void ApplyLoadedStateToWorld() {
+            Entity statisticsEntity = EnsureStatisticsEntity();
+            EntityManager.SetComponentData(
+                statisticsEntity, EnforcementTelemetry.GetStatisticsSnapshot());
+
+            if (!m_PublicTransportLaneType2UsageStateQuery
+                     .IsEmptyIgnoreFilter) {
+                EntityManager
+                    .RemoveComponent<PublicTransportLaneType2UsageState>(
+                        m_PublicTransportLaneType2UsageStateQuery);
+            }
+
+            if (!m_PublicTransportLaneType3UsageStateQuery
+                     .IsEmptyIgnoreFilter) {
+                EntityManager
+                    .RemoveComponent<PublicTransportLaneType3UsageState>(
+                        m_PublicTransportLaneType3UsageStateQuery);
+            }
+
+            if (!m_PublicTransportLaneType4UsageStateQuery
+                     .IsEmptyIgnoreFilter) {
+                EntityManager
+                    .RemoveComponent<PublicTransportLaneType4UsageState>(
+                        m_PublicTransportLaneType4UsageStateQuery);
+            }
+
+            if (!m_HasDeserializedData && m_ShouldClearLegacyRuntimeState) {
+                if (!m_PublicTransportLaneViolationQuery.IsEmptyIgnoreFilter) {
+                    EntityManager.RemoveComponent<PublicTransportLaneViolation>(
+                        m_PublicTransportLaneViolationQuery);
+                }
+
+                if (!m_PublicTransportLanePermissionStateQuery
+                         .IsEmptyIgnoreFilter) {
+                    EntityManager
+                        .RemoveComponent<PublicTransportLanePermissionState>(
+                            m_PublicTransportLanePermissionStateQuery);
+                }
+            }
+            if (!m_PersistedPublicTransportLaneAccessStateQuery
+                     .IsEmptyIgnoreFilter) {
+                EntityManager
+                    .RemoveComponent<PersistedPublicTransportLaneAccessState>(
+                        m_PersistedPublicTransportLaneAccessStateQuery);
+            }
+
+            for (int index = 0;
+                 index < m_LoadedPublicTransportLaneVehicleStates.Count;
+                 index += 1) {
+                LoadedPublicTransportLaneVehicleState loadedState =
+                    m_LoadedPublicTransportLaneVehicleStates[index];
+
+                if (!EntityManager.Exists(loadedState.Vehicle) ||
+                    !EntityManager.HasComponent<Car>(loadedState.Vehicle)) {
+                    continue;
+                }
+
+                PersistedPublicTransportLaneAccessState bootstrapState =
+                    new PersistedPublicTransportLaneAccessState {
+                        m_ShouldTrack = loadedState.ShouldTrack,
+                        m_EmergencyVehicle = loadedState.EmergencyVehicle,
+                        m_AccessBits = loadedState.AccessBits,
+                    };
+
+                EntityManager.AddComponentData(loadedState.Vehicle,
+                                               bootstrapState);
+            }
+
+            m_LoadedPublicTransportLaneVehicleStates.Clear();
+        }
+
+        private Entity EnsureStatisticsEntity() {
+            if (m_StatisticsQuery.IsEmptyIgnoreFilter) {
                 Entity entity = EntityManager.CreateEntity();
-                EntityManager.AddComponentData(entity, default(TrafficLawEnforcementStatistics));
+                EntityManager.AddComponentData(
+                    entity, default(TrafficLawEnforcementStatistics));
                 return entity;
             }
 
             return m_StatisticsQuery.GetSingletonEntity();
         }
 
-        private static EnforcementGameplaySettingsState CreateInitialGameplaySettings(Context context)
-        {
-            if (context.purpose == Purpose.NewGame || context.purpose == Purpose.LoadGame)
-            {
-                return Mod.Settings?.GetNewSaveDefaultSettings() ?? EnforcementGameplaySettingsState.CreateCodeDefaults();
+        private static EnforcementGameplaySettingsState
+        CreateInitialGameplaySettings(Context context) {
+            if (context.purpose == Purpose.NewGame ||
+                context.purpose == Purpose.LoadGame) {
+                return Mod.Settings?.GetNewSaveDefaultSettings() ??
+                       EnforcementGameplaySettingsState.CreateCodeDefaults();
             }
 
             return EnforcementGameplaySettingsState.CreateCodeDefaults();
         }
 
-        private static void ResetRuntimeState()
-        {
+        private static void LogSaveLifecycleHook(
+            string hookName,
+            Context context,
+            string extra = null) {
+            string suffix =
+                string.IsNullOrWhiteSpace(extra)
+                    ? string.Empty
+                    : $", {extra}";
+
+            Mod.log.Info(
+                "[ENFORCEMENT_SAVE_HOOK] " +
+                $"hook={hookName}, purpose={context.purpose}, version={context.version}, " +
+                $"runtimeWorldGeneration={RuntimeWorldGeneration}, " +
+                $"timeInitialized={EnforcementGameTime.IsInitialized}, " +
+                $"monthTicks={EnforcementGameTime.CurrentTimestampMonthTicks}{suffix}");
+        }
+
+        private static void ResetRuntimeState() {
             EnforcementTelemetry.ResetPersistentData();
             MonthlyEnforcementChirperService.ResetPersistentData();
             EnforcementBudgetUIService.ResetPersistentData();
@@ -556,13 +1074,162 @@ namespace Traffic_Law_Enforcement
             EnforcementFineMoneyService.ClearPendingCharges();
         }
 
-        private static bool HasInconsistentPathRequestTracking(int totalPathRequestCount, int totalViolationCount, int totalAvoidedPathCount, int totalFineAmount)
+        private static bool ShouldHydrateMonthlyTrackingStateFromPolicyImpact(
+            MonthlyEnforcementTrackingState? monthlyTrackingState,
+            EnforcementPolicyImpactTrackingState? policyImpactTrackingState)
         {
-            return totalPathRequestCount <= 0 && (totalViolationCount > 0 || totalAvoidedPathCount > 0 || totalFineAmount > 0);
+            if (!policyImpactTrackingState.HasValue)
+            {
+                return false;
+            }
+
+            if (!monthlyTrackingState.HasValue)
+            {
+                return HasMeaningfulTrackingTotals(policyImpactTrackingState.Value);
+            }
+
+            MonthlyEnforcementTrackingState trackingState = monthlyTrackingState.Value;
+            EnforcementPolicyImpactTrackingState policyState = policyImpactTrackingState.Value;
+            return trackingState.m_MonthIndex == policyState.m_MonthIndex &&
+                   !HasMeaningfulTrackingTotals(trackingState) &&
+                   HasMeaningfulTrackingTotals(policyState);
         }
 
-        private static void WriteGameplaySettings<TWriter>(TWriter writer, EnforcementGameplaySettingsState state) where TWriter : IWriter
+        private static bool ShouldHydratePolicyImpactTrackingStateFromMonthlyTracking(
+            MonthlyEnforcementTrackingState? monthlyTrackingState,
+            EnforcementPolicyImpactTrackingState? policyImpactTrackingState)
         {
+            if (!monthlyTrackingState.HasValue ||
+                !HasMeaningfulTrackingTotals(monthlyTrackingState.Value))
+            {
+                return false;
+            }
+
+            if (!policyImpactTrackingState.HasValue)
+            {
+                return true;
+            }
+
+            EnforcementPolicyImpactTrackingState policyState =
+                policyImpactTrackingState.Value;
+            // Legacy monthly tracking may still carry the only meaningful
+            // in-progress month baseline even when the newer policy-impact
+            // tracking exists as a default/empty state with a mismatched month.
+            return !HasMeaningfulTrackingTotals(policyState);
+        }
+
+        private static bool HasMeaningfulTrackingTotals(MonthlyEnforcementTrackingState trackingState)
+        {
+            return trackingState.m_TotalPathRequestCount > 0 ||
+                   trackingState.m_TotalActualPathCount > 0 ||
+                   trackingState.m_TotalAvoidedPathCount > 0 ||
+                   trackingState.m_TotalFineAmount > 0 ||
+                   trackingState.m_TotalActualOrAvoidedPathCount > 0;
+        }
+
+        private static bool HasMeaningfulTrackingTotals(EnforcementPolicyImpactTrackingState trackingState)
+        {
+            return trackingState.m_TotalPathRequestCount > 0 ||
+                   trackingState.m_TotalActualPathCount > 0 ||
+                   trackingState.m_TotalAvoidedPathCount > 0 ||
+                   trackingState.m_TotalFineAmount > 0 ||
+                   trackingState.m_TotalActualOrAvoidedPathCount > 0;
+        }
+
+        private static MonthlyEnforcementTrackingState CreateMonthlyTrackingStateFromPolicyImpactTrackingState(
+            EnforcementPolicyImpactTrackingState trackingState)
+        {
+            return new MonthlyEnforcementTrackingState(
+                trackingState.m_MonthIndex,
+                trackingState.m_TotalPathRequestCount,
+                trackingState.m_TotalActualPathCount,
+                trackingState.m_PublicTransportLaneActualCount,
+                trackingState.m_MidBlockCrossingActualCount,
+                trackingState.m_IntersectionMovementActualCount,
+                trackingState.m_TotalFineAmount,
+                trackingState.m_TotalAvoidedPathCount,
+                trackingState.m_PublicTransportLaneFineAmount,
+                trackingState.m_MidBlockCrossingFineAmount,
+                trackingState.m_IntersectionMovementFineAmount,
+                trackingState.m_PublicTransportLaneAvoidedEventCount,
+                trackingState.m_MidBlockCrossingAvoidedEventCount,
+                trackingState.m_IntersectionMovementAvoidedEventCount,
+                trackingState.m_TotalActualOrAvoidedPathCount,
+                trackingState.m_PublicTransportLaneActualOrAvoidedPathCount,
+                trackingState.m_MidBlockCrossingActualOrAvoidedPathCount,
+                trackingState.m_IntersectionMovementActualOrAvoidedPathCount);
+        }
+
+        private static EnforcementPolicyImpactTrackingState CreatePolicyImpactTrackingStateFromMonthlyTrackingState(
+            MonthlyEnforcementTrackingState trackingState)
+        {
+            return new EnforcementPolicyImpactTrackingState(
+                trackingState.m_MonthIndex,
+                trackingState.m_TotalPathRequestCount,
+                trackingState.m_TotalActualPathCount,
+                trackingState.m_TotalAvoidedPathCount,
+                trackingState.m_TotalFineAmount,
+                trackingState.m_PublicTransportLaneCount,
+                trackingState.m_MidBlockCrossingCount,
+                trackingState.m_IntersectionMovementCount,
+                trackingState.m_PublicTransportLaneFineAmount,
+                trackingState.m_MidBlockCrossingFineAmount,
+                trackingState.m_IntersectionMovementFineAmount,
+                trackingState.m_PublicTransportLaneAvoidedEventCount,
+                trackingState.m_MidBlockCrossingAvoidedEventCount,
+                trackingState.m_IntersectionMovementAvoidedEventCount,
+                trackingState.m_TotalActualOrAvoidedPathCount,
+                trackingState.m_PublicTransportLaneActualOrAvoidedPathCount,
+                trackingState.m_MidBlockCrossingActualOrAvoidedPathCount,
+                trackingState.m_IntersectionMovementActualOrAvoidedPathCount);
+        }
+
+        private static bool HasInconsistentPathRequestTracking(
+            int totalPathRequestCount, int totalViolationCount,
+            int totalAvoidedPathCount, int totalFineAmount) {
+            return totalPathRequestCount <= 0 &&
+                   (totalViolationCount > 0 || totalAvoidedPathCount > 0 ||
+                    totalFineAmount > 0);
+        }
+
+        private static void WriteMonthlyEnforcementTrackingState<TWriter>(
+            TWriter writer)
+            where TWriter : IWriter {
+            bool hasTrackingState =
+                MonthlyEnforcementChirperService.TryGetTrackingState(
+                    out MonthlyEnforcementTrackingState trackingState);
+
+            writer.Write(hasTrackingState);
+            if (!hasTrackingState) {
+                return;
+            }
+
+            writer.Write(trackingState.m_MonthIndex);
+            writer.Write(trackingState.m_TotalPathRequestCount);
+            writer.Write(trackingState.m_TotalActualPathCount);
+            writer.Write(trackingState.m_PublicTransportLaneCount);
+            writer.Write(trackingState.m_MidBlockCrossingCount);
+            writer.Write(trackingState.m_IntersectionMovementCount);
+            writer.Write(trackingState.m_TotalFineAmount);
+            writer.Write(trackingState.m_TotalAvoidedPathCount);
+            writer.Write(trackingState.m_PublicTransportLaneFineAmount);
+            writer.Write(trackingState.m_MidBlockCrossingFineAmount);
+            writer.Write(trackingState.m_IntersectionMovementFineAmount);
+            writer.Write(trackingState.m_PublicTransportLaneAvoidedEventCount);
+            writer.Write(trackingState.m_MidBlockCrossingAvoidedEventCount);
+            writer.Write(trackingState.m_IntersectionMovementAvoidedEventCount);
+            writer.Write(trackingState.m_TotalActualOrAvoidedPathCount);
+            writer.Write(
+                trackingState.m_PublicTransportLaneActualOrAvoidedPathCount);
+            writer.Write(
+                trackingState.m_MidBlockCrossingActualOrAvoidedPathCount);
+            writer.Write(
+                trackingState.m_IntersectionMovementActualOrAvoidedPathCount);
+        }
+
+        private static void WriteGameplaySettings<TWriter>(
+            TWriter writer, EnforcementGameplaySettingsState state)
+            where TWriter : IWriter {
             writer.Write(state.EnablePublicTransportLaneEnforcement);
             writer.Write(state.EnableMidBlockCrossingEnforcement);
             writer.Write(state.EnableIntersectionMovementEnforcement);
@@ -600,17 +1267,315 @@ namespace Traffic_Law_Enforcement
             writer.Write(state.IntersectionMovementRepeatMultiplierPercent);
         }
 
-        private static EnforcementGameplaySettingsState ReadGameplaySettings<TReader>(TReader reader, int version) where TReader : IReader
-        {
-            EnforcementGameplaySettingsState state = default;
-            if (version >= 6)
+        private static void WriteMonthlyEnforcementReports<TWriter>(
+            TWriter writer,
+            IReadOnlyCollection<MonthlyEnforcementReport> reports)
+            where TWriter : IWriter {
+            writer.Write(reports.Count);
+            foreach (MonthlyEnforcementReport report in reports) {
+                writer.Write(report.m_MonthIndex);
+                writer.Write(report.m_TotalPathRequestCount);
+                writer.Write(report.m_TotalActualPathCount);
+                writer.Write(report.m_PublicTransportLaneCount);
+                writer.Write(report.m_MidBlockCrossingCount);
+                writer.Write(report.m_IntersectionMovementCount);
+                writer.Write(report.m_TotalFineAmount);
+                writer.Write(report.m_TotalAvoidedPathCount);
+                writer.Write(report.m_PublicTransportLaneFineAmount);
+                writer.Write(report.m_MidBlockCrossingFineAmount);
+                writer.Write(report.m_IntersectionMovementFineAmount);
+                writer.Write(report.m_PublicTransportLaneAvoidedEventCount);
+                writer.Write(report.m_MidBlockCrossingAvoidedEventCount);
+                writer.Write(report.m_IntersectionMovementAvoidedEventCount);
+                writer.Write(report.m_TotalActualOrAvoidedPathCount);
+                writer.Write(
+                    report.m_PublicTransportLaneActualOrAvoidedPathCount);
+                writer.Write(report.m_MidBlockCrossingActualOrAvoidedPathCount);
+                writer.Write(
+                    report.m_IntersectionMovementActualOrAvoidedPathCount);
+            }
+        }
+
+        private static void WritePolicyImpactPersistentTotals<TWriter>(
+            TWriter writer,
+            EnforcementPolicyImpactService.PersistentTotalsSnapshot totals)
+            where TWriter : IWriter {
+            writer.Write(totals.TotalPathRequestCount);
+            writer.Write(totals.TotalActualPathCount);
+            writer.Write(totals.TotalAvoidedPathCount);
+            writer.Write(totals.TotalFineAmount);
+            writer.Write(totals.PublicTransportLaneActualCount);
+            writer.Write(totals.MidBlockCrossingActualCount);
+            writer.Write(totals.IntersectionMovementActualCount);
+            writer.Write(totals.PublicTransportLaneFineAmount);
+            writer.Write(totals.MidBlockCrossingFineAmount);
+            writer.Write(totals.IntersectionMovementFineAmount);
+            writer.Write(totals.PublicTransportLaneAvoidedEventCount);
+            writer.Write(totals.MidBlockCrossingAvoidedEventCount);
+            writer.Write(totals.IntersectionMovementAvoidedEventCount);
+            writer.Write(totals.TotalActualOrAvoidedPathCount);
+            writer.Write(totals.PublicTransportLaneActualOrAvoidedPathCount);
+            writer.Write(totals.MidBlockCrossingActualOrAvoidedPathCount);
+            writer.Write(totals.IntersectionMovementActualOrAvoidedPathCount);
+        }
+
+        private static void WritePolicyImpactEvents<TWriter>(
+            TWriter writer,
+            IReadOnlyCollection<PathRequestEvent> pathRequestEvents,
+            IReadOnlyCollection<ActualViolationEvent> actualViolationEvents,
+            IReadOnlyCollection<AvoidedRerouteEvent> avoidedRerouteEvents)
+            where TWriter : IWriter {
+            writer.Write(pathRequestEvents.Count);
+            foreach (PathRequestEvent entry in pathRequestEvents) {
+                writer.Write(entry.TimestampMonthTicks);
+                writer.Write(entry.PathContextSequence);
+            }
+
+            writer.Write(actualViolationEvents.Count);
+            foreach (ActualViolationEvent entry in actualViolationEvents) {
+                writer.Write(entry.TimestampMonthTicks);
+                writer.Write(entry.PathContextSequence);
+                writer.Write(entry.Kind);
+                writer.Write(entry.FineAmount);
+            }
+
+            writer.Write(avoidedRerouteEvents.Count);
+            foreach (AvoidedRerouteEvent entry in avoidedRerouteEvents) {
+                writer.Write(entry.TimestampMonthTicks);
+                writer.Write(entry.PathContextSequence);
+                writer.Write(entry.AvoidedPublicTransportLanePenalty);
+                writer.Write(entry.AvoidedMidBlockPenalty);
+                writer.Write(entry.AvoidedIntersectionPenalty);
+            }
+        }
+
+        private static void WriteVehicleEnforcementRecord<TWriter>(
+            TWriter writer,
+            VehicleEnforcementRecord record)
+            where TWriter : IWriter {
+            writer.Write(record.TotalViolations);
+            writer.Write(record.TotalFines);
+            writer.Write(record.LastKind ?? string.Empty);
+            writer.Write(record.LastLaneId);
+            writer.Write(record.LastFineAmount);
+            writer.Write(record.LastReason ?? string.Empty);
+            writer.Write(record.LastTimestampMonthTicks);
+            WriteTimestampList(writer, record.PublicTransportLaneTimestamps);
+            WriteTimestampList(writer, record.MidBlockCrossingTimestamps);
+            WriteTimestampList(writer, record.IntersectionMovementTimestamps);
+        }
+
+        private static VehicleEnforcementRecord ReadVehicleEnforcementRecord<TReader>(
+            TReader reader)
+            where TReader : IReader {
+            VehicleEnforcementRecord record = new VehicleEnforcementRecord();
+            reader.Read(out record.TotalViolations);
+            reader.Read(out record.TotalFines);
+            reader.Read(out record.LastKind);
+            reader.Read(out record.LastLaneId);
+            reader.Read(out record.LastFineAmount);
+            reader.Read(out record.LastReason);
+            reader.Read(out record.LastTimestampMonthTicks);
+            ReadTimestampList(reader, record.PublicTransportLaneTimestamps);
+            ReadTimestampList(reader, record.MidBlockCrossingTimestamps);
+            ReadTimestampList(reader, record.IntersectionMovementTimestamps);
+            return record;
+        }
+
+        private static void WriteTimestampList<TWriter>(
+            TWriter writer,
+            IReadOnlyCollection<long> timestamps)
+            where TWriter : IWriter {
+            writer.Write(timestamps.Count);
+            foreach (long timestamp in timestamps) {
+                writer.Write(timestamp);
+            }
+        }
+
+        private static void ReadTimestampList<TReader>(
+            TReader reader,
+            ICollection<long> target)
+            where TReader : IReader {
+            reader.Read(out int count);
+            for (int index = 0; index < count; index += 1) {
+                reader.Read(out long timestampMonthTicks);
+                target.Add(timestampMonthTicks);
+            }
+        }
+
+        private static Dictionary<int, VehicleEnforcementRecord>
+        MigrateLegacyVehicleEnforcementRecords(
+            IDictionary<int, int> vehicleFineTotals,
+            IDictionary<int, int> vehicleViolationCounts,
+            IEnumerable<EnforcementRecord> records,
+            IEnumerable<(string kind, int vehicleId, long timestampMonthTicks)>
+                timestamps) {
+            Dictionary<int, VehicleEnforcementRecord> vehicleRecords =
+                new Dictionary<int, VehicleEnforcementRecord>();
+
+            foreach (KeyValuePair<int, int> pair in vehicleViolationCounts) {
+                GetOrCreateVehicleEnforcementRecord(vehicleRecords, pair.Key)
+                    .TotalViolations = pair.Value;
+            }
+
+            foreach (KeyValuePair<int, int> pair in vehicleFineTotals) {
+                GetOrCreateVehicleEnforcementRecord(vehicleRecords, pair.Key)
+                    .TotalFines = pair.Value;
+            }
+
+            foreach (EnforcementRecord record in records) {
+                VehicleEnforcementRecord vehicleRecord =
+                    GetOrCreateVehicleEnforcementRecord(vehicleRecords,
+                                                       record.VehicleId);
+                vehicleRecord.LastReason = record.Reason ?? string.Empty;
+                vehicleRecord.LastKind = record.Kind ?? string.Empty;
+                vehicleRecord.LastLaneId = record.LaneId;
+                vehicleRecord.LastFineAmount = record.FineAmount;
+            }
+
+            foreach ((string kind, int vehicleId,
+                      long timestampMonthTicks) entry in timestamps) {
+                VehicleEnforcementRecord vehicleRecord =
+                    GetOrCreateVehicleEnforcementRecord(vehicleRecords,
+                                                       entry.vehicleId);
+                List<long> history = vehicleRecord.GetTimestampHistory(entry.kind);
+                history?.Add(entry.timestampMonthTicks);
+            }
+
+            foreach (VehicleEnforcementRecord record in vehicleRecords.Values) {
+                // Legacy recent records do not store per-record timestamps, so
+                // the latest timestamp can only be reconstructed on a
+                // best-effort basis from the latest known kind-specific
+                // timestamp still present in the save data.
+                record.LastTimestampMonthTicks =
+                    record.GetLatestKnownTimestampMonthTicks();
+            }
+
+            return vehicleRecords;
+        }
+
+        private static VehicleEnforcementRecord GetOrCreateVehicleEnforcementRecord(
+            IDictionary<int, VehicleEnforcementRecord> vehicleRecords,
+            int vehicleId) {
+            if (!vehicleRecords.TryGetValue(vehicleId,
+                                            out VehicleEnforcementRecord
+                                                record)) {
+                record = new VehicleEnforcementRecord();
+                vehicleRecords[vehicleId] = record;
+            }
+
+            return record;
+        }
+
+        private void WriteLoadedPublicTransportLaneVehicleStates<TWriter>(
+            TWriter writer)
+            where TWriter : IWriter {
+            EntityTypeHandle entityTypeHandle = GetEntityTypeHandle();
+            ComponentTypeHandle<VehicleTrafficLawProfile> profileTypeHandle =
+                GetComponentTypeHandle<VehicleTrafficLawProfile>(true);
+            NativeArray<ArchetypeChunk> chunks =
+                m_PublicTransportLaneProfileQuery.ToArchetypeChunkArray(
+                    Allocator.Temp);
+
+            try {
+                writer.Write(m_PublicTransportLaneProfileQuery
+                                 .CalculateEntityCount());
+
+                for (int chunkIndex = 0; chunkIndex < chunks.Length;
+                     chunkIndex += 1) {
+                    ArchetypeChunk chunk = chunks[chunkIndex];
+                    NativeArray<Entity> vehicles =
+                        chunk.GetNativeArray(entityTypeHandle);
+                    NativeArray<VehicleTrafficLawProfile> profiles =
+                        chunk.GetNativeArray(ref profileTypeHandle);
+
+                    for (int index = 0; index < vehicles.Length; index += 1) {
+                        Entity vehicle = vehicles[index];
+                        VehicleTrafficLawProfile profile = profiles[index];
+
+                        ((IWriter)writer).Write(vehicle);
+                        writer.Write(profile.m_ShouldTrack);
+                        writer.Write(profile.m_EmergencyVehicle);
+                        writer.Write(
+                            (byte)profile.m_PublicTransportLaneAccessBits);
+                    }
+                }
+            } finally {
+                chunks.Dispose();
+            }
+        }
+
+        private static void WritePolicyImpactTrackingState<TWriter>(
+            TWriter writer)
+            where TWriter : IWriter {
+            bool hasPolicyImpactTrackingState =
+                EnforcementPolicyImpactService.TryGetTrackingState(
+                    out EnforcementPolicyImpactTrackingState
+                        policyImpactTrackingState);
+
+            writer.Write(hasPolicyImpactTrackingState);
+            if (!hasPolicyImpactTrackingState) {
+                if (EnforcementLoggingPolicy.ShouldLogPolicyDiagnostics())
+                {
+                    Mod.log.Info(
+                        "[ENFORCEMENT_POLICY_TRACKING_IO] " +
+                        "phase=WriteMissing");
+                }
+
+                return;
+            }
+
+            writer.Write(policyImpactTrackingState.m_MonthIndex);
+            writer.Write(policyImpactTrackingState.m_TotalPathRequestCount);
+            writer.Write(policyImpactTrackingState.m_TotalActualPathCount);
+            writer.Write(policyImpactTrackingState.m_TotalAvoidedPathCount);
+            writer.Write(policyImpactTrackingState.m_TotalFineAmount);
+            writer.Write(
+                policyImpactTrackingState.m_PublicTransportLaneActualCount);
+            writer.Write(
+                policyImpactTrackingState.m_MidBlockCrossingActualCount);
+            writer.Write(
+                policyImpactTrackingState.m_IntersectionMovementActualCount);
+            writer.Write(
+                policyImpactTrackingState.m_PublicTransportLaneFineAmount);
+            writer.Write(
+                policyImpactTrackingState.m_MidBlockCrossingFineAmount);
+            writer.Write(
+                policyImpactTrackingState.m_IntersectionMovementFineAmount);
+            writer.Write(policyImpactTrackingState
+                             .m_PublicTransportLaneAvoidedEventCount);
+            writer.Write(
+                policyImpactTrackingState.m_MidBlockCrossingAvoidedEventCount);
+            writer.Write(policyImpactTrackingState
+                             .m_IntersectionMovementAvoidedEventCount);
+            writer.Write(
+                policyImpactTrackingState.m_TotalActualOrAvoidedPathCount);
+            writer.Write(policyImpactTrackingState
+                             .m_PublicTransportLaneActualOrAvoidedPathCount);
+            writer.Write(policyImpactTrackingState
+                             .m_MidBlockCrossingActualOrAvoidedPathCount);
+            writer.Write(policyImpactTrackingState
+                             .m_IntersectionMovementActualOrAvoidedPathCount);
+
+            if (EnforcementLoggingPolicy.ShouldLogPolicyDiagnostics())
             {
+                Mod.log.Info(
+                    "[ENFORCEMENT_POLICY_TRACKING_IO] " +
+                    $"phase=Write, month={policyImpactTrackingState.m_MonthIndex}, path={policyImpactTrackingState.m_TotalPathRequestCount}, " +
+                    $"actual={policyImpactTrackingState.m_TotalActualPathCount}, avoided={policyImpactTrackingState.m_TotalAvoidedPathCount}, " +
+                    $"decision={policyImpactTrackingState.m_TotalActualOrAvoidedPathCount}, fine={policyImpactTrackingState.m_TotalFineAmount}");
+            }
+        }
+
+        private static EnforcementGameplaySettingsState
+        ReadGameplaySettings<TReader>(TReader reader, int version)
+            where TReader : IReader {
+            EnforcementGameplaySettingsState state = default;
+            if (version >= 6) {
                 reader.Read(out state.EnablePublicTransportLaneEnforcement);
                 reader.Read(out state.EnableMidBlockCrossingEnforcement);
                 reader.Read(out state.EnableIntersectionMovementEnforcement);
-            }
-            else
-            {
+            } else {
                 reader.Read(out bool enableEnforcement);
                 state.EnablePublicTransportLaneEnforcement = enableEnforcement;
                 state.EnableMidBlockCrossingEnforcement = enableEnforcement;
@@ -652,8 +1617,10 @@ namespace Traffic_Law_Enforcement
 
             reader.Read(out state.IntersectionMovementRepeatMultiplierPercent);
 
-            // If legacy BusLane fields are present, map them to new PublicTransportLane fields (for older saves)
-            // (Assume the reader will provide the correct order; if not, add explicit field mapping here)
+            // If legacy BusLane fields are present, map them to new
+            // PublicTransportLane fields (for older saves) (Assume the reader
+            // will provide the correct order; if not, add explicit field
+            // mapping here)
 
             return state;
         }

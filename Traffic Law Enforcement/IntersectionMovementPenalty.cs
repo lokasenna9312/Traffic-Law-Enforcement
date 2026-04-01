@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+using System.Text;
 using Game.Net;
 using Unity.Entities;
 using Entity = Unity.Entities.Entity;
@@ -127,29 +127,49 @@ namespace Traffic_Law_Enforcement
 
         public static string FormatMovement(LaneMovement movement)
         {
-            List<string> parts = new List<string>(4);
+            StringBuilder parts = new StringBuilder(24);
+            bool hasParts = false;
 
             if ((movement & LaneMovement.Forward) != 0)
             {
-                parts.Add("forward");
+                parts.Append("forward");
+                hasParts = true;
             }
 
             if ((movement & LaneMovement.Left) != 0)
             {
-                parts.Add("left");
+                if (hasParts)
+                {
+                    parts.Append('+');
+                }
+
+                parts.Append("left");
+                hasParts = true;
             }
 
             if ((movement & LaneMovement.Right) != 0)
             {
-                parts.Add("right");
+                if (hasParts)
+                {
+                    parts.Append('+');
+                }
+
+                parts.Append("right");
+                hasParts = true;
             }
 
             if ((movement & LaneMovement.UTurn) != 0)
             {
-                parts.Add("u-turn");
+                if (hasParts)
+                {
+                    parts.Append('+');
+                }
+
+                parts.Append("u-turn");
+                hasParts = true;
             }
 
-            return parts.Count == 0 ? "none" : string.Join("+", parts.ToArray());
+            return hasParts ? parts.ToString() : "none";
         }
     }
 }

@@ -42,6 +42,7 @@ namespace Traffic_Law_Enforcement
         private ComponentLookup<ParkingLane> m_ParkingLaneData;
         private ComponentLookup<GarageLane> m_GarageLaneData;
         private ComponentLookup<ConnectionLane> m_ConnectionLaneData;
+        private EntityTypeHandle m_EntityTypeHandle;
         private PublicTransportLaneVehicleTypeLookups m_TypeLookups;
         private readonly HashSet<Entity> m_CandidateVehicles = new HashSet<Entity>();
         private readonly HashSet<string> m_StructureSampleSignatures = new HashSet<string>();
@@ -60,6 +61,7 @@ namespace Traffic_Law_Enforcement
         protected override void OnCreate()
         {
             base.OnCreate();
+            Enabled = false;
             m_VehicleQuery = GetEntityQuery(
                 ComponentType.ReadOnly<Car>(),
                 ComponentType.ReadOnly<CarCurrentLane>(),
@@ -127,10 +129,16 @@ namespace Traffic_Law_Enforcement
             m_ParkingLaneData.Update(this);
             m_GarageLaneData.Update(this);
             m_ConnectionLaneData.Update(this);
+            m_EntityTypeHandle = GetEntityTypeHandle();
 
             bool shouldLogEnforcementEvents = EnforcementLoggingPolicy.ShouldLogEnforcementEvents();
             bool shouldLogPathObsoleteSources = EnforcementLoggingPolicy.ShouldLogPathObsoleteSources();
-            bool shouldCollectPrefabLoggingContext = shouldLogEnforcementEvents || shouldLogPathObsoleteSources;
+            bool hasPotentialVehicleSpecificLogDemand =
+                !EnforcementLoggingPolicy.ShouldRestrictVehicleSpecificRouteDebugLogsToWatchedVehicles() ||
+                FocusedLoggingService.HasWatchedVehicles;
+            bool shouldCollectPrefabLoggingContext =
+                (shouldLogEnforcementEvents || shouldLogPathObsoleteSources) &&
+                hasPotentialVehicleSpecificLogDemand;
 
             if (shouldCollectPrefabLoggingContext)
             {
@@ -220,13 +228,15 @@ namespace Traffic_Law_Enforcement
                 pathOwner.m_State |= PathFlags.Obsolete;
                 EntityManager.SetComponentData(vehicle, pathOwner);
 
+                bool shouldLogVehicleSpecificEnforcementEvents =
+                    EnforcementLoggingPolicy.ShouldLogVehicleSpecificEnforcementEvent(vehicle);
                 string role = null;
-                if (shouldLogEnforcementEvents || shouldLogPathObsoleteSources)
+                if (shouldLogVehicleSpecificEnforcementEvents || shouldLogPathObsoleteSources)
                 {
                     role = PublicTransportLanePolicy.DescribeVehicleRole(vehicle, ref m_TypeLookups);
                 }
 
-                if (repeatCount >= 3 && shouldLogEnforcementEvents)
+                if (repeatCount >= 3 && shouldLogVehicleSpecificEnforcementEvents)
                 {
                     Mod.log.Info(
                         $"Repeated identical CENTERLINE invalidation: vehicle={vehicle}, role={role}, repeatCount={repeatCount}, " +
@@ -257,7 +267,7 @@ namespace Traffic_Law_Enforcement
 
                 RecordObservedSnapshot(vehicle, currentLane.m_Lane, sourceLane, targetLane, transitionIndex, evaluationResult, transitionFamily);
 
-                if (shouldLogEnforcementEvents)
+                if (shouldLogVehicleSpecificEnforcementEvents)
                 {
                     Mod.log.Info($"Planned center-line access route invalidated: vehicle={vehicle}, fromLane={sourceLane}, toLane={targetLane}, accessIndex={transitionIndex}, transition={transitionKind}, reason={reason}");
                     LogStructureSample(currentLane.m_Lane, sourceLane, targetLane, transitionKind);
@@ -272,17 +282,21 @@ namespace Traffic_Law_Enforcement
                 return;
             }
 
-            NativeArray<Entity> vehicles = query.ToEntityArray(Allocator.Temp);
+            NativeArray<ArchetypeChunk> chunks = query.ToArchetypeChunkArray(Allocator.Temp);
             try
             {
-                for (int index = 0; index < vehicles.Length; index += 1)
+                for (int chunkIndex = 0; chunkIndex < chunks.Length; chunkIndex += 1)
                 {
-                    m_CandidateVehicles.Add(vehicles[index]);
+                    NativeArray<Entity> vehicles = chunks[chunkIndex].GetNativeArray(m_EntityTypeHandle);
+                    for (int index = 0; index < vehicles.Length; index += 1)
+                    {
+                        m_CandidateVehicles.Add(vehicles[index]);
+                    }
                 }
             }
             finally
             {
-                vehicles.Dispose();
+                chunks.Dispose();
             }
         }
 
@@ -425,39 +439,39 @@ namespace Traffic_Law_Enforcement
                 return "null";
             }
 
-            List<string> parts = new List<string>(6);
+            System.Text.StringBuilder parts = new System.Text.StringBuilder(96);
             if (m_EdgeLaneData.HasComponent(lane))
             {
-                parts.Add("edge");
+                parts.Append("edge");
             }
 
             if (m_CarLaneData.TryGetComponent(lane, out CarLane carLane))
             {
-                parts.Add($"car(flags={carLane.m_Flags})");
+                AppendLaneShapePart(parts, $"car(flags={carLane.m_Flags})");
             }
 
             if (m_ConnectionLaneData.TryGetComponent(lane, out ConnectionLane connectionLane))
             {
-                parts.Add($"connection(flags={connectionLane.m_Flags})");
+                AppendLaneShapePart(parts, $"connection(flags={connectionLane.m_Flags})");
             }
 
             if (m_ParkingLaneData.HasComponent(lane))
             {
-                parts.Add("parking");
+                AppendLaneShapePart(parts, "parking");
             }
 
             if (m_GarageLaneData.HasComponent(lane))
             {
-                parts.Add("garage");
+                AppendLaneShapePart(parts, "garage");
             }
 
             string prefabName = TryGetPrefabName(lane);
             if (prefabName != null)
             {
-                parts.Add($"prefab={prefabName}");
+                AppendLaneShapePart(parts, $"prefab={prefabName}");
             }
 
-            return parts.Count == 0 ? "other" : string.Join(", ", parts);
+            return parts.Length == 0 ? "other" : parts.ToString();
         }
 
         private string DescribeOwnerChain(Entity entity)
@@ -467,13 +481,18 @@ namespace Traffic_Law_Enforcement
                 return "null";
             }
 
-            List<string> parts = new List<string>(8);
+            System.Text.StringBuilder parts = new System.Text.StringBuilder(192);
             Entity current = entity;
             for (int depth = 0; depth < 8 && current != Entity.Null; depth += 1)
             {
+                if (parts.Length > 0)
+                {
+                    parts.Append(" -> ");
+                }
+
                 string prefabName = TryGetPrefabName(current);
                 bool roadBuilderPrefab = IsRoadBuilderPrefabName(prefabName);
-                parts.Add(prefabName != null
+                parts.Append(prefabName != null
                     ? $"{current}[prefab={prefabName}, roadBuilder={roadBuilderPrefab}]"
                     : current.ToString());
 
@@ -485,7 +504,17 @@ namespace Traffic_Law_Enforcement
                 current = owner.m_Owner;
             }
 
-            return string.Join(" -> ", parts);
+            return parts.ToString();
+        }
+
+        private static void AppendLaneShapePart(System.Text.StringBuilder parts, string part)
+        {
+            if (parts.Length > 0)
+            {
+                parts.Append(", ");
+            }
+
+            parts.Append(part);
         }
 
         private string TryGetPrefabName(Entity entity)

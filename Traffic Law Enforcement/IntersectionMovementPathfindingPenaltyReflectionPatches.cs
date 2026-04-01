@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Reflection;
+using System.Text;
 using Game;
 using Game.Pathfind;
 using HarmonyLib;
@@ -10,13 +11,13 @@ using Entity = Unity.Entities.Entity;
 namespace Traffic_Law_Enforcement
 {
     [HarmonyPatch]
-    internal static class IntersectionMovementPathfindReflectionPatches
+    internal static class IntersectionMovementPathfindingPenaltyReflectionPatches
     {
         private const int MaxDiagnosticLogs = 32;
         private static readonly Type s_PathfindExecutorType = AccessTools.Inner(typeof(PathfindJobs), "PathfindExecutor");
         private static int s_DiagnosticLogCount;
         private static readonly HashSet<string> s_ActivatedMethods = new HashSet<string>();
-        private const string HarmonyId = "Traffic_Law_Enforcement.IntersectionMovementPathfindReflectionPatches";
+        private const string HarmonyId = "Traffic_Law_Enforcement.IntersectionMovementPathfindingPenaltyReflectionPatches";
         private static Harmony s_Harmony;
 
         private readonly struct NamedEntity
@@ -45,8 +46,7 @@ namespace Traffic_Law_Enforcement
                     continue;
                 }
 
-                if (string.Equals(method.Name, "CalculateCost", StringComparison.Ordinal) ||
-                    method.Name.IndexOf("cost", StringComparison.OrdinalIgnoreCase) >= 0)
+                if (string.Equals(method.Name, "CalculateCost", StringComparison.Ordinal))
                 {
                     yield return method;
                 }
@@ -60,10 +60,18 @@ namespace Traffic_Law_Enforcement
                 return;
             }
 
+            if (IntersectionMovementPathfindingPenaltyPatches.IsApplied)
+            {
+                Mod.log.Info("Intersection movement reflection fallback skipped: primary hook is already active.");
+                return;
+            }
+
             try
             {
+                s_DiagnosticLogCount = 0;
+                s_ActivatedMethods.Clear();
                 s_Harmony = new Harmony(HarmonyId);
-                s_Harmony.PatchAll(typeof(IntersectionMovementPathfindReflectionPatches).Assembly);
+                s_Harmony.CreateClassProcessor(typeof(IntersectionMovementPathfindingPenaltyReflectionPatches)).Patch();
                 Mod.log.Info("Intersection movement reflection fallback patches applied.");
             }
             catch (Exception ex)
@@ -82,10 +90,18 @@ namespace Traffic_Law_Enforcement
 
             s_Harmony.UnpatchAll(HarmonyId);
             s_Harmony = null;
+            s_DiagnosticLogCount = 0;
+            s_ActivatedMethods.Clear();
         }
 
+        [HarmonyPostfix]
         private static void Postfix(object[] __args, ref float __result, PathfindParameters ___m_Parameters, MethodBase __originalMethod)
         {
+            if (IntersectionMovementPathfindingPenaltyPatches.IsApplied)
+            {
+                return;
+            }
+
             string methodKey = __originalMethod?.ToString() ?? "(null)";
             if (s_ActivatedMethods.Add(methodKey))
             {
@@ -144,53 +160,17 @@ namespace Traffic_Law_Enforcement
             allowedMovement = LaneMovement.None;
 
             List<NamedEntity> entities = new List<NamedEntity>(16);
+            HashSet<object> visited = new HashSet<object>();
             if (args != null)
             {
                 for (int index = 0; index < args.Length; index += 1)
                 {
-                    CollectNamedEntities(args[index], $"arg{index}", 0, entities, new HashSet<object>());
+                    visited.Clear();
+                    CollectNamedEntities(args[index], $"arg{index}", 0, entities, visited);
                 }
             }
 
             HashSet<ulong> seenPairs = new HashSet<ulong>();
-            foreach ((int sourceIndex, int targetIndex) in EnumerateCandidatePairs(entities))
-            {
-                if (sourceIndex < 0 || targetIndex < 0 || sourceIndex >= entities.Count || targetIndex >= entities.Count || sourceIndex == targetIndex)
-                {
-                    continue;
-                }
-
-                Entity candidateSource = entities[sourceIndex].Value;
-                Entity candidateTarget = entities[targetIndex].Value;
-                if (candidateSource == Entity.Null || candidateTarget == Entity.Null || candidateSource == candidateTarget)
-                {
-                    continue;
-                }
-
-                ulong pairKey = (((ulong)(uint)candidateSource.Index) << 32) ^ (uint)candidateTarget.Index;
-                if (!seenPairs.Add(pairKey))
-                {
-                    continue;
-                }
-
-                if (IntersectionMovementPolicy.TryGetIllegalIntersectionMovement(
-                        entityManager,
-                        candidateSource,
-                        candidateTarget,
-                        out actualMovement,
-                        out allowedMovement))
-                {
-                    sourceLane = candidateSource;
-                    targetLane = candidateTarget;
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
-        private static IEnumerable<(int SourceIndex, int TargetIndex)> EnumerateCandidatePairs(List<NamedEntity> entities)
-        {
             for (int sourceIndex = 0; sourceIndex < entities.Count; sourceIndex += 1)
             {
                 if (!LooksLikeSource(entities[sourceIndex].Name))
@@ -198,27 +178,21 @@ namespace Traffic_Law_Enforcement
                     continue;
                 }
 
-                for (int targetIndex = 0; targetIndex < entities.Count; targetIndex += 1)
+                if (TryResolveIllegalPair(entityManager, entities, sourceIndex, seenPairs, true, out sourceLane, out targetLane, out actualMovement, out allowedMovement))
                 {
-                    if (sourceIndex == targetIndex || !LooksLikeTarget(entities[targetIndex].Name))
-                    {
-                        continue;
-                    }
-
-                    yield return (sourceIndex, targetIndex);
+                    return true;
                 }
             }
 
             for (int sourceIndex = 0; sourceIndex < entities.Count; sourceIndex += 1)
             {
-                for (int targetIndex = 0; targetIndex < entities.Count; targetIndex += 1)
+                if (TryResolveIllegalPair(entityManager, entities, sourceIndex, seenPairs, false, out sourceLane, out targetLane, out actualMovement, out allowedMovement))
                 {
-                    if (sourceIndex != targetIndex)
-                    {
-                        yield return (sourceIndex, targetIndex);
-                    }
+                    return true;
                 }
             }
+
+            return false;
         }
 
         private static bool LooksLikeSource(string name)
@@ -231,6 +205,66 @@ namespace Traffic_Law_Enforcement
         {
             string value = (name ?? string.Empty).ToLowerInvariant();
             return value.Contains("target") || value.Contains("to") || value.Contains("next") || value.Contains("connection") || value.Contains("end");
+        }
+
+        private static bool TryResolveIllegalPair(
+            EntityManager entityManager,
+            List<NamedEntity> entities,
+            int sourceIndex,
+            HashSet<ulong> seenPairs,
+            bool requireTargetNameMatch,
+            out Entity sourceLane,
+            out Entity targetLane,
+            out LaneMovement actualMovement,
+            out LaneMovement allowedMovement)
+        {
+            sourceLane = entities[sourceIndex].Value;
+            targetLane = Entity.Null;
+            actualMovement = LaneMovement.None;
+            allowedMovement = LaneMovement.None;
+
+            if (sourceLane == Entity.Null)
+            {
+                return false;
+            }
+
+            for (int targetIndex = 0; targetIndex < entities.Count; targetIndex += 1)
+            {
+                if (sourceIndex == targetIndex)
+                {
+                    continue;
+                }
+
+                if (requireTargetNameMatch && !LooksLikeTarget(entities[targetIndex].Name))
+                {
+                    continue;
+                }
+
+                Entity candidateTarget = entities[targetIndex].Value;
+                if (candidateTarget == Entity.Null || candidateTarget == sourceLane)
+                {
+                    continue;
+                }
+
+                ulong pairKey = (((ulong)(uint)sourceLane.Index) << 32) ^ (uint)candidateTarget.Index;
+                if (!seenPairs.Add(pairKey))
+                {
+                    continue;
+                }
+
+                if (IntersectionMovementPolicy.TryGetIllegalIntersectionMovement(
+                        entityManager,
+                        sourceLane,
+                        candidateTarget,
+                        out actualMovement,
+                        out allowedMovement))
+                {
+                    targetLane = candidateTarget;
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private static void CollectNamedEntities(object value, string path, int depth, List<NamedEntity> entities, HashSet<object> visited)
@@ -289,13 +323,25 @@ namespace Traffic_Law_Enforcement
             }
 
             ParameterInfo[] parameters = method.GetParameters();
-            List<string> parts = new List<string>(parameters.Length);
+            StringBuilder signature = new StringBuilder(96);
+            signature.Append(method.DeclaringType?.FullName);
+            signature.Append('.');
+            signature.Append(method.Name);
+            signature.Append('(');
             for (int index = 0; index < parameters.Length; index += 1)
             {
-                parts.Add(parameters[index].ParameterType.Name + " " + parameters[index].Name);
+                if (index > 0)
+                {
+                    signature.Append(", ");
+                }
+
+                signature.Append(parameters[index].ParameterType.Name);
+                signature.Append(' ');
+                signature.Append(parameters[index].Name);
             }
 
-            return $"{method.DeclaringType?.FullName}.{method.Name}({string.Join(", ", parts)})";
+            signature.Append(')');
+            return signature.ToString();
         }
     }
 }
