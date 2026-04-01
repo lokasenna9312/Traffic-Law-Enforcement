@@ -168,6 +168,35 @@ namespace Traffic_Law_Enforcement
             s_CurrentFineIncomeDirty = true;
         }
 
+        private static void GetTimestampRange(
+            List<FineIncomeEvent> entries,
+            out long minTimestamp,
+            out long maxTimestamp)
+        {
+            minTimestamp = long.MaxValue;
+            maxTimestamp = long.MinValue;
+
+            for (int index = 0; index < entries.Count; index += 1)
+            {
+                long timestamp = entries[index].TimestampMonthTicks;
+                if (timestamp < minTimestamp)
+                {
+                    minTimestamp = timestamp;
+                }
+
+                if (timestamp > maxTimestamp)
+                {
+                    maxTimestamp = timestamp;
+                }
+            }
+
+            if (entries.Count == 0)
+            {
+                minTimestamp = long.MinValue;
+                maxTimestamp = long.MinValue;
+            }
+        }
+
         public static void UpdateCurrentFineIncome(long currentTimestampMonthTicks)
         {
             if (!s_CurrentFineIncomeDirty)
@@ -193,6 +222,12 @@ namespace Traffic_Law_Enforcement
             int intersectionMovementIncome = 0;
             long cutoffTimestamp = currentTimestampMonthTicks - EnforcementGameTime.CurrentMonthTicksPerMonth;
             long earliestRetainedTimestamp = long.MaxValue;
+            int fineIncomeEventCountBefore = s_RecentFineIncomeEvents.Count;
+            int removedFineIncomeEvents = 0;
+            GetTimestampRange(
+                s_RecentFineIncomeEvents,
+                out long fineIncomeMinTimestamp,
+                out long fineIncomeMaxTimestamp);
 
             for (int index = s_RecentFineIncomeEvents.Count - 1; index >= 0; index -= 1)
             {
@@ -200,6 +235,7 @@ namespace Traffic_Law_Enforcement
                 if (currentTimestampMonthTicks > 0L && entry.TimestampMonthTicks < cutoffTimestamp)
                 {
                     s_RecentFineIncomeEvents.RemoveAt(index);
+                    removedFineIncomeEvents += 1;
                     continue;
                 }
 
@@ -235,6 +271,16 @@ namespace Traffic_Law_Enforcement
                       EnforcementGameTime.CurrentMonthTicksPerMonth
                     : long.MaxValue;
             s_CurrentFineIncomeDirty = false;
+
+            if (removedFineIncomeEvents > 0 &&
+                EnforcementLoggingPolicy.ShouldLogFineDiagnostics())
+            {
+                Mod.log.Info(
+                    "[ENFORCEMENT_FINE_PRUNE] " +
+                    $"cutoff={cutoffTimestamp}, monthTicks={currentTimestampMonthTicks}, monthWindow={EnforcementGameTime.CurrentMonthTicksPerMonth}, " +
+                    $"events={fineIncomeEventCountBefore}->{s_RecentFineIncomeEvents.Count}, removed={removedFineIncomeEvents}, rolling1m={CurrentFineIncome}, " +
+                    $"range={fineIncomeMinTimestamp}..{fineIncomeMaxTimestamp}, daysPerYear={EnforcementGameTime.CurrentDaysPerYear}");
+            }
         }
 
         public static void AccumulateFineIncomeLogBatch(int amount)
@@ -294,6 +340,14 @@ namespace Traffic_Law_Enforcement
             s_CurrentFineIncomeDirty = true;
             s_PendingBatchSinceLastLog = 0;
             s_LastFineIncomeLogTimestampStopwatchTicks = long.MinValue;
+
+            if (EnforcementLoggingPolicy.ShouldLogFineDiagnostics())
+            {
+                Mod.log.Info(
+                    "[ENFORCEMENT_FINE_STATE] phase=LoadPersistentData, " +
+                    $"events={s_RecentFineIncomeEvents.Count}, runtimeWorldGeneration={EnforcementSaveDataSystem.RuntimeWorldGeneration}, " +
+                    $"monthTicks={EnforcementGameTime.CurrentTimestampMonthTicks}");
+            }
         }
 
         public static IReadOnlyCollection<FineIncomeEvent> GetFineIncomeEventSnapshot()
@@ -303,6 +357,15 @@ namespace Traffic_Law_Enforcement
 
         public static void ResetPersistentData()
         {
+            if (EnforcementLoggingPolicy.ShouldLogFineDiagnostics())
+            {
+                Mod.log.Info(
+                    "[ENFORCEMENT_FINE_STATE] phase=ResetPersistentData, " +
+                    $"events={s_RecentFineIncomeEvents.Count}, rolling1m={CurrentFineIncome}, " +
+                    $"runtimeWorldGeneration={EnforcementSaveDataSystem.RuntimeWorldGeneration}, " +
+                    $"monthTicks={EnforcementGameTime.CurrentTimestampMonthTicks}");
+            }
+
             s_RecentFineIncomeEvents.Clear();
             CurrentFineIncome = 0;
             CurrentPublicTransportLaneFineIncome = 0;

@@ -136,8 +136,6 @@ namespace Traffic_Law_Enforcement
 
     public static class MonthlyEnforcementChirperService
     {
-        private static bool s_HasTrackingState;
-        private static MonthlyEnforcementTrackingState s_TrackingState;
         private static readonly List<MonthlyEnforcementReport> s_ReportHistory = new List<MonthlyEnforcementReport>();
         private static readonly ReadOnlyCollection<MonthlyEnforcementReport> s_ReportHistoryView =
             s_ReportHistory.AsReadOnly();
@@ -145,8 +143,16 @@ namespace Traffic_Law_Enforcement
 
         public static bool TryGetTrackingState(out MonthlyEnforcementTrackingState trackingState)
         {
-            trackingState = s_TrackingState;
-            return s_HasTrackingState;
+            if (EnforcementPolicyImpactService.TryGetTrackingState(
+                    out EnforcementPolicyImpactTrackingState policyTrackingState))
+            {
+                trackingState =
+                    CreateTrackingStateFromPolicyImpactTrackingState(policyTrackingState);
+                return true;
+            }
+
+            trackingState = default;
+            return false;
         }
 
         public static IReadOnlyCollection<MonthlyEnforcementReport> GetReportHistorySnapshot()
@@ -156,8 +162,6 @@ namespace Traffic_Law_Enforcement
 
         public static void ResetPersistentData()
         {
-            s_HasTrackingState = false;
-            s_TrackingState = default;
             s_ReportHistory.Clear();
             s_ManualPreviewRequestCount = 0;
         }
@@ -165,12 +169,6 @@ namespace Traffic_Law_Enforcement
         public static void LoadPersistentData(MonthlyEnforcementTrackingState? trackingState, IEnumerable<MonthlyEnforcementReport> reports)
         {
             ResetPersistentData();
-
-            if (trackingState.HasValue)
-            {
-                s_TrackingState = trackingState.Value;
-                s_HasTrackingState = true;
-            }
 
             if (reports == null)
             {
@@ -188,62 +186,38 @@ namespace Traffic_Law_Enforcement
             {
                 s_ReportHistory.Add(report);
             }
+
+            if (EnforcementLoggingPolicy.ShouldLogChirperDiagnostics())
+            {
+                string trackingSummary =
+                    trackingState.HasValue
+                        ? $"legacyTrackingMonth={trackingState.Value.m_MonthIndex}, totalActual={trackingState.Value.m_TotalActualPathCount}, totalAvoided={trackingState.Value.m_TotalAvoidedPathCount}, totalDecision={trackingState.Value.m_TotalActualOrAvoidedPathCount}"
+                        : "legacyTrackingMonth=null";
+
+                Mod.log.Info(
+                    "[ENFORCEMENT_CHIRPER_STATE] " +
+                    $"phase=LoadPersistentData, {trackingSummary}, reports={s_ReportHistory.Count}");
+            }
         }
 
         public static bool ResetTrackingToCurrentMonth(long currentMonthIndex)
         {
-            MonthlyEnforcementTrackingState nextState = CaptureCurrentState(currentMonthIndex);
-            if (s_HasTrackingState && TrackingStatesEqual(s_TrackingState, nextState))
-            {
-                return false;
-            }
-
-            s_TrackingState = nextState;
-            s_HasTrackingState = true;
-            return true;
+            return EnforcementPolicyImpactService.ResetTrackingToCurrentMonth(currentMonthIndex);
         }
 
         public static bool EnsureTrackingInitialized(long currentMonthIndex)
         {
-            if (!s_HasTrackingState)
-            {
-                s_TrackingState = CaptureCurrentState(currentMonthIndex);
-                s_HasTrackingState = true;
-                return true;
-            }
-
-            if (currentMonthIndex < s_TrackingState.m_MonthIndex)
-            {
-                s_TrackingState = CaptureCurrentState(currentMonthIndex);
-                return true;
-            }
-
-            return false;
+            return EnforcementPolicyImpactService.EnsureTrackingInitialized(currentMonthIndex);
         }
 
         public static bool TryAdvanceMonth(long currentMonthIndex, out MonthlyEnforcementReport report)
         {
-            report = default;
-
-            if (!s_HasTrackingState)
+            if (!EnforcementPolicyImpactService.TryAdvanceMonth(currentMonthIndex, out report))
             {
-                EnsureTrackingInitialized(currentMonthIndex);
                 return false;
             }
 
-            if (currentMonthIndex <= s_TrackingState.m_MonthIndex)
-            {
-                if (currentMonthIndex < s_TrackingState.m_MonthIndex)
-                {
-                    s_TrackingState = CaptureCurrentState(currentMonthIndex);
-                }
-
-                return false;
-            }
-
-            report = CreateDeltaReport(s_TrackingState);
             UpsertReport(report);
-            s_TrackingState = CaptureCurrentState(currentMonthIndex);
             return true;
         }
 
@@ -356,56 +330,6 @@ namespace Traffic_Law_Enforcement
             return Volatile.Read(ref s_ManualPreviewRequestCount) > 0;
         }
 
-        private static MonthlyEnforcementTrackingState CaptureCurrentState(long currentMonthIndex)
-        {
-            EnforcementPolicyImpactService.PersistentTotalsSnapshot totals = EnforcementPolicyImpactService.GetPersistentTotalsSnapshot();
-
-            return new MonthlyEnforcementTrackingState(
-                currentMonthIndex,
-                totals.TotalPathRequestCount,
-                totals.TotalActualPathCount,
-                totals.PublicTransportLaneActualCount,
-                totals.MidBlockCrossingActualCount,
-                totals.IntersectionMovementActualCount,
-                EnforcementTelemetry.TotalFineAmount,
-                totals.TotalAvoidedPathCount,
-                totals.PublicTransportLaneFineAmount,
-                totals.MidBlockCrossingFineAmount,
-                totals.IntersectionMovementFineAmount,
-                totals.PublicTransportLaneAvoidedEventCount,
-                totals.MidBlockCrossingAvoidedEventCount,
-                totals.IntersectionMovementAvoidedEventCount,
-                totals.TotalActualOrAvoidedPathCount,
-                totals.PublicTransportLaneActualOrAvoidedPathCount,
-                totals.MidBlockCrossingActualOrAvoidedPathCount,
-                totals.IntersectionMovementActualOrAvoidedPathCount);
-        }
-
-        private static MonthlyEnforcementReport CreateDeltaReport(MonthlyEnforcementTrackingState trackingState)
-        {
-            EnforcementPolicyImpactService.PersistentTotalsSnapshot totals = EnforcementPolicyImpactService.GetPersistentTotalsSnapshot();
-
-            return new MonthlyEnforcementReport(
-                trackingState.m_MonthIndex,
-                ClampToNonNegative(totals.TotalPathRequestCount - trackingState.m_TotalPathRequestCount),
-                ClampToNonNegative(totals.TotalActualPathCount - trackingState.m_TotalActualPathCount),
-                ClampToNonNegative(totals.PublicTransportLaneActualCount - trackingState.m_PublicTransportLaneCount),
-                ClampToNonNegative(totals.MidBlockCrossingActualCount - trackingState.m_MidBlockCrossingCount),
-                ClampToNonNegative(totals.IntersectionMovementActualCount - trackingState.m_IntersectionMovementCount),
-                ClampToNonNegative(EnforcementTelemetry.TotalFineAmount - trackingState.m_TotalFineAmount),
-                ClampToNonNegative(totals.TotalAvoidedPathCount - trackingState.m_TotalAvoidedPathCount),
-                ClampToNonNegative(totals.PublicTransportLaneFineAmount - trackingState.m_PublicTransportLaneFineAmount),
-                ClampToNonNegative(totals.MidBlockCrossingFineAmount - trackingState.m_MidBlockCrossingFineAmount),
-                ClampToNonNegative(totals.IntersectionMovementFineAmount - trackingState.m_IntersectionMovementFineAmount),
-                ClampToNonNegative(totals.PublicTransportLaneAvoidedEventCount - trackingState.m_PublicTransportLaneAvoidedEventCount),
-                ClampToNonNegative(totals.MidBlockCrossingAvoidedEventCount - trackingState.m_MidBlockCrossingAvoidedEventCount),
-                ClampToNonNegative(totals.IntersectionMovementAvoidedEventCount - trackingState.m_IntersectionMovementAvoidedEventCount),
-                ClampToNonNegative(totals.TotalActualOrAvoidedPathCount - trackingState.m_TotalActualOrAvoidedPathCount),
-                ClampToNonNegative(totals.PublicTransportLaneActualOrAvoidedPathCount - trackingState.m_PublicTransportLaneActualOrAvoidedPathCount),
-                ClampToNonNegative(totals.MidBlockCrossingActualOrAvoidedPathCount - trackingState.m_MidBlockCrossingActualOrAvoidedPathCount),
-                ClampToNonNegative(totals.IntersectionMovementActualOrAvoidedPathCount - trackingState.m_IntersectionMovementActualOrAvoidedPathCount));
-        }
-
         private static void UpsertReport(MonthlyEnforcementReport report)
         {
             int count = s_ReportHistory.Count;
@@ -439,31 +363,29 @@ namespace Traffic_Law_Enforcement
             s_ReportHistory.Add(report);
             s_ReportHistory.Sort((left, right) => left.m_MonthIndex.CompareTo(right.m_MonthIndex));
         }
-        private static bool TrackingStatesEqual(MonthlyEnforcementTrackingState left, MonthlyEnforcementTrackingState right)
-        {
-            return left.m_MonthIndex == right.m_MonthIndex
-                && left.m_TotalPathRequestCount == right.m_TotalPathRequestCount
-                && left.m_TotalActualPathCount == right.m_TotalActualPathCount
-                && left.m_PublicTransportLaneCount == right.m_PublicTransportLaneCount
-                && left.m_MidBlockCrossingCount == right.m_MidBlockCrossingCount
-                && left.m_IntersectionMovementCount == right.m_IntersectionMovementCount
-                && left.m_TotalFineAmount == right.m_TotalFineAmount
-                && left.m_TotalAvoidedPathCount == right.m_TotalAvoidedPathCount
-                && left.m_PublicTransportLaneFineAmount == right.m_PublicTransportLaneFineAmount
-                && left.m_MidBlockCrossingFineAmount == right.m_MidBlockCrossingFineAmount
-                && left.m_IntersectionMovementFineAmount == right.m_IntersectionMovementFineAmount
-                && left.m_PublicTransportLaneAvoidedEventCount == right.m_PublicTransportLaneAvoidedEventCount
-                && left.m_MidBlockCrossingAvoidedEventCount == right.m_MidBlockCrossingAvoidedEventCount
-                && left.m_IntersectionMovementAvoidedEventCount == right.m_IntersectionMovementAvoidedEventCount
-                && left.m_TotalActualOrAvoidedPathCount == right.m_TotalActualOrAvoidedPathCount
-                && left.m_PublicTransportLaneActualOrAvoidedPathCount == right.m_PublicTransportLaneActualOrAvoidedPathCount
-                && left.m_MidBlockCrossingActualOrAvoidedPathCount == right.m_MidBlockCrossingActualOrAvoidedPathCount
-                && left.m_IntersectionMovementActualOrAvoidedPathCount == right.m_IntersectionMovementActualOrAvoidedPathCount;
-        }
 
-        private static int ClampToNonNegative(int value)
+        private static MonthlyEnforcementTrackingState CreateTrackingStateFromPolicyImpactTrackingState(
+            EnforcementPolicyImpactTrackingState trackingState)
         {
-            return value < 0 ? 0 : value;
+            return new MonthlyEnforcementTrackingState(
+                trackingState.m_MonthIndex,
+                trackingState.m_TotalPathRequestCount,
+                trackingState.m_TotalActualPathCount,
+                trackingState.m_PublicTransportLaneActualCount,
+                trackingState.m_MidBlockCrossingActualCount,
+                trackingState.m_IntersectionMovementActualCount,
+                trackingState.m_TotalFineAmount,
+                trackingState.m_TotalAvoidedPathCount,
+                trackingState.m_PublicTransportLaneFineAmount,
+                trackingState.m_MidBlockCrossingFineAmount,
+                trackingState.m_IntersectionMovementFineAmount,
+                trackingState.m_PublicTransportLaneAvoidedEventCount,
+                trackingState.m_MidBlockCrossingAvoidedEventCount,
+                trackingState.m_IntersectionMovementAvoidedEventCount,
+                trackingState.m_TotalActualOrAvoidedPathCount,
+                trackingState.m_PublicTransportLaneActualOrAvoidedPathCount,
+                trackingState.m_MidBlockCrossingActualOrAvoidedPathCount,
+                trackingState.m_IntersectionMovementActualOrAvoidedPathCount);
         }
     }
 }

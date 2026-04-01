@@ -3,6 +3,7 @@ using Colossal.Serialization.Entities;
 using Game;
 using Game.Vehicles;
 using Game.Serialization;
+using Game.Simulation;
 using Unity.Collections;
 using Unity.Entities;
 namespace Traffic_Law_Enforcement {
@@ -320,6 +321,13 @@ namespace Traffic_Law_Enforcement {
             where TReader : IReader {
             reader.Read(out bool hasPolicyImpactTrackingState);
             if (!hasPolicyImpactTrackingState) {
+                if (EnforcementLoggingPolicy.ShouldLogPolicyDiagnostics())
+                {
+                    Mod.log.Info(
+                        "[ENFORCEMENT_POLICY_TRACKING_IO] " +
+                        $"phase=ReadMissing, version={version}");
+                }
+
                 return null;
             }
 
@@ -401,12 +409,31 @@ namespace Traffic_Law_Enforcement {
                     trackingMidBlockCrossingActualOrAvoidedPathCount,
                     trackingIntersectionMovementActualOrAvoidedPathCount);
 
+            if (EnforcementLoggingPolicy.ShouldLogPolicyDiagnostics())
+            {
+                Mod.log.Info(
+                    "[ENFORCEMENT_POLICY_TRACKING_IO] " +
+                    $"phase=Read, month={trackingState.m_MonthIndex}, path={trackingState.m_TotalPathRequestCount}, " +
+                    $"actual={trackingState.m_TotalActualPathCount}, avoided={trackingState.m_TotalAvoidedPathCount}, " +
+                    $"decision={trackingState.m_TotalActualOrAvoidedPathCount}, fine={trackingState.m_TotalFineAmount}");
+            }
+
             if (migratedLegacyPathRequestTracking ||
                 HasInconsistentPathRequestTracking(
                     trackingState.m_TotalPathRequestCount,
                     trackingState.m_TotalActualPathCount,
                     trackingState.m_TotalAvoidedPathCount,
                     trackingState.m_TotalFineAmount)) {
+                if (EnforcementLoggingPolicy.ShouldLogPolicyDiagnostics())
+                {
+                    Mod.log.Info(
+                        "[ENFORCEMENT_POLICY_TRACKING_IO] " +
+                        $"phase=ReadDiscarded, migratedLegacyPathRequestTracking={migratedLegacyPathRequestTracking}, " +
+                        $"month={trackingState.m_MonthIndex}, path={trackingState.m_TotalPathRequestCount}, " +
+                        $"actual={trackingState.m_TotalActualPathCount}, avoided={trackingState.m_TotalAvoidedPathCount}, " +
+                        $"decision={trackingState.m_TotalActualOrAvoidedPathCount}, fine={trackingState.m_TotalFineAmount}");
+                }
+
                 return null;
             }
 
@@ -605,7 +632,12 @@ namespace Traffic_Law_Enforcement {
         }
 
         public void SetDefaults(Context context) {
+            int previousGeneration = RuntimeWorldGeneration;
             AdvanceRuntimeWorldGeneration(context);
+            LogSaveLifecycleHook(
+                "SetDefaults",
+                context,
+                $"runtimeWorldGeneration={previousGeneration}->{RuntimeWorldGeneration}");
             ResetRuntimeState();
             EnforcementGameplaySettingsService.Apply(
                 CreateInitialGameplaySettings(context));
@@ -617,6 +649,7 @@ namespace Traffic_Law_Enforcement {
         }
 
         public void PreDeserialize(Context context) {
+            LogSaveLifecycleHook("PreDeserialize", context);
             ResetRuntimeState();
 
             m_LoadedPublicTransportLaneVehicleStates.Clear();
@@ -626,11 +659,29 @@ namespace Traffic_Law_Enforcement {
         }
 
         public void PostDeserialize(Context context) {
+            LogSaveLifecycleHook(
+                "PostDeserialize",
+                context,
+                $"hasDeserializedData={m_HasDeserializedData}, loadedVehicleStates={m_LoadedPublicTransportLaneVehicleStates.Count}");
             m_PendingPostDeserializeApply = true;
         }
 
         public void Serialize<TWriter>(TWriter writer)
             where TWriter : IWriter {
+            if (!EnforcementGameTime.TryUpdateFromWorld(
+                    World,
+                    logOnInitialization: true,
+                    out string saveTimeFailureReason))
+            {
+                Mod.log.Info(
+                    "[ENFORCEMENT_SAVE_HOOK] " +
+                    $"hook=SerializeTimeSyncSkipped, reason={saveTimeFailureReason}");
+            }
+            else
+            {
+                EnforcementPolicyImpactService.PrepareTrackingStateForPersistence();
+            }
+
             writer.Write(kSerializationVersion);
             writer.Write(string.IsNullOrWhiteSpace(Mod.CurrentModVersion) ? "unknown" : Mod.CurrentModVersion);
             writer.Write(string.IsNullOrWhiteSpace(Mod.CurrentGameVersion) ? "unknown" : Mod.CurrentGameVersion);
@@ -816,6 +867,22 @@ namespace Traffic_Law_Enforcement {
             EnforcementPolicyImpactTrackingState? policyImpactTrackingState =
                 ReadPolicyImpactTrackingState(
                     reader, version, migratedLegacyPathRequestTracking);
+            if (ShouldHydrateMonthlyTrackingStateFromPolicyImpact(
+                    trackingState,
+                    policyImpactTrackingState))
+            {
+                trackingState = CreateMonthlyTrackingStateFromPolicyImpactTrackingState(
+                    policyImpactTrackingState.Value);
+
+                if (EnforcementLoggingPolicy.ShouldLogChirperDiagnostics())
+                {
+                    Mod.log.Info(
+                        "[ENFORCEMENT_CHIRPER_STATE] " +
+                        $"phase=HydrateTrackingStateFromPolicyImpact, trackingMonth={trackingState.Value.m_MonthIndex}, " +
+                        $"totalActual={trackingState.Value.m_TotalActualPathCount}, totalAvoided={trackingState.Value.m_TotalAvoidedPathCount}, " +
+                        $"totalDecision={trackingState.Value.m_TotalActualOrAvoidedPathCount}, totalFine={trackingState.Value.m_TotalFineAmount}");
+                }
+            }
             PolicyImpactPersistentTotalsReadResult totalsReadResult =
                 ReadPolicyImpactPersistentTotals(reader, version);
 
@@ -855,6 +922,13 @@ namespace Traffic_Law_Enforcement {
                     policyImpactEventsReadResult.PathRequestEvents,
                     policyImpactEventsReadResult.ActualViolationEvents,
                     policyImpactEventsReadResult.AvoidedRerouteEvents));
+
+            Mod.log.Info(
+                "[ENFORCEMENT_SAVE_HOOK] hook=Deserialize, " +
+                $"fileVersion={version}, fineIncomeEvents={fineIncomeEvents.Count}, " +
+                $"reports={reports.Count}, pathRequests={policyImpactEventsReadResult.PathRequestEvents.Count}, " +
+                $"actualViolations={policyImpactEventsReadResult.ActualViolationEvents.Count}, " +
+                $"avoidedReroutes={policyImpactEventsReadResult.AvoidedRerouteEvents.Count}");
 
             m_HasDeserializedData = true;
             m_ShouldClearLegacyRuntimeState = false;
@@ -957,12 +1031,92 @@ namespace Traffic_Law_Enforcement {
             return EnforcementGameplaySettingsState.CreateCodeDefaults();
         }
 
+        private static void LogSaveLifecycleHook(
+            string hookName,
+            Context context,
+            string extra = null) {
+            string suffix =
+                string.IsNullOrWhiteSpace(extra)
+                    ? string.Empty
+                    : $", {extra}";
+
+            Mod.log.Info(
+                "[ENFORCEMENT_SAVE_HOOK] " +
+                $"hook={hookName}, purpose={context.purpose}, version={context.version}, " +
+                $"runtimeWorldGeneration={RuntimeWorldGeneration}, " +
+                $"timeInitialized={EnforcementGameTime.IsInitialized}, " +
+                $"monthTicks={EnforcementGameTime.CurrentTimestampMonthTicks}{suffix}");
+        }
+
         private static void ResetRuntimeState() {
             EnforcementTelemetry.ResetPersistentData();
             MonthlyEnforcementChirperService.ResetPersistentData();
             EnforcementBudgetUIService.ResetPersistentData();
             EnforcementPolicyImpactService.ResetPersistentData();
             EnforcementFineMoneyService.ClearPendingCharges();
+        }
+
+        private static bool ShouldHydrateMonthlyTrackingStateFromPolicyImpact(
+            MonthlyEnforcementTrackingState? monthlyTrackingState,
+            EnforcementPolicyImpactTrackingState? policyImpactTrackingState)
+        {
+            if (!policyImpactTrackingState.HasValue)
+            {
+                return false;
+            }
+
+            if (!monthlyTrackingState.HasValue)
+            {
+                return HasMeaningfulTrackingTotals(policyImpactTrackingState.Value);
+            }
+
+            MonthlyEnforcementTrackingState trackingState = monthlyTrackingState.Value;
+            EnforcementPolicyImpactTrackingState policyState = policyImpactTrackingState.Value;
+            return trackingState.m_MonthIndex == policyState.m_MonthIndex &&
+                   !HasMeaningfulTrackingTotals(trackingState) &&
+                   HasMeaningfulTrackingTotals(policyState);
+        }
+
+        private static bool HasMeaningfulTrackingTotals(MonthlyEnforcementTrackingState trackingState)
+        {
+            return trackingState.m_TotalPathRequestCount > 0 ||
+                   trackingState.m_TotalActualPathCount > 0 ||
+                   trackingState.m_TotalAvoidedPathCount > 0 ||
+                   trackingState.m_TotalFineAmount > 0 ||
+                   trackingState.m_TotalActualOrAvoidedPathCount > 0;
+        }
+
+        private static bool HasMeaningfulTrackingTotals(EnforcementPolicyImpactTrackingState trackingState)
+        {
+            return trackingState.m_TotalPathRequestCount > 0 ||
+                   trackingState.m_TotalActualPathCount > 0 ||
+                   trackingState.m_TotalAvoidedPathCount > 0 ||
+                   trackingState.m_TotalFineAmount > 0 ||
+                   trackingState.m_TotalActualOrAvoidedPathCount > 0;
+        }
+
+        private static MonthlyEnforcementTrackingState CreateMonthlyTrackingStateFromPolicyImpactTrackingState(
+            EnforcementPolicyImpactTrackingState trackingState)
+        {
+            return new MonthlyEnforcementTrackingState(
+                trackingState.m_MonthIndex,
+                trackingState.m_TotalPathRequestCount,
+                trackingState.m_TotalActualPathCount,
+                trackingState.m_PublicTransportLaneActualCount,
+                trackingState.m_MidBlockCrossingActualCount,
+                trackingState.m_IntersectionMovementActualCount,
+                trackingState.m_TotalFineAmount,
+                trackingState.m_TotalAvoidedPathCount,
+                trackingState.m_PublicTransportLaneFineAmount,
+                trackingState.m_MidBlockCrossingFineAmount,
+                trackingState.m_IntersectionMovementFineAmount,
+                trackingState.m_PublicTransportLaneAvoidedEventCount,
+                trackingState.m_MidBlockCrossingAvoidedEventCount,
+                trackingState.m_IntersectionMovementAvoidedEventCount,
+                trackingState.m_TotalActualOrAvoidedPathCount,
+                trackingState.m_PublicTransportLaneActualOrAvoidedPathCount,
+                trackingState.m_MidBlockCrossingActualOrAvoidedPathCount,
+                trackingState.m_IntersectionMovementActualOrAvoidedPathCount);
         }
 
         private static bool HasInconsistentPathRequestTracking(
@@ -1296,6 +1450,13 @@ namespace Traffic_Law_Enforcement {
 
             writer.Write(hasPolicyImpactTrackingState);
             if (!hasPolicyImpactTrackingState) {
+                if (EnforcementLoggingPolicy.ShouldLogPolicyDiagnostics())
+                {
+                    Mod.log.Info(
+                        "[ENFORCEMENT_POLICY_TRACKING_IO] " +
+                        "phase=WriteMissing");
+                }
+
                 return;
             }
 
@@ -1330,6 +1491,15 @@ namespace Traffic_Law_Enforcement {
                              .m_MidBlockCrossingActualOrAvoidedPathCount);
             writer.Write(policyImpactTrackingState
                              .m_IntersectionMovementActualOrAvoidedPathCount);
+
+            if (EnforcementLoggingPolicy.ShouldLogPolicyDiagnostics())
+            {
+                Mod.log.Info(
+                    "[ENFORCEMENT_POLICY_TRACKING_IO] " +
+                    $"phase=Write, month={policyImpactTrackingState.m_MonthIndex}, path={policyImpactTrackingState.m_TotalPathRequestCount}, " +
+                    $"actual={policyImpactTrackingState.m_TotalActualPathCount}, avoided={policyImpactTrackingState.m_TotalAvoidedPathCount}, " +
+                    $"decision={policyImpactTrackingState.m_TotalActualOrAvoidedPathCount}, fine={policyImpactTrackingState.m_TotalFineAmount}");
+            }
         }
 
         private static EnforcementGameplaySettingsState

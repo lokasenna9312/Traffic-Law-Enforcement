@@ -496,6 +496,36 @@ namespace Traffic_Law_Enforcement
             return true;
         }
 
+        private static void GetTimestampRange<T>(
+            List<T> entries,
+            Func<T, long> getTimestamp,
+            out long minTimestamp,
+            out long maxTimestamp)
+        {
+            minTimestamp = long.MaxValue;
+            maxTimestamp = long.MinValue;
+
+            for (int index = 0; index < entries.Count; index += 1)
+            {
+                long timestamp = getTimestamp(entries[index]);
+                if (timestamp < minTimestamp)
+                {
+                    minTimestamp = timestamp;
+                }
+
+                if (timestamp > maxTimestamp)
+                {
+                    maxTimestamp = timestamp;
+                }
+            }
+
+            if (entries.Count == 0)
+            {
+                minTimestamp = long.MinValue;
+                maxTimestamp = long.MinValue;
+            }
+        }
+
         private static void TryLogPolicyImpactSummary()
         {
             if (!EnforcementLoggingPolicy.ShouldLogPolicyImpactSummary())
@@ -548,6 +578,16 @@ namespace Traffic_Law_Enforcement
 
         public static void ResetPersistentData()
         {
+            if (EnforcementLoggingPolicy.ShouldLogPolicyDiagnostics())
+            {
+                Mod.log.Info(
+                    "[ENFORCEMENT_POLICY_STATE] phase=ResetPersistentData, " +
+                    $"tracking={s_HasTrackingState}, totals=path:{s_TotalPathRequestCount},actual:{s_TotalActualPathCount},avoided:{s_TotalAvoidedPathCount},decision:{s_TotalActualOrAvoidedPathCount}, " +
+                    $"events=path:{s_PathRequestEvents.Count},actual:{s_ActualViolationEvents.Count},avoided:{s_AvoidedRerouteEvents.Count}, " +
+                    $"activeContexts={s_ActivePathContextByVehicle.Count}, nextPathContext={s_NextPathContextSequence}, " +
+                    $"runtimeWorldGeneration={EnforcementSaveDataSystem.RuntimeWorldGeneration}, monthTicks={EnforcementGameTime.CurrentTimestampMonthTicks}");
+            }
+
             s_HasTrackingState = false;
             s_TrackingState = default;
             s_TotalPathRequestCount = 0;
@@ -698,6 +738,32 @@ namespace Traffic_Law_Enforcement
             s_HasLastEmittedSummaryLogSnapshot = false;
             s_LastEmittedSummaryLogSnapshot = default;
             s_LastSummaryLogTimestampStopwatchTicks = long.MinValue;
+
+            if (EnforcementLoggingPolicy.ShouldLogPolicyDiagnostics())
+            {
+                string trackingSummary =
+                    data.TrackingState.HasValue
+                        ? $"tracking=True, trackingMonth={data.TrackingState.Value.m_MonthIndex}, trackingTotals=path:{data.TrackingState.Value.m_TotalPathRequestCount},actual:{data.TrackingState.Value.m_TotalActualPathCount},avoided:{data.TrackingState.Value.m_TotalAvoidedPathCount},decision:{data.TrackingState.Value.m_TotalActualOrAvoidedPathCount},fine:{data.TrackingState.Value.m_TotalFineAmount}"
+                        : "tracking=False, trackingMonth=null";
+                bool suspiciousEmptyTrackingBaseline =
+                    data.TrackingState.HasValue &&
+                    data.TrackingState.Value.m_TotalPathRequestCount == 0 &&
+                    data.TrackingState.Value.m_TotalActualPathCount == 0 &&
+                    data.TrackingState.Value.m_TotalAvoidedPathCount == 0 &&
+                    data.TrackingState.Value.m_TotalActualOrAvoidedPathCount == 0 &&
+                    (data.Totals.TotalPathRequestCount > 0 ||
+                    data.Totals.TotalActualPathCount > 0 ||
+                    data.Totals.TotalAvoidedPathCount > 0 ||
+                    data.Totals.TotalActualOrAvoidedPathCount > 0 ||
+                    data.Totals.TotalFineAmount > 0);
+
+                Mod.log.Info(
+                    "[ENFORCEMENT_POLICY_STATE] phase=LoadPersistentData, " +
+                    $"{trackingSummary}, suspiciousEmptyTrackingBaseline={suspiciousEmptyTrackingBaseline}, totals=path:{s_TotalPathRequestCount},actual:{s_TotalActualPathCount},avoided:{s_TotalAvoidedPathCount},decision:{s_TotalActualOrAvoidedPathCount}, " +
+                    $"events=path:{s_PathRequestEvents.Count},actual:{s_ActualViolationEvents.Count},avoided:{s_AvoidedRerouteEvents.Count}, " +
+                    $"activeContexts={s_ActivePathContextByVehicle.Count}, nextPathContext={s_NextPathContextSequence}, " +
+                    $"runtimeWorldGeneration={EnforcementSaveDataSystem.RuntimeWorldGeneration}, monthTicks={EnforcementGameTime.CurrentTimestampMonthTicks}");
+            }
         }
 
         public static PersistentTotalsSnapshot GetPersistentTotalsSnapshot()
@@ -722,6 +788,78 @@ namespace Traffic_Law_Enforcement
                 s_IntersectionMovementActualOrAvoidedPathCount);
         }
 
+        public static bool ResetTrackingToCurrentMonth(long currentMonthIndex)
+        {
+            EnforcementPolicyImpactTrackingState nextState =
+                CaptureCurrentState(currentMonthIndex);
+            if (s_HasTrackingState && TrackingStatesEqual(s_TrackingState, nextState))
+            {
+                return false;
+            }
+
+            s_TrackingState = nextState;
+            s_HasTrackingState = true;
+            return true;
+        }
+
+        public static bool EnsureTrackingInitialized(long currentMonthIndex)
+        {
+            if (!s_HasTrackingState)
+            {
+                s_TrackingState = CaptureCurrentState(currentMonthIndex);
+                s_HasTrackingState = true;
+                return true;
+            }
+
+            if (currentMonthIndex < s_TrackingState.m_MonthIndex)
+            {
+                s_TrackingState = CaptureCurrentState(currentMonthIndex);
+                return true;
+            }
+
+            return false;
+        }
+
+        public static bool TryAdvanceMonth(
+            long currentMonthIndex,
+            out MonthlyEnforcementReport report)
+        {
+            report = default;
+
+            if (!s_HasTrackingState)
+            {
+                EnsureTrackingInitialized(currentMonthIndex);
+                return false;
+            }
+
+            _ = TryRepairSuspiciousTrackingBaseline(currentMonthIndex);
+
+            if (currentMonthIndex <= s_TrackingState.m_MonthIndex)
+            {
+                if (currentMonthIndex < s_TrackingState.m_MonthIndex)
+                {
+                    s_TrackingState = CaptureCurrentState(currentMonthIndex);
+                }
+
+                return false;
+            }
+
+            if (EnforcementLoggingPolicy.ShouldLogPolicyDiagnostics() &&
+                IsSuspiciousEmptyTrackingBaseline(s_TrackingState))
+            {
+                Mod.log.Info(
+                    "[ENFORCEMENT_POLICY_STATE] " +
+                    $"phase=AdvanceMonthUsingSuspiciousTrackingBaseline, trackingMonth={s_TrackingState.m_MonthIndex}, currentMonth={currentMonthIndex}, " +
+                    $"trackingTotals=path:{s_TrackingState.m_TotalPathRequestCount},actual:{s_TrackingState.m_TotalActualPathCount},avoided:{s_TrackingState.m_TotalAvoidedPathCount},decision:{s_TrackingState.m_TotalActualOrAvoidedPathCount}, " +
+                    $"currentTotals=path:{s_TotalPathRequestCount},actual:{s_TotalActualPathCount},avoided:{s_TotalAvoidedPathCount},decision:{s_TotalActualOrAvoidedPathCount}, fine={s_TotalFineAmount}");
+            }
+
+            report = CreateCompletedMonthReport(s_TrackingState);
+            s_TrackingState = CaptureCurrentState(currentMonthIndex);
+            s_HasTrackingState = true;
+            return true;
+        }
+
         public static void RecordPathRequest(int vehicleId)
         {
             RecordPathRequestInternal(vehicleId);
@@ -738,11 +876,24 @@ namespace Traffic_Law_Enforcement
             TryLogPolicyImpactSummary();
 
             long currentMonthIndex = EnforcementGameTime.GetMonthIndex(EnforcementGameTime.CurrentTimestampMonthTicks);
-            if (!s_HasTrackingState || currentMonthIndex != s_TrackingState.m_MonthIndex)
+            _ = TryRepairSuspiciousTrackingBaseline(currentMonthIndex);
+            _ = EnsureTrackingInitialized(currentMonthIndex);
+        }
+
+        public static void PrepareTrackingStateForPersistence()
+        {
+            if (!EnforcementGameTime.IsInitialized)
             {
-                s_TrackingState = CaptureCurrentState(currentMonthIndex);
-                s_HasTrackingState = true;
+                return;
             }
+
+            UpdateRollingWindowData();
+
+            long currentMonthIndex =
+                EnforcementGameTime.GetMonthIndex(
+                    EnforcementGameTime.CurrentTimestampMonthTicks);
+            _ = TryRepairSuspiciousTrackingBaseline(currentMonthIndex);
+            _ = EnsureTrackingInitialized(currentMonthIndex);
         }
 
         public static void RecordActualViolation(string kind, int fineAmount, int vehicleId)
@@ -1148,6 +1299,17 @@ namespace Traffic_Law_Enforcement
             s_NextRollingWindowPruneTimestampMonthTicks =
                 GetNextRollingWindowPruneTimestampMonthTicks();
 
+            return BuildSnapshotForEventWindow(
+                long.MinValue,
+                long.MaxValue);
+        }
+
+        private static RollingWindowSnapshot BuildSnapshotForEventWindow(
+            long startInclusiveTimestampMonthTicks,
+            long endExclusiveTimestampMonthTicks)
+        {
+            bool hasEndExclusive = endExclusiveTimestampMonthTicks != long.MaxValue;
+
             int requestEventCount = s_PathRequestEvents.Count;
             int actualViolationEventCount = s_ActualViolationEvents.Count;
             int avoidedRerouteEventCount = s_AvoidedRerouteEvents.Count;
@@ -1188,6 +1350,13 @@ namespace Traffic_Law_Enforcement
             for (int index = 0; index < s_PathRequestEvents.Count; index += 1)
             {
                 PathRequestEvent entry = s_PathRequestEvents[index];
+                if (entry.TimestampMonthTicks < startInclusiveTimestampMonthTicks ||
+                    (hasEndExclusive &&
+                    entry.TimestampMonthTicks >= endExclusiveTimestampMonthTicks))
+                {
+                    continue;
+                }
+
                 if (entry.PathContextSequence > 0L)
                 {
                     requestPaths.Add(entry.PathContextSequence);
@@ -1201,6 +1370,13 @@ namespace Traffic_Law_Enforcement
             for (int index = 0; index < s_ActualViolationEvents.Count; index += 1)
             {
                 ActualViolationEvent entry = s_ActualViolationEvents[index];
+                if (entry.TimestampMonthTicks < startInclusiveTimestampMonthTicks ||
+                    (hasEndExclusive &&
+                    entry.TimestampMonthTicks >= endExclusiveTimestampMonthTicks))
+                {
+                    continue;
+                }
+
                 totalFineAmount += entry.FineAmount;
 
                 if (entry.PathContextSequence <= 0L)
@@ -1257,6 +1433,12 @@ namespace Traffic_Law_Enforcement
             for (int index = 0; index < s_AvoidedRerouteEvents.Count; index += 1)
             {
                 AvoidedRerouteEvent entry = s_AvoidedRerouteEvents[index];
+                if (entry.TimestampMonthTicks < startInclusiveTimestampMonthTicks ||
+                    (hasEndExclusive &&
+                    entry.TimestampMonthTicks >= endExclusiveTimestampMonthTicks))
+                {
+                    continue;
+                }
 
                 if (entry.PathContextSequence <= 0L)
                 {
@@ -1360,6 +1542,69 @@ namespace Traffic_Law_Enforcement
                 intersectionMovementActualOrAvoidedPathCount);
         }
 
+        private static bool TryRepairSuspiciousTrackingBaseline(long currentMonthIndex)
+        {
+            if (!s_HasTrackingState ||
+                !EnforcementGameTime.IsInitialized ||
+                !IsSuspiciousEmptyTrackingBaseline(s_TrackingState))
+            {
+                return false;
+            }
+
+            if (currentMonthIndex < s_TrackingState.m_MonthIndex)
+            {
+                return false;
+            }
+
+            long monthOffset = currentMonthIndex - s_TrackingState.m_MonthIndex;
+            if (monthOffset > 1L)
+            {
+                if (EnforcementLoggingPolicy.ShouldLogPolicyDiagnostics())
+                {
+                    Mod.log.Info(
+                        "[ENFORCEMENT_POLICY_STATE] " +
+                        $"phase=RepairSuspiciousTrackingBaselineSkipped, reason=trackingMonthTooOld, trackingMonth={s_TrackingState.m_MonthIndex}, currentMonth={currentMonthIndex}");
+                }
+
+                return false;
+            }
+
+            long trackingMonthStartTimestamp =
+                EnforcementGameTime.GetMonthTickAtMonthIndex(
+                    s_TrackingState.m_MonthIndex);
+            long trackingMonthEndTimestamp =
+                EnforcementGameTime.GetMonthTickAtMonthIndex(
+                    s_TrackingState.m_MonthIndex + 1L);
+            RollingWindowSnapshot trackedMonthSnapshot =
+                BuildSnapshotForEventWindow(
+                    trackingMonthStartTimestamp,
+                    trackingMonthEndTimestamp);
+            EnforcementPolicyImpactTrackingState repairedTrackingState =
+                CreateTrackingStateFromTrackedMonthDelta(
+                    s_TrackingState.m_MonthIndex,
+                    trackedMonthSnapshot);
+
+            if (TrackingStatesEqual(s_TrackingState, repairedTrackingState))
+            {
+                return false;
+            }
+
+            s_TrackingState = repairedTrackingState;
+            s_HasTrackingState = true;
+
+            if (EnforcementLoggingPolicy.ShouldLogPolicyDiagnostics())
+            {
+                Mod.log.Info(
+                    "[ENFORCEMENT_POLICY_STATE] " +
+                    $"phase=RepairSuspiciousTrackingBaseline, trackingMonth={s_TrackingState.m_MonthIndex}, currentMonth={currentMonthIndex}, " +
+                    $"windowStart={trackingMonthStartTimestamp}, windowEnd={trackingMonthEndTimestamp}, " +
+                    $"monthDelta=path:{trackedMonthSnapshot.TotalPathRequestCount},actual:{trackedMonthSnapshot.TotalActualPathCount},avoided:{trackedMonthSnapshot.TotalAvoidedPathCount},decision:{trackedMonthSnapshot.TotalActualOrAvoidedPathCount},fine:{trackedMonthSnapshot.TotalFineAmount}, " +
+                    $"repairedTrackingTotals=path:{s_TrackingState.m_TotalPathRequestCount},actual:{s_TrackingState.m_TotalActualPathCount},avoided:{s_TrackingState.m_TotalAvoidedPathCount},decision:{s_TrackingState.m_TotalActualOrAvoidedPathCount},fine:{s_TrackingState.m_TotalFineAmount}");
+            }
+
+            return true;
+        }
+
         private static HashSet<long> PreparePathSet(HashSet<long> buffer)
         {
             buffer.Clear();
@@ -1387,6 +1632,137 @@ namespace Traffic_Law_Enforcement
                 s_PublicTransportLaneActualOrAvoidedPathCount,
                 s_MidBlockCrossingActualOrAvoidedPathCount,
                 s_IntersectionMovementActualOrAvoidedPathCount);
+        }
+
+        private static EnforcementPolicyImpactTrackingState CreateTrackingStateFromTrackedMonthDelta(
+            long monthIndex,
+            RollingWindowSnapshot trackedMonthSnapshot)
+        {
+            return new EnforcementPolicyImpactTrackingState(
+                monthIndex,
+                ClampToNonNegative(
+                    s_TotalPathRequestCount -
+                    trackedMonthSnapshot.TotalPathRequestCount),
+                ClampToNonNegative(
+                    s_TotalActualPathCount -
+                    trackedMonthSnapshot.TotalActualPathCount),
+                ClampToNonNegative(
+                    s_TotalAvoidedPathCount -
+                    trackedMonthSnapshot.TotalAvoidedPathCount),
+                ClampToNonNegative(
+                    s_TotalFineAmount -
+                    trackedMonthSnapshot.TotalFineAmount),
+                ClampToNonNegative(
+                    s_PublicTransportLaneActualCount -
+                    trackedMonthSnapshot.PublicTransportLaneActualCount),
+                ClampToNonNegative(
+                    s_MidBlockCrossingActualCount -
+                    trackedMonthSnapshot.MidBlockCrossingActualCount),
+                ClampToNonNegative(
+                    s_IntersectionMovementActualCount -
+                    trackedMonthSnapshot.IntersectionMovementActualCount),
+                ClampToNonNegative(
+                    s_PublicTransportLaneFineAmount -
+                    trackedMonthSnapshot.PublicTransportLaneFineAmount),
+                ClampToNonNegative(
+                    s_MidBlockCrossingFineAmount -
+                    trackedMonthSnapshot.MidBlockCrossingFineAmount),
+                ClampToNonNegative(
+                    s_IntersectionMovementFineAmount -
+                    trackedMonthSnapshot.IntersectionMovementFineAmount),
+                ClampToNonNegative(
+                    s_PublicTransportLaneAvoidedEventCount -
+                    trackedMonthSnapshot.PublicTransportLaneAvoidedEventCount),
+                ClampToNonNegative(
+                    s_MidBlockCrossingAvoidedEventCount -
+                    trackedMonthSnapshot.MidBlockCrossingAvoidedEventCount),
+                ClampToNonNegative(
+                    s_IntersectionMovementAvoidedEventCount -
+                    trackedMonthSnapshot.IntersectionMovementAvoidedEventCount),
+                ClampToNonNegative(
+                    s_TotalActualOrAvoidedPathCount -
+                    trackedMonthSnapshot.TotalActualOrAvoidedPathCount),
+                ClampToNonNegative(
+                    s_PublicTransportLaneActualOrAvoidedPathCount -
+                    trackedMonthSnapshot.PublicTransportLaneActualOrAvoidedPathCount),
+                ClampToNonNegative(
+                    s_MidBlockCrossingActualOrAvoidedPathCount -
+                    trackedMonthSnapshot.MidBlockCrossingActualOrAvoidedPathCount),
+                ClampToNonNegative(
+                    s_IntersectionMovementActualOrAvoidedPathCount -
+                    trackedMonthSnapshot.IntersectionMovementActualOrAvoidedPathCount));
+        }
+
+        private static MonthlyEnforcementReport CreateCompletedMonthReport(
+            EnforcementPolicyImpactTrackingState trackingState)
+        {
+            return new MonthlyEnforcementReport(
+                trackingState.m_MonthIndex,
+                ClampToNonNegative(s_TotalPathRequestCount - trackingState.m_TotalPathRequestCount),
+                ClampToNonNegative(s_TotalActualPathCount - trackingState.m_TotalActualPathCount),
+                ClampToNonNegative(s_PublicTransportLaneActualCount - trackingState.m_PublicTransportLaneActualCount),
+                ClampToNonNegative(s_MidBlockCrossingActualCount - trackingState.m_MidBlockCrossingActualCount),
+                ClampToNonNegative(s_IntersectionMovementActualCount - trackingState.m_IntersectionMovementActualCount),
+                ClampToNonNegative(s_TotalFineAmount - trackingState.m_TotalFineAmount),
+                ClampToNonNegative(s_TotalAvoidedPathCount - trackingState.m_TotalAvoidedPathCount),
+                ClampToNonNegative(s_PublicTransportLaneFineAmount - trackingState.m_PublicTransportLaneFineAmount),
+                ClampToNonNegative(s_MidBlockCrossingFineAmount - trackingState.m_MidBlockCrossingFineAmount),
+                ClampToNonNegative(s_IntersectionMovementFineAmount - trackingState.m_IntersectionMovementFineAmount),
+                ClampToNonNegative(s_PublicTransportLaneAvoidedEventCount - trackingState.m_PublicTransportLaneAvoidedEventCount),
+                ClampToNonNegative(s_MidBlockCrossingAvoidedEventCount - trackingState.m_MidBlockCrossingAvoidedEventCount),
+                ClampToNonNegative(s_IntersectionMovementAvoidedEventCount - trackingState.m_IntersectionMovementAvoidedEventCount),
+                ClampToNonNegative(s_TotalActualOrAvoidedPathCount - trackingState.m_TotalActualOrAvoidedPathCount),
+                ClampToNonNegative(s_PublicTransportLaneActualOrAvoidedPathCount - trackingState.m_PublicTransportLaneActualOrAvoidedPathCount),
+                ClampToNonNegative(s_MidBlockCrossingActualOrAvoidedPathCount - trackingState.m_MidBlockCrossingActualOrAvoidedPathCount),
+                ClampToNonNegative(s_IntersectionMovementActualOrAvoidedPathCount - trackingState.m_IntersectionMovementActualOrAvoidedPathCount));
+        }
+
+        private static bool TrackingStatesEqual(
+            EnforcementPolicyImpactTrackingState left,
+            EnforcementPolicyImpactTrackingState right)
+        {
+            return left.m_MonthIndex == right.m_MonthIndex
+                && left.m_TotalPathRequestCount == right.m_TotalPathRequestCount
+                && left.m_TotalActualPathCount == right.m_TotalActualPathCount
+                && left.m_TotalAvoidedPathCount == right.m_TotalAvoidedPathCount
+                && left.m_TotalFineAmount == right.m_TotalFineAmount
+                && left.m_PublicTransportLaneActualCount == right.m_PublicTransportLaneActualCount
+                && left.m_MidBlockCrossingActualCount == right.m_MidBlockCrossingActualCount
+                && left.m_IntersectionMovementActualCount == right.m_IntersectionMovementActualCount
+                && left.m_PublicTransportLaneFineAmount == right.m_PublicTransportLaneFineAmount
+                && left.m_MidBlockCrossingFineAmount == right.m_MidBlockCrossingFineAmount
+                && left.m_IntersectionMovementFineAmount == right.m_IntersectionMovementFineAmount
+                && left.m_PublicTransportLaneAvoidedEventCount == right.m_PublicTransportLaneAvoidedEventCount
+                && left.m_MidBlockCrossingAvoidedEventCount == right.m_MidBlockCrossingAvoidedEventCount
+                && left.m_IntersectionMovementAvoidedEventCount == right.m_IntersectionMovementAvoidedEventCount
+                && left.m_TotalActualOrAvoidedPathCount == right.m_TotalActualOrAvoidedPathCount
+                && left.m_PublicTransportLaneActualOrAvoidedPathCount == right.m_PublicTransportLaneActualOrAvoidedPathCount
+                && left.m_MidBlockCrossingActualOrAvoidedPathCount == right.m_MidBlockCrossingActualOrAvoidedPathCount
+                && left.m_IntersectionMovementActualOrAvoidedPathCount == right.m_IntersectionMovementActualOrAvoidedPathCount;
+        }
+
+        private static bool IsSuspiciousEmptyTrackingBaseline(
+            EnforcementPolicyImpactTrackingState trackingState)
+        {
+            if (trackingState.m_TotalPathRequestCount != 0 ||
+                trackingState.m_TotalActualPathCount != 0 ||
+                trackingState.m_TotalAvoidedPathCount != 0 ||
+                trackingState.m_TotalActualOrAvoidedPathCount != 0 ||
+                trackingState.m_TotalFineAmount != 0)
+            {
+                return false;
+            }
+
+            return s_TotalPathRequestCount > 0 ||
+                s_TotalActualPathCount > 0 ||
+                s_TotalAvoidedPathCount > 0 ||
+                s_TotalActualOrAvoidedPathCount > 0 ||
+                s_TotalFineAmount > 0;
+        }
+
+        private static int ClampToNonNegative(int value)
+        {
+            return value < 0 ? 0 : value;
         }
 
         private static bool IsGameplayContextAvailable()
@@ -1421,13 +1797,32 @@ namespace Traffic_Law_Enforcement
             FlushPendingPathRequests();
 
             long currentTimestampMonthTicks = EnforcementGameTime.CurrentTimestampMonthTicks;
-            if (currentTimestampMonthTicks > 0L &&
+            if (s_NextRollingWindowPruneTimestampMonthTicks != long.MaxValue &&
+                currentTimestampMonthTicks > 0L &&
                 currentTimestampMonthTicks < s_NextRollingWindowPruneTimestampMonthTicks)
             {
                 return;
             }
 
             long cutoffTimestamp = System.Math.Max(0L, currentTimestampMonthTicks - EnforcementGameTime.CurrentMonthTicksPerMonth);
+            int pathRequestCountBefore = s_PathRequestEvents.Count;
+            int actualViolationCountBefore = s_ActualViolationEvents.Count;
+            int avoidedRerouteCountBefore = s_AvoidedRerouteEvents.Count;
+            GetTimestampRange(
+                s_PathRequestEvents,
+                static entry => entry.TimestampMonthTicks,
+                out long pathRequestMinTimestamp,
+                out long pathRequestMaxTimestamp);
+            GetTimestampRange(
+                s_ActualViolationEvents,
+                static entry => entry.TimestampMonthTicks,
+                out long actualViolationMinTimestamp,
+                out long actualViolationMaxTimestamp);
+            GetTimestampRange(
+                s_AvoidedRerouteEvents,
+                static entry => entry.TimestampMonthTicks,
+                out long avoidedRerouteMinTimestamp,
+                out long avoidedRerouteMaxTimestamp);
 
             bool removedAny = false;
             removedAny |= PrunePathRequestEvents(cutoffTimestamp);
@@ -1437,6 +1832,20 @@ namespace Traffic_Law_Enforcement
             if (removedAny)
             {
                 s_RollingWindowSnapshotDirty = true;
+
+                if (EnforcementLoggingPolicy.ShouldLogPolicyDiagnostics())
+                {
+                    Mod.log.Info(
+                        "[ENFORCEMENT_POLICY_PRUNE] " +
+                        $"cutoff={cutoffTimestamp}, monthTicks={currentTimestampMonthTicks}, monthWindow={EnforcementGameTime.CurrentMonthTicksPerMonth}, " +
+                        $"events=path:{pathRequestCountBefore}->{s_PathRequestEvents.Count}, " +
+                        $"actual:{actualViolationCountBefore}->{s_ActualViolationEvents.Count}, " +
+                        $"avoided:{avoidedRerouteCountBefore}->{s_AvoidedRerouteEvents.Count}, " +
+                        $"pathRange={pathRequestMinTimestamp}..{pathRequestMaxTimestamp}, " +
+                        $"actualRange={actualViolationMinTimestamp}..{actualViolationMaxTimestamp}, " +
+                        $"avoidedRange={avoidedRerouteMinTimestamp}..{avoidedRerouteMaxTimestamp}, " +
+                        $"daysPerYear={EnforcementGameTime.CurrentDaysPerYear}");
+                }
             }
 
             s_NextRollingWindowPruneTimestampMonthTicks =

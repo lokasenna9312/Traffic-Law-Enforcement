@@ -107,6 +107,7 @@ namespace Traffic_Law_Enforcement
         private int m_RerouteSummaryPendingUpdates;
         private int m_UpdateCount;
         private int m_LastObservedRuntimeWorldGeneration = -1;
+        private bool m_ShouldSeedSnapshotHistoryAfterRuntimeReload;
 
         protected override void OnCreate()
         {
@@ -189,6 +190,7 @@ namespace Traffic_Law_Enforcement
                 EnforcementLoggingPolicy.ShouldLogFocusedRouteRebuildDiagnostics();
             bool pathfindingPenaltyDiagnosticLoggingEnabled =
                 EnforcementLoggingPolicy.ShouldLogPathfindingPenaltyDiagnostics();
+            bool trackPolicyImpactAvoidances = Mod.IsEnforcementEnabled;
             bool observeRouteDebugState =
                 EnforcementLoggingPolicy.ShouldObserveRouteDebugState();
             bool restrictVehicleSpecificRouteLogsToWatchedVehicles =
@@ -199,7 +201,7 @@ namespace Traffic_Law_Enforcement
                     ? BurstLoggingService.BurstRouteSelectionChangeLogsPerUpdate
                     : MaxRouteSelectionChangeLogsPerUpdate;
             m_PublicTransportLaneDecisionDiagnosticLogsThisUpdate = 0;
-            if (!observeRouteDebugState)
+            if (!observeRouteDebugState && !trackPolicyImpactAvoidances)
             {
                 ClearRouteLoggingState();
                 return;
@@ -223,10 +225,11 @@ namespace Traffic_Law_Enforcement
                 pathfindingPenaltyDiagnosticLoggingEnabled ||
                 trackRouteSelectionChanges;
             bool needsSnapshotHistory =
+                trackPolicyImpactAvoidances ||
                 estimatedRerouteLoggingEnabled ||
                 trackRouteSelectionChanges;
 
-            if (!trackVehicleSpecificRouteLogs)
+            if (!trackVehicleSpecificRouteLogs && !trackPolicyImpactAvoidances)
             {
                 ClearRouteLoggingState();
                 return;
@@ -278,7 +281,13 @@ namespace Traffic_Law_Enforcement
                 UpdateFocusedRouteDiagnosticLookups();
             }
 
+            if (needsSnapshotHistory && m_ShouldSeedSnapshotHistoryAfterRuntimeReload)
+            {
+                SeedSnapshotHistoryAfterRuntimeReload(trackRouteSelectionChanges);
+            }
+
             bool requireAllCandidateVehicles =
+                trackPolicyImpactAvoidances ||
                 (routeSelectionSummaryLoggingEnabled &&
                  !restrictVehicleSpecificRouteLogsToWatchedVehicles) ||
                 (estimatedRerouteLoggingEnabled &&
@@ -612,10 +621,72 @@ namespace Traffic_Law_Enforcement
             m_LastRouteSelectionSnapshots.Clear();
             m_CandidateVehicles.Clear();
             m_UpdateCount = 0;
+            m_ShouldSeedSnapshotHistoryAfterRuntimeReload = true;
             ObsoleteAttemptCorrelationService.ResetForRuntimeWorldGeneration(currentGeneration);
             FocusedLoggingService.ClearWatchedVehiclesForRuntimeWorldReset(currentGeneration);
             RouteDebugLoggingTelemetry.SetState(false, 0, 0, 0);
 
+        }
+
+        private void SeedSnapshotHistoryAfterRuntimeReload(bool trackRouteSelectionChanges)
+        {
+            NativeArray<Entity> vehicles =
+                m_CachedVehicleQuery.ToEntityArray(Allocator.Temp);
+            int seededSnapshotCount = 0;
+            int seededRouteSelectionSnapshotCount = 0;
+
+            try
+            {
+                for (int index = 0; index < vehicles.Length; index += 1)
+                {
+                    Entity vehicle = vehicles[index];
+                    if (!m_CurrentLaneData.TryGetComponent(vehicle, out CarCurrentLane currentLane))
+                    {
+                        continue;
+                    }
+
+                    RoutePenaltyInspectionResult snapshot =
+                        BuildSnapshot(
+                            vehicle,
+                            currentLane,
+                            captureDebugStrings: false,
+                            allowVehicleSpecificPenaltyDiagnostics: false);
+
+                    m_LastSnapshots[vehicle] = snapshot;
+                    seededSnapshotCount += 1;
+
+                    if (!trackRouteSelectionChanges)
+                    {
+                        continue;
+                    }
+
+                    RouteSelectionChangeSnapshot routeSelectionSnapshot =
+                        BuildRouteSelectionSnapshot(
+                            vehicle,
+                            currentLane.m_Lane,
+                            snapshot,
+                            previousSnapshot: null,
+                            CandidateChangeReason.None);
+
+                    m_LastRouteSelectionSnapshots[vehicle] =
+                        routeSelectionSnapshot;
+                    seededRouteSelectionSnapshotCount += 1;
+                }
+            }
+            finally
+            {
+                vehicles.Dispose();
+            }
+
+            m_ShouldSeedSnapshotHistoryAfterRuntimeReload = false;
+
+            if (EnforcementLoggingPolicy.ShouldLogRerouteDiagnostics())
+            {
+                Mod.log.Info(
+                    "[ENFORCEMENT_REROUTE_STATE] " +
+                    $"phase=SeedSnapshotHistoryAfterRuntimeReload, snapshots={seededSnapshotCount}, " +
+                    $"routeSelectionSnapshots={seededRouteSelectionSnapshotCount}, runtimeWorldGeneration={m_LastObservedRuntimeWorldGeneration}");
+            }
         }
 
         private void UpdateCoreInspectionLookups()

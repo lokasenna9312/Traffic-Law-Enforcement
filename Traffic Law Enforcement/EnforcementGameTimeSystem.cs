@@ -93,14 +93,54 @@ namespace Traffic_Law_Enforcement
         private static void CalculateAbsoluteTicks(TimeSystem timeSystem, out long absoluteMonthTicks, out long absoluteDayTicks, out int daysPerYear)
         {
             daysPerYear = Mathf.Max(1, timeSystem.daysPerYear);
-            int dayIndex = Mathf.Clamp(Mathf.FloorToInt(timeSystem.normalizedDate * daysPerYear), 0, daysPerYear - 1);
+            double rawDayPosition =
+                System.Math.Max(
+                    0d,
+                    System.Math.Min(
+                        daysPerYear,
+                        (double)timeSystem.normalizedDate * daysPerYear));
+            int dayIndex = Mathf.Clamp((int)System.Math.Floor(rawDayPosition), 0, daysPerYear - 1);
             float normalizedTime = Mathf.Clamp01(timeSystem.normalizedTime);
-            double totalDays = (((double)timeSystem.year - 1d) * daysPerYear) + dayIndex + normalizedTime;
+            double selectedDayPosition =
+                ChooseStableDayPosition(rawDayPosition, dayIndex, normalizedTime);
+            double totalDays =
+                (((double)timeSystem.year - 1d) * daysPerYear) +
+                selectedDayPosition;
             double totalMonths = totalDays * MonthsPerYear / daysPerYear;
             long monthTicksPerMonth = GetMonthTicksPerMonth(daysPerYear);
 
             absoluteDayTicks = (long)System.Math.Round(totalDays * DayTicksPerDay);
             absoluteMonthTicks = (long)System.Math.Round(totalMonths * monthTicksPerMonth);
+        }
+
+        private static double ChooseStableDayPosition(
+            double rawDayPosition,
+            int dayIndex,
+            float normalizedTime)
+        {
+            double splitDayPosition = dayIndex + normalizedTime;
+            if (!IsInitialized)
+            {
+                return splitDayPosition;
+            }
+
+            double previousAbsoluteDayPosition =
+                CurrentTimestampDayTicks / (double)DayTicksPerDay;
+            double previousDayPositionWithinYear =
+                previousAbsoluteDayPosition -
+                (System.Math.Floor(previousAbsoluteDayPosition / CurrentDaysPerYear) *
+                CurrentDaysPerYear);
+            double splitJump = splitDayPosition - previousDayPositionWithinYear;
+            double rawJump = rawDayPosition - previousDayPositionWithinYear;
+
+            if (splitJump > 0.5d &&
+                rawJump >= -0.01d &&
+                rawJump < splitJump)
+            {
+                return rawDayPosition;
+            }
+
+            return splitDayPosition;
         }
 
         public static long GetMonthTicksPerMonth(int daysPerYear)
