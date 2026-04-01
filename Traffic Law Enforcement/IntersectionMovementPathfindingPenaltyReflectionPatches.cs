@@ -46,8 +46,7 @@ namespace Traffic_Law_Enforcement
                     continue;
                 }
 
-                if (string.Equals(method.Name, "CalculateCost", StringComparison.Ordinal) ||
-                    method.Name.IndexOf("cost", StringComparison.OrdinalIgnoreCase) >= 0)
+                if (string.Equals(method.Name, "CalculateCost", StringComparison.Ordinal))
                 {
                     yield return method;
                 }
@@ -61,8 +60,16 @@ namespace Traffic_Law_Enforcement
                 return;
             }
 
+            if (IntersectionMovementPathfindingPenaltyPatches.IsApplied)
+            {
+                Mod.log.Info("Intersection movement reflection fallback skipped: primary hook is already active.");
+                return;
+            }
+
             try
             {
+                s_DiagnosticLogCount = 0;
+                s_ActivatedMethods.Clear();
                 s_Harmony = new Harmony(HarmonyId);
                 s_Harmony.CreateClassProcessor(typeof(IntersectionMovementPathfindingPenaltyReflectionPatches)).Patch();
                 Mod.log.Info("Intersection movement reflection fallback patches applied.");
@@ -83,11 +90,18 @@ namespace Traffic_Law_Enforcement
 
             s_Harmony.UnpatchAll(HarmonyId);
             s_Harmony = null;
+            s_DiagnosticLogCount = 0;
+            s_ActivatedMethods.Clear();
         }
 
         [HarmonyPostfix]
         private static void Postfix(object[] __args, ref float __result, PathfindParameters ___m_Parameters, MethodBase __originalMethod)
         {
+            if (IntersectionMovementPathfindingPenaltyPatches.IsApplied)
+            {
+                return;
+            }
+
             string methodKey = __originalMethod?.ToString() ?? "(null)";
             if (s_ActivatedMethods.Add(methodKey))
             {

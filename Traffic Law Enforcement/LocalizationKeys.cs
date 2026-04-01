@@ -132,6 +132,7 @@ namespace Traffic_Law_Enforcement
             AddOption(map, setting, nameof(Setting.SelectedObjectPanelToggleBinding));
             AddOption(map, setting, nameof(Setting.FocusedLoggingPanelToggleBinding));
             AddOption(map, setting, nameof(Setting.ModLogPath));
+            AddOption(map, setting, nameof(Setting.EnableChirperLifecycleLogging));
 
             AddOption(map, setting, nameof(Setting.PolicyImpactTotalStatistics));
             AddOption(map, setting, nameof(Setting.PolicyImpactPublicTransportLaneStatistics));

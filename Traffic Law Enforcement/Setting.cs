@@ -690,6 +690,10 @@ namespace Traffic_Law_Enforcement
         public string ModLogPath => s_ModLogPath ?? (s_ModLogPath = GetModLogPath());
 
         [Exclude]
+        [SettingsUISection(kDebugTab, kChirperGroup)]
+        public bool EnableChirperLifecycleLogging { get; set; }
+
+        [Exclude]
         [SettingsUIButton]
         [SettingsUIDisableByCondition(typeof(Setting), nameof(IsMonthlyChirperPreviewButtonDisabled))]
         [SettingsUISection(kDebugTab, kChirperGroup)]
@@ -720,6 +724,7 @@ namespace Traffic_Law_Enforcement
             EnableAllVehicleRouteSelectionChangeLogging = false;
             EnableFocusedRouteRebuildDiagnosticsLogging = false;
             EnableFocusedVehicleOnlyRouteLogging = false;
+            EnableChirperLifecycleLogging = false;
             ResetKeyBindings();
         }
 

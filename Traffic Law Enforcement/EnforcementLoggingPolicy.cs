@@ -16,6 +16,9 @@ namespace Traffic_Law_Enforcement
         public static bool EnableFineIncomeLogging =>
             Mod.Settings?.EnableFineIncomeLogging ?? false;
 
+        public static bool EnableChirperLifecycleLogging =>
+            Mod.Settings?.EnableChirperLifecycleLogging ?? false;
+
         public static bool EnableType2PublicTransportLaneUsageLogging => Mod.Settings?.EnableType2PublicTransportLaneUsageLogging ?? false;
 
         public static bool EnableType3PublicTransportLaneUsageLogging => Mod.Settings?.EnableType3PublicTransportLaneUsageLogging ?? false;
@@ -108,6 +111,26 @@ namespace Traffic_Law_Enforcement
         public static bool ShouldLogFocusedRouteRebuildDiagnostics()
         {
             return EnableFocusedRouteRebuildDiagnosticsLogging;
+        }
+
+        public static bool ShouldLogPolicyDiagnostics()
+        {
+            return EnablePolicyImpactSummaryLogging;
+        }
+
+        public static bool ShouldLogFineDiagnostics()
+        {
+            return EnableFineIncomeLogging;
+        }
+
+        public static bool ShouldLogRerouteDiagnostics()
+        {
+            return ShouldObserveRouteDebugState();
+        }
+
+        public static bool ShouldLogChirperDiagnostics()
+        {
+            return EnableChirperLifecycleLogging;
         }
 
         public static bool ShouldObserveRouteDebugState()

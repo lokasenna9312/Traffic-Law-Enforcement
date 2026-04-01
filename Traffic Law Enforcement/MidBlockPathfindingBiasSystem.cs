@@ -34,9 +34,8 @@ namespace Traffic_Law_Enforcement
             }
 
             OverrideSummary =
-                // $"UTurn money +{midBlockMoneyPenalty:0}; " +
                 $"UnsafeUTurn money +{midBlockMoneyPenalty:0}; " +
-                // $"LaneCross money +{midBlockMoneyPenalty:0}; " +
+                "illegal access ingress/egress penalties are applied per transition; " +
                 "PT-lane route penalties are still handled per route rather than through shared PathfindCarData prefabs";
         }
     }

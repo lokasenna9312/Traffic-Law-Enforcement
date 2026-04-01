@@ -50,6 +50,55 @@ namespace Traffic_Law_Enforcement
             return false;
         }
 
+        public static bool TryGetIllegalAccessTransition(
+            EntityManager entityManager,
+            Entity sourceLane,
+            Entity targetLane,
+            out LaneTransitionViolationReasonCode reasonCode)
+        {
+            reasonCode = LaneTransitionViolationReasonCode.None;
+
+            if (sourceLane == Entity.Null || targetLane == Entity.Null || sourceLane == targetLane)
+            {
+                return false;
+            }
+
+            if (TryDetectIllegalIngress(
+                    entityManager,
+                    sourceLane,
+                    targetLane,
+                    out reasonCode))
+            {
+                return true;
+            }
+
+            return TryDetectIllegalEgress(
+                entityManager,
+                sourceLane,
+                targetLane,
+                out reasonCode);
+        }
+
+        public static bool IsAccessTransitionReason(
+            LaneTransitionViolationReasonCode reasonCode)
+        {
+            switch (reasonCode)
+            {
+                case LaneTransitionViolationReasonCode.EnteredGarageAccessWithoutSideAccess:
+                case LaneTransitionViolationReasonCode.EnteredParkingAccessWithoutSideAccess:
+                case LaneTransitionViolationReasonCode.EnteredParkingConnectionWithoutSideAccess:
+                case LaneTransitionViolationReasonCode.EnteredBuildingAccessConnectionWithoutSideAccess:
+                case LaneTransitionViolationReasonCode.ExitedParkingAccessWithoutSideAccess:
+                case LaneTransitionViolationReasonCode.ExitedGarageAccessWithoutSideAccess:
+                case LaneTransitionViolationReasonCode.ExitedParkingConnectionWithoutSideAccess:
+                case LaneTransitionViolationReasonCode.ExitedBuildingAccessConnectionWithoutSideAccess:
+                    return true;
+
+                default:
+                    return false;
+            }
+        }
+
         private static bool TryDetectOppositeFlowSameRoadSegment(
             EntityManager entityManager,
             Entity sourceLane,

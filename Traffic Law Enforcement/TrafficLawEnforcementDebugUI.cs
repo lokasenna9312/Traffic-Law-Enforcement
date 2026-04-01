@@ -121,6 +121,36 @@ namespace Traffic_Law_Enforcement
             });
             overview.children.Add(new DebugUI.Value
             {
+                displayName = "PT exit pressure applied",
+                getter = () => PublicTransportLaneExitPressureTelemetry.AppliedCount
+            });
+            overview.children.Add(new DebugUI.Value
+            {
+                displayName = "PT exit pressure skipped obsolete",
+                getter = () => PublicTransportLaneExitPressureTelemetry.SkippedAlreadyObsoleteCount
+            });
+            overview.children.Add(new DebugUI.Value
+            {
+                displayName = "PT exit pressure skipped pending",
+                getter = () => PublicTransportLaneExitPressureTelemetry.SkippedPendingPathOwnerCount
+            });
+            overview.children.Add(new DebugUI.Value
+            {
+                displayName = "PT exit pressure skipped no path owner",
+                getter = () => PublicTransportLaneExitPressureTelemetry.SkippedMissingPathOwnerCount
+            });
+            overview.children.Add(new DebugUI.Value
+            {
+                displayName = "PT exit pressure correlated rebuilds",
+                getter = () => PublicTransportLaneExitPressureTelemetry.CorrelatedPathRequestCount
+            });
+            overview.children.Add(new DebugUI.Value
+            {
+                displayName = "PT exit pressure awaiting rebuild",
+                getter = () => PublicTransportLaneExitPressureTelemetry.AwaitingPathRequestCount
+            });
+            overview.children.Add(new DebugUI.Value
+            {
                 displayName = "Reroute logging enabled",
                 getter = () => RouteDebugLoggingTelemetry.Enabled
             });
