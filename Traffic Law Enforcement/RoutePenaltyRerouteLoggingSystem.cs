@@ -45,6 +45,130 @@ namespace Traffic_Law_Enforcement
             PathInformation = 1 << 6,
         }
 
+        [System.Flags]
+        private enum PublicTransportLaneDiagnosticComponentBits : byte
+        {
+            None = 0,
+            RouteLane = 1 << 0,
+            SlaveLane = 1 << 1,
+            EdgeLane = 1 << 2,
+            ConnectionLane = 1 << 3,
+        }
+
+        private enum DiagnosticBoolState : byte
+        {
+            Unknown = 0,
+            False = 1,
+            True = 2,
+        }
+
+        private readonly struct WatchedPublicTransportLaneDiagnosticKey :
+            System.IEquatable<WatchedPublicTransportLaneDiagnosticKey>
+        {
+            public readonly Entity Vehicle;
+            public readonly Entity Lane;
+
+            public WatchedPublicTransportLaneDiagnosticKey(Entity vehicle, Entity lane)
+            {
+                Vehicle = vehicle;
+                Lane = lane;
+            }
+
+            public bool Equals(WatchedPublicTransportLaneDiagnosticKey other)
+            {
+                return Vehicle == other.Vehicle &&
+                    Lane == other.Lane;
+            }
+
+            public override bool Equals(object obj)
+            {
+                return obj is WatchedPublicTransportLaneDiagnosticKey other &&
+                    Equals(other);
+            }
+
+            public override int GetHashCode()
+            {
+                unchecked
+                {
+                    int hash = Vehicle.Index;
+                    hash = (hash * 397) ^ Vehicle.Version;
+                    hash = (hash * 397) ^ Lane.Index;
+                    hash = (hash * 397) ^ Lane.Version;
+                    return hash;
+                }
+            }
+        }
+
+        private readonly struct WatchedPublicTransportLaneDiagnosticState
+        {
+            public readonly Entity CurrentLane;
+            public readonly Entity Owner;
+            public readonly Entity Aggregate;
+            public readonly Entity ResolvedRoad;
+            public readonly PublicTransportLaneDiagnosticComponentBits LaneComponentBits;
+            public readonly bool PublicOnly;
+            public readonly bool UnauthorizedPublicTransportLane;
+            public readonly bool HasResolvedPublicTransportLanePolicy;
+            public readonly DiagnosticBoolState VanillaAllows;
+            public readonly DiagnosticBoolState ModAllows;
+
+            public WatchedPublicTransportLaneDiagnosticState(
+                Entity currentLane,
+                Entity owner,
+                Entity aggregate,
+                Entity resolvedRoad,
+                PublicTransportLaneDiagnosticComponentBits laneComponentBits,
+                bool publicOnly,
+                bool unauthorizedPublicTransportLane,
+                bool hasResolvedPublicTransportLanePolicy,
+                DiagnosticBoolState vanillaAllows,
+                DiagnosticBoolState modAllows)
+            {
+                CurrentLane = currentLane;
+                Owner = owner;
+                Aggregate = aggregate;
+                ResolvedRoad = resolvedRoad;
+                LaneComponentBits = laneComponentBits;
+                PublicOnly = publicOnly;
+                UnauthorizedPublicTransportLane = unauthorizedPublicTransportLane;
+                HasResolvedPublicTransportLanePolicy = hasResolvedPublicTransportLanePolicy;
+                VanillaAllows = vanillaAllows;
+                ModAllows = modAllows;
+            }
+        }
+
+        private readonly struct LaneResolutionDiagnostic
+        {
+            public readonly Entity Owner;
+            public readonly Entity Aggregate;
+            public readonly Entity ResolvedRoad;
+            public readonly string DisplayText;
+            public readonly string OwnerText;
+            public readonly string AggregateText;
+            public readonly string ResolvedRoadText;
+            public readonly string NameSource;
+
+            public LaneResolutionDiagnostic(
+                Entity owner,
+                Entity aggregate,
+                Entity resolvedRoad,
+                string displayText,
+                string ownerText,
+                string aggregateText,
+                string resolvedRoadText,
+                string nameSource)
+            {
+                Owner = owner;
+                Aggregate = aggregate;
+                ResolvedRoad = resolvedRoad;
+                DisplayText = displayText;
+                OwnerText = ownerText;
+                AggregateText = aggregateText;
+                ResolvedRoadText = resolvedRoadText;
+                NameSource = nameSource;
+            }
+        }
+
         private const CandidateChangeReason RouteSelectionChangeReasons =
             CandidateChangeReason.Target |
             CandidateChangeReason.CurrentRoute |
@@ -95,7 +219,9 @@ namespace Traffic_Law_Enforcement
         private readonly Dictionary<Entity, RoutePenaltyInspectionResult> m_LastSnapshots = new Dictionary<Entity, RoutePenaltyInspectionResult>();
         private readonly Dictionary<Entity, RouteSelectionChangeSnapshot> m_LastRouteSelectionSnapshots = new Dictionary<Entity, RouteSelectionChangeSnapshot>();
         private readonly Dictionary<Entity, CandidateChangeReason> m_CandidateVehicles = new Dictionary<Entity, CandidateChangeReason>();
+        private readonly Dictionary<WatchedPublicTransportLaneDiagnosticKey, WatchedPublicTransportLaneDiagnosticState> m_LastWatchedPublicTransportLaneDiagnostics = new Dictionary<WatchedPublicTransportLaneDiagnosticKey, WatchedPublicTransportLaneDiagnosticState>();
         private readonly List<Entity> m_RemovedVehiclesBuffer = new List<Entity>();
+        private readonly List<WatchedPublicTransportLaneDiagnosticKey> m_RemovedWatchedPublicTransportLaneDiagnosticKeys = new List<WatchedPublicTransportLaneDiagnosticKey>();
         private Game.UI.NameSystem m_NameSystem;
         private Game.Prefabs.PrefabSystem m_PrefabSystem;
         private const int RerouteSummaryFlushInterval = 64;
@@ -210,9 +336,11 @@ namespace Traffic_Law_Enforcement
             bool needsWatchedVehicleState =
                 restrictVehicleSpecificRouteLogsToWatchedVehicles ||
                 focusedRouteRebuildDiagnosticsLoggingEnabled;
-            if (needsWatchedVehicleState)
+            if (needsWatchedVehicleState ||
+                m_LastWatchedPublicTransportLaneDiagnostics.Count > 0)
             {
                 FocusedLoggingService.PruneMissingVehicles(EntityManager);
+                PruneWatchedPublicTransportLaneDecisionDiagnostics();
             }
 
             bool hasWatchedVehicles = FocusedLoggingService.HasWatchedVehicles;
@@ -599,7 +727,42 @@ namespace Traffic_Law_Enforcement
             m_LastSnapshots.Clear();
             m_LastRouteSelectionSnapshots.Clear();
             m_CandidateVehicles.Clear();
+            m_LastWatchedPublicTransportLaneDiagnostics.Clear();
             RouteDebugLoggingTelemetry.SetState(false, 0, 0, 0);
+        }
+
+        private void PruneWatchedPublicTransportLaneDecisionDiagnostics()
+        {
+            if (m_LastWatchedPublicTransportLaneDiagnostics.Count == 0)
+            {
+                return;
+            }
+
+            if (!FocusedLoggingService.HasWatchedVehicles)
+            {
+                m_LastWatchedPublicTransportLaneDiagnostics.Clear();
+                return;
+            }
+
+            m_RemovedWatchedPublicTransportLaneDiagnosticKeys.Clear();
+            foreach (KeyValuePair<WatchedPublicTransportLaneDiagnosticKey, WatchedPublicTransportLaneDiagnosticState> pair in
+                     m_LastWatchedPublicTransportLaneDiagnostics)
+            {
+                Entity vehicle = pair.Key.Vehicle;
+                if (!EntityManager.Exists(vehicle) ||
+                    !FocusedLoggingService.IsWatched(vehicle))
+                {
+                    m_RemovedWatchedPublicTransportLaneDiagnosticKeys.Add(pair.Key);
+                }
+            }
+
+            for (int index = 0; index < m_RemovedWatchedPublicTransportLaneDiagnosticKeys.Count; index += 1)
+            {
+                m_LastWatchedPublicTransportLaneDiagnostics.Remove(
+                    m_RemovedWatchedPublicTransportLaneDiagnosticKeys[index]);
+            }
+
+            m_RemovedWatchedPublicTransportLaneDiagnosticKeys.Clear();
         }
 
         private void HandleRuntimeWorldReload()
@@ -620,6 +783,7 @@ namespace Traffic_Law_Enforcement
             m_LastSnapshots.Clear();
             m_LastRouteSelectionSnapshots.Clear();
             m_CandidateVehicles.Clear();
+            m_LastWatchedPublicTransportLaneDiagnostics.Clear();
             m_UpdateCount = 0;
             m_ShouldSeedSnapshotHistoryAfterRuntimeReload = true;
             ObsoleteAttemptCorrelationService.ResetForRuntimeWorldGeneration(currentGeneration);
@@ -1653,6 +1817,19 @@ namespace Traffic_Law_Enforcement
                 return "none";
             }
 
+            LaneResolutionDiagnostic laneResolution =
+                BuildLaneResolutionDiagnostic(lane, ref formatterContext);
+
+            return
+                $"{FormatEntityOrNone(lane)}" +
+                $"{{display=\"{laneResolution.DisplayText}\", owner={laneResolution.OwnerText}, aggregate={laneResolution.AggregateText}, " +
+                $"resolvedRoad={laneResolution.ResolvedRoadText}, nameSource={laneResolution.NameSource}}}";
+        }
+
+        private LaneResolutionDiagnostic BuildLaneResolutionDiagnostic(
+            Entity lane,
+            ref SelectedObjectDisplayFormatterContext formatterContext)
+        {
             Entity ownerEntity = Entity.Null;
             Entity aggregateEntity = Entity.Null;
             if (m_OwnerData.TryGetComponent(lane, out Owner owner) &&
@@ -1699,10 +1876,15 @@ namespace Traffic_Law_Enforcement
                 nameSource = "resolved-road";
             }
 
-            return
-                $"{FormatEntityOrNone(lane)}" +
-                $"{{display=\"{displayText}\", owner={ownerText}, aggregate={aggregateText}, " +
-                $"resolvedRoad={resolvedRoadText}, nameSource={nameSource}}}";
+            return new LaneResolutionDiagnostic(
+                ownerEntity,
+                aggregateEntity,
+                resolvedRoadEntity,
+                displayText,
+                ownerText,
+                aggregateText,
+                resolvedRoadText,
+                nameSource);
         }
 
         private string BuildNavigationPreview(Entity vehicle, Entity currentLane)
@@ -2312,15 +2494,20 @@ namespace Traffic_Law_Enforcement
                 return;
             }
 
-            string vanillaAllows = hasProfile
-                ? PublicTransportLanePolicy.VanillaAllowsAccess(
-                    vehicleProfile.m_PublicTransportLaneAccessBits).ToString()
-                : "n/a";
+            bool vanillaAllowsValue = hasProfile &&
+                PublicTransportLanePolicy.VanillaAllowsAccess(
+                    vehicleProfile.m_PublicTransportLaneAccessBits);
+            bool modAllowsValue = hasProfile &&
+                PublicTransportLanePolicy.ModAllowsAccess(
+                    vehicleProfile.m_PublicTransportLaneAccessBits);
+            DiagnosticBoolState vanillaAllowsState =
+                GetDiagnosticBoolState(hasProfile, vanillaAllowsValue);
+            DiagnosticBoolState modAllowsState =
+                GetDiagnosticBoolState(hasProfile, modAllowsValue);
 
-            string modAllows = hasProfile
-                ? PublicTransportLanePolicy.ModAllowsAccess(
-                    vehicleProfile.m_PublicTransportLaneAccessBits).ToString()
-                : "n/a";
+            string vanillaAllows = FormatDiagnosticBoolState(vanillaAllowsState);
+
+            string modAllows = FormatDiagnosticBoolState(modAllowsState);
 
             string canUsePublicTransportLane = hasProfile
                 ? PublicTransportLanePolicy.CanUsePublicTransportLane(
@@ -2353,6 +2540,52 @@ namespace Traffic_Law_Enforcement
             string laneKind =
                 RoutePenaltyInspection.DescribeLaneKind(lane, ref context);
 
+            string watchedDetail = string.Empty;
+            if (watchedVehicle)
+            {
+                Entity currentVehicleLane =
+                    m_CurrentLaneData.TryGetComponent(vehicle, out CarCurrentLane currentLaneData)
+                        ? currentLaneData.m_Lane
+                        : Entity.Null;
+                SelectedObjectDisplayFormatterContext formatterContext =
+                    CreateDisplayFormatterContext();
+                LaneResolutionDiagnostic laneResolution =
+                    BuildLaneResolutionDiagnostic(lane, ref formatterContext);
+                PublicTransportLaneDiagnosticComponentBits laneComponentBits =
+                    GetPublicTransportLaneDiagnosticComponentBits(lane);
+                WatchedPublicTransportLaneDiagnosticState watchedState =
+                    new WatchedPublicTransportLaneDiagnosticState(
+                        currentVehicleLane,
+                        laneResolution.Owner,
+                        laneResolution.Aggregate,
+                        laneResolution.ResolvedRoad,
+                        laneComponentBits,
+                        publicOnly,
+                        unauthorizedPublicTransportLane,
+                        hasResolvedPublicTransportLanePolicy,
+                        vanillaAllowsState,
+                        modAllowsState);
+
+                if (!forceLogging &&
+                    !ShouldEmitWatchedPublicTransportLaneDiagnostic(
+                        vehicle,
+                        lane,
+                        watchedState))
+                {
+                    return;
+                }
+
+                watchedDetail =
+                    $", currentLane={FormatEntityOrNone(currentVehicleLane)}, " +
+                    $"laneDisplay=\"{laneResolution.DisplayText}\", " +
+                    $"owner={laneResolution.OwnerText}, aggregate={laneResolution.AggregateText}, " +
+                    $"resolvedRoad={laneResolution.ResolvedRoadText}, resolvedRoadSource={laneResolution.NameSource}, " +
+                    $"hasEdgeLane={HasLaneDiagnosticBit(laneComponentBits, PublicTransportLaneDiagnosticComponentBits.EdgeLane)}, " +
+                    $"hasConnectionLane={HasLaneDiagnosticBit(laneComponentBits, PublicTransportLaneDiagnosticComponentBits.ConnectionLane)}, " +
+                    $"hasSlaveLane={HasLaneDiagnosticBit(laneComponentBits, PublicTransportLaneDiagnosticComponentBits.SlaveLane)}, " +
+                    $"hasRouteLane={HasLaneDiagnosticBit(laneComponentBits, PublicTransportLaneDiagnosticComponentBits.RouteLane)}";
+            }
+
             string message =
                 $"PT_ROUTE_DIAG: vehicle={vehicle}, role={role}, lane={lane}, laneKind={laneKind}, " +
                 $"forceLogging={forceLogging}, " +
@@ -2362,7 +2595,8 @@ namespace Traffic_Law_Enforcement
                 $"emergency={emergency}, emergencyOverrideActive={emergencyOverrideActive}, " +
                 $"type={type}, vanillaAllows={vanillaAllows}, modAllows={modAllows}, " +
                 $"canUsePublicTransportLane={canUsePublicTransportLane}, " +
-                $"permissionChangedByMod={permissionChangedByModText}, accessBits={accessBits}";
+                $"permissionChangedByMod={permissionChangedByModText}, accessBits={accessBits}" +
+                watchedDetail;
 
             EnforcementTelemetry.RecordEvent(message);
             Mod.log.Info(message);
@@ -2378,6 +2612,109 @@ namespace Traffic_Law_Enforcement
             return EnforcementLoggingPolicy.IsBurstLoggingActive
                 ? BurstLoggingService.BurstPublicTransportLaneDecisionDiagnosticLogsPerUpdate
                 : MaxPublicTransportLaneDecisionDiagnosticLogsPerUpdate;
+        }
+
+        private bool ShouldEmitWatchedPublicTransportLaneDiagnostic(
+            Entity vehicle,
+            Entity lane,
+            WatchedPublicTransportLaneDiagnosticState currentState)
+        {
+            WatchedPublicTransportLaneDiagnosticKey key =
+                new WatchedPublicTransportLaneDiagnosticKey(vehicle, lane);
+            if (m_LastWatchedPublicTransportLaneDiagnostics.TryGetValue(
+                    key,
+                    out WatchedPublicTransportLaneDiagnosticState previousState) &&
+                WatchedPublicTransportLaneDiagnosticStatesEqual(
+                    previousState,
+                    currentState))
+            {
+                return false;
+            }
+
+            m_LastWatchedPublicTransportLaneDiagnostics[key] = currentState;
+            return true;
+        }
+
+        private static bool WatchedPublicTransportLaneDiagnosticStatesEqual(
+            WatchedPublicTransportLaneDiagnosticState left,
+            WatchedPublicTransportLaneDiagnosticState right)
+        {
+            return left.CurrentLane == right.CurrentLane &&
+                left.Owner == right.Owner &&
+                left.Aggregate == right.Aggregate &&
+                left.ResolvedRoad == right.ResolvedRoad &&
+                left.LaneComponentBits == right.LaneComponentBits &&
+                left.PublicOnly == right.PublicOnly &&
+                left.UnauthorizedPublicTransportLane ==
+                right.UnauthorizedPublicTransportLane &&
+                left.HasResolvedPublicTransportLanePolicy ==
+                right.HasResolvedPublicTransportLanePolicy &&
+                left.VanillaAllows == right.VanillaAllows &&
+                left.ModAllows == right.ModAllows;
+        }
+
+        private PublicTransportLaneDiagnosticComponentBits GetPublicTransportLaneDiagnosticComponentBits(
+            Entity lane)
+        {
+            PublicTransportLaneDiagnosticComponentBits bits =
+                PublicTransportLaneDiagnosticComponentBits.None;
+            if (m_RouteLaneData.HasComponent(lane))
+            {
+                bits |= PublicTransportLaneDiagnosticComponentBits.RouteLane;
+            }
+
+            if (m_SlaveLaneData.HasComponent(lane))
+            {
+                bits |= PublicTransportLaneDiagnosticComponentBits.SlaveLane;
+            }
+
+            if (m_EdgeLaneData.HasComponent(lane))
+            {
+                bits |= PublicTransportLaneDiagnosticComponentBits.EdgeLane;
+            }
+
+            if (m_ConnectionLaneData.HasComponent(lane))
+            {
+                bits |= PublicTransportLaneDiagnosticComponentBits.ConnectionLane;
+            }
+
+            return bits;
+        }
+
+        private static bool HasLaneDiagnosticBit(
+            PublicTransportLaneDiagnosticComponentBits value,
+            PublicTransportLaneDiagnosticComponentBits flag)
+        {
+            return (value & flag) != 0;
+        }
+
+        private static DiagnosticBoolState GetDiagnosticBoolState(
+            bool hasValue,
+            bool value)
+        {
+            if (!hasValue)
+            {
+                return DiagnosticBoolState.Unknown;
+            }
+
+            return value
+                ? DiagnosticBoolState.True
+                : DiagnosticBoolState.False;
+        }
+
+        private static string FormatDiagnosticBoolState(DiagnosticBoolState value)
+        {
+            switch (value)
+            {
+                case DiagnosticBoolState.False:
+                    return bool.FalseString;
+
+                case DiagnosticBoolState.True:
+                    return bool.TrueString;
+
+                default:
+                    return "n/a";
+            }
         }
 
         private bool TryGetMidBlockPenaltyTag(
