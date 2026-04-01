@@ -64,12 +64,14 @@ namespace Traffic_Law_Enforcement
             m_InfoviewPrefabQuery = GetEntityQuery(ComponentType.ReadOnly<InfoviewData>(), ComponentType.ReadOnly<PrefabData>());
 
             CacheStaticChirperTemplates();
-            EnsureBaseLocalizationSources();
+            EnsureBaseLocalizationSources(
+                out bool baseAddedLocalizationSource,
+                out bool baseRequiresLocaleReload);
             EnsureSenderAccount();
 
             bool rebuiltLocalization = false;
-            bool addedLocalizationSource = false;
-            bool requiresLocaleReload = false;
+            bool addedLocalizationSource = baseAddedLocalizationSource;
+            bool requiresLocaleReload = baseRequiresLocaleReload;
             int restoredReportCount = 0;
 
             foreach (MonthlyEnforcementReport report in MonthlyEnforcementChirperService.GetReportHistorySnapshot())
@@ -701,13 +703,18 @@ namespace Traffic_Law_Enforcement
             return entries;
         }
 
-        private void EnsureBaseLocalizationSources()
+        private void EnsureBaseLocalizationSources(
+            out bool addedLocalizationSource,
+            out bool requiresLocaleReload)
         {
-            bool addedLocalizationSource = false;
+            addedLocalizationSource = false;
+            requiresLocaleReload = false;
             foreach (string localeId in GetLocalizationBuildLocales())
             {
-                bool requiresLocaleReload = false;
-                _ = EnsureSenderLocalizationEntry(localeId, ref addedLocalizationSource, ref requiresLocaleReload);
+                _ = EnsureSenderLocalizationEntry(
+                    localeId,
+                    ref addedLocalizationSource,
+                    ref requiresLocaleReload);
             }
         }
 

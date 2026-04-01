@@ -744,13 +744,25 @@ namespace Traffic_Law_Enforcement
                 return;
             }
 
+            m_CurrentLaneData.Update(this);
             m_RemovedWatchedPublicTransportLaneDiagnosticKeys.Clear();
             foreach (KeyValuePair<WatchedPublicTransportLaneDiagnosticKey, WatchedPublicTransportLaneDiagnosticState> pair in
                      m_LastWatchedPublicTransportLaneDiagnostics)
             {
                 Entity vehicle = pair.Key.Vehicle;
                 if (!EntityManager.Exists(vehicle) ||
+                    !EntityManager.Exists(pair.Key.Lane) ||
                     !FocusedLoggingService.IsWatched(vehicle))
+                {
+                    m_RemovedWatchedPublicTransportLaneDiagnosticKeys.Add(pair.Key);
+                    continue;
+                }
+
+                Entity activeCurrentLane =
+                    m_CurrentLaneData.TryGetComponent(vehicle, out CarCurrentLane currentLaneData)
+                        ? currentLaneData.m_Lane
+                        : Entity.Null;
+                if (activeCurrentLane != pair.Value.CurrentLane)
                 {
                     m_RemovedWatchedPublicTransportLaneDiagnosticKeys.Add(pair.Key);
                 }
