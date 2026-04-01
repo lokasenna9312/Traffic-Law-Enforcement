@@ -54,6 +54,7 @@ namespace Traffic_Law_Enforcement
                         typeof(MidBlockAccessPathfindingPenaltyPatches),
                         nameof(AddHeapDataPrefix));
                 s_Harmony.Patch(s_TargetMethod, prefix: postfix);
+                LogPatchInfo(s_TargetMethod);
 
                 Mod.log.Info(
                     $"Mid-block access pathfind hook patched: {DescribeMethod(s_TargetMethod)}");
@@ -163,6 +164,63 @@ namespace Traffic_Law_Enforcement
 
             return
                 $"{method.DeclaringType?.FullName}.{method.Name}({parameterList})";
+        }
+
+        private static void LogPatchInfo(MethodInfo targetMethod)
+        {
+            Patches patchInfo = Harmony.GetPatchInfo(targetMethod);
+            Mod.log.Info(
+                "[MB-AHD] patchInfo " +
+                $"target={DescribeMethod(targetMethod)} " +
+                $"prefixes={GetPatchCount(patchInfo?.Prefixes)} " +
+                $"postfixes={GetPatchCount(patchInfo?.Postfixes)} " +
+                $"transpilers={GetPatchCount(patchInfo?.Transpilers)} " +
+                $"finalizers={GetPatchCount(patchInfo?.Finalizers)} " +
+                $"owners={FormatPatchOwners(patchInfo)} " +
+                $"prefixMethods={FormatPatchMethods(patchInfo?.Prefixes)} " +
+                $"postfixMethods={FormatPatchMethods(patchInfo?.Postfixes)}");
+        }
+
+        private static int GetPatchCount<T>(ICollection<T> patches)
+        {
+            return patches?.Count ?? 0;
+        }
+
+        private static string FormatPatchOwners(Patches patchInfo)
+        {
+            if (patchInfo?.Owners == null || patchInfo.Owners.Count == 0)
+            {
+                return "none";
+            }
+
+            return string.Join(",", patchInfo.Owners);
+        }
+
+        private static string FormatPatchMethods(ICollection<Patch> patches)
+        {
+            if (patches == null || patches.Count == 0)
+            {
+                return "none";
+            }
+
+            StringBuilder builder = new StringBuilder(patches.Count * 48);
+            int index = 0;
+            foreach (Patch patch in patches)
+            {
+                if (index > 0)
+                {
+                    builder.Append(',');
+                }
+
+                MethodInfo patchMethod = patch?.PatchMethod;
+                builder.Append(
+                    patchMethod == null
+                        ? "null"
+                        : $"{patchMethod.DeclaringType?.FullName}.{patchMethod.Name}");
+                index += 1;
+            }
+
+            return builder.ToString();
         }
 
         private static void AddHeapDataPrefix(

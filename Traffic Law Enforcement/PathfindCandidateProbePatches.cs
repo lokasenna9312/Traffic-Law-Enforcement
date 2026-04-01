@@ -449,6 +449,7 @@ namespace Traffic_Law_Enforcement
                     s_ReleaseMethod,
                     postfix: new HarmonyMethod(typeof(PathfindCandidateProbePatches), nameof(ReleasePostfix)));
 
+                LogAddHeapDataPatchInfo(s_ExactIntersectionAddHeapDataMethod);
                 Mod.log.Info(
                     $"{IntersectionProbePrefix} patch applied exact=true");
                 Mod.log.Info(
@@ -1094,6 +1095,21 @@ namespace Traffic_Law_Enforcement
             }
         }
 
+        private static void LogAddHeapDataPatchInfo(MethodInfo targetMethod)
+        {
+            Patches patchInfo = Harmony.GetPatchInfo(targetMethod);
+            Mod.log.Info(
+                $"{IntersectionProbePrefix} patchInfo " +
+                $"target={DescribeMethod(targetMethod)} " +
+                $"prefixes={GetPatchCount(patchInfo?.Prefixes)} " +
+                $"postfixes={GetPatchCount(patchInfo?.Postfixes)} " +
+                $"transpilers={GetPatchCount(patchInfo?.Transpilers)} " +
+                $"finalizers={GetPatchCount(patchInfo?.Finalizers)} " +
+                $"owners={FormatPatchOwners(patchInfo)} " +
+                $"prefixMethods={FormatPatchMethods(patchInfo?.Prefixes)} " +
+                $"postfixMethods={FormatPatchMethods(patchInfo?.Postfixes)}");
+        }
+
         private static MethodInfo FindExactIntersectionAddHeapDataMethod()
         {
             if (s_PathfindExecutorType == null)
@@ -1166,6 +1182,48 @@ namespace Traffic_Law_Enforcement
             }
 
             return $"{method.DeclaringType?.FullName}.{method.Name}({parameterList})";
+        }
+
+        private static int GetPatchCount<T>(ICollection<T> patches)
+        {
+            return patches?.Count ?? 0;
+        }
+
+        private static string FormatPatchOwners(Patches patchInfo)
+        {
+            if (patchInfo?.Owners == null || patchInfo.Owners.Count == 0)
+            {
+                return "none";
+            }
+
+            return string.Join(",", patchInfo.Owners);
+        }
+
+        private static string FormatPatchMethods(ICollection<Patch> patches)
+        {
+            if (patches == null || patches.Count == 0)
+            {
+                return "none";
+            }
+
+            StringBuilder builder = new StringBuilder(patches.Count * 48);
+            int index = 0;
+            foreach (Patch patch in patches)
+            {
+                if (index > 0)
+                {
+                    builder.Append(',');
+                }
+
+                MethodInfo patchMethod = patch?.PatchMethod;
+                builder.Append(
+                    patchMethod == null
+                        ? "null"
+                        : $"{patchMethod.DeclaringType?.FullName}.{patchMethod.Name}");
+                index += 1;
+            }
+
+            return builder.ToString();
         }
     }
 }
