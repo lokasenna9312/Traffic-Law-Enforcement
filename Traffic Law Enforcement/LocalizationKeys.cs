@@ -159,6 +159,7 @@ namespace Traffic_Law_Enforcement
             map["SelectedObjectPanel.LastReasonLabel"] = SelectedObjectPanelUISystem.kLastReasonLabelLocaleId;
             map["SelectedObjectPanel.RepeatPenaltyLabel"] = SelectedObjectPanelUISystem.kRepeatPenaltyLabelLocaleId;
             map["SelectedObjectPanel.PublicTransportLanePolicyLabel"] = SelectedObjectPanelUISystem.kPublicTransportLanePolicyLabelLocaleId;
+            map["SelectedObjectPanel.FocusLogStatusLabel"] = SelectedObjectPanelUISystem.kFocusLogStatusLabelLocaleId;
             map["SelectedObjectPanel.EntitySelectionLabel"] = SelectedObjectPanelUISystem.kEntitySelectionLabelLocaleId;
             map["SelectedObjectPanel.EntitySelectionPlaceholder"] = SelectedObjectPanelUISystem.kEntitySelectionPlaceholderLocaleId;
             map["SelectedObjectPanel.EntitySelectionSubmit"] = SelectedObjectPanelUISystem.kEntitySelectionSubmitLocaleId;

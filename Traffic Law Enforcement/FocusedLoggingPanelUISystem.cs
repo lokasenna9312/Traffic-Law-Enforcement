@@ -3,6 +3,7 @@ using Game;
 using Game.Input;
 using Game.SceneFlow;
 using Game.UI;
+using Game.UI.InGame;
 using Unity.Entities;
 using Entity = Unity.Entities.Entity;
 
@@ -56,6 +57,7 @@ namespace Traffic_Law_Enforcement
 
         private ProxyAction m_PanelToggleAction;
         private SelectedObjectBridgeSystem m_SelectedObjectBridgeSystem;
+        private SelectedInfoUISystem m_SelectedInfoSystem;
         private string m_LastLocalizedLocaleId = string.Empty;
         private bool m_LocalizedBindingsInitialized;
         private int m_VisibleUpdateCount;
@@ -123,6 +125,8 @@ namespace Traffic_Law_Enforcement
 
             m_SelectedObjectBridgeSystem =
                 World.GetOrCreateSystemManaged<SelectedObjectBridgeSystem>();
+            m_SelectedInfoSystem =
+                World.GetExistingSystemManaged<SelectedInfoUISystem>();
 
             AddBinding(m_VisibleBinding = new ValueBinding<bool>(kGroup, "visible", false));
             AddBinding(m_HeaderTextBinding = new ValueBinding<string>(kGroup, "headerText", string.Empty));
@@ -156,6 +160,7 @@ namespace Traffic_Law_Enforcement
             AddBinding(new TriggerBinding(kGroup, "unwatchSelected", HandleUnwatchSelectedRequested));
             AddBinding(new TriggerBinding(kGroup, "clearWatched", HandleClearWatchedRequested));
             AddBinding(new TriggerBinding(kGroup, "toggleBurstLogging", HandleToggleBurstLoggingRequested));
+            AddBinding(new TriggerBinding<string>(kGroup, "selectWatchedVehicle", HandleSelectWatchedVehicleRequested));
         }
 
         protected override void OnDestroy()
@@ -386,6 +391,24 @@ namespace Traffic_Law_Enforcement
         private void HandleToggleBurstLoggingRequested()
         {
             BurstLoggingService.ToggleDefaultBurst();
+        }
+
+        private void HandleSelectWatchedVehicleRequested(string entityText)
+        {
+            if (!EntityReferenceUtility.TryParse(entityText, out Entity entity) ||
+                !EntityManager.Exists(entity))
+            {
+                FocusedLoggingService.PruneMissingVehicles(EntityManager);
+                return;
+            }
+
+            if (m_SelectedInfoSystem == null)
+            {
+                m_SelectedInfoSystem =
+                    World.GetExistingSystemManaged<SelectedInfoUISystem>();
+            }
+
+            m_SelectedInfoSystem?.SetSelection(entity);
         }
 
         private string BuildBurstLoggingText(double remainingSeconds)
