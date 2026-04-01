@@ -21,6 +21,7 @@ namespace Traffic_Law_Enforcement
         private const int MaxCandidateEntriesPerRequest = 8;
         private const int MaxLoggedCandidatesPerRequest = 4;
         private const int MaxDetailedIntersectionLikeLogs = 8;
+        private const long LiveProbeHeartbeatInterval = 10000;
         private const string IntersectionProbePrefix = "[IM-AHD-PROBE]";
 
         private sealed class ProbeRequestInfo
@@ -350,6 +351,7 @@ namespace Traffic_Law_Enforcement
         private static int s_RequestMatchMissLogCount;
         private static bool s_LoggedFirstWorkerExecuteInvocation;
         private static int s_DetailedIntersectionLikeLogCount;
+        private static int s_LiveFirstHitLogged;
         private static long s_TotalHits;
         private static long s_AfterVehicleFilterHits;
         private static long s_BothSidesHaveOwnerHits;
@@ -621,6 +623,16 @@ namespace Traffic_Law_Enforcement
             float ___m_HeuristicCostFactor)
         {
             long totalHits = System.Threading.Interlocked.Increment(ref s_TotalHits);
+            if (System.Threading.Interlocked.CompareExchange(ref s_LiveFirstHitLogged, 1, 0) == 0)
+            {
+                Mod.log.Info($"{IntersectionProbePrefix} live firstHit=true");
+            }
+
+            if (totalHits > 0 && totalHits % LiveProbeHeartbeatInterval == 0)
+            {
+                Mod.log.Info($"{IntersectionProbePrefix} live totalHits={totalHits}");
+            }
+
             ProbeExecutionContext currentContext = s_CurrentContext;
             if (currentContext != null)
             {
@@ -904,6 +916,7 @@ namespace Traffic_Law_Enforcement
         private static void ResetIntersectionProbeDiagnostics()
         {
             s_DetailedIntersectionLikeLogCount = 0;
+            s_LiveFirstHitLogged = 0;
             s_TotalHits = 0;
             s_AfterVehicleFilterHits = 0;
             s_BothSidesHaveOwnerHits = 0;
