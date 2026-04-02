@@ -374,6 +374,8 @@ namespace Traffic_Law_Enforcement
             bool observeType3Usage,
             bool observeType4Usage)
         {
+            EnforcementTraceAutoCaptureService.RecordScan(
+                EnforcementTraceAutoCaptureService.PtLaneFamily);
             Entity laneEntity = currentLane.m_Lane;
             if (!TryObserveVehiclePublicTransportLaneState(
                     vehicle,
@@ -382,12 +384,27 @@ namespace Traffic_Law_Enforcement
                     observeType2Usage,
                     observeType3Usage,
                     observeType4Usage,
+                    out bool isCandidate,
                     out bool isViolation,
                     out bool shouldTrackType2Usage,
                     out bool shouldTrackType3Usage,
                     out bool shouldTrackType4Usage))
             {
                 return;
+            }
+
+            if (isCandidate)
+            {
+                EnforcementTraceAutoCaptureService.RecordCandidate(
+                    EnforcementTraceAutoCaptureService.PtLaneFamily,
+                    vehicle);
+            }
+
+            if (isViolation)
+            {
+                EnforcementTraceAutoCaptureService.RecordIllegalCandidate(
+                    EnforcementTraceAutoCaptureService.PtLaneFamily,
+                    vehicle);
             }
 
             UpdateUsageObservations(
@@ -407,11 +424,13 @@ namespace Traffic_Law_Enforcement
             bool observeType2Usage,
             bool observeType3Usage,
             bool observeType4Usage,
+            out bool isCandidate,
             out bool isViolation,
             out bool shouldTrackType2Usage,
             out bool shouldTrackType3Usage,
             out bool shouldTrackType4Usage)
         {
+            isCandidate = false;
             isViolation = false;
             shouldTrackType2Usage = false;
             shouldTrackType3Usage = false;
@@ -430,6 +449,7 @@ namespace Traffic_Law_Enforcement
                 return false;
             }
 
+            isCandidate = true;
             PublicTransportLaneAccessBits bits = profile.m_PublicTransportLaneAccessBits;
             bool configuredModAllowsAccess =
                 PublicTransportLanePolicy.ModAllowsAccess(bits);

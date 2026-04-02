@@ -210,11 +210,18 @@ namespace Traffic_Law_Enforcement
                 evt.Vehicle,
                 settings,
                 ref m_TypeLookups);
+            int appliedPenalty = EnforcementPenaltyService.GetAppliedFine(
+                EnforcementKinds.PublicTransportLane,
+                evt.Vehicle);
 
             EnforcementPenaltyService.RecordPublicTransportLaneViolation(
                 evt.Vehicle,
                 evt.Lane,
                 reason);
+            EnforcementTraceAutoCaptureService.RecordApplied(
+                EnforcementTraceAutoCaptureService.PtLaneFamily,
+                evt.Vehicle,
+                appliedPenalty);
             RecordViolationStartObservation(
                 evt,
                 statistics.m_PublicTransportLaneViolationCount,

@@ -45,6 +45,7 @@ namespace Traffic_Law_Enforcement
             FocusedLoggingService.Reset();
             ObsoleteAttemptCorrelationService.Reset();
             PublicTransportLaneExitPressureTelemetry.Reset();
+            EnforcementTraceAutoCaptureService.Reset();
             m_Setting = new Setting(this);
             Settings = m_Setting;
             AssetDatabase.global.LoadSettings(nameof(Traffic_Law_Enforcement), m_Setting, new Setting(this));
@@ -107,6 +108,8 @@ namespace Traffic_Law_Enforcement
             FocusedLoggingService.Reset();
             ObsoleteAttemptCorrelationService.Reset();
             PublicTransportLaneExitPressureTelemetry.Reset();
+            EnforcementTraceAutoCaptureService.FlushAll();
+            EnforcementTraceAutoCaptureService.Reset();
             BudgetUIPatches.Remove();
             FocusedRouteDiagnosticsPatchController.RemoveAll();
             PathfindRuntimeDiscoveryPatches.Remove();

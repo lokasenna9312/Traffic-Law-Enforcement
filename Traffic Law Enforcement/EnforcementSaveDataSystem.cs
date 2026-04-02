@@ -634,6 +634,8 @@ namespace Traffic_Law_Enforcement {
         public void SetDefaults(Context context) {
             int previousGeneration = RuntimeWorldGeneration;
             AdvanceRuntimeWorldGeneration(context);
+            EnforcementTraceAutoCaptureService.NotifyRuntimeWorldGenerationChanged(
+                RuntimeWorldGeneration);
             LogSaveLifecycleHook(
                 "SetDefaults",
                 context,
