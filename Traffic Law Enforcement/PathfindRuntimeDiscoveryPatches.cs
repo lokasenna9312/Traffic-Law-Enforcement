@@ -17,8 +17,8 @@ namespace Traffic_Law_Enforcement
         private static readonly Type s_WorkerActionsType =
             AccessTools.Inner(typeof(PathfindQueueSystem), "WorkerActions");
 
-        private static readonly Type s_PathfindWorkerJobType =
-            AccessTools.Inner(typeof(PathfindQueueSystem), "PathfindWorkerJob");
+        private static readonly Type s_WorkerActionType =
+            AccessTools.Inner(typeof(PathfindQueueSystem), "WorkerAction");
 
         private static readonly MethodInfo s_IJobScheduleGenericMethod =
             AccessTools.FirstMethod(
@@ -33,11 +33,21 @@ namespace Traffic_Law_Enforcement
                 typeof(PathfindRuntimeDiscoveryPatches),
                 nameof(LogScheduleHandoff));
 
+        private static readonly FieldInfo s_WorkerActionsListField =
+            AccessTools.DeclaredField(s_WorkerActionsType, "m_Actions");
+
+        private static readonly PropertyInfo s_WorkerActionsListLengthProperty =
+            AccessTools.Property(s_WorkerActionsListField?.FieldType, "Length");
+
+        private static readonly PropertyInfo s_WorkerActionsListIndexerProperty =
+            AccessTools.Property(s_WorkerActionsListField?.FieldType, "Item");
+
+        private static readonly FieldInfo s_WorkerActionTypeField =
+            AccessTools.DeclaredField(s_WorkerActionType, "m_Type");
+
         private static Harmony s_Harmony;
         private static MethodInfo s_ScheduleWorkerJobsTarget;
-        private static MethodInfo s_PublicExecuteTarget;
         private static bool s_LoggedScheduleFirstHit;
-        private static bool s_LoggedExecuteFirstHit;
 
         public static void Apply()
         {
@@ -56,7 +66,6 @@ namespace Traffic_Law_Enforcement
                 }
 
                 s_ScheduleWorkerJobsTarget = FindScheduleWorkerJobsTarget();
-                s_PublicExecuteTarget = FindPublicExecuteTarget();
                 if (s_ScheduleWorkerJobsTarget == null)
                 {
                     Mod.log.Info(
@@ -64,36 +73,20 @@ namespace Traffic_Law_Enforcement
                     return;
                 }
 
-                if (s_PublicExecuteTarget == null)
-                {
-                    Mod.log.Info(
-                        "Execute A/B discovery skipped: public Execute target not found.");
-                    return;
-                }
-
                 s_Harmony = new Harmony(HarmonyId);
                 s_LoggedScheduleFirstHit = false;
-                s_LoggedExecuteFirstHit = false;
                 s_Harmony.Patch(
                     s_ScheduleWorkerJobsTarget,
                     transpiler: new HarmonyMethod(
                         typeof(PathfindRuntimeDiscoveryPatches),
                         nameof(ScheduleWorkerJobsTranspiler)));
-                s_Harmony.Patch(
-                    s_PublicExecuteTarget,
-                    prefix: new HarmonyMethod(
-                        typeof(PathfindRuntimeDiscoveryPatches),
-                        nameof(PublicExecutePrefix)));
                 Mod.log.Info(
                     $"[SCHED-RAW] install target={DescribeMethod(s_ScheduleWorkerJobsTarget)}");
-                Mod.log.Info(
-                    $"[EXEC-AB] install target={DescribeMethod(s_PublicExecuteTarget)}");
             }
             catch (Exception ex)
             {
                 s_Harmony = null;
                 s_ScheduleWorkerJobsTarget = null;
-                s_PublicExecuteTarget = null;
                 Mod.log.Error(ex, "Failed to apply schedule-handoff discovery patches.");
             }
         }
@@ -108,9 +101,7 @@ namespace Traffic_Law_Enforcement
             s_Harmony.UnpatchAll(HarmonyId);
             s_Harmony = null;
             s_ScheduleWorkerJobsTarget = null;
-            s_PublicExecuteTarget = null;
             s_LoggedScheduleFirstHit = false;
-            s_LoggedExecuteFirstHit = false;
         }
 
         private static MethodInfo FindScheduleWorkerJobsTarget()
@@ -125,25 +116,6 @@ namespace Traffic_Law_Enforcement
 
             return null;
         }
-
-        private static MethodInfo FindPublicExecuteTarget()
-        {
-            if (s_PathfindWorkerJobType == null)
-            {
-                return null;
-            }
-
-            foreach (MethodInfo method in AccessTools.GetDeclaredMethods(s_PathfindWorkerJobType))
-            {
-                if (IsPublicExecuteCandidate(method))
-                {
-                    return method;
-                }
-            }
-
-            return null;
-        }
-
         private static bool IsScheduleWorkerJobsCandidate(MethodInfo method)
         {
             if (method == null ||
@@ -159,19 +131,6 @@ namespace Traffic_Law_Enforcement
                 parameters[0].ParameterType == s_WorkerActionsType?.MakeByRefType();
         }
 
-        private static bool IsPublicExecuteCandidate(MethodInfo method)
-        {
-            if (method == null ||
-                method.IsStatic ||
-                method.ReturnType != typeof(void) ||
-                !string.Equals(method.Name, "Execute", StringComparison.Ordinal))
-            {
-                return false;
-            }
-
-            return method.GetParameters().Length == 0;
-        }
-
         private static IEnumerable<CodeInstruction> ScheduleWorkerJobsTranspiler(
             IEnumerable<CodeInstruction> instructions)
         {
@@ -181,6 +140,8 @@ namespace Traffic_Law_Enforcement
             {
                 if (!inserted && IsScheduleCall(instruction))
                 {
+                    yield return new CodeInstruction(OpCodes.Ldarg_1);
+                    yield return new CodeInstruction(OpCodes.Ldind_Ref);
                     yield return new CodeInstruction(OpCodes.Call, s_LogScheduleHandoffMethod);
                     inserted = true;
                 }
@@ -237,7 +198,7 @@ namespace Traffic_Law_Enforcement
             return $"{method.DeclaringType?.FullName}.{method.Name}({parameterList})";
         }
 
-        private static void LogScheduleHandoff()
+        private static void LogScheduleHandoff(object currentActions)
         {
             if (s_LoggedScheduleFirstHit)
             {
@@ -245,18 +206,61 @@ namespace Traffic_Law_Enforcement
             }
 
             s_LoggedScheduleFirstHit = true;
-            Mod.log.Info("[SCHED-RAW] firstHit=true");
+            (bool hasAnyActions, bool hasPathfindWork, int workerActionCount) =
+                InspectWorkerActions(currentActions);
+            Mod.log.Info(
+                $"[SCHED-RAW] firstHit=true hasPathfindWork={hasPathfindWork} " +
+                $"hasAnyActions={hasAnyActions} workerActionCount={workerActionCount}");
         }
 
-        private static void PublicExecutePrefix()
+        private static (bool HasAnyActions, bool HasPathfindWork, int WorkerActionCount)
+            InspectWorkerActions(object currentActions)
         {
-            if (s_LoggedExecuteFirstHit)
+            if (currentActions == null || s_WorkerActionsListField == null)
             {
-                return;
+                return (false, false, 0);
             }
 
-            s_LoggedExecuteFirstHit = true;
-            Mod.log.Info("[EXEC-AB] firstHit=true");
+            object workerActionsList = s_WorkerActionsListField.GetValue(currentActions);
+            int workerActionCount = GetWorkerActionCount(workerActionsList);
+            bool hasAnyActions = workerActionCount > 0;
+            bool hasPathfindWork = hasAnyActions && ContainsPathfindWork(workerActionsList, workerActionCount);
+            return (hasAnyActions, hasPathfindWork, workerActionCount);
+        }
+
+        private static int GetWorkerActionCount(object workerActionsList)
+        {
+            if (workerActionsList == null || s_WorkerActionsListLengthProperty == null)
+            {
+                return 0;
+            }
+
+            object value = s_WorkerActionsListLengthProperty.GetValue(workerActionsList);
+            return value is int count ? count : 0;
+        }
+
+        private static bool ContainsPathfindWork(object workerActionsList, int workerActionCount)
+        {
+            if (workerActionsList == null ||
+                workerActionCount <= 0 ||
+                s_WorkerActionsListIndexerProperty == null ||
+                s_WorkerActionTypeField == null)
+            {
+                return false;
+            }
+
+            for (int index = 0; index < workerActionCount; index += 1)
+            {
+                object workerAction =
+                    s_WorkerActionsListIndexerProperty.GetValue(workerActionsList, new object[] { index });
+                object actionType = workerAction == null ? null : s_WorkerActionTypeField.GetValue(workerAction);
+                if (string.Equals(actionType?.ToString(), nameof(PathfindQueueSystem.ActionType.Pathfind), StringComparison.Ordinal))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
     }
 }
