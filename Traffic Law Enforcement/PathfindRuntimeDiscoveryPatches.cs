@@ -3,6 +3,7 @@ using System.Reflection;
 using System.Text;
 using Game.Pathfind;
 using HarmonyLib;
+using Unity.Burst;
 using Unity.Collections;
 using Unity.Entities;
 
@@ -17,8 +18,9 @@ namespace Traffic_Law_Enforcement
             AccessTools.Inner(typeof(PathfindQueueSystem), "PathfindWorkerJob");
 
         private static Harmony s_Harmony;
-        private static MethodInfo s_ExecuteTarget;
-        private static bool s_LoggedExecuteFirstHit;
+        private static MethodInfo s_PublicExecuteTarget;
+        private static MethodInfo s_HelperExecuteTarget;
+        private static bool s_LoggedPublicExecuteFirstHit;
 
         public static void Apply()
         {
@@ -31,31 +33,37 @@ namespace Traffic_Law_Enforcement
             {
                 if (s_PathfindWorkerJobType == null)
                 {
-                    Mod.log.Info("Runtime-path discovery skipped: PathfindWorkerJob type not found.");
+                    Mod.log.Info("Execution-model validation skipped: PathfindWorkerJob type not found.");
                     return;
                 }
 
-                s_ExecuteTarget = FindExecuteTarget();
-                if (s_ExecuteTarget == null)
+                s_PublicExecuteTarget = FindPublicExecuteTarget();
+                s_HelperExecuteTarget = FindHelperExecuteTarget();
+                if (s_PublicExecuteTarget == null)
                 {
                     Mod.log.Info(
-                        "Runtime-path discovery skipped: Execute target not found.");
+                        "Execution-model validation skipped: public Execute target not found.");
                     return;
                 }
 
                 s_Harmony = new Harmony(HarmonyId);
-                s_LoggedExecuteFirstHit = false;
+                s_LoggedPublicExecuteFirstHit = false;
                 s_Harmony.Patch(
-                    s_ExecuteTarget,
+                    s_PublicExecuteTarget,
                     prefix: new HarmonyMethod(
                         typeof(PathfindRuntimeDiscoveryPatches),
-                        nameof(ExecutePrefix)));
-                Mod.log.Info($"[EXEC-RAW] install target={DescribeMethod(s_ExecuteTarget)}");
+                        nameof(PublicExecutePrefix)));
+                Mod.log.Info(
+                    $"[EXEC-MODEL] install target={DescribeMethod(s_PublicExecuteTarget)} " +
+                    $"helperTarget={DescribeMethod(s_HelperExecuteTarget)} " +
+                    $"workerBurstCompile={HasBurstCompile(s_PathfindWorkerJobType)} " +
+                    $"burstEnabled={BurstCompiler.IsEnabled}");
             }
             catch (Exception ex)
             {
                 s_Harmony = null;
-                s_ExecuteTarget = null;
+                s_PublicExecuteTarget = null;
+                s_HelperExecuteTarget = null;
                 Mod.log.Error(ex, "Failed to apply runtime-path discovery patches.");
             }
         }
@@ -69,15 +77,16 @@ namespace Traffic_Law_Enforcement
 
             s_Harmony.UnpatchAll(HarmonyId);
             s_Harmony = null;
-            s_ExecuteTarget = null;
-            s_LoggedExecuteFirstHit = false;
+            s_PublicExecuteTarget = null;
+            s_HelperExecuteTarget = null;
+            s_LoggedPublicExecuteFirstHit = false;
         }
 
-        private static MethodInfo FindExecuteTarget()
+        private static MethodInfo FindPublicExecuteTarget()
         {
             foreach (MethodInfo method in AccessTools.GetDeclaredMethods(s_PathfindWorkerJobType))
             {
-                if (IsExecuteCandidate(method))
+                if (IsPublicExecuteCandidate(method))
                 {
                     return method;
                 }
@@ -86,7 +95,34 @@ namespace Traffic_Law_Enforcement
             return null;
         }
 
-        private static bool IsExecuteCandidate(MethodInfo method)
+        private static MethodInfo FindHelperExecuteTarget()
+        {
+            foreach (MethodInfo method in AccessTools.GetDeclaredMethods(s_PathfindWorkerJobType))
+            {
+                if (IsHelperExecuteCandidate(method))
+                {
+                    return method;
+                }
+            }
+
+            return null;
+        }
+
+        private static bool IsPublicExecuteCandidate(MethodInfo method)
+        {
+            if (method == null ||
+                method.IsStatic ||
+                method.ReturnType != typeof(void) ||
+                !string.Equals(method.Name, "Execute", StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            ParameterInfo[] parameters = method.GetParameters();
+            return parameters.Length == 0;
+        }
+
+        private static bool IsHelperExecuteCandidate(MethodInfo method)
         {
             if (method == null ||
                 method.IsStatic ||
@@ -105,6 +141,12 @@ namespace Traffic_Law_Enforcement
             return parameters[0].ParameterType == typeof(PathfindActionData).MakeByRefType() &&
                 parameters[1].ParameterType == typeof(int) &&
                 parameters[2].ParameterType == typeof(Allocator);
+        }
+
+        private static bool HasBurstCompile(MemberInfo member)
+        {
+            return member != null &&
+                member.GetCustomAttributes(typeof(BurstCompileAttribute), inherit: false).Length != 0;
         }
 
         private static string DescribeMethod(MethodInfo method)
@@ -132,15 +174,15 @@ namespace Traffic_Law_Enforcement
             return $"{method.DeclaringType?.FullName}.{method.Name}({parameterList})";
         }
 
-        private static void ExecutePrefix()
+        private static void PublicExecutePrefix()
         {
-            if (s_LoggedExecuteFirstHit)
+            if (s_LoggedPublicExecuteFirstHit)
             {
                 return;
             }
 
-            s_LoggedExecuteFirstHit = true;
-            Mod.log.Info("[EXEC-RAW] firstHit=true");
+            s_LoggedPublicExecuteFirstHit = true;
+            Mod.log.Info("[EXEC-MODEL] firstHit=true");
         }
     }
 }
