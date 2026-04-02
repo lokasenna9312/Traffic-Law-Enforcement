@@ -13,6 +13,7 @@ namespace Traffic_Law_Enforcement
     {
         private const string HarmonyId =
             "Traffic_Law_Enforcement.MidBlockAccessPathfindingPenaltyPatches";
+        internal const string MbAhdRawBuildFingerprint = "mb-ahd-raw-2026-04-02-11-34";
 
         private static readonly Type s_PathfindExecutorType =
             AccessTools.Inner(typeof(PathfindJobs), "PathfindExecutor");
@@ -33,6 +34,8 @@ namespace Traffic_Law_Enforcement
 
             try
             {
+                Mod.log.Info($"[MB-AHD-RAW] patchSetup buildFingerprint={MbAhdRawBuildFingerprint}");
+
                 if (s_PathfindExecutorType == null)
                 {
                     Mod.log.Info("Mid-block access pathfind hook skipped: PathfindExecutor type not found.");

@@ -53,6 +53,8 @@ namespace Traffic_Law_Enforcement
 
             ResolveAndCacheModMetadata(modAssetPath);
             LogModVersionInfo(modAssetPath);
+            log.Info(
+                $"[MB-AHD-RAW] buildFingerprint={MidBlockAccessPathfindingPenaltyPatches.MbAhdRawBuildFingerprint}");
 
             m_Setting.RegisterInOptionsUI();
             RegisterTextLocales();
