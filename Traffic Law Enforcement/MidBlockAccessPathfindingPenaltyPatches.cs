@@ -13,6 +13,8 @@ namespace Traffic_Law_Enforcement
     {
         private const string HarmonyId =
             "Traffic_Law_Enforcement.MidBlockAccessPathfindingPenaltyPatches";
+        private const string ImAhdTestViaMbPrefix = "[IM-AHD-TEST-VIA-MB]";
+        private const long ImAhdTestViaMbHeartbeatInterval = 10000;
 
         private static readonly Type s_PathfindExecutorType =
             AccessTools.Inner(typeof(PathfindJobs), "PathfindExecutor");
@@ -20,6 +22,8 @@ namespace Traffic_Law_Enforcement
         private static Harmony s_Harmony;
         private static MethodInfo s_TargetMethod;
         private static int s_LogCount;
+        private static int s_ImAhdTestViaMbFirstHitLogged;
+        private static long s_ImAhdTestViaMbTotalHits;
 
         internal static bool IsApplied => s_Harmony != null && s_TargetMethod != null;
 
@@ -49,6 +53,7 @@ namespace Traffic_Law_Enforcement
 
                 s_Harmony = new Harmony(HarmonyId);
                 s_LogCount = 0;
+                ResetImAhdTestViaMbDiagnostics();
                 HarmonyMethod postfix =
                     new HarmonyMethod(
                         typeof(MidBlockAccessPathfindingPenaltyPatches),
@@ -73,10 +78,12 @@ namespace Traffic_Law_Enforcement
                 return;
             }
 
+            Mod.log.Info($"{ImAhdTestViaMbPrefix} summary totalHits={s_ImAhdTestViaMbTotalHits}");
             s_Harmony.UnpatchAll(HarmonyId);
             s_Harmony = null;
             s_TargetMethod = null;
             s_LogCount = 0;
+            ResetImAhdTestViaMbDiagnostics();
         }
 
         private static MethodInfo FindTransitionExpansionMethod()
@@ -232,6 +239,17 @@ namespace Traffic_Law_Enforcement
             UnsafePathfindData ___m_PathfindData,
             MethodBase __originalMethod)
         {
+            long totalHits = System.Threading.Interlocked.Increment(ref s_ImAhdTestViaMbTotalHits);
+            if (System.Threading.Interlocked.CompareExchange(ref s_ImAhdTestViaMbFirstHitLogged, 1, 0) == 0)
+            {
+                Mod.log.Info($"{ImAhdTestViaMbPrefix} live firstHit=true");
+            }
+
+            if (totalHits > 0 && totalHits % ImAhdTestViaMbHeartbeatInterval == 0)
+            {
+                Mod.log.Info($"{ImAhdTestViaMbPrefix} live totalHits={totalHits}");
+            }
+
             if (!Mod.IsMidBlockCrossingEnforcementEnabled)
             {
                 return;
@@ -286,6 +304,12 @@ namespace Traffic_Law_Enforcement
                     $"reason={RoutePenaltyInspection.FormatMidBlockReasonTag(reasonCode)}, " +
                     $"moneyWeight={moneyWeight:0.###}, addedCost={addedCost:0.###}");
             }
+        }
+
+        private static void ResetImAhdTestViaMbDiagnostics()
+        {
+            s_ImAhdTestViaMbFirstHitLogged = 0;
+            s_ImAhdTestViaMbTotalHits = 0;
         }
     }
 }
