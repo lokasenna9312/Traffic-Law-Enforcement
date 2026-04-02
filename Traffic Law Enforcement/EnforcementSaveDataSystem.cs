@@ -639,8 +639,16 @@ namespace Traffic_Law_Enforcement {
                 context,
                 $"runtimeWorldGeneration={previousGeneration}->{RuntimeWorldGeneration}");
             ResetRuntimeState();
-            EnforcementGameplaySettingsService.Apply(
-                CreateInitialGameplaySettings(context));
+            EnforcementGameplaySettingsState previousSettings =
+                EnforcementGameplaySettingsService.Current;
+            EnforcementGameplaySettingsState initialSettings =
+                CreateInitialGameplaySettings(context);
+            EnforcementGameplaySettingsService.Apply(initialSettings);
+            Mod.Settings?.LogTrackedEnforcementSettingChanges(
+                "currentSave",
+                previousSettings,
+                initialSettings,
+                $"SetDefaults:{context.purpose}");
             m_LoadedPublicTransportLaneVehicleStates.Clear();
             m_HasDeserializedData = false;
             m_ShouldClearLegacyRuntimeState =
@@ -907,7 +915,14 @@ namespace Traffic_Law_Enforcement {
             PolicyImpactEventsReadResult policyImpactEventsReadResult =
                 ReadPolicyImpactEvents(reader, version);
 
+            EnforcementGameplaySettingsState previousSettings =
+                EnforcementGameplaySettingsService.Current;
             EnforcementGameplaySettingsService.Apply(gameplaySettings);
+            Mod.Settings?.LogTrackedEnforcementSettingChanges(
+                "currentSave",
+                previousSettings,
+                gameplaySettings,
+                "Deserialize");
             EnforcementTelemetry.LoadPersistentData(
                 statistics,
                 totalFineAmount,
