@@ -61,7 +61,7 @@ namespace Traffic_Law_Enforcement
             BudgetUIPatches.Apply();
             VehicleUtilsPatches.Apply();
             FocusedRouteDiagnosticsPatchController.Sync();
-            PathfindCandidateProbePatches.Apply();
+            PathfindRuntimeDiscoveryPatches.Apply();
             MidBlockAccessPathfindingPenaltyPatches.Apply();
             IntersectionMovementPathfindingPenaltyPatches.Apply();
             if (!IntersectionMovementPathfindingPenaltyPatches.IsApplied)
@@ -108,7 +108,7 @@ namespace Traffic_Law_Enforcement
             PublicTransportLaneExitPressureTelemetry.Reset();
             BudgetUIPatches.Remove();
             FocusedRouteDiagnosticsPatchController.RemoveAll();
-            PathfindCandidateProbePatches.Remove();
+            PathfindRuntimeDiscoveryPatches.Remove();
             VehicleUtilsPatches.Remove();
             MidBlockAccessPathfindingPenaltyPatches.Remove();
             IntersectionMovementPathfindingPenaltyPatches.Remove();
