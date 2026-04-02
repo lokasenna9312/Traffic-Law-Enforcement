@@ -47,7 +47,7 @@ namespace Traffic_Law_Enforcement
 
         private static Harmony s_Harmony;
         private static MethodInfo s_ScheduleWorkerJobsTarget;
-        private static bool s_LoggedScheduleFirstHit;
+        private static int s_LastLoggedScheduleRuntimeWorldGeneration = int.MinValue;
 
         public static void Apply()
         {
@@ -74,7 +74,7 @@ namespace Traffic_Law_Enforcement
                 }
 
                 s_Harmony = new Harmony(HarmonyId);
-                s_LoggedScheduleFirstHit = false;
+                s_LastLoggedScheduleRuntimeWorldGeneration = int.MinValue;
                 s_Harmony.Patch(
                     s_ScheduleWorkerJobsTarget,
                     transpiler: new HarmonyMethod(
@@ -101,7 +101,7 @@ namespace Traffic_Law_Enforcement
             s_Harmony.UnpatchAll(HarmonyId);
             s_Harmony = null;
             s_ScheduleWorkerJobsTarget = null;
-            s_LoggedScheduleFirstHit = false;
+            s_LastLoggedScheduleRuntimeWorldGeneration = int.MinValue;
         }
 
         private static MethodInfo FindScheduleWorkerJobsTarget()
@@ -200,17 +200,19 @@ namespace Traffic_Law_Enforcement
 
         private static void LogScheduleHandoff(object currentActions)
         {
-            if (s_LoggedScheduleFirstHit)
+            int runtimeWorldGeneration =
+                EnforcementSaveDataSystem.RuntimeWorldGeneration;
+            if (s_LastLoggedScheduleRuntimeWorldGeneration == runtimeWorldGeneration)
             {
                 return;
             }
 
-            s_LoggedScheduleFirstHit = true;
+            s_LastLoggedScheduleRuntimeWorldGeneration = runtimeWorldGeneration;
             (bool hasAnyActions, bool hasPathfindWork, int workerActionCount, int pathfindActionCount) =
                 InspectWorkerActions(currentActions);
             Mod.log.Info(
-                $"[SCHED-RAW] firstHit=true hasPathfindWork={hasPathfindWork} " +
-                $"hasAnyActions={hasAnyActions} workerActionCount={workerActionCount} " +
+                $"[SCHED-RAW] runtimeWorldGeneration={runtimeWorldGeneration} firstHit=true " +
+                $"hasPathfindWork={hasPathfindWork} hasAnyActions={hasAnyActions} workerActionCount={workerActionCount} " +
                 $"pathfindActionCount={pathfindActionCount}");
         }
 
