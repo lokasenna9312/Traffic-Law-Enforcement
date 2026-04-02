@@ -13,15 +13,9 @@ namespace Traffic_Law_Enforcement
                 enableFocusedRouteDiagnostics &&
                 FocusedLoggingService.HasWatchedVehicles;
             bool setupPatchWasApplied = PathfindSetupSystemPatches.IsApplied;
-            bool candidateProbePatchWasApplied = PathfindCandidateProbePatches.IsApplied;
 
             if (shouldApplyPatches)
             {
-                if (!PathfindCandidateProbePatches.IsApplied)
-                {
-                    PathfindCandidateProbePatches.Apply();
-                }
-
                 if (!PathfindSetupSystemPatches.IsApplied)
                 {
                     PathfindSetupSystemPatches.Apply();
@@ -33,17 +27,9 @@ namespace Traffic_Law_Enforcement
                 {
                     PathfindSetupSystemPatches.Remove();
                 }
-
-                if (PathfindCandidateProbePatches.IsApplied)
-                {
-                    Mod.log.Info(
-                        $"[IM-AHD-PROBE] disabled reason={BuildDisableReason(enableFocusedRouteDiagnostics)}");
-                    PathfindCandidateProbePatches.Remove();
-                }
             }
 
-            if (setupPatchWasApplied == PathfindSetupSystemPatches.IsApplied &&
-                candidateProbePatchWasApplied == PathfindCandidateProbePatches.IsApplied)
+            if (setupPatchWasApplied == PathfindSetupSystemPatches.IsApplied)
             {
                 return;
             }
@@ -52,34 +38,12 @@ namespace Traffic_Law_Enforcement
                 $"Focused route diagnostics patch state updated: requested={enableFocusedRouteDiagnostics}, " +
                 $"effective={shouldApplyPatches}, " +
                 $"watchedCount={FocusedLoggingService.WatchedVehicleCount}, " +
-                $"setupPatch={PathfindSetupSystemPatches.IsApplied}, " +
-                $"candidateProbePatch={PathfindCandidateProbePatches.IsApplied}");
+                $"setupPatch={PathfindSetupSystemPatches.IsApplied}");
         }
 
         internal static void RemoveAll()
         {
             Sync(enableFocusedRouteDiagnostics: false);
-        }
-
-        private static string BuildDisableReason(bool enableFocusedRouteDiagnostics)
-        {
-            bool hasWatchedVehicles = FocusedLoggingService.HasWatchedVehicles;
-            if (!enableFocusedRouteDiagnostics && !hasWatchedVehicles)
-            {
-                return "focused-route-diagnostics=false,no-watched-vehicles";
-            }
-
-            if (!enableFocusedRouteDiagnostics)
-            {
-                return "focused-route-diagnostics=false";
-            }
-
-            if (!hasWatchedVehicles)
-            {
-                return "no-watched-vehicles";
-            }
-
-            return "controller-sync";
         }
     }
 }
