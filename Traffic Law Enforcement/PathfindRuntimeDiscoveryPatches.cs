@@ -206,26 +206,30 @@ namespace Traffic_Law_Enforcement
             }
 
             s_LoggedScheduleFirstHit = true;
-            (bool hasAnyActions, bool hasPathfindWork, int workerActionCount) =
+            (bool hasAnyActions, bool hasPathfindWork, int workerActionCount, int pathfindActionCount) =
                 InspectWorkerActions(currentActions);
             Mod.log.Info(
                 $"[SCHED-RAW] firstHit=true hasPathfindWork={hasPathfindWork} " +
-                $"hasAnyActions={hasAnyActions} workerActionCount={workerActionCount}");
+                $"hasAnyActions={hasAnyActions} workerActionCount={workerActionCount} " +
+                $"pathfindActionCount={pathfindActionCount}");
         }
 
-        private static (bool HasAnyActions, bool HasPathfindWork, int WorkerActionCount)
+        private static (bool HasAnyActions, bool HasPathfindWork, int WorkerActionCount, int PathfindActionCount)
             InspectWorkerActions(object currentActions)
         {
             if (currentActions == null || s_WorkerActionsListField == null)
             {
-                return (false, false, 0);
+                return (false, false, 0, 0);
             }
 
             object workerActionsList = s_WorkerActionsListField.GetValue(currentActions);
             int workerActionCount = GetWorkerActionCount(workerActionsList);
             bool hasAnyActions = workerActionCount > 0;
-            bool hasPathfindWork = hasAnyActions && ContainsPathfindWork(workerActionsList, workerActionCount);
-            return (hasAnyActions, hasPathfindWork, workerActionCount);
+            int pathfindActionCount = hasAnyActions
+                ? CountPathfindWork(workerActionsList, workerActionCount)
+                : 0;
+            bool hasPathfindWork = pathfindActionCount > 0;
+            return (hasAnyActions, hasPathfindWork, workerActionCount, pathfindActionCount);
         }
 
         private static int GetWorkerActionCount(object workerActionsList)
@@ -239,16 +243,17 @@ namespace Traffic_Law_Enforcement
             return value is int count ? count : 0;
         }
 
-        private static bool ContainsPathfindWork(object workerActionsList, int workerActionCount)
+        private static int CountPathfindWork(object workerActionsList, int workerActionCount)
         {
             if (workerActionsList == null ||
                 workerActionCount <= 0 ||
                 s_WorkerActionsListIndexerProperty == null ||
                 s_WorkerActionTypeField == null)
             {
-                return false;
+                return 0;
             }
 
+            int pathfindActionCount = 0;
             for (int index = 0; index < workerActionCount; index += 1)
             {
                 object workerAction =
@@ -256,11 +261,11 @@ namespace Traffic_Law_Enforcement
                 object actionType = workerAction == null ? null : s_WorkerActionTypeField.GetValue(workerAction);
                 if (string.Equals(actionType?.ToString(), nameof(PathfindQueueSystem.ActionType.Pathfind), StringComparison.Ordinal))
                 {
-                    return true;
+                    pathfindActionCount += 1;
                 }
             }
 
-            return false;
+            return pathfindActionCount;
         }
     }
 }
