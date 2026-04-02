@@ -1,11 +1,11 @@
 using System;
+using System.Collections.Generic;
 using System.Reflection;
+using System.Reflection.Emit;
 using System.Text;
 using Game.Pathfind;
 using HarmonyLib;
-using Unity.Burst;
-using Unity.Collections;
-using Unity.Entities;
+using Unity.Jobs;
 
 namespace Traffic_Law_Enforcement
 {
@@ -14,13 +14,25 @@ namespace Traffic_Law_Enforcement
         private const string HarmonyId =
             "Traffic_Law_Enforcement.PathfindRuntimeDiscoveryPatches";
 
-        private static readonly Type s_PathfindWorkerJobType =
-            AccessTools.Inner(typeof(PathfindQueueSystem), "PathfindWorkerJob");
+        private static readonly Type s_WorkerActionsType =
+            AccessTools.Inner(typeof(PathfindQueueSystem), "WorkerActions");
+
+        private static readonly MethodInfo s_IJobScheduleGenericMethod =
+            AccessTools.FirstMethod(
+                typeof(IJobExtensions),
+                method =>
+                    method.IsGenericMethodDefinition &&
+                    method.Name == nameof(IJobExtensions.Schedule) &&
+                    method.GetParameters().Length == 2);
+
+        private static readonly MethodInfo s_LogScheduleHandoffMethod =
+            AccessTools.DeclaredMethod(
+                typeof(PathfindRuntimeDiscoveryPatches),
+                nameof(LogScheduleHandoff));
 
         private static Harmony s_Harmony;
-        private static MethodInfo s_PublicExecuteTarget;
-        private static MethodInfo s_HelperExecuteTarget;
-        private static bool s_LoggedPublicExecuteFirstHit;
+        private static MethodInfo s_ScheduleWorkerJobsTarget;
+        private static bool s_LoggedScheduleFirstHit;
 
         public static void Apply()
         {
@@ -31,40 +43,36 @@ namespace Traffic_Law_Enforcement
 
             try
             {
-                if (s_PathfindWorkerJobType == null)
+                if (s_WorkerActionsType == null)
                 {
-                    Mod.log.Info("Execution-model validation skipped: PathfindWorkerJob type not found.");
+                    Mod.log.Info(
+                        "Schedule-handoff discovery skipped: WorkerActions type not found.");
                     return;
                 }
 
-                s_PublicExecuteTarget = FindPublicExecuteTarget();
-                s_HelperExecuteTarget = FindHelperExecuteTarget();
-                if (s_PublicExecuteTarget == null)
+                s_ScheduleWorkerJobsTarget = FindScheduleWorkerJobsTarget();
+                if (s_ScheduleWorkerJobsTarget == null)
                 {
                     Mod.log.Info(
-                        "Execution-model validation skipped: public Execute target not found.");
+                        "Schedule-handoff discovery skipped: ScheduleWorkerJobs target not found.");
                     return;
                 }
 
                 s_Harmony = new Harmony(HarmonyId);
-                s_LoggedPublicExecuteFirstHit = false;
+                s_LoggedScheduleFirstHit = false;
                 s_Harmony.Patch(
-                    s_PublicExecuteTarget,
-                    prefix: new HarmonyMethod(
+                    s_ScheduleWorkerJobsTarget,
+                    transpiler: new HarmonyMethod(
                         typeof(PathfindRuntimeDiscoveryPatches),
-                        nameof(PublicExecutePrefix)));
+                        nameof(ScheduleWorkerJobsTranspiler)));
                 Mod.log.Info(
-                    $"[EXEC-MODEL] install target={DescribeMethod(s_PublicExecuteTarget)} " +
-                    $"helperTarget={DescribeMethod(s_HelperExecuteTarget)} " +
-                    $"workerBurstCompile={HasBurstCompile(s_PathfindWorkerJobType)} " +
-                    $"burstEnabled={BurstCompiler.IsEnabled}");
+                    $"[SCHED-RAW] install target={DescribeMethod(s_ScheduleWorkerJobsTarget)}");
             }
             catch (Exception ex)
             {
                 s_Harmony = null;
-                s_PublicExecuteTarget = null;
-                s_HelperExecuteTarget = null;
-                Mod.log.Error(ex, "Failed to apply runtime-path discovery patches.");
+                s_ScheduleWorkerJobsTarget = null;
+                Mod.log.Error(ex, "Failed to apply schedule-handoff discovery patches.");
             }
         }
 
@@ -77,16 +85,15 @@ namespace Traffic_Law_Enforcement
 
             s_Harmony.UnpatchAll(HarmonyId);
             s_Harmony = null;
-            s_PublicExecuteTarget = null;
-            s_HelperExecuteTarget = null;
-            s_LoggedPublicExecuteFirstHit = false;
+            s_ScheduleWorkerJobsTarget = null;
+            s_LoggedScheduleFirstHit = false;
         }
 
-        private static MethodInfo FindPublicExecuteTarget()
+        private static MethodInfo FindScheduleWorkerJobsTarget()
         {
-            foreach (MethodInfo method in AccessTools.GetDeclaredMethods(s_PathfindWorkerJobType))
+            foreach (MethodInfo method in AccessTools.GetDeclaredMethods(typeof(PathfindQueueSystem)))
             {
-                if (IsPublicExecuteCandidate(method))
+                if (IsScheduleWorkerJobsCandidate(method))
                 {
                     return method;
                 }
@@ -95,58 +102,59 @@ namespace Traffic_Law_Enforcement
             return null;
         }
 
-        private static MethodInfo FindHelperExecuteTarget()
+        private static bool IsScheduleWorkerJobsCandidate(MethodInfo method)
         {
-            foreach (MethodInfo method in AccessTools.GetDeclaredMethods(s_PathfindWorkerJobType))
+            if (method == null ||
+                method.IsStatic ||
+                method.ReturnType != typeof(void) ||
+                !string.Equals(method.Name, "ScheduleWorkerJobs", StringComparison.Ordinal))
             {
-                if (IsHelperExecuteCandidate(method))
+                return false;
+            }
+
+            ParameterInfo[] parameters = method.GetParameters();
+            return parameters.Length == 1 &&
+                parameters[0].ParameterType == s_WorkerActionsType?.MakeByRefType();
+        }
+
+        private static IEnumerable<CodeInstruction> ScheduleWorkerJobsTranspiler(
+            IEnumerable<CodeInstruction> instructions)
+        {
+            bool inserted = false;
+
+            foreach (CodeInstruction instruction in instructions)
+            {
+                if (!inserted && IsScheduleCall(instruction))
                 {
-                    return method;
+                    yield return new CodeInstruction(OpCodes.Call, s_LogScheduleHandoffMethod);
+                    inserted = true;
                 }
+
+                yield return instruction;
             }
 
-            return null;
+            if (!inserted)
+            {
+                throw new InvalidOperationException(
+                    "Failed to locate IJobExtensions.Schedule(jobData, jobHandle) handoff.");
+            }
         }
 
-        private static bool IsPublicExecuteCandidate(MethodInfo method)
+        private static bool IsScheduleCall(CodeInstruction instruction)
         {
-            if (method == null ||
-                method.IsStatic ||
-                method.ReturnType != typeof(void) ||
-                !string.Equals(method.Name, "Execute", StringComparison.Ordinal))
+            if (instruction == null || instruction.operand is not MethodInfo method)
             {
                 return false;
             }
 
-            ParameterInfo[] parameters = method.GetParameters();
-            return parameters.Length == 0;
-        }
-
-        private static bool IsHelperExecuteCandidate(MethodInfo method)
-        {
-            if (method == null ||
-                method.IsStatic ||
-                method.ReturnType != typeof(void) ||
-                !string.Equals(method.Name, "Execute", StringComparison.Ordinal))
+            if (!string.Equals(method.Name, nameof(IJobExtensions.Schedule), StringComparison.Ordinal) ||
+                method.DeclaringType != typeof(IJobExtensions) ||
+                !method.IsGenericMethod)
             {
                 return false;
             }
 
-            ParameterInfo[] parameters = method.GetParameters();
-            if (parameters.Length != 3)
-            {
-                return false;
-            }
-
-            return parameters[0].ParameterType == typeof(PathfindActionData).MakeByRefType() &&
-                parameters[1].ParameterType == typeof(int) &&
-                parameters[2].ParameterType == typeof(Allocator);
-        }
-
-        private static bool HasBurstCompile(MemberInfo member)
-        {
-            return member != null &&
-                member.GetCustomAttributes(typeof(BurstCompileAttribute), inherit: false).Length != 0;
+            return method.GetGenericMethodDefinition() == s_IJobScheduleGenericMethod;
         }
 
         private static string DescribeMethod(MethodInfo method)
@@ -174,15 +182,15 @@ namespace Traffic_Law_Enforcement
             return $"{method.DeclaringType?.FullName}.{method.Name}({parameterList})";
         }
 
-        private static void PublicExecutePrefix()
+        private static void LogScheduleHandoff()
         {
-            if (s_LoggedPublicExecuteFirstHit)
+            if (s_LoggedScheduleFirstHit)
             {
                 return;
             }
 
-            s_LoggedPublicExecuteFirstHit = true;
-            Mod.log.Info("[EXEC-MODEL] firstHit=true");
+            s_LoggedScheduleFirstHit = true;
+            Mod.log.Info("[SCHED-RAW] firstHit=true");
         }
     }
 }
