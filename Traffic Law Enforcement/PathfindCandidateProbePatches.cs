@@ -438,7 +438,7 @@ namespace Traffic_Law_Enforcement
                     {
                         s_Harmony.Patch(
                             addHeapDataMethod,
-                            prefix: new HarmonyMethod(typeof(PathfindCandidateProbePatches), nameof(AddHeapDataNextPrefix)));
+                            prefix: new HarmonyMethod(typeof(PathfindCandidateProbePatches), nameof(AddHeapDataMidBlockShapeTestPrefix)));
                     }
                 }
 
@@ -610,6 +610,29 @@ namespace Traffic_Law_Enforcement
                 edgeDelta,
                 ___m_EndBounds,
                 ___m_HeuristicCostFactor);
+        }
+
+        private static void AddHeapDataMidBlockShapeTestPrefix(
+            EdgeID id,
+            EdgeID id2,
+            PathfindEdge edge,
+            ref float baseCost,
+            PathfindParameters ___m_Parameters,
+            UnsafePathfindData ___m_PathfindData,
+            MethodBase __originalMethod)
+        {
+            long totalHits = System.Threading.Interlocked.Increment(ref s_TotalHits);
+            if (System.Threading.Interlocked.CompareExchange(ref s_LiveFirstHitLogged, 1, 0) == 0)
+            {
+                Mod.log.Info($"{IntersectionProbePrefix} live firstHit=true");
+            }
+
+            if (totalHits > 0 && totalHits % LiveProbeHeartbeatInterval == 0)
+            {
+                Mod.log.Info($"{IntersectionProbePrefix} live totalHits={totalHits}");
+            }
+
+            MaybeLogIntersectionProbeSummary(force: false, totalHitsOverride: totalHits);
         }
 
         private static void AddHeapDataNextPrefix(
@@ -1119,8 +1142,8 @@ namespace Traffic_Law_Enforcement
             Mod.log.Info(
                 $"{IntersectionProbePrefix} state " +
                 $"phase={phase} " +
-                $"mode=unconditional " +
-                $"focusedContextOptional=true " +
+                $"mode=midblock-shaped-minimal " +
+                $"focusedContextOptional=false " +
                 $"isApplied={(s_Harmony != null)}");
         }
 
