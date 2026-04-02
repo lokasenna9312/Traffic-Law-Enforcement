@@ -36,6 +36,8 @@ namespace Traffic_Law_Enforcement
 
                 if (PathfindCandidateProbePatches.IsApplied)
                 {
+                    Mod.log.Info(
+                        $"[IM-AHD-PROBE] disabled reason={BuildDisableReason(enableFocusedRouteDiagnostics)}");
                     PathfindCandidateProbePatches.Remove();
                 }
             }
@@ -57,6 +59,27 @@ namespace Traffic_Law_Enforcement
         internal static void RemoveAll()
         {
             Sync(enableFocusedRouteDiagnostics: false);
+        }
+
+        private static string BuildDisableReason(bool enableFocusedRouteDiagnostics)
+        {
+            bool hasWatchedVehicles = FocusedLoggingService.HasWatchedVehicles;
+            if (!enableFocusedRouteDiagnostics && !hasWatchedVehicles)
+            {
+                return "focused-route-diagnostics=false,no-watched-vehicles";
+            }
+
+            if (!enableFocusedRouteDiagnostics)
+            {
+                return "focused-route-diagnostics=false";
+            }
+
+            if (!hasWatchedVehicles)
+            {
+                return "no-watched-vehicles";
+            }
+
+            return "controller-sync";
         }
     }
 }

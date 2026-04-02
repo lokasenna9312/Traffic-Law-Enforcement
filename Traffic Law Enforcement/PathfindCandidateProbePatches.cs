@@ -351,6 +351,8 @@ namespace Traffic_Law_Enforcement
         private static int s_RequestMatchMissLogCount;
         private static bool s_LoggedFirstWorkerExecuteInvocation;
         private static int s_DetailedIntersectionLikeLogCount;
+        private static int s_DisabledFocusedDiagnosticsLogged;
+        private static int s_DisabledNoWatchedVehiclesLogged;
         private static int s_LiveFirstHitLogged;
         private static long s_TotalHits;
         private static long s_AfterVehicleFilterHits;
@@ -450,6 +452,8 @@ namespace Traffic_Law_Enforcement
                     postfix: new HarmonyMethod(typeof(PathfindCandidateProbePatches), nameof(ReleasePostfix)));
 
                 LogAddHeapDataPatchInfo(s_ExactIntersectionAddHeapDataMethod);
+                LogProbeRuntimeState("apply");
+                LogDisabledReasonIfNeeded("apply");
                 Mod.log.Info(
                     $"{IntersectionProbePrefix} patch applied exact=true");
                 Mod.log.Info(
@@ -500,6 +504,7 @@ namespace Traffic_Law_Enforcement
                 return;
             }
 
+            LogProbeRuntimeState("remove");
             MaybeLogIntersectionProbeSummary(force: true);
             s_Harmony.UnpatchAll(HarmonyId);
             s_Harmony = null;
@@ -557,6 +562,7 @@ namespace Traffic_Law_Enforcement
             if (!EnforcementLoggingPolicy.ShouldLogFocusedRouteRebuildDiagnostics() ||
                 !FocusedLoggingService.HasWatchedVehicles)
             {
+                LogDisabledReasonIfNeeded("worker-execute");
                 return;
             }
 
@@ -917,6 +923,8 @@ namespace Traffic_Law_Enforcement
         private static void ResetIntersectionProbeDiagnostics()
         {
             s_DetailedIntersectionLikeLogCount = 0;
+            s_DisabledFocusedDiagnosticsLogged = 0;
+            s_DisabledNoWatchedVehiclesLogged = 0;
             s_LiveFirstHitLogged = 0;
             s_TotalHits = 0;
             s_AfterVehicleFilterHits = 0;
@@ -1108,6 +1116,39 @@ namespace Traffic_Law_Enforcement
                 $"owners={FormatPatchOwners(patchInfo)} " +
                 $"prefixMethods={FormatPatchMethods(patchInfo?.Prefixes)} " +
                 $"postfixMethods={FormatPatchMethods(patchInfo?.Postfixes)}");
+        }
+
+        private static void LogProbeRuntimeState(string phase)
+        {
+            bool requested = EnforcementLoggingPolicy.EnableFocusedRouteRebuildDiagnosticsLogging;
+            bool effective = EnforcementLoggingPolicy.ShouldLogFocusedRouteRebuildDiagnostics();
+            bool hasWatchedVehicles = FocusedLoggingService.HasWatchedVehicles;
+            Mod.log.Info(
+                $"{IntersectionProbePrefix} state " +
+                $"phase={phase} " +
+                $"requested={requested} " +
+                $"effective={effective} " +
+                $"watchedCount={FocusedLoggingService.WatchedVehicleCount} " +
+                $"hasWatchedVehicles={hasWatchedVehicles} " +
+                $"requestRegistryCount={s_RequestRegistry.Count} " +
+                $"isApplied={(s_Harmony != null)}");
+        }
+
+        private static void LogDisabledReasonIfNeeded(string source)
+        {
+            if (!EnforcementLoggingPolicy.ShouldLogFocusedRouteRebuildDiagnostics() &&
+                System.Threading.Interlocked.CompareExchange(ref s_DisabledFocusedDiagnosticsLogged, 1, 0) == 0)
+            {
+                Mod.log.Info(
+                    $"{IntersectionProbePrefix} disabled reason=focused-route-diagnostics=false source={source}");
+            }
+
+            if (!FocusedLoggingService.HasWatchedVehicles &&
+                System.Threading.Interlocked.CompareExchange(ref s_DisabledNoWatchedVehiclesLogged, 1, 0) == 0)
+            {
+                Mod.log.Info(
+                    $"{IntersectionProbePrefix} disabled reason=no-watched-vehicles source={source}");
+            }
         }
 
         private static MethodInfo FindExactIntersectionAddHeapDataMethod()
