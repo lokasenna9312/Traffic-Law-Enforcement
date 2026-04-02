@@ -1,5 +1,4 @@
 using Game;
-using Game.Common;
 using Game.Net;
 using Game.Vehicles;
 using Unity.Collections;
@@ -185,35 +184,8 @@ namespace Traffic_Law_Enforcement
                 return;
             }
 
-            bool isMidBlockCandidate = false;
-            if (Mod.IsMidBlockCrossingEnforcementEnabled)
-            {
-                EnforcementTraceAutoCaptureService.RecordScan(
-                    EnforcementTraceAutoCaptureService.MidBlockFamily);
-                isMidBlockCandidate = IsMidBlockCandidateTransition(history);
-                if (isMidBlockCandidate)
-                {
-                    EnforcementTraceAutoCaptureService.RecordCandidate(
-                        EnforcementTraceAutoCaptureService.MidBlockFamily,
-                        vehicle);
-                }
-            }
-
             if (TryDetectMidBlockCrossing(history, out LaneTransitionViolationReasonCode reasonCode))
             {
-                if (Mod.IsMidBlockCrossingEnforcementEnabled && !isMidBlockCandidate)
-                {
-                    EnforcementTraceAutoCaptureService.RecordCandidate(
-                        EnforcementTraceAutoCaptureService.MidBlockFamily,
-                        vehicle);
-                }
-
-                if (Mod.IsMidBlockCrossingEnforcementEnabled)
-                {
-                    EnforcementTraceAutoCaptureService.RecordIllegalCandidate(
-                        EnforcementTraceAutoCaptureService.MidBlockFamily,
-                        vehicle);
-                }
                 events.Add(new DetectedLaneTransitionViolation
                 {
                     Vehicle = vehicle,
@@ -225,30 +197,11 @@ namespace Traffic_Law_Enforcement
                 });
             }
 
-            bool isIntersectionCandidate = false;
             bool logIntersectionCandidate =
                 EnforcementLoggingPolicy.ShouldLogVehicleSpecificEnforcementEvent(vehicle) &&
                 Mod.IsIntersectionMovementEnforcementEnabled &&
                 (currentLane.m_LaneFlags & Game.Vehicles.CarLaneFlags.Connection) != 0 &&
                 m_IntersectionTransitionDiagnosticCount < MaxIntersectionTransitionDiagnostics;
-
-            if (Mod.IsIntersectionMovementEnforcementEnabled)
-            {
-                EnforcementTraceAutoCaptureService.RecordScan(
-                    EnforcementTraceAutoCaptureService.IntersectionFamily);
-                isIntersectionCandidate =
-                    TryGetIntersectionCandidateEvaluation(
-                        history,
-                        currentLane,
-                        out _,
-                        out _);
-                if (isIntersectionCandidate)
-                {
-                    EnforcementTraceAutoCaptureService.RecordCandidate(
-                        EnforcementTraceAutoCaptureService.IntersectionFamily,
-                        vehicle);
-                }
-            }
 
             bool hasIntersectionViolation =
                 TryDetectIntersectionMovementViolation(
@@ -282,19 +235,6 @@ namespace Traffic_Law_Enforcement
 
             if (hasIntersectionViolation)
             {
-                if (Mod.IsIntersectionMovementEnforcementEnabled && !isIntersectionCandidate)
-                {
-                    EnforcementTraceAutoCaptureService.RecordCandidate(
-                        EnforcementTraceAutoCaptureService.IntersectionFamily,
-                        vehicle);
-                }
-
-                if (Mod.IsIntersectionMovementEnforcementEnabled)
-                {
-                    EnforcementTraceAutoCaptureService.RecordIllegalCandidate(
-                        EnforcementTraceAutoCaptureService.IntersectionFamily,
-                        vehicle);
-                }
                 events.Add(new DetectedLaneTransitionViolation
                 {
                     Vehicle = vehicle,
@@ -318,84 +258,7 @@ namespace Traffic_Law_Enforcement
                 out reasonCode);
         }
 
-        private bool IsMidBlockCandidateTransition(VehicleLaneHistory history)
-        {
-            Entity sourceLane = history.m_PreviousLane;
-            Entity targetLane = history.m_CurrentLane;
-
-            if (sourceLane == Entity.Null || targetLane == Entity.Null || sourceLane == targetLane)
-            {
-                return false;
-            }
-
-            return IsOppositeFlowSameRoadCandidate(sourceLane, targetLane) ||
-                IsAccessIngressCandidate(sourceLane, targetLane) ||
-                IsAccessEgressCandidate(sourceLane, targetLane);
-        }
-
-        private bool IsOppositeFlowSameRoadCandidate(Entity sourceLane, Entity targetLane)
-        {
-            if (!m_EdgeLaneData.TryGetComponent(sourceLane, out EdgeLane sourceEdgeLane) ||
-                !m_EdgeLaneData.TryGetComponent(targetLane, out EdgeLane targetEdgeLane) ||
-                !m_CarLaneData.TryGetComponent(sourceLane, out CarLane sourceCarLane) ||
-                !m_CarLaneData.TryGetComponent(targetLane, out CarLane targetCarLane))
-            {
-                return false;
-            }
-
-            Entity sourceOwner = TryGetLaneOwner(sourceLane);
-            Entity targetOwner = TryGetLaneOwner(targetLane);
-            bool sameOwner = sourceOwner != Entity.Null && sourceOwner == targetOwner;
-            bool sameCarriageway =
-                sourceCarLane.m_CarriagewayGroup == targetCarLane.m_CarriagewayGroup;
-            return sameOwner &&
-                sameCarriageway &&
-                IsOppositeDirection(sourceEdgeLane, targetEdgeLane);
-        }
-
-        private bool IsAccessIngressCandidate(Entity sourceLane, Entity targetLane)
-        {
-            return m_EdgeLaneData.HasComponent(sourceLane) &&
-                m_CarLaneData.HasComponent(sourceLane) &&
-                IsAccessOrigin(targetLane);
-        }
-
-        private bool IsAccessEgressCandidate(Entity sourceLane, Entity targetLane)
-        {
-            return IsAccessOrigin(sourceLane) &&
-                m_EdgeLaneData.HasComponent(targetLane) &&
-                m_CarLaneData.HasComponent(targetLane);
-        }
-
-        private Entity TryGetLaneOwner(Entity lane)
-        {
-            if (!EntityManager.HasComponent<Owner>(lane))
-            {
-                return Entity.Null;
-            }
-
-            return EntityManager.GetComponentData<Owner>(lane).m_Owner;
-        }
-
         private bool TryDetectIntersectionMovementViolation(VehicleLaneHistory history, CarCurrentLane currentLane, out LaneMovement actualMovement, out LaneMovement allowedMovement)
-        {
-            if (!TryGetIntersectionCandidateEvaluation(
-                    history,
-                    currentLane,
-                    out actualMovement,
-                    out allowedMovement))
-            {
-                return false;
-            }
-
-            return (allowedMovement & actualMovement) == LaneMovement.None;
-        }
-
-        private bool TryGetIntersectionCandidateEvaluation(
-            VehicleLaneHistory history,
-            CarCurrentLane currentLane,
-            out LaneMovement actualMovement,
-            out LaneMovement allowedMovement)
         {
             actualMovement = LaneMovement.None;
             allowedMovement = LaneMovement.None;
@@ -405,29 +268,13 @@ namespace Traffic_Law_Enforcement
                 return false;
             }
 
-            if (!m_ConnectionLaneData.TryGetComponent(history.m_CurrentLane, out ConnectionLane connectionLane))
-            {
-                return false;
-            }
-
-            bool isRoadIntersectionConnection =
-                (connectionLane.m_Flags & ConnectionLaneFlags.Road) != 0 &&
-                (connectionLane.m_Flags & ConnectionLaneFlags.Parking) == 0;
-            if (!isRoadIntersectionConnection)
-            {
-                return false;
-            }
-
-            if (!m_CarLaneData.TryGetComponent(history.m_PreviousLane, out CarLane sourceCarLane) ||
-                !m_CarLaneData.TryGetComponent(history.m_CurrentLane, out CarLane targetCarLane))
-            {
-                return false;
-            }
-
-            actualMovement = GetMovement(targetCarLane.m_Flags);
-            allowedMovement = GetMovement(sourceCarLane.m_Flags);
-            return actualMovement != LaneMovement.None &&
-                allowedMovement != LaneMovement.None;
+            return IntersectionMovementPolicy.TryGetIllegalIntersectionMovement(
+                m_ConnectionLaneData,
+                m_CarLaneData,
+                history.m_PreviousLane,
+                history.m_CurrentLane,
+                out actualMovement,
+                out allowedMovement);
         }
 
         private static bool IsOppositeDirection(EdgeLane previousLane, EdgeLane currentLane)

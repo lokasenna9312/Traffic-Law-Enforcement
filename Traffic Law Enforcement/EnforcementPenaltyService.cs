@@ -42,16 +42,6 @@ namespace Traffic_Law_Enforcement
             return EnforcementGameplaySettingsService.Current.GetEffectiveIntersectionMovementFineAmount();
         }
 
-        public static int GetAppliedFine(string kind, Entity vehicle)
-        {
-            if (!IsEnforcementKindEnabled(kind))
-            {
-                return 0;
-            }
-
-            return ApplyRepeatOffenderPenalty(kind, GetBaseFine(kind), vehicle.Index);
-        }
-
         public static int ApplyRepeatOffenderPenalty(string kind, int baseFine, int vehicleId)
         {
             RepeatOffenderPolicy policy = GetRepeatOffenderPolicy(kind);
@@ -139,21 +129,6 @@ namespace Traffic_Law_Enforcement
             EnforcementTelemetry.RecordFine(kind, vehicle.Index, lane.Index, adjustedFine, adjustedReason);
             EnforcementPolicyImpactService.RecordActualViolation(kind, adjustedFine, vehicle.Index);
             EnforcementFineMoneyService.EnqueueCharge(vehicle, adjustedFine, kind);
-        }
-
-        private static int GetBaseFine(string kind)
-        {
-            switch (kind)
-            {
-                case EnforcementKinds.PublicTransportLane:
-                    return GetPublicTransportLaneFine();
-                case EnforcementKinds.MidBlockCrossing:
-                    return GetMidBlockCrossingFine();
-                case EnforcementKinds.IntersectionMovement:
-                    return GetIntersectionMovementFine();
-                default:
-                    return 0;
-            }
         }
 
         private static RepeatOffenderPolicy GetRepeatOffenderPolicy(string kind)

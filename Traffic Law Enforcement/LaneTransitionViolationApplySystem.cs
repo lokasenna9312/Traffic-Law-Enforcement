@@ -84,21 +84,11 @@ namespace Traffic_Law_Enforcement
                         statisticsChanged = true;
 
                         string reason = FormatMidBlockReason(evt.ReasonCode);
-                        int appliedPenalty = EnforcementPenaltyService.GetAppliedFine(
-                            EnforcementKinds.MidBlockCrossing,
-                            evt.Vehicle);
 
                         EnforcementPenaltyService.RecordMidBlockCrossingViolation(
                             evt.Vehicle,
                             evt.Lane,
                             reason);
-                        if (Mod.IsMidBlockCrossingEnforcementEnabled)
-                        {
-                            EnforcementTraceAutoCaptureService.RecordApplied(
-                                EnforcementTraceAutoCaptureService.MidBlockFamily,
-                                evt.Vehicle,
-                                appliedPenalty);
-                        }
 
                         if (EnforcementLoggingPolicy.ShouldLogVehicleSpecificEnforcementEvent(evt.Vehicle))
                         {
@@ -116,21 +106,11 @@ namespace Traffic_Law_Enforcement
 
                         string reason =
                             $"actual {evt.ActualMovement}, allowed {evt.AllowedMovement}";
-                        int appliedPenalty = EnforcementPenaltyService.GetAppliedFine(
-                            EnforcementKinds.IntersectionMovement,
-                            evt.Vehicle);
 
                         EnforcementPenaltyService.RecordIntersectionMovementViolation(
                             evt.Vehicle,
                             evt.Lane,
                             reason);
-                        if (Mod.IsIntersectionMovementEnforcementEnabled)
-                        {
-                            EnforcementTraceAutoCaptureService.RecordApplied(
-                                EnforcementTraceAutoCaptureService.IntersectionFamily,
-                                evt.Vehicle,
-                                appliedPenalty);
-                        }
 
                         if (EnforcementLoggingPolicy.ShouldLogVehicleSpecificEnforcementEvent(evt.Vehicle))
                         {
