@@ -13,15 +13,15 @@ namespace Traffic_Law_Enforcement
     {
         private const string HarmonyId =
             "Traffic_Law_Enforcement.MidBlockAccessPathfindingPenaltyPatches";
-        internal const string MbAhdRawBuildFingerprint = "mb-ahd-raw-2026-04-02-11-34";
+        internal const string MbAhdRawBuildFingerprint = "mb-access-ahd-2026-04-02-21-28";
+        private const string DirectAccessHitLogPrefix = "[MB-ACCESS-AHD-HIT]";
 
         private static readonly Type s_PathfindExecutorType =
             AccessTools.Inner(typeof(PathfindJobs), "PathfindExecutor");
 
         private static Harmony s_Harmony;
         private static MethodInfo s_TargetMethod;
-        private static int s_LogCount;
-        private static bool s_LoggedRawFirstHit;
+        private static int s_DirectAccessHitLogged;
 
         internal static bool IsApplied => s_Harmony != null && s_TargetMethod != null;
 
@@ -52,13 +52,12 @@ namespace Traffic_Law_Enforcement
                 }
 
                 s_Harmony = new Harmony(HarmonyId);
-                s_LogCount = 0;
-                s_LoggedRawFirstHit = false;
-                HarmonyMethod postfix =
+                s_DirectAccessHitLogged = 0;
+                HarmonyMethod prefix =
                     new HarmonyMethod(
                         typeof(MidBlockAccessPathfindingPenaltyPatches),
                         nameof(AddHeapDataPrefix));
-                s_Harmony.Patch(s_TargetMethod, prefix: postfix);
+                s_Harmony.Patch(s_TargetMethod, prefix: prefix);
                 LogPatchInfo(s_TargetMethod);
 
                 Mod.log.Info(
@@ -81,8 +80,7 @@ namespace Traffic_Law_Enforcement
             s_Harmony.UnpatchAll(HarmonyId);
             s_Harmony = null;
             s_TargetMethod = null;
-            s_LogCount = 0;
-            s_LoggedRawFirstHit = false;
+            s_DirectAccessHitLogged = 0;
         }
 
         private static MethodInfo FindTransitionExpansionMethod()
@@ -230,20 +228,12 @@ namespace Traffic_Law_Enforcement
         }
 
         private static void AddHeapDataPrefix(
-            EdgeID id,
             EdgeID id2,
             Edge edge,
             ref float baseCost,
             PathfindParameters ___m_Parameters,
-            UnsafePathfindData ___m_PathfindData,
-            MethodBase __originalMethod)
+            UnsafePathfindData ___m_PathfindData)
         {
-            if (!s_LoggedRawFirstHit)
-            {
-                s_LoggedRawFirstHit = true;
-                Mod.log.Info("[MB-AHD-RAW] firstHit=true");
-            }
-
             if (!Mod.IsMidBlockCrossingEnforcementEnabled)
             {
                 return;
@@ -278,6 +268,8 @@ namespace Traffic_Law_Enforcement
                 return;
             }
 
+            MaybeLogDirectAccessHit(sourceLane, targetLane, reasonCode);
+
             int penalty = EnforcementPenaltyService.GetMidBlockCrossingFine();
             if (penalty <= 0)
             {
@@ -286,18 +278,29 @@ namespace Traffic_Law_Enforcement
 
             float addedCost = penalty * moneyWeight;
             baseCost += addedCost;
+        }
 
-            if (EnforcementLoggingPolicy.ShouldLogPathfindingPenaltyDiagnostics() &&
-                s_LogCount < 16)
+        private static void MaybeLogDirectAccessHit(
+            Entity sourceLane,
+            Entity targetLane,
+            LaneTransitionViolationReasonCode reasonCode)
+        {
+            if (!MidBlockCrossingPolicy.IsAccessTransitionReason(reasonCode))
             {
-                s_LogCount += 1;
-                Mod.log.Info(
-                    $"Mid-block access pre-penalty applied: method={__originalMethod?.Name}, " +
-                    $"edgeId={id.m_Index}, nextEdgeId={id2.m_Index}, " +
-                    $"sourceLane={sourceLane}, targetLane={targetLane}, " +
-                    $"reason={RoutePenaltyInspection.FormatMidBlockReasonTag(reasonCode)}, " +
-                    $"moneyWeight={moneyWeight:0.###}, addedCost={addedCost:0.###}");
+                return;
             }
+
+            if (System.Threading.Interlocked.Exchange(ref s_DirectAccessHitLogged, 1) != 0)
+            {
+                return;
+            }
+
+            string tag = $"mid-block({RoutePenaltyInspection.FormatMidBlockReasonTag(reasonCode)})";
+            Mod.log.Info(
+                $"{DirectAccessHitLogPrefix} firstHit=true " +
+                $"reason={reasonCode} tag={tag} " +
+                $"sourceLane={RoutePenaltyInspection.FormatEntity(sourceLane)} " +
+                $"targetLane={RoutePenaltyInspection.FormatEntity(targetLane)}");
         }
     }
 }
