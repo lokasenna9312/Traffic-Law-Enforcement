@@ -1143,6 +1143,18 @@ namespace Traffic_Law_Enforcement
             return true;
         }
 
+        private static bool AreInspectionTagSnapshotsEqual(
+            RoutePenaltyInspectionResult previousInspection,
+            RoutePenaltyInspectionResult currentInspection)
+        {
+            return AreTagSnapshotsEqual(
+                       previousInspection.TagSnapshot,
+                       currentInspection.TagSnapshot) &&
+                AreTagSnapshotsEqual(
+                    previousInspection.NormalizedTagSnapshot,
+                    currentInspection.NormalizedTagSnapshot);
+        }
+
         private static bool IsLowValueNonWatchedRouteSelectionChange(
             RouteSelectionChangeSnapshot previousSnapshot,
             RouteSelectionChangeSnapshot currentSnapshot,
@@ -1169,9 +1181,9 @@ namespace Traffic_Law_Enforcement
                 previousSnapshot.Inspection.TotalPenalty == currentSnapshot.Inspection.TotalPenalty;
 
             bool tagsUnchanged =
-                AreTagSnapshotsEqual(
-                    previousSnapshot.Inspection.TagSnapshot,
-                    currentSnapshot.Inspection.TagSnapshot);
+                AreInspectionTagSnapshotsEqual(
+                    previousSnapshot.Inspection,
+                    currentSnapshot.Inspection);
 
             bool existingLowValueCase =
                 routeEndpointsUnchanged &&
@@ -1188,8 +1200,12 @@ namespace Traffic_Law_Enforcement
                 currentSnapshot.Inspection.TotalPenalty == 0 &&
                 previousSnapshot.Inspection.TagSnapshot.Count == 0 &&
                 currentSnapshot.Inspection.TagSnapshot.Count == 0 &&
+                previousSnapshot.Inspection.NormalizedTagSnapshot.Count == 0 &&
+                currentSnapshot.Inspection.NormalizedTagSnapshot.Count == 0 &&
                 previousSnapshot.Inspection.TagSnapshot.OmittedCount == 0 &&
-                currentSnapshot.Inspection.TagSnapshot.OmittedCount == 0;
+                currentSnapshot.Inspection.TagSnapshot.OmittedCount == 0 &&
+                previousSnapshot.Inspection.NormalizedTagSnapshot.OmittedCount == 0 &&
+                currentSnapshot.Inspection.NormalizedTagSnapshot.OmittedCount == 0;
 
             bool acceptedResultRebuildChurn =
                 previousSnapshot.HasPathOwner != currentSnapshot.HasPathOwner ||
@@ -1249,6 +1265,12 @@ namespace Traffic_Law_Enforcement
             string currentTags =
                 RoutePenaltyInspection.BuildTagSummary(
                     currentSnapshot.Inspection.TagSnapshot);
+            string previousNormalizedTags =
+                RoutePenaltyInspection.BuildTagSummary(
+                    previousSnapshot.Inspection.NormalizedTagSnapshot);
+            string currentNormalizedTags =
+                RoutePenaltyInspection.BuildTagSummary(
+                    currentSnapshot.Inspection.NormalizedTagSnapshot);
 
             string message =
                 $"Route selection change: vehicle={vehicle}, role={role}, focusedWatch={focusedWatch}, reasons={reasons}, " +
@@ -1261,7 +1283,8 @@ namespace Traffic_Law_Enforcement
                 $"acceptedPathHash={FormatHashChange(previousSnapshot.AcceptedPathHash, currentSnapshot.AcceptedPathHash)}, " +
                 $"acceptedResultHash={FormatHashChange(previousSnapshot.AcceptedResultHash, currentSnapshot.AcceptedResultHash)}, " +
                 $"plannedPenalty={previousSnapshot.Inspection.TotalPenalty} [{previousBreakdown}] -> {currentSnapshot.Inspection.TotalPenalty} [{currentBreakdown}], " +
-                $"tags={previousTags} -> {currentTags}";
+                $"tags={previousTags} -> {currentTags}, " +
+                $"normalizedTags={previousNormalizedTags} -> {currentNormalizedTags}";
 
             EnforcementTelemetry.RecordEvent(message);
             Mod.log.Info(message);
@@ -2921,6 +2944,10 @@ namespace Traffic_Law_Enforcement
                 RoutePenaltyInspection.BuildTagSummary(previousSnapshot.TagSnapshot);
             string currentTags =
                 RoutePenaltyInspection.BuildTagSummary(currentSnapshot.TagSnapshot);
+            string previousNormalizedTags =
+                RoutePenaltyInspection.BuildTagSummary(previousSnapshot.NormalizedTagSnapshot);
+            string currentNormalizedTags =
+                RoutePenaltyInspection.BuildTagSummary(currentSnapshot.NormalizedTagSnapshot);
 
             string comparisonMode = allowPublicTransportLaneComparison
                 ? "full"
@@ -2931,7 +2958,8 @@ namespace Traffic_Law_Enforcement
                 $"avoidedPenalty={avoidedPenalty}, " +
                 $"fromPenalty={previousComparablePenalty} [{previousComparableBreakdown}], " +
                 $"toPenalty={currentComparablePenalty} [{currentComparableBreakdown}], " +
-                $"fromTags={previousTags}, toTags={currentTags}";
+                $"fromTags={previousTags}, toTags={currentTags}, " +
+                $"fromNormalizedTags={previousNormalizedTags}, toNormalizedTags={currentNormalizedTags}";
 
             EnforcementTelemetry.RecordEvent(message);
             Mod.log.Info(message);
