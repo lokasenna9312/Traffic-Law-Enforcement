@@ -140,6 +140,16 @@ namespace Traffic_Law_Enforcement
             Garage = 2,
         }
 
+        private enum AccessWindowBlockedReason : byte
+        {
+            None = 0,
+            NoThreeLaneWindowInCurrentSequence = 1,
+            NoAccessConnectionInCurrentSequence = 2,
+            MiddleRoadConnectionExcluded = 3,
+            MissingExplicitEndpoint = 4,
+            ExactAnchorPairNotIllegal = 5,
+        }
+
         private struct RoutePenaltyTagCollector
         {
             public int Count;
@@ -354,6 +364,59 @@ namespace Traffic_Law_Enforcement
             }
 
             return summary.ToString();
+        }
+
+        // Diagnostic-only summary of what the current inspection lane sequence
+        // contains for exact and normalized illegal-access evidence.
+        internal static string BuildFocusedAccessWindowDiagnostic(
+            Entity vehicle,
+            Entity currentLane,
+            DynamicBuffer<CarNavigationLane> navigationLanes,
+            bool hasNavigationLanes,
+            ref RoutePenaltyInspectionContext context)
+        {
+            List<Entity> laneSequence =
+                BuildLaneSequence(currentLane, navigationLanes, hasNavigationLanes);
+
+            FindFirstExactIllegalAccessPair(
+                laneSequence,
+                out Entity exactSource,
+                out Entity exactTarget,
+                out LaneTransitionViolationReasonCode exactReasonCode,
+                ref context);
+
+            AccessWindowBlockedReason blockedReason =
+                FindFirstNormalizedAccessWindow(
+                    laneSequence,
+                    out Entity normalizedPrevious,
+                    out Entity normalizedCurrent,
+                    out Entity normalizedNext,
+                    out LaneTransitionViolationReasonCode normalizedReasonCode,
+                    out Entity blockedPrevious,
+                    out Entity blockedCurrent,
+                    out Entity blockedNext,
+                    ref context);
+
+            string exactFirst =
+                exactReasonCode == LaneTransitionViolationReasonCode.None
+                    ? "none"
+                    : $"{FormatEntity(exactSource)}->{FormatEntity(exactTarget)}:{exactReasonCode}";
+
+            string normalizedFirst =
+                normalizedReasonCode == LaneTransitionViolationReasonCode.None
+                    ? "none"
+                    : $"{FormatEntity(normalizedPrevious)}->{FormatEntity(normalizedCurrent)}->{FormatEntity(normalizedNext)}:{normalizedReasonCode}";
+
+            string normalizedBlocked =
+                normalizedReasonCode != LaneTransitionViolationReasonCode.None
+                    ? "none"
+                    : FormatBlockedReason(blockedReason, blockedPrevious, blockedCurrent, blockedNext);
+
+            return
+                $"[FOCUSED_ACCESS_WINDOW] vehicle={vehicle}, " +
+                $"exactFirst={exactFirst}, " +
+                $"normalizedFirst={normalizedFirst}, " +
+                $"normalizedBlocked={normalizedBlocked}";
         }
 
         internal static bool TryResolveAllowedOnPublicTransportLane(
@@ -752,6 +815,221 @@ namespace Traffic_Law_Enforcement
             }
 
             laneSequence.Add(lane);
+        }
+
+        private static void FindFirstExactIllegalAccessPair(
+            List<Entity> laneSequence,
+            out Entity sourceLane,
+            out Entity targetLane,
+            out LaneTransitionViolationReasonCode reasonCode,
+            ref RoutePenaltyInspectionContext context)
+        {
+            sourceLane = Entity.Null;
+            targetLane = Entity.Null;
+            reasonCode = LaneTransitionViolationReasonCode.None;
+
+            for (int index = 1; index < laneSequence.Count; index += 1)
+            {
+                Entity previousLane = laneSequence[index - 1];
+                Entity currentLane = laneSequence[index];
+
+                if (!MidBlockCrossingPolicy.TryGetIllegalAccessTransition(
+                        context.EntityManager,
+                        previousLane,
+                        currentLane,
+                        out LaneTransitionViolationReasonCode exactReasonCode))
+                {
+                    continue;
+                }
+
+                sourceLane = previousLane;
+                targetLane = currentLane;
+                reasonCode = exactReasonCode;
+                return;
+            }
+        }
+
+        private static AccessWindowBlockedReason FindFirstNormalizedAccessWindow(
+            List<Entity> laneSequence,
+            out Entity previousLane,
+            out Entity currentLane,
+            out Entity nextLane,
+            out LaneTransitionViolationReasonCode reasonCode,
+            out Entity blockedPreviousLane,
+            out Entity blockedCurrentLane,
+            out Entity blockedNextLane,
+            ref RoutePenaltyInspectionContext context)
+        {
+            previousLane = Entity.Null;
+            currentLane = Entity.Null;
+            nextLane = Entity.Null;
+            reasonCode = LaneTransitionViolationReasonCode.None;
+            blockedPreviousLane = Entity.Null;
+            blockedCurrentLane = Entity.Null;
+            blockedNextLane = Entity.Null;
+
+            if (laneSequence.Count < 3)
+            {
+                return AccessWindowBlockedReason.NoThreeLaneWindowInCurrentSequence;
+            }
+
+            bool sawAccessConnection = false;
+            AccessWindowBlockedReason firstBlockedReason = AccessWindowBlockedReason.None;
+
+            for (int index = 1; index + 1 < laneSequence.Count; index += 1)
+            {
+                Entity candidatePreviousLane = laneSequence[index - 1];
+                Entity candidateCurrentLane = laneSequence[index];
+                Entity candidateNextLane = laneSequence[index + 1];
+
+                if (!context.ConnectionLaneData.TryGetComponent(
+                        candidateCurrentLane,
+                        out _))
+                {
+                    continue;
+                }
+
+                sawAccessConnection = true;
+
+                if (!TryGetNormalizableAccessConnectionKind(
+                        candidateCurrentLane,
+                        out NormalizedAccessConnectionKind connectionKind,
+                        ref context))
+                {
+                    RecordBlockedWindow(
+                        ref firstBlockedReason,
+                        AccessWindowBlockedReason.MiddleRoadConnectionExcluded,
+                        candidatePreviousLane,
+                        candidateCurrentLane,
+                        candidateNextLane,
+                        ref blockedPreviousLane,
+                        ref blockedCurrentLane,
+                        ref blockedNextLane);
+                    continue;
+                }
+
+                bool previousIsRoad =
+                    IsRoadLane(candidatePreviousLane, ref context);
+                bool nextIsRoad =
+                    IsRoadLane(candidateNextLane, ref context);
+                bool previousIsExplicitEndpoint =
+                    TryGetExplicitAccessEndpointKind(
+                        candidatePreviousLane,
+                        out _,
+                        ref context);
+                bool nextIsExplicitEndpoint =
+                    TryGetExplicitAccessEndpointKind(
+                        candidateNextLane,
+                        out _,
+                        ref context);
+
+                if (TryNormalizeAccessIngress(
+                        candidatePreviousLane,
+                        candidateCurrentLane,
+                        candidateNextLane,
+                        connectionKind,
+                        out reasonCode,
+                        ref context))
+                {
+                    previousLane = candidatePreviousLane;
+                    currentLane = candidateCurrentLane;
+                    nextLane = candidateNextLane;
+                    return AccessWindowBlockedReason.None;
+                }
+
+                if (TryNormalizeAccessEgress(
+                        candidatePreviousLane,
+                        candidateCurrentLane,
+                        candidateNextLane,
+                        connectionKind,
+                        out reasonCode,
+                        ref context))
+                {
+                    previousLane = candidatePreviousLane;
+                    currentLane = candidateCurrentLane;
+                    nextLane = candidateNextLane;
+                    return AccessWindowBlockedReason.None;
+                }
+
+                if ((previousIsRoad && nextIsExplicitEndpoint) ||
+                    (previousIsExplicitEndpoint && nextIsRoad))
+                {
+                    RecordBlockedWindow(
+                        ref firstBlockedReason,
+                        AccessWindowBlockedReason.ExactAnchorPairNotIllegal,
+                        candidatePreviousLane,
+                        candidateCurrentLane,
+                        candidateNextLane,
+                        ref blockedPreviousLane,
+                        ref blockedCurrentLane,
+                        ref blockedNextLane);
+                    continue;
+                }
+
+                RecordBlockedWindow(
+                    ref firstBlockedReason,
+                    AccessWindowBlockedReason.MissingExplicitEndpoint,
+                    candidatePreviousLane,
+                    candidateCurrentLane,
+                    candidateNextLane,
+                    ref blockedPreviousLane,
+                    ref blockedCurrentLane,
+                    ref blockedNextLane);
+            }
+
+            if (!sawAccessConnection)
+            {
+                return AccessWindowBlockedReason.NoAccessConnectionInCurrentSequence;
+            }
+
+            return firstBlockedReason == AccessWindowBlockedReason.None
+                ? AccessWindowBlockedReason.NoAccessConnectionInCurrentSequence
+                : firstBlockedReason;
+        }
+
+        private static void RecordBlockedWindow(
+            ref AccessWindowBlockedReason firstBlockedReason,
+            AccessWindowBlockedReason candidateReason,
+            Entity candidatePreviousLane,
+            Entity candidateCurrentLane,
+            Entity candidateNextLane,
+            ref Entity blockedPreviousLane,
+            ref Entity blockedCurrentLane,
+            ref Entity blockedNextLane)
+        {
+            if (firstBlockedReason != AccessWindowBlockedReason.None)
+            {
+                return;
+            }
+
+            firstBlockedReason = candidateReason;
+            blockedPreviousLane = candidatePreviousLane;
+            blockedCurrentLane = candidateCurrentLane;
+            blockedNextLane = candidateNextLane;
+        }
+
+        private static string FormatBlockedReason(
+            AccessWindowBlockedReason blockedReason,
+            Entity previousLane,
+            Entity currentLane,
+            Entity nextLane)
+        {
+            if (blockedReason == AccessWindowBlockedReason.None)
+            {
+                return "none";
+            }
+
+            string reasonText = blockedReason.ToString();
+            if (previousLane == Entity.Null ||
+                currentLane == Entity.Null ||
+                nextLane == Entity.Null)
+            {
+                return reasonText;
+            }
+
+            return
+                $"{reasonText}@" +
+                $"{FormatEntity(previousLane)}->{FormatEntity(currentLane)}->{FormatEntity(nextLane)}";
         }
 
         // Patch 2 keeps exact-pair legality in MidBlockCrossingPolicy and adds a

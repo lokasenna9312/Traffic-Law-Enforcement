@@ -1306,6 +1306,13 @@ namespace Traffic_Law_Enforcement
                 EnforcementTelemetry.RecordEvent(transitionPreviewMessage);
                 Mod.log.Info(transitionPreviewMessage);
 
+                string accessWindowMessage =
+                    BuildFocusedAccessWindowPreview(
+                        vehicle,
+                        currentSnapshot);
+                EnforcementTelemetry.RecordEvent(accessWindowMessage);
+                Mod.log.Info(accessWindowMessage);
+
                 string nameResolutionMessage =
                     BuildFocusedLaneNameResolutionPreview(
                         vehicle,
@@ -1675,6 +1682,22 @@ namespace Traffic_Law_Enforcement
                 $"targetStartLane={FormatEntityOrNone(targetStartLane)}, " +
                 $"targetEndLane={FormatEntityOrNone(targetEndLane)}, " +
                 $"chosenTransitions={transitionSummary}";
+        }
+
+        private string BuildFocusedAccessWindowPreview(
+            Entity vehicle,
+            RouteSelectionChangeSnapshot currentSnapshot)
+        {
+            bool hasNavigationLanes =
+                m_NavigationLaneData.TryGetBuffer(vehicle, out DynamicBuffer<CarNavigationLane> navigationLanes);
+
+            RoutePenaltyInspectionContext context = CreateInspectionContext();
+            return RoutePenaltyInspection.BuildFocusedAccessWindowDiagnostic(
+                vehicle,
+                currentSnapshot.CurrentLane,
+                navigationLanes,
+                hasNavigationLanes,
+                ref context);
         }
 
         private string BuildFocusedLaneNameResolutionPreview(
