@@ -9,6 +9,18 @@ namespace Traffic_Law_Enforcement
 {
     public partial class LaneTransitionViolationSystem : GameSystemBase
     {
+        private enum OppositeFlowNearMissReason : byte
+        {
+            None = 0,
+            MissingPreviousEdgeLane = 1,
+            MissingCurrentEdgeLane = 2,
+            MissingPreviousCarLane = 3,
+            MissingCurrentCarLane = 4,
+            DifferentOwner = 5,
+            NotOppositeDirection = 6,
+            DifferentCarriagewayGroup = 7,
+        }
+
         private EntityQuery m_CarQuery;
         private EntityQuery m_ChangedTransitionQuery;
         private EntityQuery m_EventBufferQuery;
@@ -184,6 +196,8 @@ namespace Traffic_Law_Enforcement
                 return;
             }
 
+            MaybeLogRealizedOppositeFlowNearMiss(vehicle, history);
+
             if (TryDetectMidBlockCrossing(history, out LaneTransitionViolationReasonCode reasonCode))
             {
                 MaybeLogRealizedOppositeFlowDetection(vehicle, history, reasonCode);
@@ -247,6 +261,48 @@ namespace Traffic_Law_Enforcement
                     AllowedMovement = allowedMovement,
                 });
             }
+        }
+
+        // Debug-only realized-path instrumentation for opposite-flow exact-pair
+        // failures. This is emitted only when a realized transition is processed
+        // and the pair does not satisfy current OppositeFlowSameRoadSegment rules.
+        private void MaybeLogRealizedOppositeFlowNearMiss(
+            Entity vehicle,
+            VehicleLaneHistory history)
+        {
+            if (!EnforcementLoggingPolicy.ShouldLogVehicleSpecificEnforcementEvent(vehicle) ||
+                !TryGetOppositeFlowNearMissReason(history, out OppositeFlowNearMissReason failReason))
+            {
+                return;
+            }
+
+            int previousCarriagewayGroup =
+                TryGetCarriagewayGroup(history.m_PreviousLane, out ushort previousGroup)
+                    ? previousGroup
+                    : -1;
+            int currentCarriagewayGroup =
+                TryGetCarriagewayGroup(history.m_CurrentLane, out ushort currentGroup)
+                    ? currentGroup
+                    : -1;
+
+            int previousDirectionSign = GetDirectionSign(history.m_PreviousLane);
+            int currentDirectionSign = GetDirectionSign(history.m_CurrentLane);
+
+            string message =
+                "[OPPFLOW_REALIZED_NEARMISS] " +
+                $"vehicle={vehicle} " +
+                $"vehicleId={FocusedLoggingService.FormatEntity(vehicle)} " +
+                $"previousLane={FocusedLoggingService.FormatEntity(history.m_PreviousLane)} " +
+                $"currentLane={FocusedLoggingService.FormatEntity(history.m_CurrentLane)} " +
+                $"previousOwner={FocusedLoggingService.FormatEntity(history.m_PreviousLaneOwner)} " +
+                $"currentOwner={FocusedLoggingService.FormatEntity(history.m_CurrentLaneOwner)} " +
+                $"previousCarriagewayGroup={previousCarriagewayGroup} " +
+                $"currentCarriagewayGroup={currentCarriagewayGroup} " +
+                $"previousDirectionSign={previousDirectionSign} " +
+                $"currentDirectionSign={currentDirectionSign} " +
+                $"failReason={failReason}";
+
+            EnforcementLoggingPolicy.RecordEnforcementEvent(message, vehicle);
         }
 
         private bool TryDetectMidBlockCrossing(
@@ -333,6 +389,61 @@ namespace Traffic_Law_Enforcement
             }
 
             return 0;
+        }
+
+        private bool TryGetOppositeFlowNearMissReason(
+            VehicleLaneHistory history,
+            out OppositeFlowNearMissReason failReason)
+        {
+            failReason = OppositeFlowNearMissReason.None;
+
+            if (!m_EdgeLaneData.HasComponent(history.m_PreviousLane))
+            {
+                failReason = OppositeFlowNearMissReason.MissingPreviousEdgeLane;
+                return true;
+            }
+
+            if (!m_EdgeLaneData.HasComponent(history.m_CurrentLane))
+            {
+                failReason = OppositeFlowNearMissReason.MissingCurrentEdgeLane;
+                return true;
+            }
+
+            if (!m_CarLaneData.TryGetComponent(history.m_PreviousLane, out CarLane previousCarLane))
+            {
+                failReason = OppositeFlowNearMissReason.MissingPreviousCarLane;
+                return true;
+            }
+
+            if (!m_CarLaneData.TryGetComponent(history.m_CurrentLane, out CarLane currentCarLane))
+            {
+                failReason = OppositeFlowNearMissReason.MissingCurrentCarLane;
+                return true;
+            }
+
+            if (history.m_PreviousLaneOwner == Entity.Null ||
+                history.m_PreviousLaneOwner != history.m_CurrentLaneOwner)
+            {
+                failReason = OppositeFlowNearMissReason.DifferentOwner;
+                return true;
+            }
+
+            int previousDirectionSign = GetDirectionSign(history.m_PreviousLane);
+            int currentDirectionSign = GetDirectionSign(history.m_CurrentLane);
+
+            if (previousDirectionSign * currentDirectionSign >= 0)
+            {
+                failReason = OppositeFlowNearMissReason.NotOppositeDirection;
+                return true;
+            }
+
+            if (previousCarLane.m_CarriagewayGroup != currentCarLane.m_CarriagewayGroup)
+            {
+                failReason = OppositeFlowNearMissReason.DifferentCarriagewayGroup;
+                return true;
+            }
+
+            return false;
         }
 
         private bool TryDetectIntersectionMovementViolation(VehicleLaneHistory history, CarCurrentLane currentLane, out LaneMovement actualMovement, out LaneMovement allowedMovement)
