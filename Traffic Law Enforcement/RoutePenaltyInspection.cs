@@ -415,7 +415,7 @@ namespace Traffic_Law_Enforcement
                     : FormatBlockedReason(blockedReason, blockedPrevious, blockedCurrent, blockedNext);
 
             return
-                $"[FOCUSED_ACCESS_WINDOW] vehicle={vehicle}, " +
+                $"[FOCUSED_ACCESS_WINDOW] vehicle={FormatEntity(vehicle)}, " +
                 $"exactFirst={exactFirst}, " +
                 $"normalizedFirst={normalizedFirst}, " +
                 $"normalizedBlocked={normalizedBlocked}";

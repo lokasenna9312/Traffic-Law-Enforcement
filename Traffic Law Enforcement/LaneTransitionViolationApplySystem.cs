@@ -106,7 +106,10 @@ namespace Traffic_Law_Enforcement
                         if (EnforcementLoggingPolicy.ShouldLogVehicleSpecificEnforcementEvent(evt.Vehicle))
                         {
                             string message =
-                                $"Mid-block crossing violation #{statistics.m_MidBlockCrossingViolationCount}: vehicle={evt.Vehicle}, lane={evt.Lane}, reason={reason}";
+                                $"Mid-block crossing violation #{statistics.m_MidBlockCrossingViolationCount}: " +
+                                $"vehicle={FocusedLoggingService.FormatEntity(evt.Vehicle)}, " +
+                                $"lane={FocusedLoggingService.FormatEntity(evt.Lane)}, " +
+                                $"reason={reason}";
                             EnforcementLoggingPolicy.RecordEnforcementEvent(message, evt.Vehicle);
                         }
                         break;
@@ -128,7 +131,10 @@ namespace Traffic_Law_Enforcement
                         if (EnforcementLoggingPolicy.ShouldLogVehicleSpecificEnforcementEvent(evt.Vehicle))
                         {
                             string message =
-                                $"Intersection movement violation #{statistics.m_IntersectionMovementViolationCount}: vehicle={evt.Vehicle}, lane={evt.Lane}, actual={evt.ActualMovement}, allowed={evt.AllowedMovement}";
+                                $"Intersection movement violation #{statistics.m_IntersectionMovementViolationCount}: " +
+                                $"vehicle={FocusedLoggingService.FormatEntity(evt.Vehicle)}, " +
+                                $"lane={FocusedLoggingService.FormatEntity(evt.Lane)}, " +
+                                $"actual={evt.ActualMovement}, allowed={evt.AllowedMovement}";
                             EnforcementLoggingPolicy.RecordEnforcementEvent(message, evt.Vehicle);
                         }
                         break;
@@ -197,8 +203,7 @@ namespace Traffic_Law_Enforcement
 
             string message =
                 "[OPPFLOW_REALIZED_APPLY] " +
-                $"vehicle={vehicle} " +
-                $"vehicleId={FocusedLoggingService.FormatEntity(vehicle)} " +
+                $"vehicle={FocusedLoggingService.FormatEntity(vehicle)} " +
                 $"reason={reasonCode} " +
                 "applyHappened=true " +
                 $"midBlockViolationCount={violationCountBefore}->{violationCountAfter}";
@@ -223,8 +228,7 @@ namespace Traffic_Law_Enforcement
 
             string message =
                 "[ACCESS_REALIZED_APPLY] " +
-                $"vehicle={vehicle} " +
-                $"vehicleId={FocusedLoggingService.FormatEntity(vehicle)} " +
+                $"vehicle={FocusedLoggingService.FormatEntity(vehicle)} " +
                 $"reason={reasonCode} " +
                 "applyHappened=true " +
                 $"midBlockViolationCount={violationCountBefore}->{violationCountAfter}";

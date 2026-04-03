@@ -380,7 +380,8 @@ namespace Traffic_Law_Enforcement
                 s_LogCount += 1;
                 Mod.log.Info(
                     $"Intersection pre-penalty applied: method={__originalMethod?.Name}, " +
-                    $"sourceLane={sourceLane}, targetLane={targetLane}, " +
+                    $"sourceLane={RoutePenaltyInspection.FormatEntity(sourceLane)}, " +
+                    $"targetLane={RoutePenaltyInspection.FormatEntity(targetLane)}, " +
                     $"actual={IntersectionMovementPolicy.FormatMovement(actualMovement)}, " +
                     $"allowed={IntersectionMovementPolicy.FormatMovement(allowedMovement)}, " +
                     $"moneyWeight={moneyWeight:0.###}, addedCost={penalty * moneyWeight:0.###}");

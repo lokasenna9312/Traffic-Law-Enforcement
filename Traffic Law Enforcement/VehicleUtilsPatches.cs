@@ -416,8 +416,7 @@ namespace Traffic_Law_Enforcement
             s_FocusedPublicTransportLaneCostLogCounts[vehicle] = nextCount;
 
             Mod.log.Info(
-                $"FOCUSED_PT_LANE_COST: vehicle={vehicle}, " +
-                $"vehicleEntity={FocusedLoggingService.FormatEntity(vehicle)}, " +
+                $"FOCUSED_PT_LANE_COST: vehicle={FocusedLoggingService.FormatEntity(vehicle)}, " +
                 $"logIndex={nextCount}, " +
                 $"rules={FormatRuleFlags(rules)}, " +
                 $"ignoredRules={FormatRuleFlags(parameters.m_IgnoredRules)}, " +

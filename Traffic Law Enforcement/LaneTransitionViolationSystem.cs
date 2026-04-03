@@ -244,8 +244,9 @@ namespace Traffic_Law_Enforcement
                     : "(no ConnectionLane)";
 
                 Mod.log.Info(
-                    $"Intersection transition candidate: vehicle={vehicle}, " +
-                    $"fromLane={history.m_PreviousLane}, toLane={history.m_CurrentLane}, " +
+                    $"Intersection transition candidate: vehicle={FocusedLoggingService.FormatEntity(vehicle)}, " +
+                    $"fromLane={FocusedLoggingService.FormatEntity(history.m_PreviousLane)}, " +
+                    $"toLane={FocusedLoggingService.FormatEntity(history.m_CurrentLane)}, " +
                     $"illegal={hasIntersectionViolation}, actual={actualMovement}, allowed={allowedMovement}, " +
                     $"previousFlags={previousFlagsText}, currentFlags={currentFlagsText}, connectionFlags={connectionFlagsText}");
             }
@@ -291,8 +292,7 @@ namespace Traffic_Law_Enforcement
 
             string message =
                 "[OPPFLOW_REALIZED_NEARMISS] " +
-                $"vehicle={vehicle} " +
-                $"vehicleId={FocusedLoggingService.FormatEntity(vehicle)} " +
+                $"vehicle={FocusedLoggingService.FormatEntity(vehicle)} " +
                 $"previousLane={FocusedLoggingService.FormatEntity(history.m_PreviousLane)} " +
                 $"currentLane={FocusedLoggingService.FormatEntity(history.m_CurrentLane)} " +
                 $"previousOwner={FocusedLoggingService.FormatEntity(history.m_PreviousLaneOwner)} " +
@@ -323,8 +323,7 @@ namespace Traffic_Law_Enforcement
 
             string message =
                 "[ACCESS_REALIZED_DETECTED] " +
-                $"vehicle={vehicle} " +
-                $"vehicleId={FocusedLoggingService.FormatEntity(vehicle)} " +
+                $"vehicle={FocusedLoggingService.FormatEntity(vehicle)} " +
                 $"reason={reasonCode} " +
                 $"previousLane={FocusedLoggingService.FormatEntity(history.m_PreviousLane)} " +
                 $"currentLane={FocusedLoggingService.FormatEntity(history.m_CurrentLane)} " +
@@ -374,8 +373,7 @@ namespace Traffic_Law_Enforcement
 
             string message =
                 "[OPPFLOW_REALIZED_DETECTED] " +
-                $"vehicle={vehicle} " +
-                $"vehicleId={FocusedLoggingService.FormatEntity(vehicle)} " +
+                $"vehicle={FocusedLoggingService.FormatEntity(vehicle)} " +
                 $"reason={reasonCode} " +
                 $"previousLane={FocusedLoggingService.FormatEntity(history.m_PreviousLane)} " +
                 $"currentLane={FocusedLoggingService.FormatEntity(history.m_CurrentLane)} " +

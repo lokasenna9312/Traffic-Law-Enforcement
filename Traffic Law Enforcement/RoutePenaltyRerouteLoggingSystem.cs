@@ -1273,8 +1273,8 @@ namespace Traffic_Law_Enforcement
                     currentSnapshot.Inspection.NormalizedTagSnapshot);
 
             string message =
-                $"Route selection change: vehicle={vehicle}, role={role}, focusedWatch={focusedWatch}, reasons={reasons}, " +
-                $"currentLane={currentSnapshot.CurrentLane}, " +
+                $"Route selection change: vehicle={FormatEntityOrNone(vehicle)}, role={role}, focusedWatch={focusedWatch}, reasons={reasons}, " +
+                $"currentLane={FormatEntityOrNone(currentSnapshot.CurrentLane)}, " +
                 $"routeHash={previousSnapshot.RouteHash}->{currentSnapshot.RouteHash}, " +
                 $"currentRoute={FormatOptionalEntity(previousSnapshot.HasCurrentRoute, previousSnapshot.CurrentRoute)}->{FormatOptionalEntity(currentSnapshot.HasCurrentRoute, currentSnapshot.CurrentRoute)}, " +
                 $"currentTarget={FormatOptionalEntity(previousSnapshot.HasCurrentTarget, previousSnapshot.CurrentTarget)}->{FormatOptionalEntity(currentSnapshot.HasCurrentTarget, currentSnapshot.CurrentTarget)}, " +
@@ -1432,7 +1432,7 @@ namespace Traffic_Law_Enforcement
         private static string FormatOptionalEntity(bool hasValue, Entity entity)
         {
             return hasValue && entity != Entity.Null
-                ? entity.ToString()
+                ? FormatEntityOrNone(entity)
                 : "none";
         }
 
@@ -1500,13 +1500,13 @@ namespace Traffic_Law_Enforcement
                     targetKindNormalized);
 
             string message =
-                $"FOCUSED_ROUTE_REBUILD: vehicle={vehicle}, " +
+                $"FOCUSED_ROUTE_REBUILD: vehicle={FormatEntityOrNone(vehicle)}, " +
                 $"obsoleteAttemptId={obsoleteAttemptId}, " +
                 $"elapsedSinceObsolete={elapsedSinceObsolete}, " +
                 $"targetKindNormalized={targetKindNormalized}, " +
                 $"previousTarget={FormatOptionalEntity(previousSnapshot.HasCurrentTarget, previousTarget)}, " +
                 $"currentTarget={FormatOptionalEntity(currentSnapshot.HasCurrentTarget, currentTarget)}, " +
-                $"currentLane={currentLane}, normalizedCurrentLane={normalizedCurrentLane}, " +
+                $"currentLane={FormatEntityOrNone(currentLane)}, normalizedCurrentLane={FormatEntityOrNone(normalizedCurrentLane)}, " +
                 $"targetChanged={targetChanged}, " +
                 $"predictedOriginSource={predictedOriginSource}, " +
                 $"previousTargetEndMatchesCurrent={previousTargetEndMatchesCurrent}, " +
@@ -1571,7 +1571,7 @@ namespace Traffic_Law_Enforcement
                     targetKindNormalized);
 
             string message =
-                $"FOCUSED_ROUTE_ACCEPTED_RESULT: vehicle={vehicle}, " +
+                $"FOCUSED_ROUTE_ACCEPTED_RESULT: vehicle={FormatEntityOrNone(vehicle)}, " +
                 $"obsoleteAttemptId={obsoleteAttemptId}, " +
                 $"elapsedSinceObsolete={elapsedSinceObsolete}, " +
                 $"targetKindNormalized={targetKindNormalized}, " +
@@ -1678,7 +1678,7 @@ namespace Traffic_Law_Enforcement
                     : transitions.ToString();
 
             return
-                $"FOCUSED_ROUTE_TRANSITIONS: vehicle={vehicle}, " +
+                $"FOCUSED_ROUTE_TRANSITIONS: vehicle={FormatEntityOrNone(vehicle)}, " +
                 $"targetStartLane={FormatEntityOrNone(targetStartLane)}, " +
                 $"targetEndLane={FormatEntityOrNone(targetEndLane)}, " +
                 $"chosenTransitions={transitionSummary}";
@@ -1763,7 +1763,7 @@ namespace Traffic_Law_Enforcement
                     : navigationLaneResolutions.ToString();
 
             return
-                $"FOCUSED_ROUTE_NAME_RESOLUTION: vehicle={vehicle}, " +
+                $"FOCUSED_ROUTE_NAME_RESOLUTION: vehicle={FormatEntityOrNone(vehicle)}, " +
                 $"current={currentLaneResolution}, " +
                 $"targetStart={targetStartResolution}, " +
                 $"targetEnd={targetEndResolution}, " +
@@ -2347,7 +2347,9 @@ namespace Traffic_Law_Enforcement
 
         private static string FormatEntityOrNone(Entity entity)
         {
-            return entity == Entity.Null ? "none" : entity.ToString();
+            return entity == Entity.Null
+                ? "none"
+                : RoutePenaltyInspection.FormatEntity(entity);
         }
 
         private static string FormatRuleFlags(RuleFlags flags)
@@ -2645,7 +2647,7 @@ namespace Traffic_Law_Enforcement
             }
 
             string message =
-                $"PT_ROUTE_DIAG: vehicle={vehicle}, role={role}, lane={lane}, laneKind={laneKind}, " +
+                $"PT_ROUTE_DIAG: vehicle={FormatEntityOrNone(vehicle)}, role={role}, lane={FormatEntityOrNone(lane)}, laneKind={laneKind}, " +
                 $"forceLogging={forceLogging}, " +
                 $"publicOnly={publicOnly}, hasResolvedPolicy={hasResolvedPublicTransportLanePolicy}, " +
                 $"hasProfile={hasProfile}, allowedOnPublicTransportLane={allowedOnPublicTransportLane}, " +
@@ -2977,7 +2979,7 @@ namespace Traffic_Law_Enforcement
                 : "excluding-unresolved-pt";
 
             string message =
-                $"Pathfinding reroute (estimated): vehicle={vehicle}, role={role}, focusedWatch={focusedWatch}, comparisonMode={comparisonMode}, " +
+                $"Pathfinding reroute (estimated): vehicle={FormatEntityOrNone(vehicle)}, role={role}, focusedWatch={focusedWatch}, comparisonMode={comparisonMode}, " +
                 $"avoidedPenalty={avoidedPenalty}, " +
                 $"fromPenalty={previousComparablePenalty} [{previousComparableBreakdown}], " +
                 $"toPenalty={currentComparablePenalty} [{currentComparableBreakdown}], " +

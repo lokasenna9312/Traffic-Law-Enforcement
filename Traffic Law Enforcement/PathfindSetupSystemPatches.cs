@@ -338,7 +338,9 @@ namespace Traffic_Law_Enforcement
 
         private static string FormatEntityOrNone(Entity entity)
         {
-            return entity == Entity.Null ? "none" : entity.ToString();
+            return entity == Entity.Null
+                ? "none"
+                : RoutePenaltyInspection.FormatEntity(entity);
         }
 
         private static string FormatFloat3(float3 value)

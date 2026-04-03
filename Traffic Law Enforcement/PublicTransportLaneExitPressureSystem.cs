@@ -468,7 +468,8 @@ namespace Traffic_Law_Enforcement
             }
 
             Mod.log.Info(
-                $"Applied PT-lane exit pressure: vehicle={vehicle}, lane={lane}, " +
+                $"Applied PT-lane exit pressure: vehicle={FocusedLoggingService.FormatEntity(vehicle)}, " +
+                $"lane={FocusedLoggingService.FormatEntity(lane)}, " +
                 $"elapsedDayTicks={elapsedDayTicks}, thresholdDayTicks={thresholdDayTicks}");
         }
     }
