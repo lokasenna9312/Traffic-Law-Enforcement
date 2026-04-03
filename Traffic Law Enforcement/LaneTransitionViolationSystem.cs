@@ -200,6 +200,7 @@ namespace Traffic_Law_Enforcement
 
             if (TryDetectMidBlockCrossing(history, out LaneTransitionViolationReasonCode reasonCode))
             {
+                MaybeLogRealizedAccessDetection(vehicle, history, reasonCode);
                 MaybeLogRealizedOppositeFlowDetection(vehicle, history, reasonCode);
 
                 events.Add(new DetectedLaneTransitionViolation
@@ -305,6 +306,36 @@ namespace Traffic_Law_Enforcement
             EnforcementLoggingPolicy.RecordEnforcementEvent(message, vehicle);
         }
 
+        // Debug-only realized-path instrumentation for illegal access exact pairs.
+        // This confirms that realized ingress/egress was detected even if the
+        // route-inspection visibility layer did not later surface it.
+        // This does not alter classification or buffering behavior.
+        private void MaybeLogRealizedAccessDetection(
+            Entity vehicle,
+            VehicleLaneHistory history,
+            LaneTransitionViolationReasonCode reasonCode)
+        {
+            if (!MidBlockCrossingPolicy.IsAccessTransitionReason(reasonCode) ||
+                !EnforcementLoggingPolicy.ShouldLogVehicleSpecificEnforcementEvent(vehicle))
+            {
+                return;
+            }
+
+            string message =
+                "[ACCESS_REALIZED_DETECTED] " +
+                $"vehicle={vehicle} " +
+                $"vehicleId={FocusedLoggingService.FormatEntity(vehicle)} " +
+                $"reason={reasonCode} " +
+                $"previousLane={FocusedLoggingService.FormatEntity(history.m_PreviousLane)} " +
+                $"currentLane={FocusedLoggingService.FormatEntity(history.m_CurrentLane)} " +
+                $"previousOwner={FocusedLoggingService.FormatEntity(history.m_PreviousLaneOwner)} " +
+                $"currentOwner={FocusedLoggingService.FormatEntity(history.m_CurrentLaneOwner)} " +
+                $"previousLaneKind={DescribeLaneKind(history.m_PreviousLane)} " +
+                $"currentLaneKind={DescribeLaneKind(history.m_CurrentLane)}";
+
+            EnforcementLoggingPolicy.RecordEnforcementEvent(message, vehicle);
+        }
+
         private bool TryDetectMidBlockCrossing(
             VehicleLaneHistory history,
             out LaneTransitionViolationReasonCode reasonCode)
@@ -389,6 +420,53 @@ namespace Traffic_Law_Enforcement
             }
 
             return 0;
+        }
+
+        private string DescribeLaneKind(Entity lane)
+        {
+            if (lane == Entity.Null)
+            {
+                return "none";
+            }
+
+            if (m_ParkingLaneData.HasComponent(lane))
+            {
+                return "parking-lane";
+            }
+
+            if (m_GarageLaneData.HasComponent(lane) &&
+                m_ConnectionLaneData.TryGetComponent(lane, out ConnectionLane garageConnectionLane) &&
+                (garageConnectionLane.m_Flags & ConnectionLaneFlags.Parking) != 0)
+            {
+                return "garage+parking-connection";
+            }
+
+            if (m_GarageLaneData.HasComponent(lane))
+            {
+                return "garage-lane";
+            }
+
+            if (m_ConnectionLaneData.TryGetComponent(lane, out ConnectionLane connectionLane))
+            {
+                if ((connectionLane.m_Flags & ConnectionLaneFlags.Parking) != 0)
+                {
+                    return "parking-connection";
+                }
+
+                if ((connectionLane.m_Flags & ConnectionLaneFlags.Road) != 0)
+                {
+                    return "road-connection";
+                }
+
+                return "access-connection";
+            }
+
+            if (m_EdgeLaneData.HasComponent(lane) && m_CarLaneData.HasComponent(lane))
+            {
+                return "road";
+            }
+
+            return "lane";
         }
 
         private bool TryGetOppositeFlowNearMissReason(

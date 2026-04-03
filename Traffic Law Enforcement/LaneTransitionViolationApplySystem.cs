@@ -97,6 +97,11 @@ namespace Traffic_Law_Enforcement
                             evt.ReasonCode,
                             midBlockViolationCountBefore,
                             statistics.m_MidBlockCrossingViolationCount);
+                        MaybeLogRealizedAccessApply(
+                            evt.Vehicle,
+                            evt.ReasonCode,
+                            midBlockViolationCountBefore,
+                            statistics.m_MidBlockCrossingViolationCount);
 
                         if (EnforcementLoggingPolicy.ShouldLogVehicleSpecificEnforcementEvent(evt.Vehicle))
                         {
@@ -192,6 +197,32 @@ namespace Traffic_Law_Enforcement
 
             string message =
                 "[OPPFLOW_REALIZED_APPLY] " +
+                $"vehicle={vehicle} " +
+                $"vehicleId={FocusedLoggingService.FormatEntity(vehicle)} " +
+                $"reason={reasonCode} " +
+                "applyHappened=true " +
+                $"midBlockViolationCount={violationCountBefore}->{violationCountAfter}";
+
+            EnforcementLoggingPolicy.RecordEnforcementEvent(message, vehicle);
+        }
+
+        // Debug-only apply confirmation for realized illegal ingress/egress.
+        // This confirms that the buffered realized access event was later applied.
+        // This does not alter violation application behavior.
+        private static void MaybeLogRealizedAccessApply(
+            Entity vehicle,
+            LaneTransitionViolationReasonCode reasonCode,
+            int violationCountBefore,
+            int violationCountAfter)
+        {
+            if (!MidBlockCrossingPolicy.IsAccessTransitionReason(reasonCode) ||
+                !EnforcementLoggingPolicy.ShouldLogVehicleSpecificEnforcementEvent(vehicle))
+            {
+                return;
+            }
+
+            string message =
+                "[ACCESS_REALIZED_APPLY] " +
                 $"vehicle={vehicle} " +
                 $"vehicleId={FocusedLoggingService.FormatEntity(vehicle)} " +
                 $"reason={reasonCode} " +

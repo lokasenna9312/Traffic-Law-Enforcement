@@ -403,9 +403,11 @@ namespace Traffic_Law_Enforcement
                     : $"{FormatEntity(exactSource)}->{FormatEntity(exactTarget)}:{exactReasonCode}";
 
             string normalizedFirst =
-                normalizedReasonCode == LaneTransitionViolationReasonCode.None
-                    ? "none"
-                    : $"{FormatEntity(normalizedPrevious)}->{FormatEntity(normalizedCurrent)}->{FormatEntity(normalizedNext)}:{normalizedReasonCode}";
+                FormatNormalizedAccessMatch(
+                    normalizedPrevious,
+                    normalizedCurrent,
+                    normalizedNext,
+                    normalizedReasonCode);
 
             string normalizedBlocked =
                 normalizedReasonCode != LaneTransitionViolationReasonCode.None
@@ -868,6 +870,32 @@ namespace Traffic_Law_Enforcement
             blockedCurrentLane = Entity.Null;
             blockedNextLane = Entity.Null;
 
+            if (laneSequence.Count >= 2 &&
+                TryNormalizeTerminalAccessEgress(
+                    laneSequence[0],
+                    laneSequence[1],
+                    out reasonCode,
+                    ref context))
+            {
+                previousLane = laneSequence[0];
+                currentLane = laneSequence[1];
+                nextLane = Entity.Null;
+                return AccessWindowBlockedReason.None;
+            }
+
+            if (laneSequence.Count == 2 &&
+                TryNormalizeTerminalAccessIngress(
+                    laneSequence[laneSequence.Count - 2],
+                    laneSequence[laneSequence.Count - 1],
+                    out reasonCode,
+                    ref context))
+            {
+                previousLane = laneSequence[laneSequence.Count - 2];
+                currentLane = laneSequence[laneSequence.Count - 1];
+                nextLane = Entity.Null;
+                return AccessWindowBlockedReason.None;
+            }
+
             if (laneSequence.Count < 3)
             {
                 return AccessWindowBlockedReason.NoThreeLaneWindowInCurrentSequence;
@@ -979,7 +1007,33 @@ namespace Traffic_Law_Enforcement
 
             if (!sawAccessConnection)
             {
+                if (laneSequence.Count >= 2 &&
+                    context.ConnectionLaneData.HasComponent(laneSequence[0]))
+                {
+                    return AccessWindowBlockedReason.MissingExplicitEndpoint;
+                }
+
+                if (laneSequence.Count >= 2 &&
+                    context.ConnectionLaneData.HasComponent(
+                        laneSequence[laneSequence.Count - 1]))
+                {
+                    return AccessWindowBlockedReason.MissingExplicitEndpoint;
+                }
+
                 return AccessWindowBlockedReason.NoAccessConnectionInCurrentSequence;
+            }
+
+            if (laneSequence.Count > 2 &&
+                TryNormalizeTerminalAccessIngress(
+                    laneSequence[laneSequence.Count - 2],
+                    laneSequence[laneSequence.Count - 1],
+                    out reasonCode,
+                    ref context))
+            {
+                previousLane = laneSequence[laneSequence.Count - 2];
+                currentLane = laneSequence[laneSequence.Count - 1];
+                nextLane = Entity.Null;
+                return AccessWindowBlockedReason.None;
             }
 
             return firstBlockedReason == AccessWindowBlockedReason.None
@@ -1033,15 +1087,28 @@ namespace Traffic_Law_Enforcement
         }
 
         // Patch 2 keeps exact-pair legality in MidBlockCrossingPolicy and adds a
-        // separate 3-lane interpretation layer for user-facing route inspection.
-        // A qualifying road->connection->final-access or final-access->connection->road
-        // window produces one conceptual access label without replacing the exact tags.
+        // separate interpretation layer for user-facing route inspection.
+        // A qualifying 3-lane road->connection->final-access window or a terminal
+        // road<->ConnectionLane(Parking) pair can produce one conceptual access
+        // label without replacing the exact tags.
         private static void AppendNormalizedAccessTags(
             List<Entity> laneSequence,
             ref RoutePenaltyTagCollector normalizedPenaltyTags,
             ref RoutePenaltyInspectionContext context,
             int maxPenaltyTags)
         {
+            if (laneSequence.Count >= 2 &&
+                TryNormalizeTerminalAccessEgress(
+                    laneSequence[0],
+                    laneSequence[1],
+                    out LaneTransitionViolationReasonCode headReasonCode,
+                    ref context))
+            {
+                normalizedPenaltyTags.Append(
+                    EncodeMidBlockPenaltyTag(headReasonCode),
+                    maxPenaltyTags);
+            }
+
             for (int index = 1; index + 1 < laneSequence.Count; index += 1)
             {
                 if (TryGetNormalizedAccessPenaltyToken(
@@ -1053,6 +1120,18 @@ namespace Traffic_Law_Enforcement
                 {
                     normalizedPenaltyTags.Append(token, maxPenaltyTags);
                 }
+            }
+
+            if (laneSequence.Count >= 2 &&
+                TryNormalizeTerminalAccessIngress(
+                    laneSequence[laneSequence.Count - 2],
+                    laneSequence[laneSequence.Count - 1],
+                    out LaneTransitionViolationReasonCode tailReasonCode,
+                    ref context))
+            {
+                normalizedPenaltyTags.Append(
+                    EncodeMidBlockPenaltyTag(tailReasonCode),
+                    maxPenaltyTags);
             }
         }
 
@@ -1114,6 +1193,84 @@ namespace Traffic_Law_Enforcement
                 connectionKind,
                 out reasonCode,
                 ref context);
+        }
+
+        private static bool TryNormalizeTerminalAccessIngress(
+            Entity previousLane,
+            Entity terminalLane,
+            out LaneTransitionViolationReasonCode reasonCode,
+            ref RoutePenaltyInspectionContext context)
+        {
+            reasonCode = LaneTransitionViolationReasonCode.None;
+
+            if (!IsRoadLane(previousLane, ref context) ||
+                !TryGetTerminalParkingConnectionEndpointKind(
+                    terminalLane,
+                    out NormalizedAccessEndpointKind endpointKind,
+                    ref context))
+            {
+                return false;
+            }
+
+            if (!MidBlockCrossingPolicy.TryGetIllegalAccessTransition(
+                    context.EntityManager,
+                    previousLane,
+                    terminalLane,
+                    out LaneTransitionViolationReasonCode exactReason) ||
+                !IsAccessIngressReason(exactReason))
+            {
+                return false;
+            }
+
+            reasonCode = endpointKind switch
+            {
+                NormalizedAccessEndpointKind.Garage =>
+                    LaneTransitionViolationReasonCode.EnteredGarageAccessWithoutSideAccess,
+                NormalizedAccessEndpointKind.Parking =>
+                    LaneTransitionViolationReasonCode.EnteredParkingAccessWithoutSideAccess,
+                _ => LaneTransitionViolationReasonCode.None,
+            };
+
+            return reasonCode != LaneTransitionViolationReasonCode.None;
+        }
+
+        private static bool TryNormalizeTerminalAccessEgress(
+            Entity terminalLane,
+            Entity nextLane,
+            out LaneTransitionViolationReasonCode reasonCode,
+            ref RoutePenaltyInspectionContext context)
+        {
+            reasonCode = LaneTransitionViolationReasonCode.None;
+
+            if (!IsRoadLane(nextLane, ref context) ||
+                !TryGetTerminalParkingConnectionEndpointKind(
+                    terminalLane,
+                    out NormalizedAccessEndpointKind endpointKind,
+                    ref context))
+            {
+                return false;
+            }
+
+            if (!MidBlockCrossingPolicy.TryGetIllegalAccessTransition(
+                    context.EntityManager,
+                    terminalLane,
+                    nextLane,
+                    out LaneTransitionViolationReasonCode exactReason) ||
+                !IsAccessEgressReason(exactReason))
+            {
+                return false;
+            }
+
+            reasonCode = endpointKind switch
+            {
+                NormalizedAccessEndpointKind.Garage =>
+                    LaneTransitionViolationReasonCode.ExitedGarageAccessWithoutSideAccess,
+                NormalizedAccessEndpointKind.Parking =>
+                    LaneTransitionViolationReasonCode.ExitedParkingAccessWithoutSideAccess,
+                _ => LaneTransitionViolationReasonCode.None,
+            };
+
+            return reasonCode != LaneTransitionViolationReasonCode.None;
         }
 
         private static bool TryNormalizeAccessIngress(
@@ -1247,6 +1404,56 @@ namespace Traffic_Law_Enforcement
             }
 
             return false;
+        }
+
+        private static bool TryGetTerminalParkingConnectionEndpointKind(
+            Entity lane,
+            out NormalizedAccessEndpointKind kind,
+            ref RoutePenaltyInspectionContext context)
+        {
+            kind = NormalizedAccessEndpointKind.None;
+
+            // Vanilla roadside-building car traversal can end directly on a
+            // ConnectionLane(Parking). Treat that terminal parking connection as
+            // sufficient conceptual endpoint evidence in the interpretation layer.
+            if (!context.ConnectionLaneData.TryGetComponent(lane, out ConnectionLane connectionLane) ||
+                (connectionLane.m_Flags & ConnectionLaneFlags.Parking) == 0)
+            {
+                return false;
+            }
+
+            if (context.GarageLaneData.HasComponent(lane))
+            {
+                kind = NormalizedAccessEndpointKind.Garage;
+                return true;
+            }
+
+            kind = NormalizedAccessEndpointKind.Parking;
+            return true;
+        }
+
+        private static string FormatNormalizedAccessMatch(
+            Entity previousLane,
+            Entity currentLane,
+            Entity nextLane,
+            LaneTransitionViolationReasonCode reasonCode)
+        {
+            if (reasonCode == LaneTransitionViolationReasonCode.None)
+            {
+                return "none";
+            }
+
+            if (nextLane == Entity.Null)
+            {
+                return
+                    $"{FormatEntity(previousLane)}->" +
+                    $"{FormatEntity(currentLane)}:{reasonCode}";
+            }
+
+            return
+                $"{FormatEntity(previousLane)}->" +
+                $"{FormatEntity(currentLane)}->" +
+                $"{FormatEntity(nextLane)}:{reasonCode}";
         }
 
         private static bool IsRoadLane(
