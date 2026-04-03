@@ -87,6 +87,26 @@ namespace Traffic_Law_Enforcement
                 out reasonCode);
         }
 
+        public static bool TryGetOppositeFlowSameRoadSegmentTransition(
+            EntityManager entityManager,
+            Entity sourceLane,
+            Entity targetLane,
+            out LaneTransitionViolationReasonCode reasonCode)
+        {
+            reasonCode = LaneTransitionViolationReasonCode.None;
+
+            if (sourceLane == Entity.Null || targetLane == Entity.Null || sourceLane == targetLane)
+            {
+                return false;
+            }
+
+            return TryDetectOppositeFlowSameRoadSegment(
+                entityManager,
+                sourceLane,
+                targetLane,
+                out reasonCode);
+        }
+
         public static bool IsAccessTransitionReason(
             LaneTransitionViolationReasonCode reasonCode)
         {
