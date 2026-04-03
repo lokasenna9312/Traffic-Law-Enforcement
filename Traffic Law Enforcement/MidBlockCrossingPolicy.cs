@@ -7,6 +7,14 @@ namespace Traffic_Law_Enforcement
 {
     public static class MidBlockCrossingPolicy
     {
+        [System.Flags]
+        private enum AccessSide : byte
+        {
+            None = 0,
+            Left = 1 << 0,
+            Right = 1 << 1,
+        }
+
         public static bool TryGetIllegalTransition(
             EntityManager entityManager,
             Entity sourceLane,
@@ -144,26 +152,30 @@ namespace Traffic_Law_Enforcement
         {
             reasonCode = LaneTransitionViolationReasonCode.None;
 
-            if (!entityManager.HasComponent<EdgeLane>(sourceLane) ||
-                !entityManager.HasComponent<CarLane>(sourceLane))
-            {
-                return false;
-            }
-
-            CarLane sourceCarLane = entityManager.GetComponentData<CarLane>(sourceLane);
-            if (LaneAllowsSideAccess(sourceCarLane))
+            if (!TryGetRoadCarLane(entityManager, sourceLane, out CarLane sourceCarLane))
             {
                 return false;
             }
 
             if (entityManager.HasComponent<GarageLane>(targetLane))
             {
+                if (RoadHasGenericSideConnection(sourceCarLane))
+                {
+                    return false;
+                }
+
                 reasonCode = LaneTransitionViolationReasonCode.EnteredGarageAccessWithoutSideAccess;
                 return true;
             }
 
             if (entityManager.HasComponent<ParkingLane>(targetLane))
             {
+                ParkingLane parkingLane = entityManager.GetComponentData<ParkingLane>(targetLane);
+                if (RoadAllowsParkingAccess(sourceCarLane, parkingLane))
+                {
+                    return false;
+                }
+
                 reasonCode = LaneTransitionViolationReasonCode.EnteredParkingAccessWithoutSideAccess;
                 return true;
             }
@@ -177,12 +189,22 @@ namespace Traffic_Law_Enforcement
 
             if ((connectionLane.m_Flags & ConnectionLaneFlags.Parking) != 0)
             {
+                if (RoadAllowsParkingConnectionAccess(sourceCarLane))
+                {
+                    return false;
+                }
+
                 reasonCode = LaneTransitionViolationReasonCode.EnteredParkingConnectionWithoutSideAccess;
                 return true;
             }
 
             if ((connectionLane.m_Flags & ConnectionLaneFlags.Road) == 0)
             {
+                if (RoadHasGenericSideConnection(sourceCarLane))
+                {
+                    return false;
+                }
+
                 reasonCode = LaneTransitionViolationReasonCode.EnteredBuildingAccessConnectionWithoutSideAccess;
                 return true;
             }
@@ -199,26 +221,30 @@ namespace Traffic_Law_Enforcement
             reasonCode = LaneTransitionViolationReasonCode.None;
 
             if (!IsAccessOrigin(entityManager, sourceLane) ||
-                !entityManager.HasComponent<EdgeLane>(targetLane) ||
-                !entityManager.HasComponent<CarLane>(targetLane))
-            {
-                return false;
-            }
-
-            CarLane targetCarLane = entityManager.GetComponentData<CarLane>(targetLane);
-            if (LaneAllowsSideAccess(targetCarLane))
+                !TryGetRoadCarLane(entityManager, targetLane, out CarLane targetCarLane))
             {
                 return false;
             }
 
             if (entityManager.HasComponent<ParkingLane>(sourceLane))
             {
+                ParkingLane parkingLane = entityManager.GetComponentData<ParkingLane>(sourceLane);
+                if (RoadAllowsParkingAccess(targetCarLane, parkingLane))
+                {
+                    return false;
+                }
+
                 reasonCode = LaneTransitionViolationReasonCode.ExitedParkingAccessWithoutSideAccess;
                 return true;
             }
 
             if (entityManager.HasComponent<GarageLane>(sourceLane))
             {
+                if (RoadHasGenericSideConnection(targetCarLane))
+                {
+                    return false;
+                }
+
                 reasonCode = LaneTransitionViolationReasonCode.ExitedGarageAccessWithoutSideAccess;
                 return true;
             }
@@ -232,12 +258,22 @@ namespace Traffic_Law_Enforcement
 
             if ((connectionLane.m_Flags & ConnectionLaneFlags.Parking) != 0)
             {
+                if (RoadAllowsParkingConnectionAccess(targetCarLane))
+                {
+                    return false;
+                }
+
                 reasonCode = LaneTransitionViolationReasonCode.ExitedParkingConnectionWithoutSideAccess;
                 return true;
             }
 
             if ((connectionLane.m_Flags & ConnectionLaneFlags.Road) == 0)
             {
+                if (RoadHasGenericSideConnection(targetCarLane))
+                {
+                    return false;
+                }
+
                 reasonCode = LaneTransitionViolationReasonCode.ExitedBuildingAccessConnectionWithoutSideAccess;
                 return true;
             }
@@ -281,12 +317,84 @@ namespace Traffic_Law_Enforcement
             return sourceDirection * targetDirection < 0f;
         }
 
-        private static bool LaneAllowsSideAccess(CarLane lane)
+        private static bool TryGetRoadCarLane(
+            EntityManager entityManager,
+            Entity lane,
+            out CarLane carLane)
         {
-            return (lane.m_Flags &
-                (CarLaneFlags.SideConnection |
-                 CarLaneFlags.ParkingLeft |
-                 CarLaneFlags.ParkingRight)) != 0;
+            if (entityManager.HasComponent<EdgeLane>(lane) &&
+                entityManager.HasComponent<CarLane>(lane))
+            {
+                carLane = entityManager.GetComponentData<CarLane>(lane);
+                return true;
+            }
+
+            carLane = default;
+            return false;
+        }
+
+        // Patch 1 keeps the classifier exact-pair based. It improves the shared
+        // legality test by separating generic side-connection permission from
+        // parking-side matching, but does not normalize multi-hop access shapes.
+        private static bool RoadHasGenericSideConnection(CarLane lane)
+        {
+            return (lane.m_Flags & CarLaneFlags.SideConnection) != 0;
+        }
+
+        private static bool RoadAllowsParkingConnectionAccess(CarLane roadLane)
+        {
+            return RoadHasGenericSideConnection(roadLane) ||
+                GetRoadParkingSides(roadLane) != AccessSide.None;
+        }
+
+        private static bool RoadAllowsParkingAccess(CarLane roadLane, ParkingLane parkingLane)
+        {
+            if (RoadHasGenericSideConnection(roadLane))
+            {
+                return true;
+            }
+
+            AccessSide roadSides = GetRoadParkingSides(roadLane);
+            if (roadSides == AccessSide.None)
+            {
+                return false;
+            }
+
+            AccessSide parkingSides = GetParkingSides(parkingLane);
+            return parkingSides == AccessSide.None ||
+                (roadSides & parkingSides) != 0;
+        }
+
+        private static AccessSide GetRoadParkingSides(CarLane lane)
+        {
+            AccessSide sides = AccessSide.None;
+            if ((lane.m_Flags & CarLaneFlags.ParkingLeft) != 0)
+            {
+                sides |= AccessSide.Left;
+            }
+
+            if ((lane.m_Flags & CarLaneFlags.ParkingRight) != 0)
+            {
+                sides |= AccessSide.Right;
+            }
+
+            return sides;
+        }
+
+        private static AccessSide GetParkingSides(ParkingLane lane)
+        {
+            AccessSide sides = AccessSide.None;
+            if ((lane.m_Flags & (ParkingLaneFlags.LeftSide | ParkingLaneFlags.ParkingLeft)) != 0)
+            {
+                sides |= AccessSide.Left;
+            }
+
+            if ((lane.m_Flags & (ParkingLaneFlags.RightSide | ParkingLaneFlags.ParkingRight)) != 0)
+            {
+                sides |= AccessSide.Right;
+            }
+
+            return sides;
         }
     }
 }
