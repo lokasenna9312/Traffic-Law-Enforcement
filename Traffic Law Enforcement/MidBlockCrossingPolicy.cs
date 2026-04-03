@@ -159,7 +159,14 @@ namespace Traffic_Law_Enforcement
 
             if (entityManager.HasComponent<GarageLane>(targetLane))
             {
-                if (RoadHasGenericSideConnection(sourceCarLane))
+                if (TryGetConnectionLane(entityManager, targetLane, out ConnectionLane garageConnectionLane))
+                {
+                    if (RoadAllowsGarageAccess(sourceCarLane, garageConnectionLane))
+                    {
+                        return false;
+                    }
+                }
+                else if (RoadHasGenericSideConnection(sourceCarLane))
                 {
                     return false;
                 }
@@ -189,7 +196,7 @@ namespace Traffic_Law_Enforcement
 
             if ((connectionLane.m_Flags & ConnectionLaneFlags.Parking) != 0)
             {
-                if (RoadAllowsParkingConnectionAccess(sourceCarLane))
+                if (RoadAllowsParkingConnectionAccess(sourceCarLane, connectionLane))
                 {
                     return false;
                 }
@@ -200,7 +207,12 @@ namespace Traffic_Law_Enforcement
 
             if ((connectionLane.m_Flags & ConnectionLaneFlags.Road) == 0)
             {
-                if (RoadHasGenericSideConnection(sourceCarLane))
+                if (!IsInsideAccessConnection(connectionLane))
+                {
+                    return false;
+                }
+
+                if (RoadAllowsBuildingAccess(sourceCarLane))
                 {
                     return false;
                 }
@@ -240,7 +252,14 @@ namespace Traffic_Law_Enforcement
 
             if (entityManager.HasComponent<GarageLane>(sourceLane))
             {
-                if (RoadHasGenericSideConnection(targetCarLane))
+                if (TryGetConnectionLane(entityManager, sourceLane, out ConnectionLane garageConnectionLane))
+                {
+                    if (RoadAllowsGarageAccess(targetCarLane, garageConnectionLane))
+                    {
+                        return false;
+                    }
+                }
+                else if (RoadHasGenericSideConnection(targetCarLane))
                 {
                     return false;
                 }
@@ -258,7 +277,7 @@ namespace Traffic_Law_Enforcement
 
             if ((connectionLane.m_Flags & ConnectionLaneFlags.Parking) != 0)
             {
-                if (RoadAllowsParkingConnectionAccess(targetCarLane))
+                if (RoadAllowsParkingConnectionAccess(targetCarLane, connectionLane))
                 {
                     return false;
                 }
@@ -269,7 +288,12 @@ namespace Traffic_Law_Enforcement
 
             if ((connectionLane.m_Flags & ConnectionLaneFlags.Road) == 0)
             {
-                if (RoadHasGenericSideConnection(targetCarLane))
+                if (!IsInsideAccessConnection(connectionLane))
+                {
+                    return false;
+                }
+
+                if (RoadAllowsBuildingAccess(targetCarLane))
                 {
                     return false;
                 }
@@ -333,18 +357,71 @@ namespace Traffic_Law_Enforcement
             return false;
         }
 
-        // Patch 1 keeps the classifier exact-pair based. It improves the shared
-        // legality test by separating generic side-connection permission from
-        // parking-side matching, but does not normalize multi-hop access shapes.
+        private static bool TryGetConnectionLane(
+            EntityManager entityManager,
+            Entity lane,
+            out ConnectionLane connectionLane)
+        {
+            if (entityManager.HasComponent<ConnectionLane>(lane))
+            {
+                connectionLane = entityManager.GetComponentData<ConnectionLane>(lane);
+                return true;
+            }
+
+            connectionLane = default;
+            return false;
+        }
+
+        // Patch 1.5 keeps the classifier exact-pair based. It refines patch 1 by
+        // treating ConnectionLaneFlags.Inside as the primary signal that a direct
+        // access connection is internal-facing. Parking-side flags alone no longer
+        // legalize those Inside connection pairs.
         private static bool RoadHasGenericSideConnection(CarLane lane)
         {
             return (lane.m_Flags & CarLaneFlags.SideConnection) != 0;
         }
 
-        private static bool RoadAllowsParkingConnectionAccess(CarLane roadLane)
+        private static bool IsInsideAccessConnection(ConnectionLane connectionLane)
         {
-            return RoadHasGenericSideConnection(roadLane) ||
+            return (connectionLane.m_Flags & ConnectionLaneFlags.Inside) != 0;
+        }
+
+        private static bool RoadAllowsBuildingAccess(CarLane roadLane)
+        {
+            return RoadHasGenericSideConnection(roadLane);
+        }
+
+        private static bool RoadAllowsGarageAccess(CarLane roadLane, ConnectionLane connectionLane)
+        {
+            if (RoadHasGenericSideConnection(roadLane))
+            {
+                return true;
+            }
+
+            if (IsInsideAccessConnection(connectionLane))
+            {
+                return false;
+            }
+
+            return (connectionLane.m_Flags & ConnectionLaneFlags.Parking) != 0 &&
                 GetRoadParkingSides(roadLane) != AccessSide.None;
+        }
+
+        private static bool RoadAllowsParkingConnectionAccess(
+            CarLane roadLane,
+            ConnectionLane connectionLane)
+        {
+            if (RoadHasGenericSideConnection(roadLane))
+            {
+                return true;
+            }
+
+            if (IsInsideAccessConnection(connectionLane))
+            {
+                return false;
+            }
+
+            return GetRoadParkingSides(roadLane) != AccessSide.None;
         }
 
         private static bool RoadAllowsParkingAccess(CarLane roadLane, ParkingLane parkingLane)
