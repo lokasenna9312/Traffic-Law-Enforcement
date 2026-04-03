@@ -37,8 +37,20 @@ namespace Traffic_Law_Enforcement
         private static string s_ModLogPath;
         private const string EnforcementLoggingMigrationMarkerFileName =
             "enforcement_logging_summary_migration_v1.flag";
+        private bool m_EnableEstimatedRerouteLogging;
+        private bool m_EnableEnforcementEventLogging;
+        private bool m_EnablePolicyImpactSummaryLogging;
+        private bool m_EnableFineIncomeLogging;
+        private bool m_EnablePathfindingPenaltyDiagnosticLogging;
+        private bool m_EnableType2PublicTransportLaneUsageLogging;
+        private bool m_EnableType3PublicTransportLaneUsageLogging;
+        private bool m_EnableType4PublicTransportLaneUsageLogging;
+        private bool m_EnablePathObsoleteSourceLogging;
+        private bool m_EnableAllVehicleRouteSelectionChangeLogging;
         private bool m_EnableFocusedRouteRebuildDiagnosticsLogging;
+        private bool m_EnableFocusedVehicleOnlyRouteLogging;
         private bool m_EnableSettingChangeLogging;
+        private bool m_EnableChirperLifecycleLogging;
         private bool m_DefaultEnablePublicTransportLaneEnforcement;
         private bool m_DefaultEnableMidBlockCrossingEnforcement;
         private bool m_DefaultEnableIntersectionMovementEnforcement;
@@ -1469,44 +1481,114 @@ namespace Traffic_Law_Enforcement
 
         [Exclude]
         [SettingsUISection(kDebugTab, kDebugLoggingGroup)]
-        public bool EnableEstimatedRerouteLogging { get; set; }
+        public bool EnableEstimatedRerouteLogging
+        {
+            get => m_EnableEstimatedRerouteLogging;
+            set => SetDebugLoggingToggle(
+                ref m_EnableEstimatedRerouteLogging,
+                value,
+                nameof(EnableEstimatedRerouteLogging));
+        }
 
         [Exclude]
         [SettingsUISection(kDebugTab, kDebugLoggingGroup)]
-        public bool EnableEnforcementEventLogging { get; set; }
+        public bool EnableEnforcementEventLogging
+        {
+            get => m_EnableEnforcementEventLogging;
+            set => SetDebugLoggingToggle(
+                ref m_EnableEnforcementEventLogging,
+                value,
+                nameof(EnableEnforcementEventLogging));
+        }
 
         [Exclude]
         [SettingsUISection(kDebugTab, kDebugLoggingGroup)]
-        public bool EnablePolicyImpactSummaryLogging { get; set; }
+        public bool EnablePolicyImpactSummaryLogging
+        {
+            get => m_EnablePolicyImpactSummaryLogging;
+            set => SetDebugLoggingToggle(
+                ref m_EnablePolicyImpactSummaryLogging,
+                value,
+                nameof(EnablePolicyImpactSummaryLogging));
+        }
 
         [Exclude]
         [SettingsUISection(kDebugTab, kDebugLoggingGroup)]
-        public bool EnableFineIncomeLogging { get; set; }
+        public bool EnableFineIncomeLogging
+        {
+            get => m_EnableFineIncomeLogging;
+            set => SetDebugLoggingToggle(
+                ref m_EnableFineIncomeLogging,
+                value,
+                nameof(EnableFineIncomeLogging));
+        }
 
 
         [Exclude]
         [SettingsUISection(kDebugTab, kDebugLoggingGroup)]
-        public bool EnablePathfindingPenaltyDiagnosticLogging { get; set; }
+        public bool EnablePathfindingPenaltyDiagnosticLogging
+        {
+            get => m_EnablePathfindingPenaltyDiagnosticLogging;
+            set => SetDebugLoggingToggle(
+                ref m_EnablePathfindingPenaltyDiagnosticLogging,
+                value,
+                nameof(EnablePathfindingPenaltyDiagnosticLogging));
+        }
 
         [Exclude]
         [SettingsUISection(kDebugTab, kDebugLoggingGroup)]
-        public bool EnableType2PublicTransportLaneUsageLogging { get; set; }
+        public bool EnableType2PublicTransportLaneUsageLogging
+        {
+            get => m_EnableType2PublicTransportLaneUsageLogging;
+            set => SetDebugLoggingToggle(
+                ref m_EnableType2PublicTransportLaneUsageLogging,
+                value,
+                nameof(EnableType2PublicTransportLaneUsageLogging));
+        }
 
         [Exclude]
         [SettingsUISection(kDebugTab, kDebugLoggingGroup)]
-        public bool EnableType3PublicTransportLaneUsageLogging { get; set; }
+        public bool EnableType3PublicTransportLaneUsageLogging
+        {
+            get => m_EnableType3PublicTransportLaneUsageLogging;
+            set => SetDebugLoggingToggle(
+                ref m_EnableType3PublicTransportLaneUsageLogging,
+                value,
+                nameof(EnableType3PublicTransportLaneUsageLogging));
+        }
 
         [Exclude]
         [SettingsUISection(kDebugTab, kDebugLoggingGroup)]
-        public bool EnableType4PublicTransportLaneUsageLogging { get; set; }
+        public bool EnableType4PublicTransportLaneUsageLogging
+        {
+            get => m_EnableType4PublicTransportLaneUsageLogging;
+            set => SetDebugLoggingToggle(
+                ref m_EnableType4PublicTransportLaneUsageLogging,
+                value,
+                nameof(EnableType4PublicTransportLaneUsageLogging));
+        }
 
         [Exclude]
         [SettingsUISection(kDebugTab, kDebugLoggingGroup)]
-        public bool EnablePathObsoleteSourceLogging { get; set; }
+        public bool EnablePathObsoleteSourceLogging
+        {
+            get => m_EnablePathObsoleteSourceLogging;
+            set => SetDebugLoggingToggle(
+                ref m_EnablePathObsoleteSourceLogging,
+                value,
+                nameof(EnablePathObsoleteSourceLogging));
+        }
 
         [Exclude]
         [SettingsUISection(kDebugTab, kDebugLoggingGroup)]
-        public bool EnableAllVehicleRouteSelectionChangeLogging { get; set; }
+        public bool EnableAllVehicleRouteSelectionChangeLogging
+        {
+            get => m_EnableAllVehicleRouteSelectionChangeLogging;
+            set => SetDebugLoggingToggle(
+                ref m_EnableAllVehicleRouteSelectionChangeLogging,
+                value,
+                nameof(EnableAllVehicleRouteSelectionChangeLogging));
+        }
 
         [Exclude]
         [SettingsUISection(kDebugTab, kFocusedLoggingGroup)]
@@ -1520,14 +1602,26 @@ namespace Traffic_Law_Enforcement
                     return;
                 }
 
+                bool previous = m_EnableFocusedRouteRebuildDiagnosticsLogging;
                 m_EnableFocusedRouteRebuildDiagnosticsLogging = value;
                 FocusedRouteDiagnosticsPatchController.Sync(value);
+                LogDebugLoggingToggleChange(
+                    nameof(EnableFocusedRouteRebuildDiagnosticsLogging),
+                    previous,
+                    value);
             }
         }
 
         [Exclude]
         [SettingsUISection(kDebugTab, kFocusedLoggingGroup)]
-        public bool EnableFocusedVehicleOnlyRouteLogging { get; set; }
+        public bool EnableFocusedVehicleOnlyRouteLogging
+        {
+            get => m_EnableFocusedVehicleOnlyRouteLogging;
+            set => SetDebugLoggingToggle(
+                ref m_EnableFocusedVehicleOnlyRouteLogging,
+                value,
+                nameof(EnableFocusedVehicleOnlyRouteLogging));
+        }
 
         [SettingsUISection(kDebugTab, kDebugBindingsGroup)]
         [SettingsUIKeyboardBinding(
@@ -1549,7 +1643,14 @@ namespace Traffic_Law_Enforcement
 
         [Exclude]
         [SettingsUISection(kDebugTab, kChirperGroup)]
-        public bool EnableChirperLifecycleLogging { get; set; }
+        public bool EnableChirperLifecycleLogging
+        {
+            get => m_EnableChirperLifecycleLogging;
+            set => SetDebugLoggingToggle(
+                ref m_EnableChirperLifecycleLogging,
+                value,
+                nameof(EnableChirperLifecycleLogging));
+        }
 
         [Exclude]
         [SettingsUIButton]
@@ -1612,6 +1713,33 @@ namespace Traffic_Law_Enforcement
         internal void EnableSettingChangeLogging()
         {
             m_EnableSettingChangeLogging = true;
+        }
+
+        internal void LogDebugLoggingSettingsSnapshot(string source = null)
+        {
+            if (!m_EnableSettingChangeLogging)
+            {
+                return;
+            }
+
+            string resolvedSource =
+                string.IsNullOrWhiteSpace(source) ? "unknown" : source;
+            Mod.log.Info(
+                "[LOGGING_SETTINGS_SNAPSHOT] " +
+                $"source={resolvedSource}, " +
+                $"estimatedReroute={EnableEstimatedRerouteLogging}, " +
+                $"enforcementEvents={EnableEnforcementEventLogging}, " +
+                $"policyImpactSummary={EnablePolicyImpactSummaryLogging}, " +
+                $"fineIncome={EnableFineIncomeLogging}, " +
+                $"pathfindingPenaltyDiagnostics={EnablePathfindingPenaltyDiagnosticLogging}, " +
+                $"type2PtLaneUsage={EnableType2PublicTransportLaneUsageLogging}, " +
+                $"type3PtLaneUsage={EnableType3PublicTransportLaneUsageLogging}, " +
+                $"type4PtLaneUsage={EnableType4PublicTransportLaneUsageLogging}, " +
+                $"pathObsoleteSource={EnablePathObsoleteSourceLogging}, " +
+                $"allVehicleRouteSelectionChanges={EnableAllVehicleRouteSelectionChangeLogging}, " +
+                $"focusedRouteRebuildDiagnostics={EnableFocusedRouteRebuildDiagnosticsLogging}, " +
+                $"focusedVehicleOnlyRouteLogging={EnableFocusedVehicleOnlyRouteLogging}, " +
+                $"chirperLifecycle={EnableChirperLifecycleLogging}");
         }
 
         internal void LogTrackedEnforcementSettingChanges(
@@ -1972,6 +2100,38 @@ namespace Traffic_Law_Enforcement
                 string.IsNullOrWhiteSpace(source) ? string.Empty : $", source={source}";
             Mod.log.Info(
                 $"[ENFORCEMENT_SETTINGS] scope={scope}, option={option}, value={current}, previous={previous}{sourceSuffix}");
+        }
+
+        private void SetDebugLoggingToggle(
+            ref bool field,
+            bool value,
+            string optionName)
+        {
+            if (field == value)
+            {
+                return;
+            }
+
+            bool previous = field;
+            field = value;
+            LogDebugLoggingToggleChange(optionName, previous, value);
+        }
+
+        private void LogDebugLoggingToggleChange(
+            string option,
+            bool previous,
+            bool current,
+            string source = null)
+        {
+            if (!m_EnableSettingChangeLogging || previous == current)
+            {
+                return;
+            }
+
+            string sourceSuffix =
+                string.IsNullOrWhiteSpace(source) ? string.Empty : $", source={source}";
+            Mod.log.Info(
+                $"[LOGGING_SETTINGS] option={option}, enabled={current}, previous={previous}{sourceSuffix}");
         }
 
         private static string GetModLogPath()

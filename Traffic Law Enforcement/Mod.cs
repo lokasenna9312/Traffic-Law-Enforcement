@@ -56,6 +56,7 @@ namespace Traffic_Law_Enforcement
             log.Info(
                 $"[MB-AHD-RAW] buildFingerprint={MidBlockAccessPathfindingPenaltyPatches.MbAhdRawBuildFingerprint}");
             m_Setting.EnableSettingChangeLogging();
+            m_Setting.LogDebugLoggingSettingsSnapshot("OnLoad");
 
             m_Setting.RegisterInOptionsUI();
             RegisterTextLocales();
