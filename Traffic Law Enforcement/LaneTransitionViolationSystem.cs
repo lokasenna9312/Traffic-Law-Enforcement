@@ -186,6 +186,8 @@ namespace Traffic_Law_Enforcement
 
             if (TryDetectMidBlockCrossing(history, out LaneTransitionViolationReasonCode reasonCode))
             {
+                MaybeLogRealizedOppositeFlowDetection(vehicle, history, reasonCode);
+
                 events.Add(new DetectedLaneTransitionViolation
                 {
                     Vehicle = vehicle,
@@ -256,6 +258,81 @@ namespace Traffic_Law_Enforcement
                 history.m_PreviousLane,
                 history.m_CurrentLane,
                 out reasonCode);
+        }
+
+        // Debug-only realized-path instrumentation for the exact pair that fired
+        // OppositeFlowSameRoadSegment. This does not alter classification.
+        private void MaybeLogRealizedOppositeFlowDetection(
+            Entity vehicle,
+            VehicleLaneHistory history,
+            LaneTransitionViolationReasonCode reasonCode)
+        {
+            if (reasonCode != LaneTransitionViolationReasonCode.OppositeFlowSameRoadSegment ||
+                !EnforcementLoggingPolicy.ShouldLogVehicleSpecificEnforcementEvent(vehicle))
+            {
+                return;
+            }
+
+            int previousCarriagewayGroup =
+                TryGetCarriagewayGroup(history.m_PreviousLane, out ushort previousGroup)
+                    ? previousGroup
+                    : -1;
+            int currentCarriagewayGroup =
+                TryGetCarriagewayGroup(history.m_CurrentLane, out ushort currentGroup)
+                    ? currentGroup
+                    : -1;
+
+            int previousDirectionSign = GetDirectionSign(history.m_PreviousLane);
+            int currentDirectionSign = GetDirectionSign(history.m_CurrentLane);
+
+            string message =
+                "[OPPFLOW_REALIZED_DETECTED] " +
+                $"vehicle={vehicle} " +
+                $"vehicleId={FocusedLoggingService.FormatEntity(vehicle)} " +
+                $"reason={reasonCode} " +
+                $"previousLane={FocusedLoggingService.FormatEntity(history.m_PreviousLane)} " +
+                $"currentLane={FocusedLoggingService.FormatEntity(history.m_CurrentLane)} " +
+                $"previousOwner={FocusedLoggingService.FormatEntity(history.m_PreviousLaneOwner)} " +
+                $"currentOwner={FocusedLoggingService.FormatEntity(history.m_CurrentLaneOwner)} " +
+                $"previousCarriagewayGroup={previousCarriagewayGroup} " +
+                $"currentCarriagewayGroup={currentCarriagewayGroup} " +
+                $"previousDirectionSign={previousDirectionSign} " +
+                $"currentDirectionSign={currentDirectionSign}";
+
+            EnforcementLoggingPolicy.RecordEnforcementEvent(message, vehicle);
+        }
+
+        private bool TryGetCarriagewayGroup(Entity lane, out ushort carriagewayGroup)
+        {
+            if (m_CarLaneData.TryGetComponent(lane, out CarLane carLane))
+            {
+                carriagewayGroup = carLane.m_CarriagewayGroup;
+                return true;
+            }
+
+            carriagewayGroup = 0;
+            return false;
+        }
+
+        private int GetDirectionSign(Entity lane)
+        {
+            if (!m_EdgeLaneData.TryGetComponent(lane, out EdgeLane edgeLane))
+            {
+                return 0;
+            }
+
+            float direction = edgeLane.m_EdgeDelta.y - edgeLane.m_EdgeDelta.x;
+            if (direction > 0f)
+            {
+                return 1;
+            }
+
+            if (direction < 0f)
+            {
+                return -1;
+            }
+
+            return 0;
         }
 
         private bool TryDetectIntersectionMovementViolation(VehicleLaneHistory history, CarCurrentLane currentLane, out LaneMovement actualMovement, out LaneMovement allowedMovement)

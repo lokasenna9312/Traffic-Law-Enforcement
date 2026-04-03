@@ -80,6 +80,8 @@ namespace Traffic_Law_Enforcement
                 {
                     case LaneTransitionViolationKind.MidBlockCrossing:
                     {
+                        int midBlockViolationCountBefore =
+                            statistics.m_MidBlockCrossingViolationCount;
                         statistics.m_MidBlockCrossingViolationCount += 1;
                         statisticsChanged = true;
 
@@ -89,6 +91,12 @@ namespace Traffic_Law_Enforcement
                             evt.Vehicle,
                             evt.Lane,
                             reason);
+
+                        MaybeLogRealizedOppositeFlowApply(
+                            evt.Vehicle,
+                            evt.ReasonCode,
+                            midBlockViolationCountBefore,
+                            statistics.m_MidBlockCrossingViolationCount);
 
                         if (EnforcementLoggingPolicy.ShouldLogVehicleSpecificEnforcementEvent(evt.Vehicle))
                         {
@@ -166,6 +174,31 @@ namespace Traffic_Law_Enforcement
                 default:
                     return "lane transition violation";
             }
+        }
+
+        // Debug-only apply confirmation for realized OppositeFlowSameRoadSegment.
+        // This does not alter violation application behavior.
+        private static void MaybeLogRealizedOppositeFlowApply(
+            Entity vehicle,
+            LaneTransitionViolationReasonCode reasonCode,
+            int violationCountBefore,
+            int violationCountAfter)
+        {
+            if (reasonCode != LaneTransitionViolationReasonCode.OppositeFlowSameRoadSegment ||
+                !EnforcementLoggingPolicy.ShouldLogVehicleSpecificEnforcementEvent(vehicle))
+            {
+                return;
+            }
+
+            string message =
+                "[OPPFLOW_REALIZED_APPLY] " +
+                $"vehicle={vehicle} " +
+                $"vehicleId={FocusedLoggingService.FormatEntity(vehicle)} " +
+                $"reason={reasonCode} " +
+                "applyHappened=true " +
+                $"midBlockViolationCount={violationCountBefore}->{violationCountAfter}";
+
+            EnforcementLoggingPolicy.RecordEnforcementEvent(message, vehicle);
         }
     }
 }
