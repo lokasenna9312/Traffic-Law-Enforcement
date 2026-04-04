@@ -24,6 +24,35 @@ namespace Traffic_Law_Enforcement
             DifferentCarriagewayGroup = 7,
         }
 
+        private readonly struct OrdinaryEgressDecisionProbe
+        {
+            internal readonly IllegalEgressApplyMode Branch;
+            internal readonly Entity StoredOriginLane;
+            internal readonly bool CandidateFormed;
+            internal readonly bool LegalityEvaluated;
+            internal readonly bool IsIllegal;
+            internal readonly LaneTransitionViolationReasonCode ReasonCode;
+            internal readonly string DropReason;
+
+            internal OrdinaryEgressDecisionProbe(
+                IllegalEgressApplyMode branch,
+                Entity storedOriginLane,
+                bool candidateFormed,
+                bool legalityEvaluated,
+                bool isIllegal,
+                LaneTransitionViolationReasonCode reasonCode,
+                string dropReason)
+            {
+                Branch = branch;
+                StoredOriginLane = storedOriginLane;
+                CandidateFormed = candidateFormed;
+                LegalityEvaluated = legalityEvaluated;
+                IsIllegal = isIllegal;
+                ReasonCode = reasonCode;
+                DropReason = dropReason;
+            }
+        }
+
         private EntityQuery m_CarQuery;
         private EntityQuery m_ChangedTransitionQuery;
         private EntityQuery m_EventBufferQuery;
@@ -244,6 +273,14 @@ namespace Traffic_Law_Enforcement
             MaybeLogRealizedOppositeFlowNearMiss(vehicle, history);
             MaybeLogRealizedEgressTrace(vehicle, history);
 
+            LaneTransitionAnalysisState analysisStateBefore = analysisState;
+            bool shouldLogOrdinaryEgressProbe =
+                TryBuildOrdinaryEgressDecisionProbe(
+                    vehicle,
+                    history,
+                    analysisStateBefore,
+                    out OrdinaryEgressDecisionProbe ordinaryEgressProbe);
+
             IllegalEgressApplyMode illegalEgressMode = IllegalEgressApplyMode.None;
             Entity illegalEgressOriginLane = Entity.Null;
             Entity illegalEgressRoadLane = Entity.Null;
@@ -278,6 +315,31 @@ namespace Traffic_Law_Enforcement
                 ClearPendingOrdinaryEgress(ref analysisState);
             }
 
+            bool bufferedOrdinaryEgress =
+                hasMidBlockViolation &&
+                IsIllegalEgressReason(reasonCode);
+            if (shouldLogOrdinaryEgressProbe)
+            {
+                LogOrdinaryEgressCandidateResult(
+                    vehicle,
+                    history,
+                    ordinaryEgressProbe);
+                LogOrdinaryEgressBufferResult(
+                    vehicle,
+                    history,
+                    ordinaryEgressProbe,
+                    bufferedOrdinaryEgress,
+                    bufferedOrdinaryEgress
+                        ? illegalEgressMode
+                        : ordinaryEgressProbe.Branch,
+                    bufferedOrdinaryEgress
+                        ? illegalEgressOriginLane
+                        : ordinaryEgressProbe.StoredOriginLane,
+                    bufferedOrdinaryEgress
+                        ? reasonCode
+                        : ordinaryEgressProbe.ReasonCode);
+            }
+
             if (hasMidBlockViolation)
             {
                 MaybeLogRealizedAccessDetection(vehicle, history, reasonCode);
@@ -287,6 +349,9 @@ namespace Traffic_Law_Enforcement
                 {
                     Vehicle = vehicle,
                     Lane = history.m_CurrentLane,
+                    PreviousLane = history.m_PreviousLane,
+                    PreviousOwner = history.m_PreviousLaneOwner,
+                    CurrentOwner = history.m_CurrentLaneOwner,
                     Kind = LaneTransitionViolationKind.MidBlockCrossing,
                     ReasonCode = reasonCode,
                     IllegalEgressMode = illegalEgressMode,
@@ -346,6 +411,9 @@ namespace Traffic_Law_Enforcement
                 {
                     Vehicle = vehicle,
                     Lane = history.m_CurrentLane,
+                    PreviousLane = history.m_PreviousLane,
+                    PreviousOwner = history.m_PreviousLaneOwner,
+                    CurrentOwner = history.m_CurrentLaneOwner,
                     Kind = LaneTransitionViolationKind.IntersectionMovement,
                     ReasonCode = LaneTransitionViolationReasonCode.None,
                     ActualMovement = actualMovement,
@@ -490,6 +558,99 @@ namespace Traffic_Law_Enforcement
                 history.m_PreviousLane,
                 history.m_CurrentLane,
                 out reasonCode);
+        }
+
+        private bool TryBuildOrdinaryEgressDecisionProbe(
+            Entity vehicle,
+            VehicleLaneHistory history,
+            LaneTransitionAnalysisState analysisState,
+            out OrdinaryEgressDecisionProbe probe)
+        {
+            probe = default;
+
+            if (!EnforcementLoggingPolicy.ShouldLogVehicleSpecificEnforcementEvent(vehicle) ||
+                !IsEligibleForPendingOrdinaryEgress(vehicle) ||
+                history.m_PreviousLane == Entity.Null ||
+                history.m_CurrentLane == Entity.Null ||
+                !IsRoadLane(history.m_CurrentLane) ||
+                IsRoadLane(history.m_PreviousLane))
+            {
+                return false;
+            }
+
+            if (IsAccessOrigin(history.m_PreviousLane))
+            {
+                MidBlockCrossingPolicy.TraceIllegalEgressTransition(
+                    EntityManager,
+                    history.m_PreviousLane,
+                    history.m_CurrentLane,
+                    out bool previousIsAccessOrigin,
+                    out bool currentIsRoad,
+                    out bool detected,
+                    out _,
+                    out LaneTransitionViolationReasonCode reasonCode);
+
+                bool legalityEvaluated =
+                    previousIsAccessOrigin &&
+                    currentIsRoad;
+                probe = new OrdinaryEgressDecisionProbe(
+                    IllegalEgressApplyMode.Direct,
+                    history.m_PreviousLane,
+                    candidateFormed: legalityEvaluated,
+                    legalityEvaluated: legalityEvaluated,
+                    isIllegal: legalityEvaluated && detected,
+                    reasonCode,
+                    detected
+                        ? string.Empty
+                        : legalityEvaluated
+                        ? "LegalityReturnedLegal"
+                        : "NoDirectCandidate");
+                return true;
+            }
+
+            if (IsNarrowOrdinaryEgressIntermediate(history.m_PreviousLane))
+            {
+                if (HasPendingOrdinaryEgress(analysisState))
+                {
+                    Entity pendingOriginLane = analysisState.m_PendingOrdinaryEgressOriginLane;
+                    bool detected = MidBlockCrossingPolicy.TryGetIllegalEgressTransition(
+                        EntityManager,
+                        pendingOriginLane,
+                        history.m_CurrentLane,
+                        out LaneTransitionViolationReasonCode reasonCode);
+                    probe = new OrdinaryEgressDecisionProbe(
+                        IllegalEgressApplyMode.Carried,
+                        pendingOriginLane,
+                        candidateFormed: true,
+                        legalityEvaluated: true,
+                        isIllegal: detected,
+                        reasonCode,
+                        detected
+                            ? string.Empty
+                            : "LegalityReturnedLegal");
+                    return true;
+                }
+
+                probe = new OrdinaryEgressDecisionProbe(
+                    IllegalEgressApplyMode.None,
+                    Entity.Null,
+                    candidateFormed: false,
+                    legalityEvaluated: false,
+                    isIllegal: false,
+                    LaneTransitionViolationReasonCode.None,
+                    "NoCarriedCandidate");
+                return true;
+            }
+
+            probe = new OrdinaryEgressDecisionProbe(
+                IllegalEgressApplyMode.None,
+                Entity.Null,
+                candidateFormed: false,
+                legalityEvaluated: false,
+                isIllegal: false,
+                LaneTransitionViolationReasonCode.None,
+                "NoDirectCandidate");
+            return true;
         }
 
         // This keeps the smallest ordinary-car egress carry scoped to:
@@ -865,6 +1026,104 @@ namespace Traffic_Law_Enforcement
         private bool IsRoadLane(Entity lane)
         {
             return m_EdgeLaneData.HasComponent(lane) && m_CarLaneData.HasComponent(lane);
+        }
+
+        private void LogOrdinaryEgressCandidateResult(
+            Entity vehicle,
+            VehicleLaneHistory history,
+            OrdinaryEgressDecisionProbe probe)
+        {
+            string message =
+                "[ACCESS_EGRESS_CANDIDATE_RESULT] " +
+                $"vehicle={FocusedLoggingService.FormatEntity(vehicle)} " +
+                $"branch={FormatIllegalEgressBranch(probe.Branch)} " +
+                $"storedOriginLane={FocusedLoggingService.FormatEntity(probe.StoredOriginLane)} " +
+                $"previousLane={FocusedLoggingService.FormatEntity(history.m_PreviousLane)} " +
+                $"currentLane={FocusedLoggingService.FormatEntity(history.m_CurrentLane)} " +
+                $"previousOwner={FocusedLoggingService.FormatEntity(history.m_PreviousLaneOwner)} " +
+                $"currentOwner={FocusedLoggingService.FormatEntity(history.m_CurrentLaneOwner)} " +
+                $"candidateFormed={probe.CandidateFormed} " +
+                $"legalityEvaluated={probe.LegalityEvaluated} " +
+                $"legalityResult={FormatOrdinaryEgressLegalityResult(probe.LegalityEvaluated, probe.IsIllegal)} " +
+                "buffered=False " +
+                "applied=False " +
+                $"reasonCode={probe.ReasonCode} " +
+                $"dropReason={FormatOrdinaryEgressDropReason(probe.DropReason)}";
+
+            EnforcementLoggingPolicy.RecordEnforcementEvent(message, vehicle);
+        }
+
+        private void LogOrdinaryEgressBufferResult(
+            Entity vehicle,
+            VehicleLaneHistory history,
+            OrdinaryEgressDecisionProbe probe,
+            bool buffered,
+            IllegalEgressApplyMode branch,
+            Entity storedOriginLane,
+            LaneTransitionViolationReasonCode reasonCode)
+        {
+            string dropReason = string.Empty;
+            if (!buffered)
+            {
+                if (!probe.CandidateFormed)
+                {
+                    dropReason = probe.DropReason;
+                }
+                else if (probe.LegalityEvaluated && !probe.IsIllegal)
+                {
+                    dropReason = "LegalityReturnedLegal";
+                }
+                else
+                {
+                    dropReason = "NotBuffered";
+                }
+            }
+
+            string message =
+                "[ACCESS_EGRESS_BUFFER_RESULT] " +
+                $"vehicle={FocusedLoggingService.FormatEntity(vehicle)} " +
+                $"branch={FormatIllegalEgressBranch(branch)} " +
+                $"storedOriginLane={FocusedLoggingService.FormatEntity(storedOriginLane)} " +
+                $"previousLane={FocusedLoggingService.FormatEntity(history.m_PreviousLane)} " +
+                $"currentLane={FocusedLoggingService.FormatEntity(history.m_CurrentLane)} " +
+                $"previousOwner={FocusedLoggingService.FormatEntity(history.m_PreviousLaneOwner)} " +
+                $"currentOwner={FocusedLoggingService.FormatEntity(history.m_CurrentLaneOwner)} " +
+                $"candidateFormed={probe.CandidateFormed} " +
+                $"legalityEvaluated={probe.LegalityEvaluated} " +
+                $"legalityResult={FormatOrdinaryEgressLegalityResult(probe.LegalityEvaluated, probe.IsIllegal)} " +
+                $"buffered={buffered} " +
+                "applied=False " +
+                $"reasonCode={reasonCode} " +
+                $"dropReason={FormatOrdinaryEgressDropReason(dropReason)}";
+
+            EnforcementLoggingPolicy.RecordEnforcementEvent(message, vehicle);
+        }
+
+        private string FormatIllegalEgressBranch(IllegalEgressApplyMode branch)
+        {
+            return branch switch
+            {
+                IllegalEgressApplyMode.Direct => "Direct",
+                IllegalEgressApplyMode.Carried => "Carried",
+                _ => "None",
+            };
+        }
+
+        private string FormatOrdinaryEgressLegalityResult(bool evaluated, bool illegal)
+        {
+            if (!evaluated)
+            {
+                return "NotEvaluated";
+            }
+
+            return illegal ? "Illegal" : "Legal";
+        }
+
+        private string FormatOrdinaryEgressDropReason(string dropReason)
+        {
+            return string.IsNullOrWhiteSpace(dropReason)
+                ? "None"
+                : dropReason;
         }
 
         private void LogPendingOrdinaryEgressCorridorConsume(

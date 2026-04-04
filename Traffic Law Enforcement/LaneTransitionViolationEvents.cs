@@ -28,6 +28,9 @@ namespace Traffic_Law_Enforcement
     {
         public Entity Vehicle;
         public Entity Lane;
+        public Entity PreviousLane;
+        public Entity PreviousOwner;
+        public Entity CurrentOwner;
         public LaneTransitionViolationKind Kind;
         public LaneTransitionViolationReasonCode ReasonCode;
         public IllegalEgressApplyMode IllegalEgressMode;

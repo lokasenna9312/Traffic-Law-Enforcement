@@ -91,7 +91,11 @@ namespace Traffic_Law_Enforcement
                             evt.Vehicle,
                             evt.Lane,
                             reason);
-                        RecordAppliedIllegalEgressMarker(evt);
+                        bool illegalEgressMarkerWritten =
+                            TryRecordAppliedIllegalEgressMarker(evt);
+                        MaybeLogOrdinaryEgressApplyResult(
+                            evt,
+                            illegalEgressMarkerWritten);
 
                         MaybeLogRealizedOppositeFlowApply(
                             evt.Vehicle,
@@ -237,7 +241,7 @@ namespace Traffic_Law_Enforcement
             EnforcementLoggingPolicy.RecordEnforcementEvent(message, vehicle);
         }
 
-        private static void RecordAppliedIllegalEgressMarker(
+        private static bool TryRecordAppliedIllegalEgressMarker(
             DetectedLaneTransitionViolation evt)
         {
             if (!IsIllegalEgressReason(evt.ReasonCode) ||
@@ -246,7 +250,7 @@ namespace Traffic_Law_Enforcement
                 evt.IllegalEgressOriginLane == Entity.Null ||
                 evt.IllegalEgressRoadLane == Entity.Null)
             {
-                return;
+                return false;
             }
 
             EnforcementTelemetry.RecordAppliedIllegalEgressMarker(
@@ -254,6 +258,44 @@ namespace Traffic_Law_Enforcement
                 evt.IllegalEgressMode,
                 evt.IllegalEgressOriginLane.Index,
                 evt.IllegalEgressRoadLane.Index);
+            return true;
+        }
+
+        private static void MaybeLogOrdinaryEgressApplyResult(
+            DetectedLaneTransitionViolation evt,
+            bool markerWritten)
+        {
+            if (!IsIllegalEgressReason(evt.ReasonCode) ||
+                !EnforcementLoggingPolicy.ShouldLogVehicleSpecificEnforcementEvent(evt.Vehicle))
+            {
+                return;
+            }
+
+            string branch = evt.IllegalEgressMode switch
+            {
+                IllegalEgressApplyMode.Direct => "Direct",
+                IllegalEgressApplyMode.Carried => "Carried",
+                _ => "None",
+            };
+
+            string message =
+                "[ACCESS_EGRESS_APPLY_RESULT] " +
+                $"vehicle={FocusedLoggingService.FormatEntity(evt.Vehicle)} " +
+                $"branch={branch} " +
+                $"storedOriginLane={FocusedLoggingService.FormatEntity(evt.IllegalEgressOriginLane)} " +
+                $"previousLane={FocusedLoggingService.FormatEntity(evt.PreviousLane)} " +
+                $"currentLane={FocusedLoggingService.FormatEntity(evt.Lane)} " +
+                $"previousOwner={FocusedLoggingService.FormatEntity(evt.PreviousOwner)} " +
+                $"currentOwner={FocusedLoggingService.FormatEntity(evt.CurrentOwner)} " +
+                "candidateFormed=True " +
+                "legalityEvaluated=True " +
+                "legalityResult=Illegal " +
+                "buffered=True " +
+                "applied=True " +
+                $"reasonCode={evt.ReasonCode} " +
+                $"dropReason={(markerWritten ? "None" : "MarkerWriteSkipped")}";
+
+            EnforcementLoggingPolicy.RecordEnforcementEvent(message, evt.Vehicle);
         }
 
         private static bool IsIllegalEgressReason(LaneTransitionViolationReasonCode reasonCode)
