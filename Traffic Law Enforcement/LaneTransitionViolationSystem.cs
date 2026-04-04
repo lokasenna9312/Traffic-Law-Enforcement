@@ -1,9 +1,12 @@
 using Game;
+using Game.Common;
 using Game.Net;
 using Game.Vehicles;
 using Unity.Collections;
 using Unity.Entities;
 using Entity = Unity.Entities.Entity;
+using PrefabRef = Game.Prefabs.PrefabRef;
+using PrefabSystem = Game.Prefabs.PrefabSystem;
 
 namespace Traffic_Law_Enforcement
 {
@@ -40,9 +43,12 @@ namespace Traffic_Law_Enforcement
         private ComponentLookup<ParkingLane> m_ParkingLaneData;
         private ComponentLookup<GarageLane> m_GarageLaneData;
         private ComponentLookup<ConnectionLane> m_ConnectionLaneData;
+        private ComponentLookup<Owner> m_OwnerData;
+        private ComponentLookup<PrefabRef> m_PrefabRefData;
         private ComponentLookup<LaneTransitionAnalysisState> m_AnalysisStateData;
         private const int MaxIntersectionTransitionDiagnostics = 32;
         private int m_IntersectionTransitionDiagnosticCount;
+        private PrefabSystem m_PrefabSystem;
 
         protected override void OnCreate()
         {
@@ -77,7 +83,10 @@ namespace Traffic_Law_Enforcement
             m_ParkingLaneData = GetComponentLookup<ParkingLane>(true);
             m_GarageLaneData = GetComponentLookup<GarageLane>(true);
             m_ConnectionLaneData = GetComponentLookup<ConnectionLane>(true);
+            m_OwnerData = GetComponentLookup<Owner>(true);
+            m_PrefabRefData = GetComponentLookup<PrefabRef>(true);
             m_AnalysisStateData = GetComponentLookup<LaneTransitionAnalysisState>();
+            m_PrefabSystem = World.GetOrCreateSystemManaged<PrefabSystem>();
             RequireForUpdate(m_CarQuery);
         }
 
@@ -101,6 +110,14 @@ namespace Traffic_Law_Enforcement
             {
                 if (!enforcementActive)
                 {
+                    m_CarLaneData.Update(this);
+                    m_EdgeLaneData.Update(this);
+                    m_ParkingLaneData.Update(this);
+                    m_GarageLaneData.Update(this);
+                    m_ConnectionLaneData.Update(this);
+                    m_OwnerData.Update(this);
+                    m_PrefabRefData.Update(this);
+
                     for (int chunkIndex = 0; chunkIndex < chunks.Length; chunkIndex += 1)
                     {
                         ArchetypeChunk chunk = chunks[chunkIndex];
@@ -124,6 +141,8 @@ namespace Traffic_Law_Enforcement
                 m_ParkingLaneData.Update(this);
                 m_GarageLaneData.Update(this);
                 m_ConnectionLaneData.Update(this);
+                m_OwnerData.Update(this);
+                m_PrefabRefData.Update(this);
 
                 if (m_EventEntity == Entity.Null || !EntityManager.Exists(m_EventEntity))
                 {
@@ -173,6 +192,14 @@ namespace Traffic_Law_Enforcement
             }
 
             analysisState.m_LastProcessedLaneChangeCount = history.m_LaneChangeCount;
+            if (HasPendingOrdinaryEgress(analysisState))
+            {
+                LogPendingOrdinaryEgressCorridorExpire(
+                    vehicle,
+                    analysisState.m_PendingOrdinaryEgressOriginLane,
+                    history,
+                    "ExpiredOnStateReset");
+            }
             ClearPendingOrdinaryEgress(ref analysisState);
             if (m_AnalysisStateData.HasComponent(vehicle))
             {
@@ -201,6 +228,14 @@ namespace Traffic_Law_Enforcement
 
             if (m_CarData.TryGetComponent(vehicle, out Car car) && EmergencyVehiclePolicy.IsEmergencyVehicle(car))
             {
+                if (HasPendingOrdinaryEgress(analysisState))
+                {
+                    LogPendingOrdinaryEgressCorridorExpire(
+                        vehicle,
+                        analysisState.m_PendingOrdinaryEgressOriginLane,
+                        history,
+                        "ExpiredOnStateReset");
+                }
                 ClearPendingOrdinaryEgress(ref analysisState);
                 EntityManager.SetComponentData(vehicle, analysisState);
                 return;
@@ -480,6 +515,11 @@ namespace Traffic_Law_Enforcement
 
             if (!IsEligibleForPendingOrdinaryEgress(vehicle))
             {
+                LogPendingOrdinaryEgressCorridorExpire(
+                    vehicle,
+                    pendingOriginLane,
+                    history,
+                    "ExpiredOnDeliveryTruck");
                 ClearPendingOrdinaryEgress(ref analysisState);
                 return false;
             }
@@ -495,6 +535,11 @@ namespace Traffic_Law_Enforcement
                         pendingOriginLane,
                         history.m_CurrentLane,
                         out reasonCode);
+                    LogPendingOrdinaryEgressCorridorConsume(
+                        vehicle,
+                        pendingOriginLane,
+                        history,
+                        detected);
                     if (detected)
                     {
                         originLane = pendingOriginLane;
@@ -505,11 +550,20 @@ namespace Traffic_Law_Enforcement
 
                 if (IsNarrowOrdinaryEgressIntermediate(history.m_CurrentLane))
                 {
-                    AdvancePendingOrdinaryEgressCorridor(ref analysisState);
+                    AdvancePendingOrdinaryEgressCorridor(
+                        vehicle,
+                        history,
+                        ref analysisState,
+                        pendingOriginLane);
                     return false;
                 }
             }
 
+            LogPendingOrdinaryEgressCorridorExpire(
+                vehicle,
+                pendingOriginLane,
+                history,
+                GetPendingOrdinaryEgressExpireReason(history));
             ClearPendingOrdinaryEgress(ref analysisState);
             return false;
         }
@@ -766,7 +820,10 @@ namespace Traffic_Law_Enforcement
         }
 
         private void AdvancePendingOrdinaryEgressCorridor(
-            ref LaneTransitionAnalysisState analysisState)
+            Entity vehicle,
+            VehicleLaneHistory history,
+            ref LaneTransitionAnalysisState analysisState,
+            Entity pendingOriginLane)
         {
             if (analysisState.m_PendingOrdinaryEgressCorridorFailsafeBudget > 0)
             {
@@ -775,6 +832,11 @@ namespace Traffic_Law_Enforcement
 
             if (analysisState.m_PendingOrdinaryEgressCorridorFailsafeBudget == 0)
             {
+                LogPendingOrdinaryEgressCorridorExpire(
+                    vehicle,
+                    pendingOriginLane,
+                    history,
+                    "ExpiredOnFailsafe");
                 ClearPendingOrdinaryEgress(ref analysisState);
             }
         }
@@ -799,6 +861,152 @@ namespace Traffic_Law_Enforcement
         private bool IsRoadLane(Entity lane)
         {
             return m_EdgeLaneData.HasComponent(lane) && m_CarLaneData.HasComponent(lane);
+        }
+
+        private void LogPendingOrdinaryEgressCorridorConsume(
+            Entity vehicle,
+            Entity storedOriginLane,
+            VehicleLaneHistory history,
+            bool detected)
+        {
+            if (!EnforcementLoggingPolicy.ShouldLogVehicleSpecificEnforcementEvent(vehicle))
+            {
+                return;
+            }
+
+            string message =
+                "[ACCESS_EGRESS_CORRIDOR_CONSUME] " +
+                $"vehicle={FocusedLoggingService.FormatEntity(vehicle)} " +
+                $"storedOriginLane={FocusedLoggingService.FormatEntity(storedOriginLane)} " +
+                $"previousLane={FocusedLoggingService.FormatEntity(history.m_PreviousLane)} " +
+                $"currentLane={FocusedLoggingService.FormatEntity(history.m_CurrentLane)} " +
+                $"previousOwner={FocusedLoggingService.FormatEntity(history.m_PreviousLaneOwner)} " +
+                $"currentOwner={FocusedLoggingService.FormatEntity(history.m_CurrentLaneOwner)} " +
+                $"previousLaneKind={DescribeLaneKind(history.m_PreviousLane)} " +
+                $"currentLaneKind={DescribeLaneKind(history.m_CurrentLane)} " +
+                $"currentIsRoad={IsRoadLane(history.m_CurrentLane)} " +
+                $"currentIsInvisibleRoadPathLike={IsInvisibleRoadPathLike(history.m_CurrentLane, history.m_CurrentLaneOwner)} " +
+                "corridorAction=Consume " +
+                "corridorReason=ConsumedOnRoad " +
+                $"legalityResult={FormatCorridorLegalityResult(evaluated: true, illegal: detected)}";
+
+            EnforcementLoggingPolicy.RecordEnforcementEvent(message, vehicle);
+        }
+
+        private void LogPendingOrdinaryEgressCorridorExpire(
+            Entity vehicle,
+            Entity storedOriginLane,
+            VehicleLaneHistory history,
+            string corridorReason)
+        {
+            if (!EnforcementLoggingPolicy.ShouldLogVehicleSpecificEnforcementEvent(vehicle))
+            {
+                return;
+            }
+
+            string message =
+                "[ACCESS_EGRESS_CORRIDOR_EXPIRE] " +
+                $"vehicle={FocusedLoggingService.FormatEntity(vehicle)} " +
+                $"storedOriginLane={FocusedLoggingService.FormatEntity(storedOriginLane)} " +
+                $"previousLane={FocusedLoggingService.FormatEntity(history.m_PreviousLane)} " +
+                $"currentLane={FocusedLoggingService.FormatEntity(history.m_CurrentLane)} " +
+                $"previousOwner={FocusedLoggingService.FormatEntity(history.m_PreviousLaneOwner)} " +
+                $"currentOwner={FocusedLoggingService.FormatEntity(history.m_CurrentLaneOwner)} " +
+                $"previousLaneKind={DescribeLaneKind(history.m_PreviousLane)} " +
+                $"currentLaneKind={DescribeLaneKind(history.m_CurrentLane)} " +
+                $"currentIsRoad={IsRoadLane(history.m_CurrentLane)} " +
+                $"currentIsInvisibleRoadPathLike={IsInvisibleRoadPathLike(history.m_CurrentLane, history.m_CurrentLaneOwner)} " +
+                "corridorAction=Expire " +
+                $"corridorReason={corridorReason} " +
+                "legalityResult=NotEvaluated";
+
+            EnforcementLoggingPolicy.RecordEnforcementEvent(message, vehicle);
+        }
+
+        private string GetPendingOrdinaryEgressExpireReason(VehicleLaneHistory history)
+        {
+            if (m_ConnectionLaneData.HasComponent(history.m_CurrentLane))
+            {
+                return "ExpiredOnConnectionLane";
+            }
+
+            if (IsAccessOrigin(history.m_CurrentLane))
+            {
+                return "ExpiredOnNewAccessOrigin";
+            }
+
+            if (IsRoadLane(history.m_CurrentLane))
+            {
+                return "ExpiredOnRoadButNotConsumeShape";
+            }
+
+            return "ExpiredOnOutsideIntermediateFamily";
+        }
+
+        private string FormatCorridorLegalityResult(bool evaluated, bool illegal)
+        {
+            if (!evaluated)
+            {
+                return "NotEvaluated";
+            }
+
+            return illegal ? "Illegal" : "Legal";
+        }
+
+        private bool IsInvisibleRoadPathLike(Entity lane, Entity laneOwner)
+        {
+            return HasInvisibleRoadPathLikePrefabName(lane) ||
+                HasInvisibleRoadPathLikePrefabName(laneOwner) ||
+                HasInvisibleRoadPathLikeOwnerChainPrefabName(laneOwner);
+        }
+
+        private bool HasInvisibleRoadPathLikeOwnerChainPrefabName(Entity entity)
+        {
+            Entity current = entity;
+            for (int depth = 0; depth < 4 && current != Entity.Null; depth += 1)
+            {
+                if (HasInvisibleRoadPathLikePrefabName(current))
+                {
+                    return true;
+                }
+
+                if (!m_OwnerData.TryGetComponent(current, out Owner owner) ||
+                    owner.m_Owner == Entity.Null ||
+                    owner.m_Owner == current)
+                {
+                    break;
+                }
+
+                current = owner.m_Owner;
+            }
+
+            return false;
+        }
+
+        private bool HasInvisibleRoadPathLikePrefabName(Entity entity)
+        {
+            if (entity == Entity.Null)
+            {
+                return false;
+            }
+
+            string prefabName = TryGetPrefabName(entity);
+            return !string.IsNullOrEmpty(prefabName) &&
+                prefabName.IndexOf("Invisible Road Path", System.StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        private string TryGetPrefabName(Entity entity)
+        {
+            if (entity == Entity.Null ||
+                !m_PrefabRefData.TryGetComponent(entity, out PrefabRef prefabRef) ||
+                prefabRef.m_Prefab == Entity.Null)
+            {
+                return null;
+            }
+
+            return m_PrefabSystem != null
+                ? m_PrefabSystem.GetPrefabName(prefabRef.m_Prefab)
+                : prefabRef.m_Prefab.ToString();
         }
 
         private static bool IsIllegalEgressReason(LaneTransitionViolationReasonCode reasonCode)
