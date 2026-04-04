@@ -237,6 +237,7 @@ namespace Traffic_Law_Enforcement
                     "ExpiredOnStateReset");
             }
             ClearPendingOrdinaryEgress(ref analysisState);
+            ClearPendingUndercroftOrdinaryEgressBridge(ref analysisState);
             ClearOrdinaryEgressFamilyBoundaryBreadcrumb(ref analysisState);
             if (m_AnalysisStateData.HasComponent(vehicle))
             {
@@ -274,6 +275,7 @@ namespace Traffic_Law_Enforcement
                         "ExpiredOnStateReset");
                 }
                 ClearPendingOrdinaryEgress(ref analysisState);
+                ClearPendingUndercroftOrdinaryEgressBridge(ref analysisState);
                 ClearOrdinaryEgressFamilyBoundaryBreadcrumb(ref analysisState);
                 EntityManager.SetComponentData(vehicle, analysisState);
                 return;
@@ -322,10 +324,12 @@ namespace Traffic_Law_Enforcement
             else
             {
                 ClearPendingOrdinaryEgress(ref analysisState);
+                ClearPendingUndercroftOrdinaryEgressBridge(ref analysisState);
             }
 
             if (hasMidBlockViolation)
             {
+                ClearPendingUndercroftOrdinaryEgressBridge(ref analysisState);
                 ClearOrdinaryEgressFamilyBoundaryBreadcrumb(ref analysisState);
             }
 
@@ -1008,10 +1012,26 @@ namespace Traffic_Law_Enforcement
             VehicleLaneHistory history,
             ref LaneTransitionAnalysisState analysisState)
         {
+            if (TrySeedPendingOrdinaryEgressFromUndercroftBridge(
+                    vehicle,
+                    history,
+                    ref analysisState))
+            {
+                return;
+            }
+
             bool currentIsNarrowIntermediate =
                 IsNarrowOrdinaryEgressIntermediate(history.m_CurrentLane);
             bool previousIsAccessOrigin =
                 IsAccessOrigin(history.m_PreviousLane);
+
+            if (TryRememberPendingUndercroftOrdinaryEgressBridge(
+                    vehicle,
+                    history,
+                    ref analysisState))
+            {
+                return;
+            }
 
             if (!IsEligibleForPendingOrdinaryEgress(vehicle) ||
                 !previousIsAccessOrigin ||
@@ -1035,9 +1055,11 @@ namespace Traffic_Law_Enforcement
                 }
 
                 ClearPendingOrdinaryEgress(ref analysisState);
+                ClearPendingUndercroftOrdinaryEgressBridge(ref analysisState);
                 return;
             }
 
+            ClearPendingUndercroftOrdinaryEgressBridge(ref analysisState);
             ClearOrdinaryEgressFamilyBoundaryBreadcrumb(ref analysisState);
             analysisState.m_PendingOrdinaryEgressOriginLane = history.m_PreviousLane;
             analysisState.m_PendingOrdinaryEgressCorridorFailsafeBudget =
@@ -1045,7 +1067,8 @@ namespace Traffic_Law_Enforcement
             LogPendingOrdinaryEgressCorridorArm(
                 vehicle,
                 history.m_PreviousLane,
-                history);
+                history,
+                "ArmedOnAccessOriginExit");
         }
 
         private void AdvancePendingOrdinaryEgressCorridor(
@@ -1076,6 +1099,13 @@ namespace Traffic_Law_Enforcement
                 analysisState.m_PendingOrdinaryEgressOriginLane != Entity.Null;
         }
 
+        private bool HasPendingUndercroftOrdinaryEgressBridge(
+            LaneTransitionAnalysisState analysisState)
+        {
+            return analysisState.m_PendingUndercroftOrdinaryEgressBridgeConnectionLane != Entity.Null &&
+                analysisState.m_PendingUndercroftOrdinaryEgressBridgeOriginLane != Entity.Null;
+        }
+
         private bool HasOrdinaryEgressFamilyBoundaryBreadcrumb(
             LaneTransitionAnalysisState analysisState)
         {
@@ -1088,6 +1118,13 @@ namespace Traffic_Law_Enforcement
         {
             analysisState.m_PendingOrdinaryEgressCorridorFailsafeBudget = 0;
             analysisState.m_PendingOrdinaryEgressOriginLane = Entity.Null;
+        }
+
+        private void ClearPendingUndercroftOrdinaryEgressBridge(
+            ref LaneTransitionAnalysisState analysisState)
+        {
+            analysisState.m_PendingUndercroftOrdinaryEgressBridgeConnectionLane = Entity.Null;
+            analysisState.m_PendingUndercroftOrdinaryEgressBridgeOriginLane = Entity.Null;
         }
 
         private void ClearOrdinaryEgressFamilyBoundaryBreadcrumb(
@@ -1111,6 +1148,64 @@ namespace Traffic_Law_Enforcement
             analysisState.m_LastOrdinaryEgressFamilyOriginLane = storedOriginLane;
         }
 
+        private bool TryRememberPendingUndercroftOrdinaryEgressBridge(
+            Entity vehicle,
+            VehicleLaneHistory history,
+            ref LaneTransitionAnalysisState analysisState)
+        {
+            if (!IsEligibleForPendingOrdinaryEgress(vehicle) ||
+                !m_GarageLaneData.HasComponent(history.m_PreviousLane) ||
+                !IsQualifyingUndercroftOrdinaryEgressBridgeConnection(history.m_CurrentLane) ||
+                history.m_PreviousLaneOwner == Entity.Null ||
+                history.m_PreviousLaneOwner != history.m_CurrentLaneOwner)
+            {
+                return false;
+            }
+
+            ClearOrdinaryEgressFamilyBoundaryBreadcrumb(ref analysisState);
+            analysisState.m_PendingUndercroftOrdinaryEgressBridgeOriginLane =
+                history.m_PreviousLane;
+            analysisState.m_PendingUndercroftOrdinaryEgressBridgeConnectionLane =
+                history.m_CurrentLane;
+            return true;
+        }
+
+        private bool TrySeedPendingOrdinaryEgressFromUndercroftBridge(
+            Entity vehicle,
+            VehicleLaneHistory history,
+            ref LaneTransitionAnalysisState analysisState)
+        {
+            if (!HasPendingUndercroftOrdinaryEgressBridge(analysisState))
+            {
+                return false;
+            }
+
+            Entity bridgeConnectionLane =
+                analysisState.m_PendingUndercroftOrdinaryEgressBridgeConnectionLane;
+            Entity bridgeOriginLane =
+                analysisState.m_PendingUndercroftOrdinaryEgressBridgeOriginLane;
+
+            if (!IsEligibleForPendingOrdinaryEgress(vehicle) ||
+                history.m_PreviousLane != bridgeConnectionLane ||
+                !IsNarrowOrdinaryEgressIntermediate(history.m_CurrentLane))
+            {
+                ClearPendingUndercroftOrdinaryEgressBridge(ref analysisState);
+                return false;
+            }
+
+            ClearPendingUndercroftOrdinaryEgressBridge(ref analysisState);
+            ClearOrdinaryEgressFamilyBoundaryBreadcrumb(ref analysisState);
+            analysisState.m_PendingOrdinaryEgressOriginLane = bridgeOriginLane;
+            analysisState.m_PendingOrdinaryEgressCorridorFailsafeBudget =
+                PendingOrdinaryEgressCorridorFailsafeBudget;
+            LogPendingOrdinaryEgressCorridorArm(
+                vehicle,
+                bridgeOriginLane,
+                history,
+                "ArmedOnUndercroftConnectionExit");
+            return true;
+        }
+
         private bool IsEligibleForPendingOrdinaryEgress(Entity vehicle)
         {
             return !m_DeliveryTruckData.HasComponent(vehicle);
@@ -1119,6 +1214,30 @@ namespace Traffic_Law_Enforcement
         private bool IsRoadLane(Entity lane)
         {
             return m_EdgeLaneData.HasComponent(lane) && m_CarLaneData.HasComponent(lane);
+        }
+
+        private bool IsQualifyingUndercroftOrdinaryEgressBridgeConnection(Entity lane)
+        {
+            if (!m_ConnectionLaneData.TryGetComponent(lane, out ConnectionLane connectionLane))
+            {
+                return false;
+            }
+
+            ConnectionLaneFlags requiredFlags =
+                ConnectionLaneFlags.Road |
+                ConnectionLaneFlags.Inside |
+                ConnectionLaneFlags.AllowEnter;
+            if ((connectionLane.m_Flags & requiredFlags) != requiredFlags)
+            {
+                return false;
+            }
+
+            ConnectionLaneFlags excludedFlags =
+                ConnectionLaneFlags.Parking |
+                ConnectionLaneFlags.Pedestrian |
+                ConnectionLaneFlags.AllowCargo |
+                ConnectionLaneFlags.AllowExit;
+            return (connectionLane.m_Flags & excludedFlags) == 0;
         }
 
         private void LogOrdinaryEgressCandidateResult(
@@ -1294,7 +1413,8 @@ namespace Traffic_Law_Enforcement
         private void LogPendingOrdinaryEgressCorridorArm(
             Entity vehicle,
             Entity storedOriginLane,
-            VehicleLaneHistory history)
+            VehicleLaneHistory history,
+            string corridorReason)
         {
             if (!EnforcementLoggingPolicy.ShouldLogVehicleSpecificEnforcementEvent(vehicle))
             {
@@ -1314,7 +1434,7 @@ namespace Traffic_Law_Enforcement
                 $"currentIsRoad={IsRoadLane(history.m_CurrentLane)} " +
                 $"currentIsInvisibleRoadPathLike={IsInvisibleRoadPathLike(history.m_CurrentLane, history.m_CurrentLaneOwner)} " +
                 "corridorAction=Arm " +
-                "corridorReason=ArmedOnAccessOriginExit " +
+                $"corridorReason={corridorReason} " +
                 "legalityResult=NotEvaluated";
 
             EnforcementLoggingPolicy.RecordEnforcementEvent(message, vehicle);
