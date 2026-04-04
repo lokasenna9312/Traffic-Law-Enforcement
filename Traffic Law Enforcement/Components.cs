@@ -24,6 +24,9 @@ namespace Traffic_Law_Enforcement
         public byte m_LastProcessedLaneChangeCount;
         public byte m_PendingOrdinaryEgressCorridorFailsafeBudget;
         public Entity m_PendingOrdinaryEgressOriginLane;
+        public byte m_LastOrdinaryEgressFamilyBoundaryReason;
+        public Entity m_LastOrdinaryEgressFamilyBoundaryLane;
+        public Entity m_LastOrdinaryEgressFamilyOriginLane;
     }
 
     public struct OriginalPathfindCarData : IComponentData

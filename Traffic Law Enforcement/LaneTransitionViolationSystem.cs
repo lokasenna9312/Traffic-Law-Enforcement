@@ -53,6 +53,13 @@ namespace Traffic_Law_Enforcement
             }
         }
 
+        private enum OrdinaryEgressFamilyBoundaryReason : byte
+        {
+            None = 0,
+            ConnectionExitNotAccessOrigin = 1,
+            ExpiredOnConnectionLane = 2,
+        }
+
         private EntityQuery m_CarQuery;
         private EntityQuery m_ChangedTransitionQuery;
         private EntityQuery m_EventBufferQuery;
@@ -230,6 +237,7 @@ namespace Traffic_Law_Enforcement
                     "ExpiredOnStateReset");
             }
             ClearPendingOrdinaryEgress(ref analysisState);
+            ClearOrdinaryEgressFamilyBoundaryBreadcrumb(ref analysisState);
             if (m_AnalysisStateData.HasComponent(vehicle))
             {
                 EntityManager.SetComponentData(vehicle, analysisState);
@@ -266,6 +274,7 @@ namespace Traffic_Law_Enforcement
                         "ExpiredOnStateReset");
                 }
                 ClearPendingOrdinaryEgress(ref analysisState);
+                ClearOrdinaryEgressFamilyBoundaryBreadcrumb(ref analysisState);
                 EntityManager.SetComponentData(vehicle, analysisState);
                 return;
             }
@@ -315,11 +324,22 @@ namespace Traffic_Law_Enforcement
                 ClearPendingOrdinaryEgress(ref analysisState);
             }
 
+            if (hasMidBlockViolation)
+            {
+                ClearOrdinaryEgressFamilyBoundaryBreadcrumb(ref analysisState);
+            }
+
             bool bufferedOrdinaryEgress =
                 hasMidBlockViolation &&
                 IsIllegalEgressReason(reasonCode);
             if (shouldLogOrdinaryEgressProbe)
             {
+                bool loggedConnectionFamilyRoadArrival =
+                    MaybeLogOrdinaryEgressConnectionFamilyRoadArrival(
+                        vehicle,
+                        history,
+                        analysisStateBefore,
+                        ordinaryEgressProbe);
                 LogOrdinaryEgressCandidateResult(
                     vehicle,
                     history,
@@ -338,6 +358,10 @@ namespace Traffic_Law_Enforcement
                     bufferedOrdinaryEgress
                         ? reasonCode
                         : ordinaryEgressProbe.ReasonCode);
+                if (loggedConnectionFamilyRoadArrival)
+                {
+                    ClearOrdinaryEgressFamilyBoundaryBreadcrumb(ref analysisState);
+                }
             }
 
             if (hasMidBlockViolation)
@@ -689,6 +713,7 @@ namespace Traffic_Law_Enforcement
             {
                 if (IsRoadLane(history.m_CurrentLane))
                 {
+                    ClearOrdinaryEgressFamilyBoundaryBreadcrumb(ref analysisState);
                     ClearPendingOrdinaryEgress(ref analysisState);
 
                     bool detected = MidBlockCrossingPolicy.TryGetIllegalEgressTransition(
@@ -720,11 +745,27 @@ namespace Traffic_Law_Enforcement
                 }
             }
 
+            string expireReason = GetPendingOrdinaryEgressExpireReason(history);
+            if (expireReason == "ExpiredOnConnectionLane")
+            {
+                RememberOrdinaryEgressFamilyBoundaryBreadcrumb(
+                    ref analysisState,
+                    OrdinaryEgressFamilyBoundaryReason.ExpiredOnConnectionLane,
+                    history.m_CurrentLane,
+                    pendingOriginLane);
+                LogOrdinaryEgressConnectionFamilyBoundary(
+                    vehicle,
+                    pendingOriginLane,
+                    history,
+                    history.m_CurrentLane,
+                    OrdinaryEgressFamilyBoundaryReason.ExpiredOnConnectionLane);
+            }
+
             LogPendingOrdinaryEgressCorridorExpire(
                 vehicle,
                 pendingOriginLane,
                 history,
-                GetPendingOrdinaryEgressExpireReason(history));
+                expireReason);
             ClearPendingOrdinaryEgress(ref analysisState);
             return false;
         }
@@ -967,14 +1008,37 @@ namespace Traffic_Law_Enforcement
             VehicleLaneHistory history,
             ref LaneTransitionAnalysisState analysisState)
         {
+            bool currentIsNarrowIntermediate =
+                IsNarrowOrdinaryEgressIntermediate(history.m_CurrentLane);
+            bool previousIsAccessOrigin =
+                IsAccessOrigin(history.m_PreviousLane);
+
             if (!IsEligibleForPendingOrdinaryEgress(vehicle) ||
-                !IsAccessOrigin(history.m_PreviousLane) ||
-                !IsNarrowOrdinaryEgressIntermediate(history.m_CurrentLane))
+                !previousIsAccessOrigin ||
+                !currentIsNarrowIntermediate)
             {
+                if (m_ConnectionLaneData.HasComponent(history.m_PreviousLane) &&
+                    currentIsNarrowIntermediate &&
+                    !previousIsAccessOrigin)
+                {
+                    RememberOrdinaryEgressFamilyBoundaryBreadcrumb(
+                        ref analysisState,
+                        OrdinaryEgressFamilyBoundaryReason.ConnectionExitNotAccessOrigin,
+                        history.m_PreviousLane,
+                        Entity.Null);
+                    LogOrdinaryEgressConnectionFamilyBoundary(
+                        vehicle,
+                        Entity.Null,
+                        history,
+                        history.m_PreviousLane,
+                        OrdinaryEgressFamilyBoundaryReason.ConnectionExitNotAccessOrigin);
+                }
+
                 ClearPendingOrdinaryEgress(ref analysisState);
                 return;
             }
 
+            ClearOrdinaryEgressFamilyBoundaryBreadcrumb(ref analysisState);
             analysisState.m_PendingOrdinaryEgressOriginLane = history.m_PreviousLane;
             analysisState.m_PendingOrdinaryEgressCorridorFailsafeBudget =
                 PendingOrdinaryEgressCorridorFailsafeBudget;
@@ -1012,10 +1076,39 @@ namespace Traffic_Law_Enforcement
                 analysisState.m_PendingOrdinaryEgressOriginLane != Entity.Null;
         }
 
+        private bool HasOrdinaryEgressFamilyBoundaryBreadcrumb(
+            LaneTransitionAnalysisState analysisState)
+        {
+            return analysisState.m_LastOrdinaryEgressFamilyBoundaryReason !=
+                   (byte)OrdinaryEgressFamilyBoundaryReason.None &&
+                analysisState.m_LastOrdinaryEgressFamilyBoundaryLane != Entity.Null;
+        }
+
         private void ClearPendingOrdinaryEgress(ref LaneTransitionAnalysisState analysisState)
         {
             analysisState.m_PendingOrdinaryEgressCorridorFailsafeBudget = 0;
             analysisState.m_PendingOrdinaryEgressOriginLane = Entity.Null;
+        }
+
+        private void ClearOrdinaryEgressFamilyBoundaryBreadcrumb(
+            ref LaneTransitionAnalysisState analysisState)
+        {
+            analysisState.m_LastOrdinaryEgressFamilyBoundaryReason =
+                (byte)OrdinaryEgressFamilyBoundaryReason.None;
+            analysisState.m_LastOrdinaryEgressFamilyBoundaryLane = Entity.Null;
+            analysisState.m_LastOrdinaryEgressFamilyOriginLane = Entity.Null;
+        }
+
+        private void RememberOrdinaryEgressFamilyBoundaryBreadcrumb(
+            ref LaneTransitionAnalysisState analysisState,
+            OrdinaryEgressFamilyBoundaryReason boundaryReason,
+            Entity boundaryLane,
+            Entity storedOriginLane)
+        {
+            analysisState.m_LastOrdinaryEgressFamilyBoundaryReason =
+                (byte)boundaryReason;
+            analysisState.m_LastOrdinaryEgressFamilyBoundaryLane = boundaryLane;
+            analysisState.m_LastOrdinaryEgressFamilyOriginLane = storedOriginLane;
         }
 
         private bool IsEligibleForPendingOrdinaryEgress(Entity vehicle)
@@ -1097,6 +1190,48 @@ namespace Traffic_Law_Enforcement
                 $"dropReason={FormatOrdinaryEgressDropReason(dropReason)}";
 
             EnforcementLoggingPolicy.RecordEnforcementEvent(message, vehicle);
+        }
+
+        private bool MaybeLogOrdinaryEgressConnectionFamilyRoadArrival(
+            Entity vehicle,
+            VehicleLaneHistory history,
+            LaneTransitionAnalysisState analysisState,
+            OrdinaryEgressDecisionProbe probe)
+        {
+            if (!HasOrdinaryEgressFamilyBoundaryBreadcrumb(analysisState) ||
+                probe.Branch != IllegalEgressApplyMode.None ||
+                probe.CandidateFormed ||
+                probe.DropReason != "NoCarriedCandidate")
+            {
+                return false;
+            }
+
+            Entity boundaryLane =
+                analysisState.m_LastOrdinaryEgressFamilyBoundaryLane;
+            Entity storedOriginLane =
+                analysisState.m_LastOrdinaryEgressFamilyOriginLane;
+            OrdinaryEgressFamilyBoundaryReason boundaryReason =
+                (OrdinaryEgressFamilyBoundaryReason)
+                analysisState.m_LastOrdinaryEgressFamilyBoundaryReason;
+
+            string message =
+                "[ACCESS_EGRESS_CONNECTION_FAMILY_ROAD_ARRIVAL] " +
+                $"vehicle={FocusedLoggingService.FormatEntity(vehicle)} " +
+                $"storedOriginLane={FocusedLoggingService.FormatEntity(storedOriginLane)} " +
+                $"connectionLane={FocusedLoggingService.FormatEntity(boundaryLane)} " +
+                $"previousLane={FocusedLoggingService.FormatEntity(history.m_PreviousLane)} " +
+                $"currentLane={FocusedLoggingService.FormatEntity(history.m_CurrentLane)} " +
+                $"previousOwner={FocusedLoggingService.FormatEntity(history.m_PreviousLaneOwner)} " +
+                $"currentOwner={FocusedLoggingService.FormatEntity(history.m_CurrentLaneOwner)} " +
+                $"previousLaneKind={DescribeLaneKind(history.m_PreviousLane)} " +
+                $"currentLaneKind={DescribeLaneKind(history.m_CurrentLane)} " +
+                $"currentIsRoad={IsRoadLane(history.m_CurrentLane)} " +
+                $"boundaryReason={FormatOrdinaryEgressFamilyBoundaryReason(boundaryReason)} " +
+                $"boundaryConnectionFlags={FormatConnectionLaneFlags(boundaryLane)} " +
+                "pendingAvailable=False";
+
+            EnforcementLoggingPolicy.RecordEnforcementEvent(message, vehicle);
+            return true;
         }
 
         private string FormatIllegalEgressBranch(IllegalEgressApplyMode branch)
@@ -1185,6 +1320,37 @@ namespace Traffic_Law_Enforcement
             EnforcementLoggingPolicy.RecordEnforcementEvent(message, vehicle);
         }
 
+        private void LogOrdinaryEgressConnectionFamilyBoundary(
+            Entity vehicle,
+            Entity storedOriginLane,
+            VehicleLaneHistory history,
+            Entity connectionLane,
+            OrdinaryEgressFamilyBoundaryReason boundaryReason)
+        {
+            if (!EnforcementLoggingPolicy.ShouldLogVehicleSpecificEnforcementEvent(vehicle))
+            {
+                return;
+            }
+
+            string message =
+                "[ACCESS_EGRESS_CONNECTION_FAMILY_BOUNDARY] " +
+                $"vehicle={FocusedLoggingService.FormatEntity(vehicle)} " +
+                $"storedOriginLane={FocusedLoggingService.FormatEntity(storedOriginLane)} " +
+                $"connectionLane={FocusedLoggingService.FormatEntity(connectionLane)} " +
+                $"previousLane={FocusedLoggingService.FormatEntity(history.m_PreviousLane)} " +
+                $"currentLane={FocusedLoggingService.FormatEntity(history.m_CurrentLane)} " +
+                $"previousOwner={FocusedLoggingService.FormatEntity(history.m_PreviousLaneOwner)} " +
+                $"currentOwner={FocusedLoggingService.FormatEntity(history.m_CurrentLaneOwner)} " +
+                $"previousLaneKind={DescribeLaneKind(history.m_PreviousLane)} " +
+                $"currentLaneKind={DescribeLaneKind(history.m_CurrentLane)} " +
+                $"connectionFlags={FormatConnectionLaneFlags(connectionLane)} " +
+                $"previousIsAccessOrigin={IsAccessOrigin(history.m_PreviousLane)} " +
+                $"currentIsAccessOrigin={IsAccessOrigin(history.m_CurrentLane)} " +
+                $"boundaryReason={FormatOrdinaryEgressFamilyBoundaryReason(boundaryReason)}";
+
+            EnforcementLoggingPolicy.RecordEnforcementEvent(message, vehicle);
+        }
+
         private void LogPendingOrdinaryEgressCorridorExpire(
             Entity vehicle,
             Entity storedOriginLane,
@@ -1233,6 +1399,26 @@ namespace Traffic_Law_Enforcement
             }
 
             return "ExpiredOnOutsideIntermediateFamily";
+        }
+
+        private string FormatOrdinaryEgressFamilyBoundaryReason(
+            OrdinaryEgressFamilyBoundaryReason boundaryReason)
+        {
+            return boundaryReason switch
+            {
+                OrdinaryEgressFamilyBoundaryReason.ConnectionExitNotAccessOrigin =>
+                    "ConnectionExitNotAccessOrigin",
+                OrdinaryEgressFamilyBoundaryReason.ExpiredOnConnectionLane =>
+                    "ExpiredOnConnectionLane",
+                _ => "None",
+            };
+        }
+
+        private string FormatConnectionLaneFlags(Entity lane)
+        {
+            return m_ConnectionLaneData.TryGetComponent(lane, out ConnectionLane connectionLane)
+                ? connectionLane.m_Flags.ToString()
+                : "None";
         }
 
         private string FormatCorridorLegalityResult(bool evaluated, bool illegal)
