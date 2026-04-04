@@ -22,6 +22,8 @@ namespace Traffic_Law_Enforcement
     public struct LaneTransitionAnalysisState : IComponentData
     {
         public byte m_LastProcessedLaneChangeCount;
+        public byte m_PendingOrdinaryEgressHopBudget;
+        public Entity m_PendingOrdinaryEgressOriginLane;
     }
 
     public struct OriginalPathfindCarData : IComponentData

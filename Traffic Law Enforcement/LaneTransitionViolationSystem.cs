@@ -25,10 +25,12 @@ namespace Traffic_Law_Enforcement
         private EntityQuery m_ChangedTransitionQuery;
         private EntityQuery m_EventBufferQuery;
         private Entity m_EventEntity;
+        private const byte PendingOrdinaryEgressHopBudget = 1;
         private EntityTypeHandle m_EntityTypeHandle;
         private ComponentTypeHandle<VehicleLaneHistory> m_HistoryTypeHandle;
         private ComponentTypeHandle<CarCurrentLane> m_CurrentLaneTypeHandle;
         private ComponentLookup<Car> m_CarData;
+        private ComponentLookup<DeliveryTruck> m_DeliveryTruckData;
         private ComponentLookup<CarLane> m_CarLaneData;
         private ComponentLookup<EdgeLane> m_EdgeLaneData;
         private ComponentLookup<ParkingLane> m_ParkingLaneData;
@@ -65,6 +67,7 @@ namespace Traffic_Law_Enforcement
                 m_EventEntity = m_EventBufferQuery.GetSingletonEntity();
             }
             m_CarData = GetComponentLookup<Car>(true);
+            m_DeliveryTruckData = GetComponentLookup<DeliveryTruck>(true);
             m_CarLaneData = GetComponentLookup<CarLane>(true);
             m_EdgeLaneData = GetComponentLookup<EdgeLane>(true);
             m_ParkingLaneData = GetComponentLookup<ParkingLane>(true);
@@ -111,6 +114,7 @@ namespace Traffic_Law_Enforcement
 
                 m_CurrentLaneTypeHandle = GetComponentTypeHandle<CarCurrentLane>(true);
                 m_CarData.Update(this);
+                m_DeliveryTruckData.Update(this);
                 m_CarLaneData.Update(this);
                 m_EdgeLaneData.Update(this);
                 m_ParkingLaneData.Update(this);
@@ -165,6 +169,7 @@ namespace Traffic_Law_Enforcement
             }
 
             analysisState.m_LastProcessedLaneChangeCount = history.m_LaneChangeCount;
+            ClearPendingOrdinaryEgress(ref analysisState);
             if (m_AnalysisStateData.HasComponent(vehicle))
             {
                 EntityManager.SetComponentData(vehicle, analysisState);
@@ -189,17 +194,32 @@ namespace Traffic_Law_Enforcement
             }
 
             analysisState.m_LastProcessedLaneChangeCount = history.m_LaneChangeCount;
-            EntityManager.SetComponentData(vehicle, analysisState);
 
             if (m_CarData.TryGetComponent(vehicle, out Car car) && EmergencyVehiclePolicy.IsEmergencyVehicle(car))
             {
+                ClearPendingOrdinaryEgress(ref analysisState);
+                EntityManager.SetComponentData(vehicle, analysisState);
                 return;
             }
 
             MaybeLogRealizedOppositeFlowNearMiss(vehicle, history);
             MaybeLogRealizedEgressTrace(vehicle, history);
 
-            if (TryDetectMidBlockCrossing(history, out LaneTransitionViolationReasonCode reasonCode))
+            bool hasMidBlockViolation = TryDetectMidBlockCrossing(history, out LaneTransitionViolationReasonCode reasonCode);
+            if (!hasMidBlockViolation)
+            {
+                hasMidBlockViolation = TryDetectPendingOrdinaryEgress(
+                    vehicle,
+                    history,
+                    ref analysisState,
+                    out reasonCode);
+            }
+            else
+            {
+                ClearPendingOrdinaryEgress(ref analysisState);
+            }
+
+            if (hasMidBlockViolation)
             {
                 MaybeLogRealizedAccessDetection(vehicle, history, reasonCode);
                 MaybeLogRealizedOppositeFlowDetection(vehicle, history, reasonCode);
@@ -214,6 +234,12 @@ namespace Traffic_Law_Enforcement
                     AllowedMovement = LaneMovement.None,
                 });
             }
+            else
+            {
+                WritePendingOrdinaryEgressIfNeeded(vehicle, history, ref analysisState);
+            }
+
+            EntityManager.SetComponentData(vehicle, analysisState);
 
             bool logIntersectionCandidate =
                 EnforcementLoggingPolicy.ShouldLogVehicleSpecificEnforcementEvent(vehicle) &&
@@ -400,6 +426,40 @@ namespace Traffic_Law_Enforcement
             return MidBlockCrossingPolicy.TryGetIllegalTransition(
                 EntityManager,
                 history.m_PreviousLane,
+                history.m_CurrentLane,
+                out reasonCode);
+        }
+
+        // This adds the smallest carried egress context for the confirmed
+        // ordinary-car miss family:
+        // access-origin -> narrow non-road lane -> road.
+        // The direct exact-pair path remains unchanged and still runs first.
+        private bool TryDetectPendingOrdinaryEgress(
+            Entity vehicle,
+            VehicleLaneHistory history,
+            ref LaneTransitionAnalysisState analysisState,
+            out LaneTransitionViolationReasonCode reasonCode)
+        {
+            reasonCode = LaneTransitionViolationReasonCode.None;
+
+            if (!HasPendingOrdinaryEgress(analysisState))
+            {
+                return false;
+            }
+
+            Entity pendingOriginLane = analysisState.m_PendingOrdinaryEgressOriginLane;
+            ClearPendingOrdinaryEgress(ref analysisState);
+
+            if (!IsEligibleForPendingOrdinaryEgress(vehicle) ||
+                !IsNarrowOrdinaryEgressIntermediate(history.m_PreviousLane) ||
+                !IsRoadLane(history.m_CurrentLane))
+            {
+                return false;
+            }
+
+            return MidBlockCrossingPolicy.TryGetIllegalEgressTransition(
+                EntityManager,
+                pendingOriginLane,
                 history.m_CurrentLane,
                 out reasonCode);
         }
@@ -611,6 +671,58 @@ namespace Traffic_Law_Enforcement
             return m_ParkingLaneData.HasComponent(lane) ||
                 m_GarageLaneData.HasComponent(lane) ||
                 IsAccessConnection(lane);
+        }
+
+        private void WritePendingOrdinaryEgressIfNeeded(
+            Entity vehicle,
+            VehicleLaneHistory history,
+            ref LaneTransitionAnalysisState analysisState)
+        {
+            if (!IsEligibleForPendingOrdinaryEgress(vehicle) ||
+                !IsAccessOrigin(history.m_PreviousLane) ||
+                !IsNarrowOrdinaryEgressIntermediate(history.m_CurrentLane))
+            {
+                ClearPendingOrdinaryEgress(ref analysisState);
+                return;
+            }
+
+            analysisState.m_PendingOrdinaryEgressOriginLane = history.m_PreviousLane;
+            analysisState.m_PendingOrdinaryEgressHopBudget = PendingOrdinaryEgressHopBudget;
+        }
+
+        private bool HasPendingOrdinaryEgress(LaneTransitionAnalysisState analysisState)
+        {
+            return analysisState.m_PendingOrdinaryEgressHopBudget > 0 &&
+                analysisState.m_PendingOrdinaryEgressOriginLane != Entity.Null;
+        }
+
+        private void ClearPendingOrdinaryEgress(ref LaneTransitionAnalysisState analysisState)
+        {
+            analysisState.m_PendingOrdinaryEgressHopBudget = 0;
+            analysisState.m_PendingOrdinaryEgressOriginLane = Entity.Null;
+        }
+
+        private bool IsEligibleForPendingOrdinaryEgress(Entity vehicle)
+        {
+            return !m_DeliveryTruckData.HasComponent(vehicle);
+        }
+
+        private bool IsRoadLane(Entity lane)
+        {
+            return m_EdgeLaneData.HasComponent(lane) && m_CarLaneData.HasComponent(lane);
+        }
+
+        private bool IsNarrowOrdinaryEgressIntermediate(Entity lane)
+        {
+            if (lane == Entity.Null ||
+                IsRoadLane(lane) ||
+                IsAccessOrigin(lane) ||
+                m_ConnectionLaneData.HasComponent(lane))
+            {
+                return false;
+            }
+
+            return true;
         }
 
         private bool IsAccessConnection(Entity lane)
