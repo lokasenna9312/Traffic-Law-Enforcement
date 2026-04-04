@@ -440,13 +440,15 @@ namespace Traffic_Law_Enforcement
                 return string.Empty;
             }
 
+            string baseSummary;
             if (!context.PermissionStateData.TryGetComponent(
                     vehicle,
                     out PublicTransportLanePermissionState permissionState))
             {
-                return hasTrafficLawProfile
+                baseSummary = hasTrafficLawProfile
                     ? "No active permission state"
                     : "Not tracked by Traffic Law Enforcement";
+                return AppendIllegalEgressDebugSummary(vehicle, baseSummary);
             }
 
             PublicTransportLaneAccessBits accessBits =
@@ -460,7 +462,7 @@ namespace Traffic_Law_Enforcement
                     accessBits,
                     emergencyActive);
 
-            return
+            baseSummary =
                 $"type={PublicTransportLanePolicy.DescribeType(accessBits)}, " +
                 $"vanillaAllow={PublicTransportLanePolicy.VanillaAllowsAccess(accessBits)}, " +
                 $"modAllow={PublicTransportLanePolicy.ModAllowsAccess(accessBits)}, " +
@@ -471,6 +473,33 @@ namespace Traffic_Law_Enforcement
                 $"emergency={emergencyActive}, " +
                 $"emergencyOverride={emergencyOverrideActive}, " +
                 $"graceConsumed={permissionState.m_ImmediateEntryGraceConsumed != 0}";
+
+            return AppendIllegalEgressDebugSummary(vehicle, baseSummary);
+        }
+
+        private static string AppendIllegalEgressDebugSummary(
+            Entity vehicle,
+            string baseSummary)
+        {
+            if (vehicle == Entity.Null ||
+                !EnforcementTelemetry.TryGetVehicleEnforcementRecord(
+                    vehicle.Index,
+                    out VehicleEnforcementRecord record) ||
+                record.LastAppliedIllegalEgressMode == IllegalEgressApplyMode.None)
+            {
+                return baseSummary;
+            }
+
+            string debugSummary =
+                "ordinaryEgressApply=" +
+                $"mode={record.LastAppliedIllegalEgressMode}, " +
+                $"timestampMonthTicks={record.LastAppliedIllegalEgressTimestampMonthTicks}, " +
+                $"originLaneId={record.LastAppliedIllegalEgressOriginLaneId}, " +
+                $"roadLaneId={record.LastAppliedIllegalEgressRoadLaneId}";
+
+            return string.IsNullOrWhiteSpace(baseSummary)
+                ? debugSummary
+                : $"{baseSummary} | {debugSummary}";
         }
     }
 }

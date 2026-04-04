@@ -30,6 +30,9 @@ namespace Traffic_Law_Enforcement
         public Entity Lane;
         public LaneTransitionViolationKind Kind;
         public LaneTransitionViolationReasonCode ReasonCode;
+        public IllegalEgressApplyMode IllegalEgressMode;
+        public Entity IllegalEgressOriginLane;
+        public Entity IllegalEgressRoadLane;
         public LaneMovement ActualMovement;
         public LaneMovement AllowedMovement;
     }

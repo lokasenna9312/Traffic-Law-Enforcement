@@ -205,14 +205,34 @@ namespace Traffic_Law_Enforcement
             MaybeLogRealizedOppositeFlowNearMiss(vehicle, history);
             MaybeLogRealizedEgressTrace(vehicle, history);
 
+            IllegalEgressApplyMode illegalEgressMode = IllegalEgressApplyMode.None;
+            Entity illegalEgressOriginLane = Entity.Null;
+            Entity illegalEgressRoadLane = Entity.Null;
             bool hasMidBlockViolation = TryDetectMidBlockCrossing(history, out LaneTransitionViolationReasonCode reasonCode);
+            if (hasMidBlockViolation)
+            {
+                CaptureDirectIllegalEgressApplyMarker(
+                    vehicle,
+                    history,
+                    reasonCode,
+                    out illegalEgressMode,
+                    out illegalEgressOriginLane,
+                    out illegalEgressRoadLane);
+            }
+
             if (!hasMidBlockViolation)
             {
                 hasMidBlockViolation = TryDetectPendingOrdinaryEgress(
                     vehicle,
                     history,
                     ref analysisState,
-                    out reasonCode);
+                    out reasonCode,
+                    out illegalEgressOriginLane);
+                if (hasMidBlockViolation)
+                {
+                    illegalEgressMode = IllegalEgressApplyMode.Carried;
+                    illegalEgressRoadLane = history.m_CurrentLane;
+                }
             }
             else
             {
@@ -230,6 +250,9 @@ namespace Traffic_Law_Enforcement
                     Lane = history.m_CurrentLane,
                     Kind = LaneTransitionViolationKind.MidBlockCrossing,
                     ReasonCode = reasonCode,
+                    IllegalEgressMode = illegalEgressMode,
+                    IllegalEgressOriginLane = illegalEgressOriginLane,
+                    IllegalEgressRoadLane = illegalEgressRoadLane,
                     ActualMovement = LaneMovement.None,
                     AllowedMovement = LaneMovement.None,
                 });
@@ -438,9 +461,11 @@ namespace Traffic_Law_Enforcement
             Entity vehicle,
             VehicleLaneHistory history,
             ref LaneTransitionAnalysisState analysisState,
-            out LaneTransitionViolationReasonCode reasonCode)
+            out LaneTransitionViolationReasonCode reasonCode,
+            out Entity originLane)
         {
             reasonCode = LaneTransitionViolationReasonCode.None;
+            originLane = Entity.Null;
 
             if (!HasPendingOrdinaryEgress(analysisState))
             {
@@ -457,11 +482,17 @@ namespace Traffic_Law_Enforcement
                 return false;
             }
 
-            return MidBlockCrossingPolicy.TryGetIllegalEgressTransition(
+            bool detected = MidBlockCrossingPolicy.TryGetIllegalEgressTransition(
                 EntityManager,
                 pendingOriginLane,
                 history.m_CurrentLane,
                 out reasonCode);
+            if (detected)
+            {
+                originLane = pendingOriginLane;
+            }
+
+            return detected;
         }
 
         // Debug-only realized-path instrumentation for the exact pair that fired
@@ -673,6 +704,30 @@ namespace Traffic_Law_Enforcement
                 IsAccessConnection(lane);
         }
 
+        private void CaptureDirectIllegalEgressApplyMarker(
+            Entity vehicle,
+            VehicleLaneHistory history,
+            LaneTransitionViolationReasonCode reasonCode,
+            out IllegalEgressApplyMode mode,
+            out Entity originLane,
+            out Entity roadLane)
+        {
+            mode = IllegalEgressApplyMode.None;
+            originLane = Entity.Null;
+            roadLane = Entity.Null;
+
+            if (!IsEligibleForPendingOrdinaryEgress(vehicle) ||
+                !IsIllegalEgressReason(reasonCode) ||
+                !IsRoadLane(history.m_CurrentLane))
+            {
+                return;
+            }
+
+            mode = IllegalEgressApplyMode.Direct;
+            originLane = history.m_PreviousLane;
+            roadLane = history.m_CurrentLane;
+        }
+
         private void WritePendingOrdinaryEgressIfNeeded(
             Entity vehicle,
             VehicleLaneHistory history,
@@ -710,6 +765,21 @@ namespace Traffic_Law_Enforcement
         private bool IsRoadLane(Entity lane)
         {
             return m_EdgeLaneData.HasComponent(lane) && m_CarLaneData.HasComponent(lane);
+        }
+
+        private static bool IsIllegalEgressReason(LaneTransitionViolationReasonCode reasonCode)
+        {
+            switch (reasonCode)
+            {
+                case LaneTransitionViolationReasonCode.ExitedParkingAccessWithoutSideAccess:
+                case LaneTransitionViolationReasonCode.ExitedGarageAccessWithoutSideAccess:
+                case LaneTransitionViolationReasonCode.ExitedParkingConnectionWithoutSideAccess:
+                case LaneTransitionViolationReasonCode.ExitedBuildingAccessConnectionWithoutSideAccess:
+                    return true;
+
+                default:
+                    return false;
+            }
         }
 
         private bool IsNarrowOrdinaryEgressIntermediate(Entity lane)

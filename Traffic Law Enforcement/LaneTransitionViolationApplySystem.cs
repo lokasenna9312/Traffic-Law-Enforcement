@@ -91,6 +91,7 @@ namespace Traffic_Law_Enforcement
                             evt.Vehicle,
                             evt.Lane,
                             reason);
+                        RecordAppliedIllegalEgressMarker(evt);
 
                         MaybeLogRealizedOppositeFlowApply(
                             evt.Vehicle,
@@ -234,6 +235,40 @@ namespace Traffic_Law_Enforcement
                 $"midBlockViolationCount={violationCountBefore}->{violationCountAfter}";
 
             EnforcementLoggingPolicy.RecordEnforcementEvent(message, vehicle);
+        }
+
+        private static void RecordAppliedIllegalEgressMarker(
+            DetectedLaneTransitionViolation evt)
+        {
+            if (!IsIllegalEgressReason(evt.ReasonCode) ||
+                evt.IllegalEgressMode == IllegalEgressApplyMode.None ||
+                evt.Vehicle == Entity.Null ||
+                evt.IllegalEgressOriginLane == Entity.Null ||
+                evt.IllegalEgressRoadLane == Entity.Null)
+            {
+                return;
+            }
+
+            EnforcementTelemetry.RecordAppliedIllegalEgressMarker(
+                evt.Vehicle.Index,
+                evt.IllegalEgressMode,
+                evt.IllegalEgressOriginLane.Index,
+                evt.IllegalEgressRoadLane.Index);
+        }
+
+        private static bool IsIllegalEgressReason(LaneTransitionViolationReasonCode reasonCode)
+        {
+            switch (reasonCode)
+            {
+                case LaneTransitionViolationReasonCode.ExitedParkingAccessWithoutSideAccess:
+                case LaneTransitionViolationReasonCode.ExitedGarageAccessWithoutSideAccess:
+                case LaneTransitionViolationReasonCode.ExitedParkingConnectionWithoutSideAccess:
+                case LaneTransitionViolationReasonCode.ExitedBuildingAccessConnectionWithoutSideAccess:
+                    return true;
+
+                default:
+                    return false;
+            }
         }
     }
 }

@@ -12,7 +12,7 @@ namespace Traffic_Law_Enforcement {
                                                      ISerializable,
                                                      IPreDeserialize,
                                                      IPostDeserialize {
-        private const int kSerializationVersion = 12;
+        private const int kSerializationVersion = 13;
 
         private EntityQuery m_StatisticsQuery;
         private EntityQuery m_PublicTransportLaneViolationQuery;
@@ -791,7 +791,7 @@ namespace Traffic_Law_Enforcement {
                 for (int index = 0; index < vehicleRecordCount; index += 1) {
                     reader.Read(out int vehicleId);
                     vehicleRecords[vehicleId] =
-                        ReadVehicleEnforcementRecord(reader);
+                        ReadVehicleEnforcementRecord(reader, version);
                 }
 
                 reader.Read(out int recordCount);
@@ -1378,10 +1378,15 @@ namespace Traffic_Law_Enforcement {
             WriteTimestampList(writer, record.PublicTransportLaneTimestamps);
             WriteTimestampList(writer, record.MidBlockCrossingTimestamps);
             WriteTimestampList(writer, record.IntersectionMovementTimestamps);
+            writer.Write((byte)record.LastAppliedIllegalEgressMode);
+            writer.Write(record.LastAppliedIllegalEgressTimestampMonthTicks);
+            writer.Write(record.LastAppliedIllegalEgressOriginLaneId);
+            writer.Write(record.LastAppliedIllegalEgressRoadLaneId);
         }
 
         private static VehicleEnforcementRecord ReadVehicleEnforcementRecord<TReader>(
-            TReader reader)
+            TReader reader,
+            int version)
             where TReader : IReader {
             VehicleEnforcementRecord record = new VehicleEnforcementRecord();
             reader.Read(out record.TotalViolations);
@@ -1394,7 +1399,31 @@ namespace Traffic_Law_Enforcement {
             ReadTimestampList(reader, record.PublicTransportLaneTimestamps);
             ReadTimestampList(reader, record.MidBlockCrossingTimestamps);
             ReadTimestampList(reader, record.IntersectionMovementTimestamps);
+            if (version >= 13)
+            {
+                reader.Read(out byte illegalEgressModeValue);
+                record.LastAppliedIllegalEgressMode =
+                    ClampIllegalEgressApplyMode(illegalEgressModeValue);
+                reader.Read(out record.LastAppliedIllegalEgressTimestampMonthTicks);
+                reader.Read(out record.LastAppliedIllegalEgressOriginLaneId);
+                reader.Read(out record.LastAppliedIllegalEgressRoadLaneId);
+            }
             return record;
+        }
+
+        private static IllegalEgressApplyMode ClampIllegalEgressApplyMode(
+            byte value)
+        {
+            switch ((IllegalEgressApplyMode)value)
+            {
+                case IllegalEgressApplyMode.None:
+                case IllegalEgressApplyMode.Direct:
+                case IllegalEgressApplyMode.Carried:
+                    return (IllegalEgressApplyMode)value;
+
+                default:
+                    return IllegalEgressApplyMode.None;
+            }
         }
 
         private static void WriteTimestampList<TWriter>(
