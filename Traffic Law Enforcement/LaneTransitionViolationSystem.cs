@@ -197,6 +197,7 @@ namespace Traffic_Law_Enforcement
             }
 
             MaybeLogRealizedOppositeFlowNearMiss(vehicle, history);
+            MaybeLogRealizedEgressTrace(vehicle, history);
 
             if (TryDetectMidBlockCrossing(history, out LaneTransitionViolationReasonCode reasonCode))
             {
@@ -331,6 +332,63 @@ namespace Traffic_Law_Enforcement
                 $"currentOwner={FocusedLoggingService.FormatEntity(history.m_CurrentLaneOwner)} " +
                 $"previousLaneKind={DescribeLaneKind(history.m_PreviousLane)} " +
                 $"currentLaneKind={DescribeLaneKind(history.m_CurrentLane)}";
+
+            EnforcementLoggingPolicy.RecordEnforcementEvent(message, vehicle);
+        }
+
+        // Debug-only realized egress trace. This stays narrowly scoped to
+        // watched vehicle-specific enforcement logging and only reports pairs
+        // where the current realized lane is road and the previous lane is
+        // either non-road or access-adjacent enough to plausibly be part of
+        // a roadside-building egress boundary.
+        private void MaybeLogRealizedEgressTrace(
+            Entity vehicle,
+            VehicleLaneHistory history)
+        {
+            if (!EnforcementLoggingPolicy.ShouldLogVehicleSpecificEnforcementEvent(vehicle))
+            {
+                return;
+            }
+
+            MidBlockCrossingPolicy.TraceIllegalEgressTransition(
+                EntityManager,
+                history.m_PreviousLane,
+                history.m_CurrentLane,
+                out bool previousIsAccessOrigin,
+                out bool currentIsRoad,
+                out bool egressDetectResult,
+                out MidBlockCrossingPolicy.AccessEgressTraceFailReason failReason,
+                out _);
+
+            if (!currentIsRoad)
+            {
+                return;
+            }
+
+            bool previousIsRoad =
+                m_EdgeLaneData.HasComponent(history.m_PreviousLane) &&
+                m_CarLaneData.HasComponent(history.m_PreviousLane);
+
+            if (!previousIsAccessOrigin && previousIsRoad)
+            {
+                return;
+            }
+
+            string vehicleText = FocusedLoggingService.FormatEntity(vehicle);
+            string message =
+                "[ACCESS_EGRESS_REALIZED_TRACE] " +
+                $"vehicle={vehicleText} " +
+                $"vehicleId={vehicleText} " +
+                $"previousLane={FocusedLoggingService.FormatEntity(history.m_PreviousLane)} " +
+                $"currentLane={FocusedLoggingService.FormatEntity(history.m_CurrentLane)} " +
+                $"previousOwner={FocusedLoggingService.FormatEntity(history.m_PreviousLaneOwner)} " +
+                $"currentOwner={FocusedLoggingService.FormatEntity(history.m_CurrentLaneOwner)} " +
+                $"previousLaneKind={DescribeLaneKind(history.m_PreviousLane)} " +
+                $"currentLaneKind={DescribeLaneKind(history.m_CurrentLane)} " +
+                $"previousIsAccessOrigin={previousIsAccessOrigin} " +
+                $"currentIsRoad={currentIsRoad} " +
+                $"egressDetectResult={egressDetectResult} " +
+                $"failReason={failReason}";
 
             EnforcementLoggingPolicy.RecordEnforcementEvent(message, vehicle);
         }

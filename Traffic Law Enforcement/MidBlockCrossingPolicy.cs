@@ -7,6 +7,17 @@ namespace Traffic_Law_Enforcement
 {
     public static class MidBlockCrossingPolicy
     {
+        internal enum AccessEgressTraceFailReason : byte
+        {
+            None = 0,
+            PreviousNotAccessOrigin = 1,
+            CurrentNotRoad = 2,
+            RoadAllowsParkingAccess = 3,
+            RoadAllowsGarageAccess = 4,
+            RoadAllowsParkingConnectionAccess = 5,
+            RoadAllowsBuildingAccess = 6,
+        }
+
         [System.Flags]
         private enum AccessSide : byte
         {
@@ -125,6 +136,112 @@ namespace Traffic_Law_Enforcement
                 default:
                     return false;
             }
+        }
+
+        internal static void TraceIllegalEgressTransition(
+            EntityManager entityManager,
+            Entity sourceLane,
+            Entity targetLane,
+            out bool previousIsAccessOrigin,
+            out bool currentIsRoad,
+            out bool egressDetectResult,
+            out AccessEgressTraceFailReason failReason,
+            out LaneTransitionViolationReasonCode reasonCode)
+        {
+            previousIsAccessOrigin = IsAccessOrigin(entityManager, sourceLane);
+            currentIsRoad = TryGetRoadCarLane(entityManager, targetLane, out CarLane targetCarLane);
+            egressDetectResult = false;
+            failReason = AccessEgressTraceFailReason.None;
+            reasonCode = LaneTransitionViolationReasonCode.None;
+
+            if (!previousIsAccessOrigin)
+            {
+                failReason = AccessEgressTraceFailReason.PreviousNotAccessOrigin;
+                return;
+            }
+
+            if (!currentIsRoad)
+            {
+                failReason = AccessEgressTraceFailReason.CurrentNotRoad;
+                return;
+            }
+
+            if (entityManager.HasComponent<ParkingLane>(sourceLane))
+            {
+                ParkingLane parkingLane = entityManager.GetComponentData<ParkingLane>(sourceLane);
+                if (RoadAllowsParkingAccess(targetCarLane, parkingLane))
+                {
+                    failReason = AccessEgressTraceFailReason.RoadAllowsParkingAccess;
+                    return;
+                }
+
+                egressDetectResult = true;
+                reasonCode = LaneTransitionViolationReasonCode.ExitedParkingAccessWithoutSideAccess;
+                return;
+            }
+
+            if (entityManager.HasComponent<GarageLane>(sourceLane))
+            {
+                if (TryGetConnectionLane(entityManager, sourceLane, out ConnectionLane garageConnectionLane))
+                {
+                    if (RoadAllowsGarageAccess(targetCarLane, garageConnectionLane))
+                    {
+                        failReason = AccessEgressTraceFailReason.RoadAllowsGarageAccess;
+                        return;
+                    }
+                }
+                else if (RoadHasGenericSideConnection(targetCarLane))
+                {
+                    failReason = AccessEgressTraceFailReason.RoadAllowsGarageAccess;
+                    return;
+                }
+
+                egressDetectResult = true;
+                reasonCode = LaneTransitionViolationReasonCode.ExitedGarageAccessWithoutSideAccess;
+                return;
+            }
+
+            if (!entityManager.HasComponent<ConnectionLane>(sourceLane))
+            {
+                failReason = AccessEgressTraceFailReason.PreviousNotAccessOrigin;
+                return;
+            }
+
+            ConnectionLane connectionLane = entityManager.GetComponentData<ConnectionLane>(sourceLane);
+
+            if ((connectionLane.m_Flags & ConnectionLaneFlags.Parking) != 0)
+            {
+                if (RoadAllowsParkingConnectionAccess(targetCarLane, connectionLane))
+                {
+                    failReason = AccessEgressTraceFailReason.RoadAllowsParkingConnectionAccess;
+                    return;
+                }
+
+                egressDetectResult = true;
+                reasonCode = LaneTransitionViolationReasonCode.ExitedParkingConnectionWithoutSideAccess;
+                return;
+            }
+
+            if ((connectionLane.m_Flags & ConnectionLaneFlags.Road) == 0)
+            {
+                if (!IsInsideAccessConnection(connectionLane))
+                {
+                    failReason = AccessEgressTraceFailReason.PreviousNotAccessOrigin;
+                    return;
+                }
+
+                if (RoadAllowsBuildingAccess(targetCarLane))
+                {
+                    failReason = AccessEgressTraceFailReason.RoadAllowsBuildingAccess;
+                    return;
+                }
+
+                egressDetectResult = true;
+                reasonCode = LaneTransitionViolationReasonCode.ExitedBuildingAccessConnectionWithoutSideAccess;
+                return;
+            }
+
+            failReason = AccessEgressTraceFailReason.PreviousNotAccessOrigin;
         }
 
         private static bool TryDetectOppositeFlowSameRoadSegment(
