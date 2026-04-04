@@ -282,7 +282,7 @@ namespace Traffic_Law_Enforcement
             }
 
             MaybeLogRealizedOppositeFlowNearMiss(vehicle, history);
-            MaybeLogRealizedEgressTrace(vehicle, history);
+            MaybeLogRealizedEgressTrace(vehicle, currentLane, history);
 
             LaneTransitionAnalysisState analysisStateBefore = analysisState;
             bool shouldLogOrdinaryEgressProbe =
@@ -527,6 +527,7 @@ namespace Traffic_Law_Enforcement
         // a roadside-building egress boundary.
         private void MaybeLogRealizedEgressTrace(
             Entity vehicle,
+            CarCurrentLane currentLane,
             VehicleLaneHistory history)
         {
             if (!EnforcementLoggingPolicy.ShouldLogVehicleSpecificEnforcementEvent(vehicle))
@@ -544,6 +545,24 @@ namespace Traffic_Law_Enforcement
                 out MidBlockCrossingPolicy.AccessEgressTraceFailReason failReason,
                 out _);
 
+            if (m_DeliveryTruckData.HasComponent(vehicle))
+            {
+                string deliveryTruckMessage =
+                    "[TRUCK_EGRESS_DIRECT_TRACE] " +
+                    $"vehicle={FocusedLoggingService.FormatEntity(vehicle)} " +
+                    $"previousLane={FocusedLoggingService.FormatEntity(history.m_PreviousLane)} " +
+                    $"currentLane={FocusedLoggingService.FormatEntity(history.m_CurrentLane)} " +
+                    $"previousLaneKind={DescribeLaneKind(history.m_PreviousLane)} " +
+                    $"currentLaneKind={DescribeLaneKind(history.m_CurrentLane)} " +
+                    $"previousConnectionFlags={FormatConnectionLaneFlags(history.m_PreviousLane)} " +
+                    $"currentConnectionFlags={FormatConnectionLaneFlags(history.m_CurrentLane)} " +
+                    $"previousIsAccessOrigin={previousIsAccessOrigin} " +
+                    $"currentIsRoad={currentIsRoad} " +
+                    $"egressDetectResult={egressDetectResult} " +
+                    $"failReason={failReason} " +
+                    $"currentLaneFlags={currentLane.m_LaneFlags}";
+                EnforcementLoggingPolicy.RecordEnforcementEvent(deliveryTruckMessage, vehicle);
+            }
             if (!currentIsRoad)
             {
                 return;
@@ -559,7 +578,7 @@ namespace Traffic_Law_Enforcement
             }
 
             string vehicleText = FocusedLoggingService.FormatEntity(vehicle);
-            string message =
+            string accessTraceMessage =
                 "[ACCESS_EGRESS_REALIZED_TRACE] " +
                 $"vehicle={vehicleText} " +
                 $"vehicleId={vehicleText} " +
@@ -574,7 +593,7 @@ namespace Traffic_Law_Enforcement
                 $"egressDetectResult={egressDetectResult} " +
                 $"failReason={failReason}";
 
-            EnforcementLoggingPolicy.RecordEnforcementEvent(message, vehicle);
+            EnforcementLoggingPolicy.RecordEnforcementEvent(accessTraceMessage, vehicle);
         }
 
         private bool TryDetectMidBlockCrossing(
@@ -1031,6 +1050,26 @@ namespace Traffic_Law_Enforcement
                     ref analysisState))
             {
                 return;
+            }
+
+            if (m_DeliveryTruckData.HasComponent(vehicle) &&
+                !IsEligibleForPendingOrdinaryEgress(vehicle) &&
+                previousIsAccessOrigin &&
+                currentIsNarrowIntermediate)
+            {
+                string message =
+                    "[TRUCK_EGRESS_CARRY_SKIPPED] " +
+                    $"vehicle={FocusedLoggingService.FormatEntity(vehicle)} " +
+                    $"previousLane={FocusedLoggingService.FormatEntity(history.m_PreviousLane)} " +
+                    $"currentLane={FocusedLoggingService.FormatEntity(history.m_CurrentLane)} " +
+                    $"previousLaneKind={DescribeLaneKind(history.m_PreviousLane)} " +
+                    $"currentLaneKind={DescribeLaneKind(history.m_CurrentLane)} " +
+                    $"previousConnectionFlags={FormatConnectionLaneFlags(history.m_PreviousLane)} " +
+                    $"currentConnectionFlags={FormatConnectionLaneFlags(history.m_CurrentLane)} " +
+                    $"previousIsAccessOrigin={previousIsAccessOrigin} " +
+                    $"currentIsNarrowIntermediate={currentIsNarrowIntermediate} " +
+                    $"reason=WouldNeedCarryButDeliveryTruckExcluded";
+                EnforcementLoggingPolicy.RecordEnforcementEvent(message, vehicle);
             }
 
             if (!IsEligibleForPendingOrdinaryEgress(vehicle) ||
