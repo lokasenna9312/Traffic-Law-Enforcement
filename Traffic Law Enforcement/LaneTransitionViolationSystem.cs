@@ -817,6 +817,10 @@ namespace Traffic_Law_Enforcement
             analysisState.m_PendingOrdinaryEgressOriginLane = history.m_PreviousLane;
             analysisState.m_PendingOrdinaryEgressCorridorFailsafeBudget =
                 PendingOrdinaryEgressCorridorFailsafeBudget;
+            LogPendingOrdinaryEgressCorridorArm(
+                vehicle,
+                history.m_PreviousLane,
+                history);
         }
 
         private void AdvancePendingOrdinaryEgressCorridor(
@@ -889,6 +893,35 @@ namespace Traffic_Law_Enforcement
                 "corridorAction=Consume " +
                 "corridorReason=ConsumedOnRoad " +
                 $"legalityResult={FormatCorridorLegalityResult(evaluated: true, illegal: detected)}";
+
+            EnforcementLoggingPolicy.RecordEnforcementEvent(message, vehicle);
+        }
+
+        private void LogPendingOrdinaryEgressCorridorArm(
+            Entity vehicle,
+            Entity storedOriginLane,
+            VehicleLaneHistory history)
+        {
+            if (!EnforcementLoggingPolicy.ShouldLogVehicleSpecificEnforcementEvent(vehicle))
+            {
+                return;
+            }
+
+            string message =
+                "[ACCESS_EGRESS_CORRIDOR_ARM] " +
+                $"vehicle={FocusedLoggingService.FormatEntity(vehicle)} " +
+                $"storedOriginLane={FocusedLoggingService.FormatEntity(storedOriginLane)} " +
+                $"previousLane={FocusedLoggingService.FormatEntity(history.m_PreviousLane)} " +
+                $"currentLane={FocusedLoggingService.FormatEntity(history.m_CurrentLane)} " +
+                $"previousOwner={FocusedLoggingService.FormatEntity(history.m_PreviousLaneOwner)} " +
+                $"currentOwner={FocusedLoggingService.FormatEntity(history.m_CurrentLaneOwner)} " +
+                $"previousLaneKind={DescribeLaneKind(history.m_PreviousLane)} " +
+                $"currentLaneKind={DescribeLaneKind(history.m_CurrentLane)} " +
+                $"currentIsRoad={IsRoadLane(history.m_CurrentLane)} " +
+                $"currentIsInvisibleRoadPathLike={IsInvisibleRoadPathLike(history.m_CurrentLane, history.m_CurrentLaneOwner)} " +
+                "corridorAction=Arm " +
+                "corridorReason=ArmedOnAccessOriginExit " +
+                "legalityResult=NotEvaluated";
 
             EnforcementLoggingPolicy.RecordEnforcementEvent(message, vehicle);
         }
