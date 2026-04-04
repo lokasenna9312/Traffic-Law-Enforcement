@@ -1053,7 +1053,6 @@ namespace Traffic_Law_Enforcement
             }
 
             if (m_DeliveryTruckData.HasComponent(vehicle) &&
-                !IsEligibleForPendingOrdinaryEgress(vehicle) &&
                 previousIsAccessOrigin &&
                 currentIsNarrowIntermediate)
             {
