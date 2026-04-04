@@ -25,7 +25,11 @@ namespace Traffic_Law_Enforcement
         private EntityQuery m_ChangedTransitionQuery;
         private EntityQuery m_EventBufferQuery;
         private Entity m_EventEntity;
-        private const byte PendingOrdinaryEgressHopBudget = 1;
+        // The real carry boundary is semantic:
+        // stay inside the narrow ordinary-egress intermediate corridor until the
+        // first ordinary road arrival. This large budget is only a defensive
+        // guardrail against stale carry surviving indefinitely.
+        private const byte PendingOrdinaryEgressCorridorFailsafeBudget = 32;
         private EntityTypeHandle m_EntityTypeHandle;
         private ComponentTypeHandle<VehicleLaneHistory> m_HistoryTypeHandle;
         private ComponentTypeHandle<CarCurrentLane> m_CurrentLaneTypeHandle;
@@ -222,7 +226,7 @@ namespace Traffic_Law_Enforcement
 
             if (!hasMidBlockViolation)
             {
-                hasMidBlockViolation = TryDetectPendingOrdinaryEgress(
+                hasMidBlockViolation = TryDetectOrAdvancePendingOrdinaryEgress(
                     vehicle,
                     history,
                     ref analysisState,
@@ -257,7 +261,7 @@ namespace Traffic_Law_Enforcement
                     AllowedMovement = LaneMovement.None,
                 });
             }
-            else
+            else if (!HasPendingOrdinaryEgress(analysisState))
             {
                 WritePendingOrdinaryEgressIfNeeded(vehicle, history, ref analysisState);
             }
@@ -453,11 +457,11 @@ namespace Traffic_Law_Enforcement
                 out reasonCode);
         }
 
-        // This adds the smallest carried egress context for the confirmed
-        // ordinary-car miss family:
-        // access-origin -> narrow non-road lane -> road.
+        // This keeps the smallest ordinary-car egress carry scoped to:
+        // recognized access origin -> narrow degraded non-road corridor ->
+        // first ordinary road arrival.
         // The direct exact-pair path remains unchanged and still runs first.
-        private bool TryDetectPendingOrdinaryEgress(
+        private bool TryDetectOrAdvancePendingOrdinaryEgress(
             Entity vehicle,
             VehicleLaneHistory history,
             ref LaneTransitionAnalysisState analysisState,
@@ -473,26 +477,41 @@ namespace Traffic_Law_Enforcement
             }
 
             Entity pendingOriginLane = analysisState.m_PendingOrdinaryEgressOriginLane;
-            ClearPendingOrdinaryEgress(ref analysisState);
 
-            if (!IsEligibleForPendingOrdinaryEgress(vehicle) ||
-                !IsNarrowOrdinaryEgressIntermediate(history.m_PreviousLane) ||
-                !IsRoadLane(history.m_CurrentLane))
+            if (!IsEligibleForPendingOrdinaryEgress(vehicle))
             {
+                ClearPendingOrdinaryEgress(ref analysisState);
                 return false;
             }
 
-            bool detected = MidBlockCrossingPolicy.TryGetIllegalEgressTransition(
-                EntityManager,
-                pendingOriginLane,
-                history.m_CurrentLane,
-                out reasonCode);
-            if (detected)
+            if (IsNarrowOrdinaryEgressIntermediate(history.m_PreviousLane))
             {
-                originLane = pendingOriginLane;
+                if (IsRoadLane(history.m_CurrentLane))
+                {
+                    ClearPendingOrdinaryEgress(ref analysisState);
+
+                    bool detected = MidBlockCrossingPolicy.TryGetIllegalEgressTransition(
+                        EntityManager,
+                        pendingOriginLane,
+                        history.m_CurrentLane,
+                        out reasonCode);
+                    if (detected)
+                    {
+                        originLane = pendingOriginLane;
+                    }
+
+                    return detected;
+                }
+
+                if (IsNarrowOrdinaryEgressIntermediate(history.m_CurrentLane))
+                {
+                    AdvancePendingOrdinaryEgressCorridor(ref analysisState);
+                    return false;
+                }
             }
 
-            return detected;
+            ClearPendingOrdinaryEgress(ref analysisState);
+            return false;
         }
 
         // Debug-only realized-path instrumentation for the exact pair that fired
@@ -742,18 +761,33 @@ namespace Traffic_Law_Enforcement
             }
 
             analysisState.m_PendingOrdinaryEgressOriginLane = history.m_PreviousLane;
-            analysisState.m_PendingOrdinaryEgressHopBudget = PendingOrdinaryEgressHopBudget;
+            analysisState.m_PendingOrdinaryEgressCorridorFailsafeBudget =
+                PendingOrdinaryEgressCorridorFailsafeBudget;
+        }
+
+        private void AdvancePendingOrdinaryEgressCorridor(
+            ref LaneTransitionAnalysisState analysisState)
+        {
+            if (analysisState.m_PendingOrdinaryEgressCorridorFailsafeBudget > 0)
+            {
+                analysisState.m_PendingOrdinaryEgressCorridorFailsafeBudget -= 1;
+            }
+
+            if (analysisState.m_PendingOrdinaryEgressCorridorFailsafeBudget == 0)
+            {
+                ClearPendingOrdinaryEgress(ref analysisState);
+            }
         }
 
         private bool HasPendingOrdinaryEgress(LaneTransitionAnalysisState analysisState)
         {
-            return analysisState.m_PendingOrdinaryEgressHopBudget > 0 &&
+            return analysisState.m_PendingOrdinaryEgressCorridorFailsafeBudget > 0 &&
                 analysisState.m_PendingOrdinaryEgressOriginLane != Entity.Null;
         }
 
         private void ClearPendingOrdinaryEgress(ref LaneTransitionAnalysisState analysisState)
         {
-            analysisState.m_PendingOrdinaryEgressHopBudget = 0;
+            analysisState.m_PendingOrdinaryEgressCorridorFailsafeBudget = 0;
             analysisState.m_PendingOrdinaryEgressOriginLane = Entity.Null;
         }
 
