@@ -439,6 +439,35 @@ namespace Traffic_Law_Enforcement
                 out MidBlockCrossingPolicy.AccessEgressTraceFailReason failReason,
                 out _);
 
+                bool previousIsConnection =
+                    m_ConnectionLaneData.HasComponent(history.m_PreviousLane);
+
+                bool previousIsParkingFamily =
+                    m_ParkingLaneData.HasComponent(history.m_PreviousLane) ||
+                    m_GarageLaneData.HasComponent(history.m_PreviousLane) ||
+                    (m_ConnectionLaneData.TryGetComponent(history.m_PreviousLane, out ConnectionLane previousConnection) &&
+                    (previousConnection.m_Flags & ConnectionLaneFlags.Parking) != 0);
+
+                if (previousIsConnection && !previousIsParkingFamily)
+                {
+                    string nonParkingSourceProbeMessage =
+                        "[NON_PARKING_BUILDING_EGRESS_SOURCE_PROBE] " +
+                        $"vehicle={FocusedLoggingService.FormatEntity(vehicle)} " +
+                        $"isDeliveryTruck={m_DeliveryTruckData.HasComponent(vehicle)} " +
+                        $"previousLane={FocusedLoggingService.FormatEntity(history.m_PreviousLane)} " +
+                        $"currentLane={FocusedLoggingService.FormatEntity(history.m_CurrentLane)} " +
+                        $"previousLaneKind={DescribeLaneKind(history.m_PreviousLane)} " +
+                        $"currentLaneKind={DescribeLaneKind(history.m_CurrentLane)} " +
+                        $"previousConnectionFlags={FormatConnectionLaneFlags(history.m_PreviousLane)} " +
+                        $"currentConnectionFlags={FormatConnectionLaneFlags(history.m_CurrentLane)} " +
+                        $"previousIsAccessOrigin={previousIsAccessOrigin} " +
+                        $"currentIsRoad={currentIsRoad} " +
+                        $"egressDetectResult={egressDetectResult} " +
+                        $"failReason={failReason}";
+
+                    EnforcementLoggingPolicy.RecordEnforcementEvent(nonParkingSourceProbeMessage, vehicle);
+                }
+                
             if (m_DeliveryTruckData.HasComponent(vehicle))
             {
                 string deliveryTruckMessage =
