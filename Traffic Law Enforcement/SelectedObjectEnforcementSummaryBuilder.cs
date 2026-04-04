@@ -481,11 +481,27 @@ namespace Traffic_Law_Enforcement
             Entity vehicle,
             string baseSummary)
         {
-            if (vehicle == Entity.Null ||
-                !EnforcementTelemetry.TryGetVehicleEnforcementRecord(
+            if (vehicle == Entity.Null)
+            {
+                return baseSummary;
+            }
+
+            bool recordFound =
+                EnforcementTelemetry.TryGetVehicleEnforcementRecord(
                     vehicle.Index,
-                    out VehicleEnforcementRecord record) ||
-                record.LastAppliedIllegalEgressMode == IllegalEgressApplyMode.None)
+                    out VehicleEnforcementRecord record);
+            bool markerPresent =
+                recordFound &&
+                record.LastAppliedIllegalEgressMode != IllegalEgressApplyMode.None;
+
+            LogIllegalEgressApplyMarkerRead(
+                vehicle,
+                markerPresent,
+                recordFound
+                    ? record
+                    : new VehicleEnforcementRecord());
+
+            if (!markerPresent)
             {
                 return baseSummary;
             }
@@ -500,6 +516,28 @@ namespace Traffic_Law_Enforcement
             return string.IsNullOrWhiteSpace(baseSummary)
                 ? debugSummary
                 : $"{baseSummary} | {debugSummary}";
+        }
+
+        private static void LogIllegalEgressApplyMarkerRead(
+            Entity vehicle,
+            bool markerPresent,
+            VehicleEnforcementRecord record)
+        {
+            if (!EnforcementLoggingPolicy.ShouldLogEnforcementEvents())
+            {
+                return;
+            }
+
+            string message =
+                "[ACCESS_EGRESS_APPLY_MARKER_READ] " +
+                $"vehicle={FocusedLoggingService.FormatEntity(vehicle)} " +
+                $"markerPresent={markerPresent} " +
+                $"mode={(markerPresent ? record.LastAppliedIllegalEgressMode : IllegalEgressApplyMode.None)} " +
+                $"timestampMonthTicks={(markerPresent ? record.LastAppliedIllegalEgressTimestampMonthTicks : 0L)} " +
+                $"originLaneId={(markerPresent ? record.LastAppliedIllegalEgressOriginLaneId : -1)} " +
+                $"roadLaneId={(markerPresent ? record.LastAppliedIllegalEgressRoadLaneId : -1)}";
+
+            Mod.log.Info(message);
         }
     }
 }
