@@ -551,7 +551,7 @@ namespace Traffic_Law_Enforcement
 
             Entity pendingOriginLane = analysisState.m_PendingOrdinaryEgressOriginLane;
 
-            if (!IsEligibleForPendingOrdinaryEgress(vehicle))
+            if (!CanUseLegacyGarageConnectionEgressBridgeQuarantine(vehicle))
             {
                 ClearPendingOrdinaryEgress(ref analysisState);
                 return false;
@@ -812,7 +812,7 @@ namespace Traffic_Law_Enforcement
             originLane = Entity.Null;
             roadLane = Entity.Null;
 
-            if (!IsEligibleForPendingOrdinaryEgress(vehicle) ||
+            if (!CanUseLegacyGarageConnectionEgressBridgeQuarantine(vehicle) ||
                 !IsIllegalEgressReason(reasonCode) ||
                 !IsRoadLane(history.m_CurrentLane))
             {
@@ -869,7 +869,7 @@ namespace Traffic_Law_Enforcement
                 EnforcementLoggingPolicy.RecordEnforcementEvent(message, vehicle);
             }
 
-            if (!IsEligibleForPendingOrdinaryEgress(vehicle) ||
+            if (!CanUseLegacyGarageConnectionEgressBridgeQuarantine(vehicle) ||
                 !previousIsAccessOrigin ||
                 !currentIsNarrowIntermediate)
             {
@@ -932,7 +932,7 @@ namespace Traffic_Law_Enforcement
             VehicleLaneHistory history,
             ref LaneTransitionAnalysisState analysisState)
         {
-            if (!IsEligibleForPendingOrdinaryEgress(vehicle) ||
+            if (!CanUseLegacyGarageConnectionEgressBridgeQuarantine(vehicle) ||
                 !m_GarageLaneData.HasComponent(history.m_PreviousLane) ||
                 !IsQualifyingGarageConnectionEgressBridgeConnection(history.m_CurrentLane) ||
                 history.m_PreviousLaneOwner == Entity.Null ||
@@ -963,7 +963,7 @@ namespace Traffic_Law_Enforcement
             Entity bridgeOriginLane =
                 analysisState.m_PendingGarageConnectionEgressBridgeOriginLane;
 
-            if (!IsEligibleForPendingOrdinaryEgress(vehicle) ||
+            if (!CanUseLegacyGarageConnectionEgressBridgeQuarantine(vehicle) ||
                 history.m_PreviousLane != bridgeConnectionLane ||
                 !IsNarrowOrdinaryEgressIntermediate(history.m_CurrentLane))
             {
@@ -978,7 +978,7 @@ namespace Traffic_Law_Enforcement
             return true;
         }
 
-        private bool IsEligibleForPendingOrdinaryEgress(Entity vehicle)
+        private bool CanUseLegacyGarageConnectionEgressBridgeQuarantine(Entity vehicle)
         {
             return !m_DeliveryTruckData.HasComponent(vehicle);
         }
