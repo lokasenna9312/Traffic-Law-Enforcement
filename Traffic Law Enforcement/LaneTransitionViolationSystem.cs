@@ -171,6 +171,58 @@ namespace Traffic_Law_Enforcement
             }
         }
 
+        private void MaybeLogRealizedIngressTrace(
+            Entity vehicle,
+            VehicleLaneHistory history)
+        {
+            if (!EnforcementLoggingPolicy.ShouldLogVehicleSpecificEnforcementEvent(vehicle))
+            {
+                return;
+            }
+
+            MidBlockCrossingPolicy.TraceIllegalIngressTransition(
+                EntityManager,
+                history.m_PreviousLane,
+                history.m_CurrentLane,
+                out bool previousIsRoad,
+                out bool currentIsAccessTarget,
+                out bool ingressDetectResult,
+                out MidBlockCrossingPolicy.AccessIngressTraceFailReason failReason,
+                out LaneTransitionViolationReasonCode reasonCode);
+
+            // Only non-parking targets
+            bool isConnection =
+                m_ConnectionLaneData.HasComponent(history.m_CurrentLane);
+
+            bool isParkingFamily =
+                m_ParkingLaneData.HasComponent(history.m_CurrentLane) ||
+                m_GarageLaneData.HasComponent(history.m_CurrentLane) ||
+                (m_ConnectionLaneData.TryGetComponent(history.m_CurrentLane, out ConnectionLane conn) &&
+                (conn.m_Flags & ConnectionLaneFlags.Parking) != 0);
+
+            if (!previousIsRoad || !isConnection || isParkingFamily)
+            {
+                return;
+            }
+
+            EnforcementLoggingPolicy.RecordEnforcementEvent(
+                "[NON_PARKING_BUILDING_INGRESS_TARGET_PROBE] " +
+                $"vehicle={FocusedLoggingService.FormatEntity(vehicle)} " +
+                $"prev={FocusedLoggingService.FormatEntity(history.m_PreviousLane)} " +
+                $"curr={FocusedLoggingService.FormatEntity(history.m_CurrentLane)} " +
+                $"prevOwner={FocusedLoggingService.FormatEntity(history.m_PreviousLaneOwner)} " +
+                $"currOwner={FocusedLoggingService.FormatEntity(history.m_CurrentLaneOwner)} " +
+                $"prevKind={DescribeLaneKind(history.m_PreviousLane)} " +
+                $"currKind={DescribeLaneKind(history.m_CurrentLane)} " +
+                $"previousIsRoad={previousIsRoad} " +
+                $"currentIsAccessTarget={currentIsAccessTarget} " +
+                $"ingressDetectResult={ingressDetectResult} " +
+                $"failReason={failReason} " +
+                $"reasonCode={reasonCode} " +
+                $"isDeliveryTruck={m_DeliveryTruckData.HasComponent(vehicle)}",
+                vehicle);
+        }
+
         private void SyncAnalysisState(Entity vehicle, VehicleLaneHistory history)
         {
             if (!m_AnalysisStateData.TryGetComponent(vehicle, out LaneTransitionAnalysisState analysisState))
@@ -221,6 +273,7 @@ namespace Traffic_Law_Enforcement
 
             MaybeLogRealizedOppositeFlowNearMiss(vehicle, history);
             MaybeLogRealizedEgressTrace(vehicle, currentLane, history);
+            MaybeLogRealizedIngressTrace(vehicle, history);
 
             IllegalEgressApplyMode illegalEgressMode = IllegalEgressApplyMode.None;
             Entity illegalEgressOriginLane = Entity.Null;

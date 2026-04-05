@@ -7,6 +7,65 @@ namespace Traffic_Law_Enforcement
 {
     public static class MidBlockCrossingPolicy
     {
+
+        internal static void TraceIllegalIngressTransition(
+            EntityManager entityManager,
+            Entity previousLane,
+            Entity currentLane,
+            out bool previousIsRoad,
+            out bool currentIsAccessTarget,
+            out bool ingressDetectResult,
+            out AccessIngressTraceFailReason failReason,
+            out LaneTransitionViolationReasonCode reasonCode)
+        {
+            reasonCode = LaneTransitionViolationReasonCode.None;
+
+            previousIsRoad =
+                entityManager.HasComponent<EdgeLane>(previousLane) &&
+                entityManager.HasComponent<CarLane>(previousLane);
+
+            currentIsAccessTarget =
+                entityManager.HasComponent<ParkingLane>(currentLane) ||
+                entityManager.HasComponent<GarageLane>(currentLane) ||
+                entityManager.HasComponent<ConnectionLane>(currentLane);
+
+            ingressDetectResult =
+                TryGetIllegalIngressTransition(
+                    entityManager,
+                    previousLane,
+                    currentLane,
+                    out reasonCode);
+
+            // Only fewest reasons
+            if (!previousIsRoad)
+            {
+                failReason = AccessIngressTraceFailReason.PreviousNotRoad;
+                return;
+            }
+
+            if (!currentIsAccessTarget)
+            {
+                failReason = AccessIngressTraceFailReason.CurrentNotAccessTarget;
+                return;
+            }
+
+            if (!ingressDetectResult)
+            {
+                failReason = AccessIngressTraceFailReason.NoIllegalIngressDetected;
+                return;
+            }
+
+            failReason = AccessIngressTraceFailReason.None;
+        }
+
+        internal enum AccessIngressTraceFailReason : byte
+        {
+            None = 0,
+            PreviousNotRoad = 1,
+            CurrentNotAccessTarget = 2,
+            NoIllegalIngressDetected = 3
+        }
+
         internal enum AccessEgressTraceFailReason : byte
         {
             None = 0,
@@ -156,6 +215,26 @@ namespace Traffic_Law_Enforcement
                 default:
                     return false;
             }
+        }
+
+        public static bool TryGetIllegalIngressTransition(
+            EntityManager entityManager,
+            Entity sourceLane,
+            Entity targetLane,
+            out LaneTransitionViolationReasonCode reasonCode)
+        {
+            reasonCode = LaneTransitionViolationReasonCode.None;
+
+            if (sourceLane == Entity.Null || targetLane == Entity.Null || sourceLane == targetLane)
+            {
+                return false;
+            }
+
+            return TryDetectIllegalIngress(
+                entityManager,
+                sourceLane,
+                targetLane,
+                out reasonCode);
         }
 
         internal static void TraceIllegalEgressTransition(
