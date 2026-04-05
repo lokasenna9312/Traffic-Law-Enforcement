@@ -199,6 +199,43 @@ namespace Traffic_Law_Enforcement
                 (m_ConnectionLaneData.TryGetComponent(history.m_CurrentLane, out ConnectionLane currentConnection) &&
                 (currentConnection.m_Flags & ConnectionLaneFlags.Parking) != 0);
 
+            bool currentIsRoad =
+                IsRoadLane(history.m_CurrentLane);
+
+            bool ownerChanged =
+                history.m_PreviousLaneOwner != Entity.Null &&
+                history.m_PreviousLaneOwner != history.m_CurrentLaneOwner;
+
+            bool isLateNonParkingIngressSeam =
+                previousIsRoad &&
+                !currentIsConnection &&
+                !currentIsRoad &&
+                !currentIsParkingFamily;
+
+            if (isLateNonParkingIngressSeam)
+            {
+                EnforcementLoggingPolicy.RecordEnforcementEvent(
+                    "[NON_PARKING_BUILDING_INGRESS_LATE_SEAM_PROBE] " +
+                    $"vehicle={FocusedLoggingService.FormatEntity(vehicle)} " +
+                    $"isDeliveryTruck={m_DeliveryTruckData.HasComponent(vehicle)} " +
+                    $"previousLane={FocusedLoggingService.FormatEntity(history.m_PreviousLane)} " +
+                    $"currentLane={FocusedLoggingService.FormatEntity(history.m_CurrentLane)} " +
+                    $"previousOwner={FocusedLoggingService.FormatEntity(history.m_PreviousLaneOwner)} " +
+                    $"currentOwner={FocusedLoggingService.FormatEntity(history.m_CurrentLaneOwner)} " +
+                    $"ownerChanged={ownerChanged} " +
+                    $"previousLaneKind={DescribeLaneKind(history.m_PreviousLane)} " +
+                    $"currentLaneKind={DescribeLaneKind(history.m_CurrentLane)} " +
+                    $"previousConnectionFlags={FormatConnectionLaneFlags(history.m_PreviousLane)} " +
+                    $"currentConnectionFlags={FormatConnectionLaneFlags(history.m_CurrentLane)} " +
+                    $"previousIsRoad={previousIsRoad} " +
+                    $"currentIsRoad={currentIsRoad} " +
+                    $"currentIsAccessTarget={currentIsAccessTarget} " +
+                    $"ingressDetectResult={ingressDetectResult} " +
+                    $"failReason={failReason} " +
+                    $"reasonCode={reasonCode}",
+                    vehicle);
+            }
+
             if (!previousIsRoad ||
                 !currentIsConnection ||
                 currentIsParkingFamily)
