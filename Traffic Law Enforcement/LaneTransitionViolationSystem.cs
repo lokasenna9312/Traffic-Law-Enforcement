@@ -551,12 +551,6 @@ namespace Traffic_Law_Enforcement
 
             Entity pendingOriginLane = analysisState.m_PendingOrdinaryEgressOriginLane;
 
-            if (!CanUseLegacyGarageConnectionEgressBridgeQuarantine(vehicle))
-            {
-                ClearPendingOrdinaryEgress(ref analysisState);
-                return false;
-            }
-
             if (IsNarrowOrdinaryEgressIntermediate(history.m_PreviousLane))
             {
                 if (IsRoadLane(history.m_CurrentLane))
@@ -812,8 +806,7 @@ namespace Traffic_Law_Enforcement
             originLane = Entity.Null;
             roadLane = Entity.Null;
 
-            if (!CanUseLegacyGarageConnectionEgressBridgeQuarantine(vehicle) ||
-                !IsIllegalEgressReason(reasonCode) ||
+            if (!IsIllegalEgressReason(reasonCode) ||
                 !IsRoadLane(history.m_CurrentLane))
             {
                 return;
@@ -850,27 +843,7 @@ namespace Traffic_Law_Enforcement
                 return;
             }
 
-            if (m_DeliveryTruckData.HasComponent(vehicle) &&
-                previousIsAccessOrigin &&
-                currentIsNarrowIntermediate)
-            {
-                string message =
-                    "[TRUCK_EGRESS_CARRY_SKIPPED] " +
-                    $"vehicle={FocusedLoggingService.FormatEntity(vehicle)} " +
-                    $"previousLane={FocusedLoggingService.FormatEntity(history.m_PreviousLane)} " +
-                    $"currentLane={FocusedLoggingService.FormatEntity(history.m_CurrentLane)} " +
-                    $"previousLaneKind={DescribeLaneKind(history.m_PreviousLane)} " +
-                    $"currentLaneKind={DescribeLaneKind(history.m_CurrentLane)} " +
-                    $"previousConnectionFlags={FormatConnectionLaneFlags(history.m_PreviousLane)} " +
-                    $"currentConnectionFlags={FormatConnectionLaneFlags(history.m_CurrentLane)} " +
-                    $"previousIsAccessOrigin={previousIsAccessOrigin} " +
-                    $"currentIsNarrowIntermediate={currentIsNarrowIntermediate} " +
-                    $"reason=WouldNeedCarryButDeliveryTruckExcluded";
-                EnforcementLoggingPolicy.RecordEnforcementEvent(message, vehicle);
-            }
-
-            if (!CanUseLegacyGarageConnectionEgressBridgeQuarantine(vehicle) ||
-                !previousIsAccessOrigin ||
+            if (!previousIsAccessOrigin ||
                 !currentIsNarrowIntermediate)
             {
                 ClearPendingOrdinaryEgress(ref analysisState);
