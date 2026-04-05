@@ -503,12 +503,14 @@ namespace Traffic_Law_Enforcement
                     (m_ConnectionLaneData.TryGetComponent(history.m_PreviousLane, out ConnectionLane previousConnection) &&
                     (previousConnection.m_Flags & ConnectionLaneFlags.Parking) != 0);
 
+                bool ownerChanged =
+                    history.m_PreviousLaneOwner != Entity.Null &&
+                    history.m_PreviousLaneOwner != history.m_CurrentLaneOwner;
+
                 bool isLateNonParkingEgressSeam =
                     !previousIsAccessOrigin &&
                     !IsRoadLane(history.m_PreviousLane) &&
-                    currentIsRoad &&
-                    history.m_PreviousLaneOwner != Entity.Null &&
-                    history.m_PreviousLaneOwner != history.m_CurrentLaneOwner;
+                    currentIsRoad;
 
                 if (isLateNonParkingEgressSeam)
                 {
@@ -520,6 +522,7 @@ namespace Traffic_Law_Enforcement
                         $"currentLane={FocusedLoggingService.FormatEntity(history.m_CurrentLane)} " +
                         $"previousOwner={FocusedLoggingService.FormatEntity(history.m_PreviousLaneOwner)} " +
                         $"currentOwner={FocusedLoggingService.FormatEntity(history.m_CurrentLaneOwner)} " +
+                        $"ownerChanged={ownerChanged} " +
                         $"previousLaneKind={DescribeLaneKind(history.m_PreviousLane)} " +
                         $"currentLaneKind={DescribeLaneKind(history.m_CurrentLane)} " +
                         $"previousConnectionFlags={FormatConnectionLaneFlags(history.m_PreviousLane)} " +
