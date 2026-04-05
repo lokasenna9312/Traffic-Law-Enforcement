@@ -551,12 +551,6 @@ namespace Traffic_Law_Enforcement
 
             Entity pendingOriginLane = analysisState.m_PendingOrdinaryEgressOriginLane;
 
-            if (!CanUseLegacyGarageConnectionEgressBridgeQuarantine(vehicle))
-            {
-                ClearPendingOrdinaryEgress(ref analysisState);
-                return false;
-            }
-
             if (IsNarrowOrdinaryEgressIntermediate(history.m_PreviousLane))
             {
                 if (IsRoadLane(history.m_CurrentLane))
@@ -808,16 +802,6 @@ namespace Traffic_Law_Enforcement
             out Entity originLane,
             out Entity roadLane)
         {
-            mode = IllegalEgressApplyMode.None;
-            originLane = Entity.Null;
-            roadLane = Entity.Null;
-
-            if (!CanUseLegacyGarageConnectionEgressBridgeQuarantine(vehicle) ||
-                !IsIllegalEgressReason(reasonCode) ||
-                !IsRoadLane(history.m_CurrentLane))
-            {
-                return;
-            }
 
             mode = IllegalEgressApplyMode.Direct;
             originLane = history.m_PreviousLane;
@@ -867,15 +851,6 @@ namespace Traffic_Law_Enforcement
                     $"currentIsNarrowIntermediate={currentIsNarrowIntermediate} " +
                     $"reason=WouldNeedCarryButDeliveryTruckExcluded";
                 EnforcementLoggingPolicy.RecordEnforcementEvent(message, vehicle);
-            }
-
-            if (!CanUseLegacyGarageConnectionEgressBridgeQuarantine(vehicle) ||
-                !previousIsAccessOrigin ||
-                !currentIsNarrowIntermediate)
-            {
-                ClearPendingOrdinaryEgress(ref analysisState);
-                ClearPendingGarageConnectionEgressBridge(ref analysisState);
-                return;
             }
 
             ClearPendingGarageConnectionEgressBridge(ref analysisState);
