@@ -185,7 +185,7 @@ namespace Traffic_Law_Enforcement
 
             analysisState.m_LastProcessedLaneChangeCount = history.m_LaneChangeCount;
             ClearPendingOrdinaryEgress(ref analysisState);
-            ClearPendingUndercroftOrdinaryEgressBridge(ref analysisState);
+            ClearPendingGarageConnectionEgressBridge(ref analysisState);
             if (m_AnalysisStateData.HasComponent(vehicle))
             {
                 EntityManager.SetComponentData(vehicle, analysisState);
@@ -214,7 +214,7 @@ namespace Traffic_Law_Enforcement
             if (m_CarData.TryGetComponent(vehicle, out Car car) && EmergencyVehiclePolicy.IsEmergencyVehicle(car))
             {
                 ClearPendingOrdinaryEgress(ref analysisState);
-                ClearPendingUndercroftOrdinaryEgressBridge(ref analysisState);
+                ClearPendingGarageConnectionEgressBridge(ref analysisState);
                 EntityManager.SetComponentData(vehicle, analysisState);
                 return;
             }
@@ -254,12 +254,12 @@ namespace Traffic_Law_Enforcement
             else
             {
                 ClearPendingOrdinaryEgress(ref analysisState);
-                ClearPendingUndercroftOrdinaryEgressBridge(ref analysisState);
+                ClearPendingGarageConnectionEgressBridge(ref analysisState);
             }
 
             if (hasMidBlockViolation)
             {
-                ClearPendingUndercroftOrdinaryEgressBridge(ref analysisState);
+                ClearPendingGarageConnectionEgressBridge(ref analysisState);
             }
 
             if (hasMidBlockViolation)
@@ -829,7 +829,7 @@ namespace Traffic_Law_Enforcement
             VehicleLaneHistory history,
             ref LaneTransitionAnalysisState analysisState)
         {
-            if (TrySeedPendingOrdinaryEgressFromUndercroftBridge(
+            if (TrySeedPendingOrdinaryEgressFromGarageConnectionBridge(
                     vehicle,
                     history,
                     ref analysisState))
@@ -842,7 +842,7 @@ namespace Traffic_Law_Enforcement
             bool previousIsAccessOrigin =
                 IsAccessOrigin(history.m_PreviousLane);
 
-            if (TryRememberPendingUndercroftOrdinaryEgressBridge(
+            if (TryRememberPendingGarageConnectionEgressBridge(
                     vehicle,
                     history,
                     ref analysisState))
@@ -874,11 +874,11 @@ namespace Traffic_Law_Enforcement
                 !currentIsNarrowIntermediate)
             {
                 ClearPendingOrdinaryEgress(ref analysisState);
-                ClearPendingUndercroftOrdinaryEgressBridge(ref analysisState);
+                ClearPendingGarageConnectionEgressBridge(ref analysisState);
                 return;
             }
 
-            ClearPendingUndercroftOrdinaryEgressBridge(ref analysisState);
+            ClearPendingGarageConnectionEgressBridge(ref analysisState);
             analysisState.m_PendingOrdinaryEgressOriginLane = history.m_PreviousLane;
             analysisState.m_PendingOrdinaryEgressCorridorFailsafeBudget =
                 PendingOrdinaryEgressCorridorFailsafeBudget;
@@ -907,11 +907,11 @@ namespace Traffic_Law_Enforcement
                 analysisState.m_PendingOrdinaryEgressOriginLane != Entity.Null;
         }
 
-        private bool HasPendingUndercroftOrdinaryEgressBridge(
+        private bool HasPendingGarageConnectionEgressBridge(
             LaneTransitionAnalysisState analysisState)
         {
-            return analysisState.m_PendingUndercroftOrdinaryEgressBridgeConnectionLane != Entity.Null &&
-                analysisState.m_PendingUndercroftOrdinaryEgressBridgeOriginLane != Entity.Null;
+            return analysisState.m_PendingGarageConnectionEgressBridgeConnectionLane != Entity.Null &&
+                analysisState.m_PendingGarageConnectionEgressBridgeOriginLane != Entity.Null;
         }
 
         private void ClearPendingOrdinaryEgress(ref LaneTransitionAnalysisState analysisState)
@@ -920,58 +920,58 @@ namespace Traffic_Law_Enforcement
             analysisState.m_PendingOrdinaryEgressOriginLane = Entity.Null;
         }
 
-        private void ClearPendingUndercroftOrdinaryEgressBridge(
+        private void ClearPendingGarageConnectionEgressBridge(
             ref LaneTransitionAnalysisState analysisState)
         {
-            analysisState.m_PendingUndercroftOrdinaryEgressBridgeConnectionLane = Entity.Null;
-            analysisState.m_PendingUndercroftOrdinaryEgressBridgeOriginLane = Entity.Null;
+            analysisState.m_PendingGarageConnectionEgressBridgeConnectionLane = Entity.Null;
+            analysisState.m_PendingGarageConnectionEgressBridgeOriginLane = Entity.Null;
         }
 
-        private bool TryRememberPendingUndercroftOrdinaryEgressBridge(
+        private bool TryRememberPendingGarageConnectionEgressBridge(
             Entity vehicle,
             VehicleLaneHistory history,
             ref LaneTransitionAnalysisState analysisState)
         {
             if (!IsEligibleForPendingOrdinaryEgress(vehicle) ||
                 !m_GarageLaneData.HasComponent(history.m_PreviousLane) ||
-                !IsQualifyingUndercroftOrdinaryEgressBridgeConnection(history.m_CurrentLane) ||
+                !IsQualifyingGarageConnectionEgressBridgeConnection(history.m_CurrentLane) ||
                 history.m_PreviousLaneOwner == Entity.Null ||
                 history.m_PreviousLaneOwner != history.m_CurrentLaneOwner)
             {
                 return false;
             }
 
-            analysisState.m_PendingUndercroftOrdinaryEgressBridgeOriginLane =
+            analysisState.m_PendingGarageConnectionEgressBridgeOriginLane =
                 history.m_PreviousLane;
-            analysisState.m_PendingUndercroftOrdinaryEgressBridgeConnectionLane =
+            analysisState.m_PendingGarageConnectionEgressBridgeConnectionLane =
                 history.m_CurrentLane;
             return true;
         }
 
-        private bool TrySeedPendingOrdinaryEgressFromUndercroftBridge(
+        private bool TrySeedPendingOrdinaryEgressFromGarageConnectionBridge(
             Entity vehicle,
             VehicleLaneHistory history,
             ref LaneTransitionAnalysisState analysisState)
         {
-            if (!HasPendingUndercroftOrdinaryEgressBridge(analysisState))
+            if (!HasPendingGarageConnectionEgressBridge(analysisState))
             {
                 return false;
             }
 
             Entity bridgeConnectionLane =
-                analysisState.m_PendingUndercroftOrdinaryEgressBridgeConnectionLane;
+                analysisState.m_PendingGarageConnectionEgressBridgeConnectionLane;
             Entity bridgeOriginLane =
-                analysisState.m_PendingUndercroftOrdinaryEgressBridgeOriginLane;
+                analysisState.m_PendingGarageConnectionEgressBridgeOriginLane;
 
             if (!IsEligibleForPendingOrdinaryEgress(vehicle) ||
                 history.m_PreviousLane != bridgeConnectionLane ||
                 !IsNarrowOrdinaryEgressIntermediate(history.m_CurrentLane))
             {
-                ClearPendingUndercroftOrdinaryEgressBridge(ref analysisState);
+                ClearPendingGarageConnectionEgressBridge(ref analysisState);
                 return false;
             }
 
-            ClearPendingUndercroftOrdinaryEgressBridge(ref analysisState);
+            ClearPendingGarageConnectionEgressBridge(ref analysisState);
             analysisState.m_PendingOrdinaryEgressOriginLane = bridgeOriginLane;
             analysisState.m_PendingOrdinaryEgressCorridorFailsafeBudget =
                 PendingOrdinaryEgressCorridorFailsafeBudget;
@@ -988,7 +988,7 @@ namespace Traffic_Law_Enforcement
             return m_EdgeLaneData.HasComponent(lane) && m_CarLaneData.HasComponent(lane);
         }
 
-        private bool IsQualifyingUndercroftOrdinaryEgressBridgeConnection(Entity lane)
+        private bool IsQualifyingGarageConnectionEgressBridgeConnection(Entity lane)
         {
             if (!m_ConnectionLaneData.TryGetComponent(lane, out ConnectionLane connectionLane))
             {
