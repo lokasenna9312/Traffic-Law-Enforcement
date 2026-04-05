@@ -455,11 +455,17 @@ namespace Traffic_Law_Enforcement
                     history.m_PreviousLaneOwner != history.m_CurrentLaneOwner)
                 {
                     EnforcementLoggingPolicy.RecordEnforcementEvent(
-                        "[OBSERVED_NONPARKING_ACCESS_CANDIDATE] " +
-                        $"prev={history.m_PreviousLane} " +
-                        $"curr={history.m_CurrentLane} " +
-                        $"prevOwner={history.m_PreviousLaneOwner} " +
-                        $"currOwner={history.m_CurrentLaneOwner}",
+                    "[OBSERVED_NONPARKING_ACCESS_CANDIDATE] " +
+                    $"vehicle={FocusedLoggingService.FormatEntity(vehicle)} " +
+                    $"prev={FocusedLoggingService.FormatEntity(history.m_PreviousLane)} " +
+                    $"curr={FocusedLoggingService.FormatEntity(history.m_CurrentLane)} " +
+                    $"prevOwner={FocusedLoggingService.FormatEntity(history.m_PreviousLaneOwner)} " +
+                    $"currOwner={FocusedLoggingService.FormatEntity(history.m_CurrentLaneOwner)} " +
+                    $"prevKind={DescribeLaneKind(history.m_PreviousLane)} " +
+                    $"currKind={DescribeLaneKind(history.m_CurrentLane)} " +
+                    $"prevIsAccessOrigin={previousIsAccessOrigin} " +
+                    $"currentIsRoad={currentIsRoad} " +
+                    $"failReason={failReason}",
                         vehicle);
                 }
 
