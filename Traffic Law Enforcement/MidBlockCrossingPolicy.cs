@@ -7,6 +7,19 @@ namespace Traffic_Law_Enforcement
 {
     public static class MidBlockCrossingPolicy
     {
+        internal enum AccessIngressTraceFailReason : byte
+        {
+            None = 0,
+            PreviousNotRoad = 1,
+            CurrentNotConnectionLikeTarget = 2,
+            CurrentRoadFlaggedConnection = 3,
+            CurrentNotInsideAccessConnection = 4,
+            RoadAllowsGarageAccess = 5,
+            RoadAllowsParkingAccess = 6,
+            RoadAllowsParkingConnectionAccess = 7,
+            RoadAllowsBuildingAccess = 8,
+            NoIllegalIngressDetected = 9
+        }
 
         internal static void TraceIllegalIngressTransition(
             EntityManager entityManager,
@@ -19,51 +32,103 @@ namespace Traffic_Law_Enforcement
             out LaneTransitionViolationReasonCode reasonCode)
         {
             reasonCode = LaneTransitionViolationReasonCode.None;
+            ingressDetectResult = false;
+            failReason = AccessIngressTraceFailReason.None;
+            currentIsAccessTarget = false;
 
             previousIsRoad =
-                entityManager.HasComponent<EdgeLane>(previousLane) &&
-                entityManager.HasComponent<CarLane>(previousLane);
+                TryGetRoadCarLane(entityManager, previousLane, out CarLane sourceCarLane);
 
-            currentIsAccessTarget =
-                entityManager.HasComponent<ParkingLane>(currentLane) ||
-                entityManager.HasComponent<GarageLane>(currentLane) ||
-                entityManager.HasComponent<ConnectionLane>(currentLane);
-
-            ingressDetectResult =
-                TryGetIllegalIngressTransition(
-                    entityManager,
-                    previousLane,
-                    currentLane,
-                    out reasonCode);
-
-            // Only fewest reasons
             if (!previousIsRoad)
             {
                 failReason = AccessIngressTraceFailReason.PreviousNotRoad;
                 return;
             }
 
-            if (!currentIsAccessTarget)
+            if (entityManager.HasComponent<GarageLane>(currentLane))
             {
-                failReason = AccessIngressTraceFailReason.CurrentNotAccessTarget;
+                currentIsAccessTarget = true;
+
+                if (TryGetConnectionLane(entityManager, currentLane, out ConnectionLane garageConnectionLane))
+                {
+                    if (RoadAllowsGarageAccess(sourceCarLane, garageConnectionLane))
+                    {
+                        failReason = AccessIngressTraceFailReason.RoadAllowsGarageAccess;
+                        return;
+                    }
+                }
+                else if (RoadHasGenericSideConnection(sourceCarLane))
+                {
+                    failReason = AccessIngressTraceFailReason.RoadAllowsGarageAccess;
+                    return;
+                }
+
+                ingressDetectResult = true;
+                reasonCode = LaneTransitionViolationReasonCode.EnteredGarageAccessWithoutSideAccess;
                 return;
             }
 
-            if (!ingressDetectResult)
+            if (entityManager.HasComponent<ParkingLane>(currentLane))
             {
-                failReason = AccessIngressTraceFailReason.NoIllegalIngressDetected;
+                currentIsAccessTarget = true;
+
+                ParkingLane parkingLane = entityManager.GetComponentData<ParkingLane>(currentLane);
+                if (RoadAllowsParkingAccess(sourceCarLane, parkingLane))
+                {
+                    failReason = AccessIngressTraceFailReason.RoadAllowsParkingAccess;
+                    return;
+                }
+
+                ingressDetectResult = true;
+                reasonCode = LaneTransitionViolationReasonCode.EnteredParkingAccessWithoutSideAccess;
                 return;
             }
 
-            failReason = AccessIngressTraceFailReason.None;
-        }
+            if (!entityManager.HasComponent<ConnectionLane>(currentLane))
+            {
+                failReason = AccessIngressTraceFailReason.CurrentNotConnectionLikeTarget;
+                return;
+            }
 
-        internal enum AccessIngressTraceFailReason : byte
-        {
-            None = 0,
-            PreviousNotRoad = 1,
-            CurrentNotAccessTarget = 2,
-            NoIllegalIngressDetected = 3
+            ConnectionLane connectionLane = entityManager.GetComponentData<ConnectionLane>(currentLane);
+
+            if ((connectionLane.m_Flags & ConnectionLaneFlags.Parking) != 0)
+            {
+                currentIsAccessTarget = true;
+
+                if (RoadAllowsParkingConnectionAccess(sourceCarLane, connectionLane))
+                {
+                    failReason = AccessIngressTraceFailReason.RoadAllowsParkingConnectionAccess;
+                    return;
+                }
+
+                ingressDetectResult = true;
+                reasonCode = LaneTransitionViolationReasonCode.EnteredParkingConnectionWithoutSideAccess;
+                return;
+            }
+
+            if ((connectionLane.m_Flags & ConnectionLaneFlags.Road) != 0)
+            {
+                failReason = AccessIngressTraceFailReason.CurrentRoadFlaggedConnection;
+                return;
+            }
+
+            if (!IsInsideAccessConnection(connectionLane))
+            {
+                failReason = AccessIngressTraceFailReason.CurrentNotInsideAccessConnection;
+                return;
+            }
+
+            currentIsAccessTarget = true;
+
+            if (RoadAllowsBuildingAccess(sourceCarLane))
+            {
+                failReason = AccessIngressTraceFailReason.RoadAllowsBuildingAccess;
+                return;
+            }
+
+            ingressDetectResult = true;
+            reasonCode = LaneTransitionViolationReasonCode.EnteredBuildingAccessConnectionWithoutSideAccess;
         }
 
         internal enum AccessEgressTraceFailReason : byte
