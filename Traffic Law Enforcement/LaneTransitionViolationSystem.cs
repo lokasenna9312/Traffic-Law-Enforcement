@@ -503,24 +503,31 @@ namespace Traffic_Law_Enforcement
                     (m_ConnectionLaneData.TryGetComponent(history.m_PreviousLane, out ConnectionLane previousConnection) &&
                     (previousConnection.m_Flags & ConnectionLaneFlags.Parking) != 0);
 
-                if (!IsAccessOrigin(history.m_PreviousLane) &&
+                bool isLateNonParkingEgressSeam =
+                    !previousIsAccessOrigin &&
                     !IsRoadLane(history.m_PreviousLane) &&
-                    IsRoadLane(history.m_CurrentLane) &&
+                    currentIsRoad &&
                     history.m_PreviousLaneOwner != Entity.Null &&
-                    history.m_PreviousLaneOwner != history.m_CurrentLaneOwner)
+                    history.m_PreviousLaneOwner != history.m_CurrentLaneOwner;
+
+                if (isLateNonParkingEgressSeam)
                 {
                     EnforcementLoggingPolicy.RecordEnforcementEvent(
-                    "[OBSERVED_NONPARKING_ACCESS_CANDIDATE] " +
-                    $"vehicle={FocusedLoggingService.FormatEntity(vehicle)} " +
-                    $"prev={FocusedLoggingService.FormatEntity(history.m_PreviousLane)} " +
-                    $"curr={FocusedLoggingService.FormatEntity(history.m_CurrentLane)} " +
-                    $"prevOwner={FocusedLoggingService.FormatEntity(history.m_PreviousLaneOwner)} " +
-                    $"currOwner={FocusedLoggingService.FormatEntity(history.m_CurrentLaneOwner)} " +
-                    $"prevKind={DescribeLaneKind(history.m_PreviousLane)} " +
-                    $"currKind={DescribeLaneKind(history.m_CurrentLane)} " +
-                    $"prevIsAccessOrigin={previousIsAccessOrigin} " +
-                    $"currentIsRoad={currentIsRoad} " +
-                    $"failReason={failReason}",
+                        "[NON_PARKING_BUILDING_EGRESS_LATE_SEAM_PROBE] " +
+                        $"vehicle={FocusedLoggingService.FormatEntity(vehicle)} " +
+                        $"isDeliveryTruck={m_DeliveryTruckData.HasComponent(vehicle)} " +
+                        $"previousLane={FocusedLoggingService.FormatEntity(history.m_PreviousLane)} " +
+                        $"currentLane={FocusedLoggingService.FormatEntity(history.m_CurrentLane)} " +
+                        $"previousOwner={FocusedLoggingService.FormatEntity(history.m_PreviousLaneOwner)} " +
+                        $"currentOwner={FocusedLoggingService.FormatEntity(history.m_CurrentLaneOwner)} " +
+                        $"previousLaneKind={DescribeLaneKind(history.m_PreviousLane)} " +
+                        $"currentLaneKind={DescribeLaneKind(history.m_CurrentLane)} " +
+                        $"previousConnectionFlags={FormatConnectionLaneFlags(history.m_PreviousLane)} " +
+                        $"currentConnectionFlags={FormatConnectionLaneFlags(history.m_CurrentLane)} " +
+                        $"previousIsAccessOrigin={previousIsAccessOrigin} " +
+                        $"currentIsRoad={currentIsRoad} " +
+                        $"egressDetectResult={egressDetectResult} " +
+                        $"failReason={failReason}",
                         vehicle);
                 }
 
