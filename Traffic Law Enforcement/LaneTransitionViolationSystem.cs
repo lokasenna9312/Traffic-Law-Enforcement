@@ -448,6 +448,21 @@ namespace Traffic_Law_Enforcement
                     (m_ConnectionLaneData.TryGetComponent(history.m_PreviousLane, out ConnectionLane previousConnection) &&
                     (previousConnection.m_Flags & ConnectionLaneFlags.Parking) != 0);
 
+                if (!IsAccessOrigin(history.m_PreviousLane) &&
+                    !IsRoadLane(history.m_PreviousLane) &&
+                    IsRoadLane(history.m_CurrentLane) &&
+                    history.m_PreviousLaneOwner != Entity.Null &&
+                    history.m_PreviousLaneOwner != history.m_CurrentLaneOwner)
+                {
+                    EnforcementLoggingPolicy.RecordEnforcementEvent(
+                        "[OBSERVED_NONPARKING_ACCESS_CANDIDATE] " +
+                        $"prev={history.m_PreviousLane} " +
+                        $"curr={history.m_CurrentLane} " +
+                        $"prevOwner={history.m_PreviousLaneOwner} " +
+                        $"currOwner={history.m_CurrentLaneOwner}",
+                        vehicle);
+                }
+
                 if (previousIsConnection && !previousIsParkingFamily)
                 {
                     string nonParkingSourceProbeMessage =
