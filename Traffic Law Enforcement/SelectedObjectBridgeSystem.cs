@@ -549,7 +549,10 @@ namespace Traffic_Law_Enforcement
                     resolveResult,
                     tleApplicability,
                     vehicle,
-                    hasVehicleEntity);
+                    hasVehicleEntity,
+                    CanRetainDeferredSnapshotFields(
+                        resolveResult,
+                        tleApplicability));
             }
 
             bool tleApplicable =
@@ -1110,8 +1113,13 @@ namespace Traffic_Law_Enforcement
             SelectedObjectResolveResult resolveResult,
             SelectedObjectTleApplicability tleApplicability,
             Entity vehicle,
-            bool hasVehicleEntity)
+            bool hasVehicleEntity,
+            bool retainDeferredSnapshotFields)
         {
+            bool routeDiagnosticsAvailable =
+                tleApplicability == SelectedObjectTleApplicability.ApplicableReady &&
+                resolveResult.VehicleKind == SelectedObjectKind.RoadCar &&
+                hasVehicleEntity;
             string roleText =
                 tleApplicability == SelectedObjectTleApplicability.ApplicableReady
                     ? BuildRoleText(resolveResult)
@@ -1139,46 +1147,126 @@ namespace Traffic_Law_Enforcement
                 string.Empty,
                 string.Empty,
                 string.Empty,
-                string.Empty,
-                string.Empty,
-                string.Empty,
-                string.Empty,
+                retainDeferredSnapshotFields
+                    ? m_CurrentSnapshot.SummaryClassificationText
+                    : string.Empty,
+                retainDeferredSnapshotFields
+                    ? m_CurrentSnapshot.SummaryTleStatusText
+                    : string.Empty,
+                retainDeferredSnapshotFields
+                    ? m_CurrentSnapshot.CompactLastReasonText
+                    : string.Empty,
+                retainDeferredSnapshotFields
+                    ? m_CurrentSnapshot.CompactRepeatPenaltyText
+                    : string.Empty,
                 resolveResult.IsVehicle && hasVehicleEntity ? vehicle.Index : -1,
                 roleText,
-                string.Empty,
-                hasTrafficLawProfile: false,
-                currentLaneEntity: Entity.Null,
-                previousLaneEntity: Entity.Null,
-                currentLaneText: string.Empty,
-                previousLaneText: string.Empty,
-                laneChangeCount: 0,
-                ptLaneViolationActive: false,
-                pendingExitActive: false,
-                permissionStateSummary: string.Empty,
-                totalFines: 0,
-                totalViolations: 0,
-                lastReason: string.Empty,
-                hasPathOwner: false,
-                hasCurrentTarget: false,
-                hasCurrentRoute: false,
-                currentPathFlags: default,
-                currentTargetEntity: Entity.Null,
-                currentRouteEntity: Entity.Null,
-                currentRouteColorText: string.Empty,
-                hasRouteDiagnostics: false,
-                routeDiagnosticsCurrentTargetText: string.Empty,
-                routeDiagnosticsCurrentRouteText: string.Empty,
-                routeDiagnosticsTargetRoadText: string.Empty,
-                routeDiagnosticsStartOwnerRoadText: string.Empty,
-                routeDiagnosticsEndOwnerRoadText: string.Empty,
-                routeDiagnosticsDirectConnectText: string.Empty,
-                routeDiagnosticsFullPathToTargetStartText: string.Empty,
-                routeDiagnosticsNavigationLanesText: string.Empty,
-                routeDiagnosticsPlannedPenaltiesText: string.Empty,
-                routeDiagnosticsPenaltyTagsText: string.Empty,
-                routeDiagnosticsExplanationText: string.Empty,
-                routeDiagnosticsWaypointRouteLaneText: string.Empty,
-                routeDiagnosticsConnectedStopText: string.Empty);
+                retainDeferredSnapshotFields
+                    ? m_CurrentSnapshot.PublicTransportLanePolicyText
+                    : string.Empty,
+                retainDeferredSnapshotFields &&
+                    m_CurrentSnapshot.HasTrafficLawProfile,
+                retainDeferredSnapshotFields
+                    ? m_CurrentSnapshot.CurrentLaneEntity
+                    : Entity.Null,
+                retainDeferredSnapshotFields
+                    ? m_CurrentSnapshot.PreviousLaneEntity
+                    : Entity.Null,
+                retainDeferredSnapshotFields
+                    ? m_CurrentSnapshot.CurrentLaneText
+                    : string.Empty,
+                retainDeferredSnapshotFields
+                    ? m_CurrentSnapshot.PreviousLaneText
+                    : string.Empty,
+                retainDeferredSnapshotFields
+                    ? m_CurrentSnapshot.LaneChangeCount
+                    : 0,
+                retainDeferredSnapshotFields &&
+                    m_CurrentSnapshot.PublicTransportLaneViolationActive,
+                retainDeferredSnapshotFields &&
+                    m_CurrentSnapshot.PendingExitActive,
+                retainDeferredSnapshotFields
+                    ? m_CurrentSnapshot.PermissionStateSummary
+                    : string.Empty,
+                retainDeferredSnapshotFields
+                    ? m_CurrentSnapshot.TotalFines
+                    : 0,
+                retainDeferredSnapshotFields
+                    ? m_CurrentSnapshot.TotalViolations
+                    : 0,
+                retainDeferredSnapshotFields
+                    ? m_CurrentSnapshot.LastReason
+                    : string.Empty,
+                retainDeferredSnapshotFields &&
+                    m_CurrentSnapshot.HasPathOwner,
+                retainDeferredSnapshotFields &&
+                    m_CurrentSnapshot.HasCurrentTarget,
+                retainDeferredSnapshotFields &&
+                    m_CurrentSnapshot.HasCurrentRoute,
+                retainDeferredSnapshotFields
+                    ? m_CurrentSnapshot.CurrentPathFlags
+                    : default,
+                retainDeferredSnapshotFields
+                    ? m_CurrentSnapshot.CurrentTargetEntity
+                    : Entity.Null,
+                retainDeferredSnapshotFields
+                    ? m_CurrentSnapshot.CurrentRouteEntity
+                    : Entity.Null,
+                retainDeferredSnapshotFields
+                    ? m_CurrentSnapshot.CurrentRouteColorText
+                    : string.Empty,
+                routeDiagnosticsAvailable,
+                retainDeferredSnapshotFields
+                    ? m_CurrentSnapshot.RouteDiagnosticsCurrentTargetText
+                    : string.Empty,
+                retainDeferredSnapshotFields
+                    ? m_CurrentSnapshot.RouteDiagnosticsCurrentRouteText
+                    : string.Empty,
+                retainDeferredSnapshotFields
+                    ? m_CurrentSnapshot.RouteDiagnosticsTargetRoadText
+                    : string.Empty,
+                retainDeferredSnapshotFields
+                    ? m_CurrentSnapshot.RouteDiagnosticsStartOwnerRoadText
+                    : string.Empty,
+                retainDeferredSnapshotFields
+                    ? m_CurrentSnapshot.RouteDiagnosticsEndOwnerRoadText
+                    : string.Empty,
+                retainDeferredSnapshotFields
+                    ? m_CurrentSnapshot.RouteDiagnosticsDirectConnectText
+                    : string.Empty,
+                retainDeferredSnapshotFields
+                    ? m_CurrentSnapshot.RouteDiagnosticsFullPathToTargetStartText
+                    : string.Empty,
+                retainDeferredSnapshotFields
+                    ? m_CurrentSnapshot.RouteDiagnosticsNavigationLanesText
+                    : string.Empty,
+                retainDeferredSnapshotFields
+                    ? m_CurrentSnapshot.RouteDiagnosticsPlannedPenaltiesText
+                    : string.Empty,
+                retainDeferredSnapshotFields
+                    ? m_CurrentSnapshot.RouteDiagnosticsPenaltyTagsText
+                    : string.Empty,
+                retainDeferredSnapshotFields
+                    ? m_CurrentSnapshot.RouteDiagnosticsExplanationText
+                    : string.Empty,
+                retainDeferredSnapshotFields
+                    ? m_CurrentSnapshot.RouteDiagnosticsWaypointRouteLaneText
+                    : string.Empty,
+                retainDeferredSnapshotFields
+                    ? m_CurrentSnapshot.RouteDiagnosticsConnectedStopText
+                    : string.Empty);
+        }
+
+        private bool CanRetainDeferredSnapshotFields(
+            SelectedObjectResolveResult resolveResult,
+            SelectedObjectTleApplicability tleApplicability)
+        {
+            return m_HasSnapshot &&
+                resolveResult.ResolveState == m_CurrentSnapshot.ResolveState &&
+                resolveResult.VehicleKind == m_CurrentSnapshot.VehicleKind &&
+                tleApplicability == m_CurrentSnapshot.TleApplicability &&
+                resolveResult.SourceSelectedEntity == m_CurrentSnapshot.SourceSelectedEntity &&
+                resolveResult.ResolvedVehicleEntity == m_CurrentSnapshot.ResolvedVehicleEntity;
         }
 
         private SelectedObjectDisplayFormatterContext CreateDisplayFormatterContext()

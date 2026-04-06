@@ -440,7 +440,7 @@ namespace Traffic_Law_Enforcement
                     snapshot,
                     out SelectedObjectDebugSnapshot laneDetailsSnapshot);
             RefreshRouteDiagnosticsCache(snapshot);
-            ScheduleRouteDiagnosticsRefresh(summarySnapshot);
+            ScheduleRouteDiagnosticsRefresh(snapshot);
             bool routeDiagnosticsReady =
                 TryGetRouteDiagnosticsDisplaySnapshot(
                     snapshot,
@@ -518,9 +518,7 @@ namespace Traffic_Law_Enforcement
             bool summaryContentReady = summaryReady;
             bool laneDetailsExpanded = !m_IsLaneDetailsCollapsed;
             bool laneDetailsContentReady = laneDetailsExpanded && laneDetailsReady;
-            bool routeDiagnosticsVisible =
-                summaryContentReady &&
-                summarySnapshot.HasRouteDiagnostics;
+            bool routeDiagnosticsVisible = CanShowRouteDiagnosticsSection(snapshot);
             bool routeDiagnosticsExpanded =
                 routeDiagnosticsVisible &&
                 !m_IsRouteDiagnosticsCollapsed &&
@@ -807,9 +805,9 @@ namespace Traffic_Law_Enforcement
                  laneDetailsSnapshot.CurrentLaneText == m_LastPanelLaneDetailsSnapshot.CurrentLaneText &&
                  laneDetailsSnapshot.PreviousLaneText == m_LastPanelLaneDetailsSnapshot.PreviousLaneText &&
                  laneDetailsSnapshot.LaneChangeCount == m_LastPanelLaneDetailsSnapshot.LaneChangeCount);
+            bool routeDiagnosticsVisible = CanShowRouteDiagnosticsSection(snapshot);
             bool routeDiagnosticsRelevant =
-                summaryReady &&
-                summarySnapshot.HasRouteDiagnostics &&
+                routeDiagnosticsVisible &&
                 !m_IsRouteDiagnosticsCollapsed;
             bool routeDiagnosticsStateMatches =
                 !routeDiagnosticsRelevant ||
@@ -839,6 +837,7 @@ namespace Traffic_Law_Enforcement
                 m_PathObsoleteStatusIsError == m_LastPanelPathObsoleteStatusIsError &&
                 m_IsLaneDetailsCollapsed == m_LastPanelLaneDetailsCollapsed &&
                 m_IsRouteDiagnosticsCollapsed == m_LastPanelRouteDiagnosticsCollapsed &&
+                routeDiagnosticsVisible == m_LastPanelState.RouteDiagnosticsVisible &&
                 summaryStateMatches &&
                 laneDetailsStateMatches &&
                 routeDiagnosticsStateMatches;
@@ -1313,7 +1312,7 @@ namespace Traffic_Law_Enforcement
         private void ScheduleRouteDiagnosticsRefresh(SelectedObjectDebugSnapshot snapshot)
         {
             if (m_IsRouteDiagnosticsCollapsed ||
-                !snapshot.HasRouteDiagnostics ||
+                !CanShowRouteDiagnosticsSection(snapshot) ||
                 snapshot.TleApplicability != SelectedObjectTleApplicability.ApplicableReady ||
                 snapshot.ResolvedVehicleEntity == Entity.Null)
             {
@@ -1379,6 +1378,14 @@ namespace Traffic_Law_Enforcement
             return snapshot.HasRouteDiagnostics &&
                 !string.IsNullOrEmpty(snapshot.RouteDiagnosticsCurrentTargetText) &&
                 !string.IsNullOrEmpty(snapshot.RouteDiagnosticsCurrentRouteText);
+        }
+
+        private static bool CanShowRouteDiagnosticsSection(
+            SelectedObjectDebugSnapshot snapshot)
+        {
+            return snapshot.TleApplicability == SelectedObjectTleApplicability.ApplicableReady &&
+                snapshot.VehicleKind == SelectedObjectKind.RoadCar &&
+                snapshot.ResolvedVehicleEntity != Entity.Null;
         }
 
         private static bool IsSameResolvedSelection(
