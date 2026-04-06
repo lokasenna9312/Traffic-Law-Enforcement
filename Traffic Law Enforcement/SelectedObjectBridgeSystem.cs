@@ -14,7 +14,15 @@ namespace Traffic_Law_Enforcement
 {
     public partial class SelectedObjectBridgeSystem : GameSystemBase
     {
-        private static bool s_MinimalSnapshotConsumerActive;
+        [System.Flags]
+        private enum MinimalSnapshotConsumerSource
+        {
+            None = 0,
+            FocusedLoggingPanel = 1 << 0,
+            SelectedObjectPanel = 1 << 1,
+        }
+
+        private static MinimalSnapshotConsumerSource s_MinimalSnapshotConsumers;
         private static bool s_DetailedSnapshotConsumerActive;
         private static bool s_SummaryRequested;
         private static bool s_DebugFieldsRequested;
@@ -219,9 +227,18 @@ namespace Traffic_Law_Enforcement
             s_DetailedSnapshotConsumerActive = active;
         }
 
-        internal static void SetMinimalSnapshotConsumerActive(bool active)
+        internal static void SetFocusedLoggingMinimalSnapshotConsumerActive(bool active)
         {
-            s_MinimalSnapshotConsumerActive = active;
+            SetMinimalSnapshotConsumerActive(
+                MinimalSnapshotConsumerSource.FocusedLoggingPanel,
+                active);
+        }
+
+        internal static void SetSelectedObjectPanelMinimalSnapshotConsumerActive(bool active)
+        {
+            SetMinimalSnapshotConsumerActive(
+                MinimalSnapshotConsumerSource.SelectedObjectPanel,
+                active);
         }
 
         internal static void SetLaneDetailsConsumerActive(bool active)
@@ -312,10 +329,12 @@ namespace Traffic_Law_Enforcement
                 includeRouteDiagnosticsDisplayFields;
             bool includeCurrentLaneFields =
                 includeLaneDetailsFields ||
-                includeRouteDiagnosticsDisplayFields;
+                includeRouteDiagnosticsDisplayFields ||
+                summaryRequested;
             bool includePathStateFields =
                 s_DetailedSnapshotConsumerActive ||
-                includeRouteDiagnosticsDisplayFields;
+                includeRouteDiagnosticsDisplayFields ||
+                summaryRequested;
             bool includeProfileData =
                 includeSummaryFields ||
                 includeRouteDiagnosticsDisplayFields;
@@ -328,7 +347,7 @@ namespace Traffic_Law_Enforcement
                 laneDetailsRequested ||
                 routeDiagnosticsRequested;
             bool buildAnySnapshot =
-                s_MinimalSnapshotConsumerActive ||
+                s_MinimalSnapshotConsumers != MinimalSnapshotConsumerSource.None ||
                 buildDetailedSnapshot;
 
             if (!buildAnySnapshot)
@@ -511,7 +530,7 @@ namespace Traffic_Law_Enforcement
                 GetTleApplicability(resolveResult);
             bool includeRoleText =
                 s_DetailedSnapshotConsumerActive ||
-                s_MinimalSnapshotConsumerActive;
+                s_MinimalSnapshotConsumers != MinimalSnapshotConsumerSource.None;
             bool needsTypeLookups =
                 resolveResult.VehicleKind == SelectedObjectKind.RoadCar &&
                 ((!buildDetailedSnapshot &&
@@ -1726,6 +1745,19 @@ namespace Traffic_Law_Enforcement
             bool requested = s_RouteDiagnosticsRequested;
             s_RouteDiagnosticsRequested = false;
             return requested;
+        }
+
+        private static void SetMinimalSnapshotConsumerActive(
+            MinimalSnapshotConsumerSource source,
+            bool active)
+        {
+            if (active)
+            {
+                s_MinimalSnapshotConsumers |= source;
+                return;
+            }
+
+            s_MinimalSnapshotConsumers &= ~source;
         }
 
     }
