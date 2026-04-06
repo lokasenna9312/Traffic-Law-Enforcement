@@ -420,11 +420,6 @@ namespace Traffic_Law_Enforcement
                 return;
             }
 
-            currentSuggestedEntitySelectionValue =
-                BuildSuggestedEntitySelectionValue(m_SelectedObjectBridgeSystem.CurrentSnapshot);
-            RefreshEntitySelectionStatus(currentSuggestedEntitySelectionValue);
-            RefreshPathObsoleteStatus(currentSuggestedEntitySelectionValue);
-            SelectedObjectDebugSnapshot snapshot = m_SelectedObjectBridgeSystem.CurrentSnapshot;
             int currentBridgeSnapshotSerial = m_SelectedObjectBridgeSystem.SnapshotSerial;
             if (m_HasCachedPanelState &&
                 currentBridgeSnapshotSerial == m_LastProcessedBridgeSnapshotSerial)
@@ -432,6 +427,11 @@ namespace Traffic_Law_Enforcement
                 return;
             }
 
+            currentSuggestedEntitySelectionValue =
+                BuildSuggestedEntitySelectionValue(m_SelectedObjectBridgeSystem.CurrentSnapshot);
+            RefreshEntitySelectionStatus(currentSuggestedEntitySelectionValue);
+            RefreshPathObsoleteStatus(currentSuggestedEntitySelectionValue);
+            SelectedObjectDebugSnapshot snapshot = m_SelectedObjectBridgeSystem.CurrentSnapshot;
             if (snapshot.ResolveState == SelectedObjectResolveState.None ||
                 snapshot.ResolveState == SelectedObjectResolveState.NotVehicle)
             {

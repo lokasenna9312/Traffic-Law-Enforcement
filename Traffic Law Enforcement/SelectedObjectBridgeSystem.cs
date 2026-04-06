@@ -419,6 +419,10 @@ namespace Traffic_Law_Enforcement
             if (buildDetailedSnapshot &&
                 (!resolveResult.HasSelection || !resolveResult.IsVehicle))
             {
+                SelectedObjectDebugSnapshot previousSnapshot = m_CurrentSnapshot;
+                bool hadSnapshot = m_HasSnapshot;
+                int previousHydrationPhase = m_SelectionHydrationPhase;
+
                 m_CurrentSnapshot = BuildSnapshot(
                     resolveResult,
                     buildDetailedSnapshot,
@@ -434,8 +438,13 @@ namespace Traffic_Law_Enforcement
                     includePathStateFields);
                 m_LastSnapshotSettingsVersion = EnforcementGameplaySettingsService.Version;
                 m_HasSnapshot = true;
-                m_SnapshotSerial++;
                 AdvanceSelectionHydrationPhase(panelSelectionHydrationActive);
+                if (!hadSnapshot ||
+                    !m_CurrentSnapshot.Equals(previousSnapshot) ||
+                    previousHydrationPhase != m_SelectionHydrationPhase)
+                {
+                    m_SnapshotSerial++;
+                }
                 return;
             }
 
@@ -495,6 +504,10 @@ namespace Traffic_Law_Enforcement
                 }
             }
 
+            SelectedObjectDebugSnapshot previousSnapshotAfterUpdates = m_CurrentSnapshot;
+            bool hadSnapshotAfterUpdates = m_HasSnapshot;
+            int previousHydrationPhaseAfterUpdates = m_SelectionHydrationPhase;
+
             m_CurrentSnapshot = BuildSnapshot(
                 resolveResult,
                 buildDetailedSnapshot,
@@ -510,8 +523,13 @@ namespace Traffic_Law_Enforcement
                 includePathStateFields);
             m_LastSnapshotSettingsVersion = EnforcementGameplaySettingsService.Version;
             m_HasSnapshot = true;
-            m_SnapshotSerial++;
             AdvanceSelectionHydrationPhase(panelSelectionHydrationActive);
+            if (!hadSnapshotAfterUpdates ||
+                !m_CurrentSnapshot.Equals(previousSnapshotAfterUpdates) ||
+                previousHydrationPhaseAfterUpdates != m_SelectionHydrationPhase)
+            {
+                m_SnapshotSerial++;
+            }
         }
 
         private SelectedObjectDebugSnapshot BuildSnapshot(
