@@ -1,6 +1,7 @@
 using Game;
 using Game.Common;
 using Game.Net;
+using Game.Pathfind;
 using Game.Vehicles;
 using Unity.Collections;
 using Unity.Entities;
@@ -42,6 +43,10 @@ namespace Traffic_Law_Enforcement
         private ComponentLookup<GarageLane> m_GarageLaneData;
         private ComponentLookup<ConnectionLane> m_ConnectionLaneData;
         private ComponentLookup<Owner> m_OwnerData;
+        private ComponentLookup<PersonalCar> m_PersonalCarData;
+        private ComponentLookup<Target> m_TargetData;
+        private ComponentLookup<PathOwner> m_PathOwnerData;
+        private ComponentLookup<Game.Objects.SpawnLocation> m_SpawnLocationData;
         private ComponentLookup<LaneTransitionAnalysisState> m_AnalysisStateData;
         private const int MaxIntersectionTransitionDiagnostics = 32;
         private int m_IntersectionTransitionDiagnosticCount;
@@ -80,6 +85,10 @@ namespace Traffic_Law_Enforcement
             m_GarageLaneData = GetComponentLookup<GarageLane>(true);
             m_ConnectionLaneData = GetComponentLookup<ConnectionLane>(true);
             m_OwnerData = GetComponentLookup<Owner>(true);
+            m_PersonalCarData = GetComponentLookup<PersonalCar>(true);
+            m_TargetData = GetComponentLookup<Target>(true);
+            m_PathOwnerData = GetComponentLookup<PathOwner>(true);
+            m_SpawnLocationData = GetComponentLookup<Game.Objects.SpawnLocation>(true);
             m_AnalysisStateData = GetComponentLookup<LaneTransitionAnalysisState>();
             RequireForUpdate(m_CarQuery);
         }
@@ -135,6 +144,10 @@ namespace Traffic_Law_Enforcement
                 m_GarageLaneData.Update(this);
                 m_ConnectionLaneData.Update(this);
                 m_OwnerData.Update(this);
+                m_PersonalCarData.Update(this);
+                m_TargetData.Update(this);
+                m_PathOwnerData.Update(this);
+                m_SpawnLocationData.Update(this);
 
                 if (m_EventEntity == Entity.Null || !EntityManager.Exists(m_EventEntity))
                 {
@@ -173,6 +186,7 @@ namespace Traffic_Law_Enforcement
 
         private void MaybeLogRealizedIngressTrace(
             Entity vehicle,
+            CarCurrentLane currentLane,
             VehicleLaneHistory history)
         {
             if (!EnforcementLoggingPolicy.ShouldLogVehicleSpecificEnforcementEvent(vehicle))
@@ -234,6 +248,8 @@ namespace Traffic_Law_Enforcement
                     $"failReason={failReason} " +
                     $"reasonCode={reasonCode}",
                     vehicle);
+
+                MaybeLogOrdinaryCarSemanticLateSeam(vehicle, currentLane, "IngressLate");
             }
 
             if (!previousIsRoad ||
@@ -312,7 +328,7 @@ namespace Traffic_Law_Enforcement
 
             MaybeLogRealizedOppositeFlowNearMiss(vehicle, history);
             MaybeLogRealizedEgressTrace(vehicle, currentLane, history);
-            MaybeLogRealizedIngressTrace(vehicle, history);
+            MaybeLogRealizedIngressTrace(vehicle, currentLane, history);
 
             IllegalEgressApplyMode illegalEgressMode = IllegalEgressApplyMode.None;
             Entity illegalEgressOriginLane = Entity.Null;
@@ -569,6 +585,8 @@ namespace Traffic_Law_Enforcement
                         $"egressDetectResult={egressDetectResult} " +
                         $"failReason={failReason}",
                         vehicle);
+
+                    MaybeLogOrdinaryCarSemanticLateSeam(vehicle, currentLane, "EgressLate");
                 }
 
                 if (previousIsConnection && !previousIsParkingFamily)
@@ -640,6 +658,66 @@ namespace Traffic_Law_Enforcement
                 $"failReason={failReason}";
 
             EnforcementLoggingPolicy.RecordEnforcementEvent(accessTraceMessage, vehicle);
+        }
+
+        private void MaybeLogOrdinaryCarSemanticLateSeam(
+            Entity vehicle,
+            CarCurrentLane currentLane,
+            string seamKind)
+        {
+            if (!m_PersonalCarData.TryGetComponent(vehicle, out PersonalCar personalCar))
+            {
+                return;
+            }
+
+            bool transporting =
+                (personalCar.m_State & PersonalCarFlags.Transporting) != 0;
+            bool boarding =
+                (personalCar.m_State & PersonalCarFlags.Boarding) != 0;
+            bool disembarking =
+                (personalCar.m_State & PersonalCarFlags.Disembarking) != 0;
+            bool homeTarget =
+                (personalCar.m_State & PersonalCarFlags.HomeTarget) != 0;
+
+            Entity targetEntity = Entity.Null;
+            if (m_TargetData.TryGetComponent(vehicle, out Target target))
+            {
+                targetEntity = target.m_Target;
+            }
+
+            bool hasPathOwner =
+                m_PathOwnerData.TryGetComponent(vehicle, out PathOwner pathOwner);
+            bool parkingSpaceReached =
+                hasPathOwner && VehicleUtils.ParkingSpaceReached(currentLane, pathOwner);
+            bool pathEndReached =
+                VehicleUtils.PathEndReached(currentLane);
+            bool hasSpawnLocation =
+                currentLane.m_Lane != Entity.Null &&
+                m_SpawnLocationData.HasComponent(currentLane.m_Lane);
+
+            string hypothesis =
+                pathEndReached && hasSpawnLocation && (transporting || disembarking) && !parkingSpaceReached
+                    ? "TransportDropoffLike"
+                    : parkingSpaceReached || boarding
+                        ? "ParkingAdjacent"
+                        : "Unresolved";
+
+            string message =
+                "[ORDINARY_CAR_ACCESS_LATE_SEMANTIC_PROBE] " +
+                $"vehicle={FocusedLoggingService.FormatEntity(vehicle)} " +
+                $"seamKind={seamKind} " +
+                $"target={FocusedLoggingService.FormatEntity(targetEntity)} " +
+                $"transporting={transporting} " +
+                $"boarding={boarding} " +
+                $"disembarking={disembarking} " +
+                $"homeTarget={homeTarget} " +
+                $"hasPathOwner={hasPathOwner} " +
+                $"parkingSpaceReached={parkingSpaceReached} " +
+                $"pathEndReached={pathEndReached} " +
+                $"hasSpawnLocation={hasSpawnLocation} " +
+                $"hypothesis={hypothesis}";
+
+            EnforcementLoggingPolicy.RecordEnforcementEvent(message, vehicle);
         }
 
         private bool TryDetectMidBlockCrossing(
