@@ -15,6 +15,7 @@ namespace Traffic_Law_Enforcement
     public partial class SelectedObjectPanelUISystem : UISystemBase
     {
         private const string kGroup = "selectedObjectPanel";
+        private const int kRouteDiagnosticsRefreshIntervalFrames = 6;
         internal const string kHeaderTextLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Text.Header";
         internal const string kSummaryTitleLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Text.SummaryTitle";
         internal const string kClassificationLabelLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Label.Classification";
@@ -196,6 +197,7 @@ namespace Traffic_Law_Enforcement
         private string m_TotalsFormatText = "Violations {0}, Fines {1}";
         private bool m_HasCachedPanelState;
         private SelectedObjectDebugSnapshot m_LastPanelSnapshot;
+        private SelectedObjectDebugSnapshot m_LastPanelRouteDiagnosticsSnapshot;
         private PanelState m_LastPanelState;
         private string m_LastPanelSuggestedEntitySelectionValue = string.Empty;
         private string m_LastPanelEntitySelectionStatus = string.Empty;
@@ -207,6 +209,11 @@ namespace Traffic_Law_Enforcement
         private bool m_LastPanelLaneDetailsReady = true;
         private bool m_LastPanelRouteDiagnosticsReady = true;
         private bool m_CollapsedFastPathApplied;
+        private bool m_HasCachedRouteDiagnosticsSnapshot;
+        private SelectedObjectDebugSnapshot m_CachedRouteDiagnosticsSnapshot;
+        private int m_LastRouteDiagnosticsRequestFrame = int.MinValue;
+        private Entity m_LastRouteDiagnosticsRequestedSourceEntity;
+        private Entity m_LastRouteDiagnosticsRequestedVehicleEntity;
 
         public override GameMode gameMode => GameMode.Game;
 
@@ -359,6 +366,7 @@ namespace Traffic_Law_Enforcement
             {
                 m_HasCachedPanelState = false;
                 m_CollapsedFastPathApplied = false;
+                ClearRouteDiagnosticsCache();
                 m_VisibleBinding.Update(false);
                 return;
             }
@@ -397,9 +405,15 @@ namespace Traffic_Law_Enforcement
             RefreshPathObsoleteStatus(currentSuggestedEntitySelectionValue);
             SelectedObjectDebugSnapshot snapshot = m_SelectedObjectBridgeSystem.CurrentSnapshot;
             bool laneDetailsReady = m_SelectedObjectBridgeSystem.AreLaneDetailsHydrated;
-            bool routeDiagnosticsReady = m_SelectedObjectBridgeSystem.AreRouteDiagnosticsHydrated;
+            RefreshRouteDiagnosticsCache(snapshot);
+            ScheduleRouteDiagnosticsRefresh(snapshot);
+            bool routeDiagnosticsReady =
+                TryGetRouteDiagnosticsDisplaySnapshot(
+                    snapshot,
+                    out SelectedObjectDebugSnapshot routeDiagnosticsSnapshot);
             if (TryReusePanelState(
                     snapshot,
+                    routeDiagnosticsSnapshot,
                     currentSuggestedEntitySelectionValue,
                     laneDetailsReady,
                     routeDiagnosticsReady,
@@ -410,11 +424,13 @@ namespace Traffic_Law_Enforcement
 
             PanelState state = BuildState(
                 snapshot,
+                routeDiagnosticsSnapshot,
                 currentSuggestedEntitySelectionValue,
                 laneDetailsReady,
                 routeDiagnosticsReady);
             CachePanelState(
                 snapshot,
+                routeDiagnosticsSnapshot,
                 currentSuggestedEntitySelectionValue,
                 laneDetailsReady,
                 routeDiagnosticsReady,
@@ -424,6 +440,7 @@ namespace Traffic_Law_Enforcement
 
         private PanelState BuildState(
             SelectedObjectDebugSnapshot snapshot,
+            SelectedObjectDebugSnapshot routeDiagnosticsSnapshot,
             string suggestedEntitySelectionValue,
             bool laneDetailsReady,
             bool routeDiagnosticsReady)
@@ -505,28 +522,28 @@ namespace Traffic_Law_Enforcement
                     : string.Empty,
                 RouteDiagnosticsVisible = routeDiagnosticsVisible,
                 CurrentTarget = routeDiagnosticsExpanded
-                    ? BuildCurrentTargetDisplayText(snapshot)
+                    ? BuildCurrentTargetDisplayText(routeDiagnosticsSnapshot)
                     : string.Empty,
                 CurrentTargetEntity = routeDiagnosticsExpanded
-                    ? BuildCurrentTargetEntityText(snapshot)
+                    ? BuildCurrentTargetEntityText(routeDiagnosticsSnapshot)
                     : string.Empty,
                 CurrentRoute = routeDiagnosticsExpanded
-                    ? NormalizeText(snapshot.RouteDiagnosticsCurrentRouteText)
+                    ? NormalizeText(routeDiagnosticsSnapshot.RouteDiagnosticsCurrentRouteText)
                     : string.Empty,
                 CurrentRouteEntityText = routeDiagnosticsExpanded
-                    ? BuildCurrentRouteEntityText(snapshot)
+                    ? BuildCurrentRouteEntityText(routeDiagnosticsSnapshot)
                     : string.Empty,
                 CurrentRouteColor = routeDiagnosticsExpanded
-                    ? BuildCurrentRouteColorText(snapshot)
+                    ? BuildCurrentRouteColorText(routeDiagnosticsSnapshot)
                     : string.Empty,
                 TargetRoad = routeDiagnosticsExpanded
-                    ? NormalizeText(snapshot.RouteDiagnosticsTargetRoadText)
+                    ? NormalizeText(routeDiagnosticsSnapshot.RouteDiagnosticsTargetRoadText)
                     : string.Empty,
                 RouteExplanation = routeDiagnosticsExpanded
-                    ? NormalizeText(snapshot.RouteDiagnosticsExplanationText)
+                    ? NormalizeText(routeDiagnosticsSnapshot.RouteDiagnosticsExplanationText)
                     : string.Empty,
                 ConnectedStop = routeDiagnosticsExpanded
-                    ? NormalizeText(snapshot.RouteDiagnosticsConnectedStopText)
+                    ? NormalizeText(routeDiagnosticsSnapshot.RouteDiagnosticsConnectedStopText)
                     : string.Empty
             };
         }
@@ -575,6 +592,7 @@ namespace Traffic_Law_Enforcement
         private void UpdateLocalizedTextBindings()
         {
             m_HasCachedPanelState = false;
+            ClearRouteDiagnosticsCache();
             m_HeaderTextBinding.Update(LocalizeText(kHeaderTextLocaleId, "Selected Object"));
             m_SummaryTitleBinding.Update(LocalizeText(kSummaryTitleLocaleId, "Summary"));
             m_ClassificationLabelBinding.Update(LocalizeText(kClassificationLabelLocaleId, "Classification"));
@@ -672,6 +690,7 @@ namespace Traffic_Law_Enforcement
 
         private bool TryReusePanelState(
             SelectedObjectDebugSnapshot snapshot,
+            SelectedObjectDebugSnapshot routeDiagnosticsSnapshot,
             string suggestedEntitySelectionValue,
             bool laneDetailsReady,
             bool routeDiagnosticsReady,
@@ -680,6 +699,7 @@ namespace Traffic_Law_Enforcement
             if (!m_HasCachedPanelState ||
                 !CanReusePanelState(
                     snapshot,
+                    routeDiagnosticsSnapshot,
                     suggestedEntitySelectionValue,
                     laneDetailsReady,
                     routeDiagnosticsReady))
@@ -694,6 +714,7 @@ namespace Traffic_Law_Enforcement
 
         private bool CanReusePanelState(
             SelectedObjectDebugSnapshot snapshot,
+            SelectedObjectDebugSnapshot routeDiagnosticsSnapshot,
             string suggestedEntitySelectionValue,
             bool laneDetailsReady,
             bool routeDiagnosticsReady)
@@ -714,14 +735,14 @@ namespace Traffic_Law_Enforcement
                 !routeDiagnosticsRelevant ||
                 (!routeDiagnosticsReady && !m_LastPanelRouteDiagnosticsReady) ||
                 (routeDiagnosticsReady == m_LastPanelRouteDiagnosticsReady &&
-                 snapshot.CurrentTargetEntity == m_LastPanelSnapshot.CurrentTargetEntity &&
-                 snapshot.CurrentRouteEntity == m_LastPanelSnapshot.CurrentRouteEntity &&
-                 snapshot.CurrentRouteColorText == m_LastPanelSnapshot.CurrentRouteColorText &&
-                 snapshot.RouteDiagnosticsCurrentTargetText == m_LastPanelSnapshot.RouteDiagnosticsCurrentTargetText &&
-                 snapshot.RouteDiagnosticsCurrentRouteText == m_LastPanelSnapshot.RouteDiagnosticsCurrentRouteText &&
-                 snapshot.RouteDiagnosticsTargetRoadText == m_LastPanelSnapshot.RouteDiagnosticsTargetRoadText &&
-                 snapshot.RouteDiagnosticsExplanationText == m_LastPanelSnapshot.RouteDiagnosticsExplanationText &&
-                 snapshot.RouteDiagnosticsConnectedStopText == m_LastPanelSnapshot.RouteDiagnosticsConnectedStopText);
+                 routeDiagnosticsSnapshot.CurrentTargetEntity == m_LastPanelRouteDiagnosticsSnapshot.CurrentTargetEntity &&
+                 routeDiagnosticsSnapshot.CurrentRouteEntity == m_LastPanelRouteDiagnosticsSnapshot.CurrentRouteEntity &&
+                 routeDiagnosticsSnapshot.CurrentRouteColorText == m_LastPanelRouteDiagnosticsSnapshot.CurrentRouteColorText &&
+                 routeDiagnosticsSnapshot.RouteDiagnosticsCurrentTargetText == m_LastPanelRouteDiagnosticsSnapshot.RouteDiagnosticsCurrentTargetText &&
+                 routeDiagnosticsSnapshot.RouteDiagnosticsCurrentRouteText == m_LastPanelRouteDiagnosticsSnapshot.RouteDiagnosticsCurrentRouteText &&
+                 routeDiagnosticsSnapshot.RouteDiagnosticsTargetRoadText == m_LastPanelRouteDiagnosticsSnapshot.RouteDiagnosticsTargetRoadText &&
+                 routeDiagnosticsSnapshot.RouteDiagnosticsExplanationText == m_LastPanelRouteDiagnosticsSnapshot.RouteDiagnosticsExplanationText &&
+                 routeDiagnosticsSnapshot.RouteDiagnosticsConnectedStopText == m_LastPanelRouteDiagnosticsSnapshot.RouteDiagnosticsConnectedStopText);
 
             return
                 snapshot.ResolveState == m_LastPanelSnapshot.ResolveState &&
@@ -756,6 +777,7 @@ namespace Traffic_Law_Enforcement
 
         private void CachePanelState(
             SelectedObjectDebugSnapshot snapshot,
+            SelectedObjectDebugSnapshot routeDiagnosticsSnapshot,
             string suggestedEntitySelectionValue,
             bool laneDetailsReady,
             bool routeDiagnosticsReady,
@@ -763,6 +785,7 @@ namespace Traffic_Law_Enforcement
         {
             m_HasCachedPanelState = true;
             m_LastPanelSnapshot = snapshot;
+            m_LastPanelRouteDiagnosticsSnapshot = routeDiagnosticsSnapshot;
             m_LastPanelState = state;
             m_LastPanelSuggestedEntitySelectionValue = suggestedEntitySelectionValue ?? string.Empty;
             m_LastPanelEntitySelectionStatus = m_EntitySelectionStatus ?? string.Empty;
@@ -822,6 +845,7 @@ namespace Traffic_Law_Enforcement
             SelectedObjectBridgeSystem.SetRouteDiagnosticsConsumerActive(false);
             ClearEntitySelectionStatus();
             ClearPathObsoleteStatus();
+            ClearRouteDiagnosticsCache();
         }
 
         private void ToggleCollapsed()
@@ -840,6 +864,7 @@ namespace Traffic_Law_Enforcement
             else
             {
                 m_CollapsedFastPathApplied = false;
+                m_LastRouteDiagnosticsRequestFrame = int.MinValue;
                 m_CollapsedBinding.Update(false);
             }
         }
@@ -847,12 +872,15 @@ namespace Traffic_Law_Enforcement
         private void ToggleLaneDetailsCollapsed()
         {
             m_IsLaneDetailsCollapsed = !m_IsLaneDetailsCollapsed;
+            m_HasCachedPanelState = false;
             m_LaneDetailsCollapsedBinding.Update(m_IsLaneDetailsCollapsed);
         }
 
         private void ToggleRouteDiagnosticsCollapsed()
         {
             m_IsRouteDiagnosticsCollapsed = !m_IsRouteDiagnosticsCollapsed;
+            m_HasCachedPanelState = false;
+            m_LastRouteDiagnosticsRequestFrame = int.MinValue;
             m_RouteDiagnosticsCollapsedBinding.Update(m_IsRouteDiagnosticsCollapsed);
         }
 
@@ -1010,8 +1038,112 @@ namespace Traffic_Law_Enforcement
             SelectedObjectBridgeSystem.SetDetailedSnapshotConsumerActive(panelBodyVisible);
             SelectedObjectBridgeSystem.SetLaneDetailsConsumerActive(
                 panelBodyVisible && !m_IsLaneDetailsCollapsed);
-            SelectedObjectBridgeSystem.SetRouteDiagnosticsConsumerActive(
-                panelBodyVisible && !m_IsRouteDiagnosticsCollapsed);
+            SelectedObjectBridgeSystem.SetRouteDiagnosticsConsumerActive(false);
+        }
+
+        private void RefreshRouteDiagnosticsCache(SelectedObjectDebugSnapshot snapshot)
+        {
+            if (HasRouteDiagnosticsDisplayData(snapshot))
+            {
+                m_CachedRouteDiagnosticsSnapshot = snapshot;
+                m_HasCachedRouteDiagnosticsSnapshot = true;
+                return;
+            }
+
+            if (m_HasCachedRouteDiagnosticsSnapshot &&
+                !IsSameResolvedSelection(snapshot, m_CachedRouteDiagnosticsSnapshot))
+            {
+                m_HasCachedRouteDiagnosticsSnapshot = false;
+                m_CachedRouteDiagnosticsSnapshot = default;
+            }
+        }
+
+        private void ScheduleRouteDiagnosticsRefresh(SelectedObjectDebugSnapshot snapshot)
+        {
+            if (m_IsRouteDiagnosticsCollapsed ||
+                !snapshot.HasRouteDiagnostics ||
+                snapshot.TleApplicability != SelectedObjectTleApplicability.ApplicableReady ||
+                snapshot.ResolvedVehicleEntity == Entity.Null)
+            {
+                return;
+            }
+
+            bool selectionChangedSinceLastRequest =
+                snapshot.SourceSelectedEntity != m_LastRouteDiagnosticsRequestedSourceEntity ||
+                snapshot.ResolvedVehicleEntity != m_LastRouteDiagnosticsRequestedVehicleEntity;
+            bool hasDisplaySnapshot =
+                HasRouteDiagnosticsDisplayData(snapshot) ||
+                HasCachedRouteDiagnosticsDisplayData(snapshot);
+            int currentFrame = UnityEngine.Time.frameCount;
+            bool refreshDue =
+                m_LastRouteDiagnosticsRequestFrame == int.MinValue ||
+                currentFrame - m_LastRouteDiagnosticsRequestFrame >=
+                kRouteDiagnosticsRefreshIntervalFrames;
+
+            if (!selectionChangedSinceLastRequest &&
+                hasDisplaySnapshot &&
+                !refreshDue)
+            {
+                return;
+            }
+
+            SelectedObjectBridgeSystem.RequestRouteDiagnosticsSnapshot();
+            m_LastRouteDiagnosticsRequestFrame = currentFrame;
+            m_LastRouteDiagnosticsRequestedSourceEntity = snapshot.SourceSelectedEntity;
+            m_LastRouteDiagnosticsRequestedVehicleEntity = snapshot.ResolvedVehicleEntity;
+        }
+
+        private bool TryGetRouteDiagnosticsDisplaySnapshot(
+            SelectedObjectDebugSnapshot snapshot,
+            out SelectedObjectDebugSnapshot routeDiagnosticsSnapshot)
+        {
+            if (HasRouteDiagnosticsDisplayData(snapshot))
+            {
+                routeDiagnosticsSnapshot = snapshot;
+                return true;
+            }
+
+            if (HasCachedRouteDiagnosticsDisplayData(snapshot))
+            {
+                routeDiagnosticsSnapshot = m_CachedRouteDiagnosticsSnapshot;
+                return true;
+            }
+
+            routeDiagnosticsSnapshot = snapshot;
+            return false;
+        }
+
+        private bool HasCachedRouteDiagnosticsDisplayData(
+            SelectedObjectDebugSnapshot snapshot)
+        {
+            return m_HasCachedRouteDiagnosticsSnapshot &&
+                HasRouteDiagnosticsDisplayData(m_CachedRouteDiagnosticsSnapshot) &&
+                IsSameResolvedSelection(snapshot, m_CachedRouteDiagnosticsSnapshot);
+        }
+
+        private static bool HasRouteDiagnosticsDisplayData(
+            SelectedObjectDebugSnapshot snapshot)
+        {
+            return snapshot.HasRouteDiagnostics &&
+                !string.IsNullOrEmpty(snapshot.RouteDiagnosticsCurrentTargetText) &&
+                !string.IsNullOrEmpty(snapshot.RouteDiagnosticsCurrentRouteText);
+        }
+
+        private static bool IsSameResolvedSelection(
+            SelectedObjectDebugSnapshot left,
+            SelectedObjectDebugSnapshot right)
+        {
+            return left.SourceSelectedEntity == right.SourceSelectedEntity &&
+                left.ResolvedVehicleEntity == right.ResolvedVehicleEntity;
+        }
+
+        private void ClearRouteDiagnosticsCache()
+        {
+            m_HasCachedRouteDiagnosticsSnapshot = false;
+            m_CachedRouteDiagnosticsSnapshot = default;
+            m_LastRouteDiagnosticsRequestFrame = int.MinValue;
+            m_LastRouteDiagnosticsRequestedSourceEntity = Entity.Null;
+            m_LastRouteDiagnosticsRequestedVehicleEntity = Entity.Null;
         }
 
         private void UpdateSaveScopedUiState()
@@ -1029,6 +1161,7 @@ namespace Traffic_Law_Enforcement
                 m_LaneDetailsCollapsedBinding.Update(true);
                 m_IsRouteDiagnosticsCollapsed = true;
                 m_RouteDiagnosticsCollapsedBinding.Update(true);
+                ClearRouteDiagnosticsCache();
             }
 
             m_LastSeenRuntimeWorldGeneration = runtimeWorldGeneration;

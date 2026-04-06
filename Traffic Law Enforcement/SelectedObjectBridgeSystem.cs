@@ -14,20 +14,6 @@ namespace Traffic_Law_Enforcement
 {
     public partial class SelectedObjectBridgeSystem : GameSystemBase
     {
-        [System.Flags]
-        private enum SnapshotBuildFeatures
-        {
-            None = 0,
-            Minimal = 1 << 0,
-            Summary = 1 << 1,
-            GeneralDebug = 1 << 2,
-            RouteDiagnosticsDebug = 1 << 3,
-            PermissionStateSummary = 1 << 4,
-            LaneDetails = 1 << 5,
-            RouteDiagnosticsDisplay = 1 << 6,
-            DeferredRouteDiagnostics = 1 << 7,
-        }
-
         private static bool s_MinimalSnapshotConsumerActive;
         private static bool s_DetailedSnapshotConsumerActive;
         private static bool s_SummaryRequested;
@@ -220,8 +206,6 @@ namespace Traffic_Law_Enforcement
         private SelectedObjectDebugSnapshot m_CurrentSnapshot;
         private bool m_HasSnapshot;
         private int m_LastSnapshotSettingsVersion = -1;
-        private int m_LastSnapshotBuiltFrame = -1;
-        private SnapshotBuildFeatures m_LastSnapshotBuiltFeatures;
         private Entity m_LastHydratedSelectionSourceEntity;
         private Entity m_LastHydratedResolvedVehicleEntity;
         private int m_SelectionHydrationPhase = 3;
@@ -411,24 +395,6 @@ namespace Traffic_Law_Enforcement
                     includeRouteDiagnosticsDisplayFields;
             }
 
-            SnapshotBuildFeatures requestedFeatures =
-                BuildSnapshotFeatures(
-                    buildDetailedSnapshot,
-                    includeSummaryFields,
-                    includeGeneralDebugFields,
-                    includeRouteDiagnosticsDebugFields,
-                    includePermissionStateSummary,
-                    includeLaneDetailsFields,
-                    includeRouteDiagnosticsDisplayFields,
-                    includeDeferredRouteDiagnosticsFields);
-            if (CanReuseSnapshotBuiltThisFrame(
-                    resolveResult,
-                    requestedFeatures,
-                    EnforcementGameplaySettingsService.Version))
-            {
-                return;
-            }
-
             if (buildDetailedSnapshot &&
                 (!resolveResult.HasSelection || !resolveResult.IsVehicle))
             {
@@ -447,7 +413,6 @@ namespace Traffic_Law_Enforcement
                     includePathStateFields);
                 m_LastSnapshotSettingsVersion = EnforcementGameplaySettingsService.Version;
                 m_HasSnapshot = true;
-                RecordSnapshotBuild(requestedFeatures);
                 AdvanceSelectionHydrationPhase(panelSelectionHydrationActive);
                 return;
             }
@@ -523,83 +488,7 @@ namespace Traffic_Law_Enforcement
                 includePathStateFields);
             m_LastSnapshotSettingsVersion = EnforcementGameplaySettingsService.Version;
             m_HasSnapshot = true;
-            RecordSnapshotBuild(requestedFeatures);
             AdvanceSelectionHydrationPhase(panelSelectionHydrationActive);
-        }
-
-        private static SnapshotBuildFeatures BuildSnapshotFeatures(
-            bool buildDetailedSnapshot,
-            bool includeSummaryFields,
-            bool includeGeneralDebugFields,
-            bool includeRouteDiagnosticsDebugFields,
-            bool includePermissionStateSummary,
-            bool includeLaneDetailsFields,
-            bool includeRouteDiagnosticsDisplayFields,
-            bool includeDeferredRouteDiagnosticsFields)
-        {
-            SnapshotBuildFeatures features = SnapshotBuildFeatures.Minimal;
-            if (!buildDetailedSnapshot)
-            {
-                return features;
-            }
-
-            if (includeSummaryFields)
-            {
-                features |= SnapshotBuildFeatures.Summary;
-            }
-
-            if (includeGeneralDebugFields)
-            {
-                features |= SnapshotBuildFeatures.GeneralDebug;
-            }
-
-            if (includeRouteDiagnosticsDebugFields)
-            {
-                features |= SnapshotBuildFeatures.RouteDiagnosticsDebug;
-            }
-
-            if (includePermissionStateSummary)
-            {
-                features |= SnapshotBuildFeatures.PermissionStateSummary;
-            }
-
-            if (includeLaneDetailsFields)
-            {
-                features |= SnapshotBuildFeatures.LaneDetails;
-            }
-
-            if (includeRouteDiagnosticsDisplayFields)
-            {
-                features |= SnapshotBuildFeatures.RouteDiagnosticsDisplay;
-            }
-
-            if (includeDeferredRouteDiagnosticsFields)
-            {
-                features |= SnapshotBuildFeatures.DeferredRouteDiagnostics;
-            }
-
-            return features;
-        }
-
-        private bool CanReuseSnapshotBuiltThisFrame(
-            SelectedObjectResolveResult resolveResult,
-            SnapshotBuildFeatures requestedFeatures,
-            int settingsVersion)
-        {
-            return m_HasSnapshot &&
-                UnityEngine.Time.frameCount == m_LastSnapshotBuiltFrame &&
-                settingsVersion == m_LastSnapshotSettingsVersion &&
-                resolveResult.ResolveState == m_CurrentSnapshot.ResolveState &&
-                resolveResult.VehicleKind == m_CurrentSnapshot.VehicleKind &&
-                resolveResult.SourceSelectedEntity == m_CurrentSnapshot.SourceSelectedEntity &&
-                resolveResult.ResolvedVehicleEntity == m_CurrentSnapshot.ResolvedVehicleEntity &&
-                (m_LastSnapshotBuiltFeatures & requestedFeatures) == requestedFeatures;
-        }
-
-        private void RecordSnapshotBuild(SnapshotBuildFeatures features)
-        {
-            m_LastSnapshotBuiltFrame = UnityEngine.Time.frameCount;
-            m_LastSnapshotBuiltFeatures = features;
         }
 
         private SelectedObjectDebugSnapshot BuildSnapshot(
