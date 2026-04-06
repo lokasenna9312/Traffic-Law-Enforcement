@@ -165,7 +165,7 @@ namespace Traffic_Law_Enforcement
 
         protected override void OnDestroy()
         {
-            SelectedObjectBridgeSystem.SetMinimalSnapshotConsumerActive(false);
+            SelectedObjectBridgeSystem.SetFocusedLoggingMinimalSnapshotConsumerActive(false);
             if (m_PanelToggleAction != null)
             {
                 m_PanelToggleAction.shouldBeEnabled = false;
@@ -181,7 +181,7 @@ namespace Traffic_Law_Enforcement
 
             UpdatePanelToggle();
             bool windowVisible = FocusedLoggingService.IsWindowVisible;
-            SelectedObjectBridgeSystem.SetMinimalSnapshotConsumerActive(
+            SelectedObjectBridgeSystem.SetFocusedLoggingMinimalSnapshotConsumerActive(
                 windowVisible);
 
             if (!windowVisible)
@@ -360,7 +360,7 @@ namespace Traffic_Law_Enforcement
         private void HandleCloseRequested()
         {
             FocusedLoggingService.SetWindowVisible(false);
-            SelectedObjectBridgeSystem.SetMinimalSnapshotConsumerActive(false);
+            SelectedObjectBridgeSystem.SetFocusedLoggingMinimalSnapshotConsumerActive(false);
         }
 
         private void HandleWatchSelectedRequested()
