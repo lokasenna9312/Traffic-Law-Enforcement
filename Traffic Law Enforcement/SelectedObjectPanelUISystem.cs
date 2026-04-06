@@ -5,6 +5,7 @@ using Game.Pathfind;
 using Game.Prefabs;
 using Game.Routes;
 using Game.SceneFlow;
+using Game.Simulation;
 using Game.UI;
 using Game.UI.InGame;
 using Game.Vehicles;
@@ -85,6 +86,7 @@ namespace Traffic_Law_Enforcement
 
         private SelectedObjectBridgeSystem m_SelectedObjectBridgeSystem;
         private SelectedInfoUISystem m_SelectedInfoSystem;
+        private SimulationSystem m_SimulationSystem;
         private ProxyAction m_PanelToggleAction;
 
         private ValueBinding<bool> m_VisibleBinding;
@@ -279,6 +281,9 @@ namespace Traffic_Law_Enforcement
                 World.GetOrCreateSystemManaged<SelectedObjectBridgeSystem>();
             m_SelectedInfoSystem =
                 World.GetExistingSystemManaged<SelectedInfoUISystem>();
+            m_SimulationSystem =
+                World.GetExistingSystemManaged<SimulationSystem>() ??
+                World.GetOrCreateSystemManaged<SimulationSystem>();
 
             AddBinding(m_VisibleBinding = new ValueBinding<bool>(kGroup, "visible", false));
             AddBinding(m_CompactBinding = new ValueBinding<bool>(kGroup, "compact", false));
@@ -375,9 +380,10 @@ namespace Traffic_Law_Enforcement
         {
             base.OnUpdate();
 
+            bool simulationPaused = IsSimulationPaused();
             UpdatePanelToggle();
             UpdateSaveScopedUiState();
-            SyncSnapshotConsumers();
+            SyncSnapshotConsumers(simulationPaused);
 
             if (!m_IsPanelEnabled)
             {
@@ -405,6 +411,29 @@ namespace Traffic_Law_Enforcement
             {
                 m_SelectedObjectBridgeSystem =
                     World.GetExistingSystemManaged<SelectedObjectBridgeSystem>();
+            }
+
+            if (simulationPaused && m_HasCachedPanelState)
+            {
+                if (m_SelectedObjectBridgeSystem == null ||
+                    !m_SelectedObjectBridgeSystem.HasSnapshot)
+                {
+                    return;
+                }
+
+                SelectedObjectDebugSnapshot pausedSnapshot =
+                    m_SelectedObjectBridgeSystem.CurrentSnapshot;
+                if (IsSameResolvedSelection(pausedSnapshot, m_LastPanelSnapshot))
+                {
+                    m_LastProcessedBridgeSnapshotSerial =
+                        m_SelectedObjectBridgeSystem.SnapshotSerial;
+                    return;
+                }
+
+                m_HasCachedPanelState = false;
+                m_LastProcessedBridgeSnapshotSerial = -1;
+                ClearDeferredSnapshotCaches();
+                return;
             }
 
             string currentSuggestedEntitySelectionValue = string.Empty;
@@ -1119,13 +1148,22 @@ namespace Traffic_Law_Enforcement
             return GameManager.instance?.localizationManager?.activeLocaleId ?? string.Empty;
         }
 
-        private void SyncSnapshotConsumers()
+        private void SyncSnapshotConsumers(bool simulationPaused)
         {
             bool panelBodyVisible = m_IsPanelEnabled && !m_IsCollapsed;
-            SelectedObjectBridgeSystem.SetSelectedObjectPanelMinimalSnapshotConsumerActive(false);
-            SelectedObjectBridgeSystem.SetDetailedSnapshotConsumerActive(panelBodyVisible);
+            bool pauseFreezeActive =
+                panelBodyVisible &&
+                simulationPaused &&
+                m_HasCachedPanelState;
+
+            SelectedObjectBridgeSystem.SetSelectedObjectPanelMinimalSnapshotConsumerActive(
+                panelBodyVisible && simulationPaused);
+            SelectedObjectBridgeSystem.SetDetailedSnapshotConsumerActive(
+                panelBodyVisible && !pauseFreezeActive);
             SelectedObjectBridgeSystem.SetLaneDetailsConsumerActive(
-                panelBodyVisible && !m_IsLaneDetailsCollapsed);
+                panelBodyVisible &&
+                !m_IsLaneDetailsCollapsed &&
+                !pauseFreezeActive);
             SelectedObjectBridgeSystem.SetRouteDiagnosticsConsumerActive(false);
         }
 
@@ -1320,7 +1358,8 @@ namespace Traffic_Law_Enforcement
 
         private void ScheduleRouteDiagnosticsRefresh(SelectedObjectDebugSnapshot snapshot)
         {
-            if (m_IsRouteDiagnosticsCollapsed ||
+            if (IsSimulationPaused() ||
+                m_IsRouteDiagnosticsCollapsed ||
                 !CanShowRouteDiagnosticsSection(snapshot) ||
                 snapshot.TleApplicability != SelectedObjectTleApplicability.ApplicableReady ||
                 snapshot.ResolvedVehicleEntity == Entity.Null)
@@ -1454,6 +1493,8 @@ namespace Traffic_Law_Enforcement
                 m_LaneDetailsCollapsedBinding.Update(true);
                 m_IsRouteDiagnosticsCollapsed = true;
                 m_RouteDiagnosticsCollapsedBinding.Update(true);
+                m_HasCachedPanelState = false;
+                m_LastProcessedBridgeSnapshotSerial = -1;
                 ClearDeferredSnapshotCaches();
             }
 
@@ -1844,6 +1885,19 @@ namespace Traffic_Law_Enforcement
             }
 
             return fallback;
+        }
+
+        private bool IsSimulationPaused()
+        {
+            if (m_SimulationSystem == null)
+            {
+                m_SimulationSystem =
+                    World.GetExistingSystemManaged<SimulationSystem>();
+            }
+
+            return m_SimulationSystem != null &&
+                GameManager.instance?.isGameLoading != true &&
+                m_SimulationSystem.selectedSpeed <= 0.001f;
         }
 
     }
