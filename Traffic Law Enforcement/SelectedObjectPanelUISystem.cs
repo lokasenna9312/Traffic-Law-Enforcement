@@ -425,6 +425,7 @@ namespace Traffic_Law_Enforcement
                     m_SelectedObjectBridgeSystem.CurrentSnapshot;
                 if (IsSameResolvedSelection(pausedSnapshot, m_LastPanelSnapshot))
                 {
+                    RefreshFocusLogBindingIfNeeded(pausedSnapshot);
                     m_LastProcessedBridgeSnapshotSerial =
                         m_SelectedObjectBridgeSystem.SnapshotSerial;
                     return;
@@ -453,6 +454,7 @@ namespace Traffic_Law_Enforcement
             if (m_HasCachedPanelState &&
                 currentBridgeSnapshotSerial == m_LastProcessedBridgeSnapshotSerial)
             {
+                RefreshFocusLogBindingIfNeeded(m_SelectedObjectBridgeSystem.CurrentSnapshot);
                 return;
             }
 
@@ -1783,6 +1785,24 @@ namespace Traffic_Law_Enforcement
             return FocusedLoggingService.IsWatched(snapshot.ResolvedVehicleEntity)
                 ? m_FocusLogWatchedText
                 : m_FocusLogNotWatchedText;
+        }
+
+        private void RefreshFocusLogBindingIfNeeded(SelectedObjectDebugSnapshot snapshot)
+        {
+            if (!m_HasCachedPanelState)
+            {
+                return;
+            }
+
+            string focusLogStatusText = BuildFocusLogStatusText(snapshot);
+            string cachedFocusLogStatusText = m_LastPanelState.FocusLogStatus ?? string.Empty;
+            if (focusLogStatusText == cachedFocusLogStatusText)
+            {
+                return;
+            }
+
+            m_FocusLogStatusBinding.Update(focusLogStatusText);
+            m_LastPanelState.FocusLogStatus = focusLogStatusText;
         }
 
         private void SetEntitySelectionStatus(string text, bool isError)
