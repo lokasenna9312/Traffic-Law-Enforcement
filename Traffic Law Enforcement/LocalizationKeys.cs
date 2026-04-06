@@ -199,6 +199,7 @@ namespace Traffic_Law_Enforcement
             map["SelectedObjectPanel.TargetRoadLabel"] = SelectedObjectPanelUISystem.kTargetRoadLabelLocaleId;
             map["SelectedObjectPanel.RouteExplanationLabel"] = SelectedObjectPanelUISystem.kRouteExplanationLabelLocaleId;
             map["SelectedObjectPanel.ConnectedStopLabel"] = SelectedObjectPanelUISystem.kConnectedStopLabelLocaleId;
+            map["SelectedObjectPanel.RouteDiagnosticsPausedRefresh"] = SelectedObjectPanelUISystem.kRouteDiagnosticsPausedRefreshTextLocaleId;
             map["SelectedObjectPanel.LiveLaneStateReady"] = SelectedObjectPanelUISystem.kLiveLaneStateReadyLocaleId;
             map["SelectedObjectPanel.LiveLaneStateNoLiveLane"] = SelectedObjectPanelUISystem.kLiveLaneStateNoLiveLaneLocaleId;
             map["SelectedObjectPanel.LiveLaneStateNotApplicable"] = SelectedObjectPanelUISystem.kLiveLaneStateNotApplicableLocaleId;

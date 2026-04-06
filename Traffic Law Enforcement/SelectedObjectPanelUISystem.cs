@@ -55,6 +55,7 @@ namespace Traffic_Law_Enforcement
         internal const string kTargetRoadLabelLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Label.TargetRoad";
         internal const string kRouteExplanationLabelLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Label.RouteExplanation";
         internal const string kConnectedStopLabelLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Label.ConnectedStop";
+        internal const string kRouteDiagnosticsPausedRefreshTextLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Text.RouteDiagnosticsPausedRefresh";
         internal const string kEntitySelectionLabelLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Label.EntitySelection";
         internal const string kEntitySelectionPlaceholderLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Text.EntitySelectionPlaceholder";
         internal const string kEntitySelectionSubmitLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Text.EntitySelectionSubmit";
@@ -555,11 +556,22 @@ namespace Traffic_Law_Enforcement
             bool summaryContentReady = summaryReady;
             bool laneDetailsExpanded = !m_IsLaneDetailsCollapsed;
             bool laneDetailsContentReady = laneDetailsExpanded && laneDetailsReady;
+            bool simulationPaused = IsSimulationPaused();
             bool routeDiagnosticsVisible = CanShowRouteDiagnosticsSection(snapshot);
             bool routeDiagnosticsExpanded =
                 routeDiagnosticsVisible &&
-                !m_IsRouteDiagnosticsCollapsed &&
+                !m_IsRouteDiagnosticsCollapsed;
+            bool routeDiagnosticsContentReady =
+                routeDiagnosticsExpanded &&
                 routeDiagnosticsReady;
+            string pausedRouteDiagnosticsPlaceholder =
+                simulationPaused &&
+                routeDiagnosticsExpanded &&
+                !routeDiagnosticsReady
+                    ? LocalizeText(
+                        kRouteDiagnosticsPausedRefreshTextLocaleId,
+                        "Paused. Unpause to refresh.")
+                    : string.Empty;
 
             return new PanelState
             {
@@ -612,28 +624,28 @@ namespace Traffic_Law_Enforcement
                     ? BuildLiveLaneStateText(summarySnapshot)
                     : string.Empty,
                 RouteDiagnosticsVisible = routeDiagnosticsVisible,
-                CurrentTarget = routeDiagnosticsExpanded
+                CurrentTarget = routeDiagnosticsContentReady
                     ? BuildCurrentTargetDisplayText(routeDiagnosticsSnapshot)
                     : string.Empty,
-                CurrentTargetEntity = routeDiagnosticsExpanded
+                CurrentTargetEntity = routeDiagnosticsContentReady
                     ? BuildCurrentTargetEntityText(routeDiagnosticsSnapshot)
                     : string.Empty,
-                CurrentRoute = routeDiagnosticsExpanded
+                CurrentRoute = routeDiagnosticsContentReady
                     ? NormalizeText(routeDiagnosticsSnapshot.RouteDiagnosticsCurrentRouteText)
                     : string.Empty,
-                CurrentRouteEntityText = routeDiagnosticsExpanded
+                CurrentRouteEntityText = routeDiagnosticsContentReady
                     ? BuildCurrentRouteEntityText(routeDiagnosticsSnapshot)
                     : string.Empty,
-                CurrentRouteColor = routeDiagnosticsExpanded
+                CurrentRouteColor = routeDiagnosticsContentReady
                     ? BuildCurrentRouteColorText(routeDiagnosticsSnapshot)
                     : string.Empty,
-                TargetRoad = routeDiagnosticsExpanded
+                TargetRoad = routeDiagnosticsContentReady
                     ? NormalizeText(routeDiagnosticsSnapshot.RouteDiagnosticsTargetRoadText)
                     : string.Empty,
-                RouteExplanation = routeDiagnosticsExpanded
+                RouteExplanation = routeDiagnosticsContentReady
                     ? NormalizeText(routeDiagnosticsSnapshot.RouteDiagnosticsExplanationText)
-                    : string.Empty,
-                ConnectedStop = routeDiagnosticsExpanded
+                    : pausedRouteDiagnosticsPlaceholder,
+                ConnectedStop = routeDiagnosticsContentReady
                     ? NormalizeText(routeDiagnosticsSnapshot.RouteDiagnosticsConnectedStopText)
                     : string.Empty
             };
