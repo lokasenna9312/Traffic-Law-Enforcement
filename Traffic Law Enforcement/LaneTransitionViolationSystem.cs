@@ -1,3 +1,4 @@
+using System.Text;
 using Game;
 using Game.Common;
 using Game.Net;
@@ -43,10 +44,15 @@ namespace Traffic_Law_Enforcement
         private ComponentLookup<GarageLane> m_GarageLaneData;
         private ComponentLookup<ConnectionLane> m_ConnectionLaneData;
         private ComponentLookup<Owner> m_OwnerData;
+        private ComponentLookup<PathInformation> m_PathInformationData;
+        private BufferLookup<Game.Simulation.ServiceDispatch> m_ServiceDispatchData;
         private ComponentLookup<PersonalCar> m_PersonalCarData;
         private ComponentLookup<Target> m_TargetData;
         private ComponentLookup<PathOwner> m_PathOwnerData;
         private ComponentLookup<Game.Objects.SpawnLocation> m_SpawnLocationData;
+        private ComponentLookup<GarbageTruck> m_GarbageTruckData;
+        private ComponentLookup<MaintenanceVehicle> m_MaintenanceVehicleData;
+        private ComponentLookup<PostVan> m_PostVanData;
         private ComponentLookup<LaneTransitionAnalysisState> m_AnalysisStateData;
         private const int MaxIntersectionTransitionDiagnostics = 32;
         private int m_IntersectionTransitionDiagnosticCount;
@@ -85,10 +91,15 @@ namespace Traffic_Law_Enforcement
             m_GarageLaneData = GetComponentLookup<GarageLane>(true);
             m_ConnectionLaneData = GetComponentLookup<ConnectionLane>(true);
             m_OwnerData = GetComponentLookup<Owner>(true);
+            m_PathInformationData = GetComponentLookup<PathInformation>(true);
+            m_ServiceDispatchData = GetBufferLookup<Game.Simulation.ServiceDispatch>(true);
             m_PersonalCarData = GetComponentLookup<PersonalCar>(true);
             m_TargetData = GetComponentLookup<Target>(true);
             m_PathOwnerData = GetComponentLookup<PathOwner>(true);
             m_SpawnLocationData = GetComponentLookup<Game.Objects.SpawnLocation>(true);
+            m_GarbageTruckData = GetComponentLookup<GarbageTruck>(true);
+            m_MaintenanceVehicleData = GetComponentLookup<MaintenanceVehicle>(true);
+            m_PostVanData = GetComponentLookup<PostVan>(true);
             m_AnalysisStateData = GetComponentLookup<LaneTransitionAnalysisState>();
             RequireForUpdate(m_CarQuery);
         }
@@ -144,10 +155,15 @@ namespace Traffic_Law_Enforcement
                 m_GarageLaneData.Update(this);
                 m_ConnectionLaneData.Update(this);
                 m_OwnerData.Update(this);
+                m_PathInformationData.Update(this);
+                m_ServiceDispatchData.Update(this);
                 m_PersonalCarData.Update(this);
                 m_TargetData.Update(this);
                 m_PathOwnerData.Update(this);
                 m_SpawnLocationData.Update(this);
+                m_GarbageTruckData.Update(this);
+                m_MaintenanceVehicleData.Update(this);
+                m_PostVanData.Update(this);
 
                 if (m_EventEntity == Entity.Null || !EntityManager.Exists(m_EventEntity))
                 {
@@ -250,6 +266,7 @@ namespace Traffic_Law_Enforcement
                     vehicle);
 
                 MaybeLogOrdinaryCarSemanticLateSeam(vehicle, currentLane, "IngressLate");
+                MaybeLogServiceVehicleSemanticLateSeam(vehicle, "IngressLate");
             }
 
             if (!previousIsRoad ||
@@ -587,6 +604,7 @@ namespace Traffic_Law_Enforcement
                         vehicle);
 
                     MaybeLogOrdinaryCarSemanticLateSeam(vehicle, currentLane, "EgressLate");
+                    MaybeLogServiceVehicleSemanticLateSeam(vehicle, "EgressLate");
                 }
 
                 if (previousIsConnection && !previousIsParkingFamily)
@@ -718,6 +736,156 @@ namespace Traffic_Law_Enforcement
                 $"hypothesis={hypothesis}";
 
             EnforcementLoggingPolicy.RecordEnforcementEvent(message, vehicle);
+        }
+
+        private void MaybeLogServiceVehicleSemanticLateSeam(
+            Entity vehicle,
+            string seamKind)
+        {
+            bool isDeliveryTruck =
+                m_DeliveryTruckData.TryGetComponent(vehicle, out DeliveryTruck deliveryTruck);
+            bool isGarbageTruck =
+                m_GarbageTruckData.TryGetComponent(vehicle, out GarbageTruck garbageTruck);
+            bool isMaintenanceVehicle =
+                m_MaintenanceVehicleData.TryGetComponent(vehicle, out MaintenanceVehicle maintenanceVehicle);
+            bool isPostVan =
+                m_PostVanData.TryGetComponent(vehicle, out PostVan postVan);
+
+            if (!isDeliveryTruck &&
+                !isGarbageTruck &&
+                !isMaintenanceVehicle &&
+                !isPostVan)
+            {
+                return;
+            }
+
+            Entity targetEntity = Entity.Null;
+            if (m_TargetData.TryGetComponent(vehicle, out Target target))
+            {
+                targetEntity = target.m_Target;
+            }
+
+            Entity ownerEntity = Entity.Null;
+            if (m_OwnerData.TryGetComponent(vehicle, out Owner owner))
+            {
+                ownerEntity = owner.m_Owner;
+            }
+
+            bool hasPathInformation =
+                m_PathInformationData.TryGetComponent(vehicle, out PathInformation pathInformation);
+            Entity pathOrigin =
+                hasPathInformation ? pathInformation.m_Origin : Entity.Null;
+            Entity pathDestination =
+                hasPathInformation ? pathInformation.m_Destination : Entity.Null;
+
+            bool hasServiceDispatch =
+                m_ServiceDispatchData.HasBuffer(vehicle);
+            int serviceDispatchCount =
+                hasServiceDispatch ? m_ServiceDispatchData[vehicle].Length : 0;
+
+            bool deliveryReturning =
+                isDeliveryTruck &&
+                (deliveryTruck.m_State & DeliveryTruckFlags.Returning) != 0;
+            bool deliveryDelivering =
+                isDeliveryTruck &&
+                (deliveryTruck.m_State & DeliveryTruckFlags.Delivering) != 0;
+
+            bool garbageReturning =
+                isGarbageTruck &&
+                (garbageTruck.m_State & GarbageTruckFlags.Returning) != 0;
+
+            bool maintenanceReturning =
+                isMaintenanceVehicle &&
+                (maintenanceVehicle.m_State & MaintenanceVehicleFlags.Returning) != 0;
+            bool maintenanceTransformTarget =
+                isMaintenanceVehicle &&
+                (maintenanceVehicle.m_State & MaintenanceVehicleFlags.TransformTarget) != 0;
+            bool maintenanceEdgeTarget =
+                isMaintenanceVehicle &&
+                (maintenanceVehicle.m_State & MaintenanceVehicleFlags.EdgeTarget) != 0;
+
+            bool postReturning =
+                isPostVan &&
+                (postVan.m_State & PostVanFlags.Returning) != 0;
+            bool postDelivering =
+                isPostVan &&
+                (postVan.m_State & PostVanFlags.Delivering) != 0;
+            bool postCollecting =
+                isPostVan &&
+                (postVan.m_State & PostVanFlags.Collecting) != 0;
+
+            bool returnLike =
+                deliveryReturning ||
+                garbageReturning ||
+                maintenanceReturning ||
+                postReturning;
+
+            bool workLike =
+                deliveryDelivering ||
+                maintenanceTransformTarget ||
+                maintenanceEdgeTarget ||
+                postDelivering ||
+                postCollecting;
+
+            bool hasCommonServiceContext =
+                targetEntity != Entity.Null ||
+                ownerEntity != Entity.Null ||
+                hasPathInformation ||
+                hasServiceDispatch;
+
+            string hypothesis =
+                returnLike
+                    ? "ReturnLike"
+                    : workLike
+                        ? "WorkLike"
+                        : hasCommonServiceContext
+                            ? "ServiceContextOnly"
+                            : "Unresolved";
+
+            StringBuilder message = new StringBuilder(512);
+            message.Append("[NON_PARKING_SERVICE_ACCESS_LATE_SEMANTIC_PROBE] ");
+            message.Append($"vehicle={FocusedLoggingService.FormatEntity(vehicle)} ");
+            message.Append($"seamKind={seamKind} ");
+            message.Append($"target={FocusedLoggingService.FormatEntity(targetEntity)} ");
+            message.Append($"owner={FocusedLoggingService.FormatEntity(ownerEntity)} ");
+            message.Append($"hasPathInformation={hasPathInformation} ");
+            message.Append($"pathOrigin={FocusedLoggingService.FormatEntity(pathOrigin)} ");
+            message.Append($"pathDestination={FocusedLoggingService.FormatEntity(pathDestination)} ");
+            message.Append($"hasServiceDispatch={hasServiceDispatch} ");
+            message.Append($"serviceDispatchCount={serviceDispatchCount}");
+
+            if (isDeliveryTruck)
+            {
+                message.Append($" isDeliveryTruck=true");
+                message.Append($" deliveryReturning={deliveryReturning}");
+                message.Append($" deliveryDelivering={deliveryDelivering}");
+            }
+
+            if (isGarbageTruck)
+            {
+                message.Append($" isGarbageTruck=true");
+                message.Append($" garbageReturning={garbageReturning}");
+            }
+
+            if (isMaintenanceVehicle)
+            {
+                message.Append($" isMaintenanceVehicle=true");
+                message.Append($" maintenanceReturning={maintenanceReturning}");
+                message.Append($" maintenanceTransformTarget={maintenanceTransformTarget}");
+                message.Append($" maintenanceEdgeTarget={maintenanceEdgeTarget}");
+            }
+
+            if (isPostVan)
+            {
+                message.Append($" isPostVan=true");
+                message.Append($" postReturning={postReturning}");
+                message.Append($" postDelivering={postDelivering}");
+                message.Append($" postCollecting={postCollecting}");
+            }
+
+            message.Append($" hypothesis={hypothesis}");
+
+            EnforcementLoggingPolicy.RecordEnforcementEvent(message.ToString(), vehicle);
         }
 
         private bool TryDetectMidBlockCrossing(
