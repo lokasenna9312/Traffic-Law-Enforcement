@@ -226,13 +226,17 @@ namespace Traffic_Law_Enforcement
             bool hasWatchedVehicles,
             int watchedVehicleCount)
         {
-            bool hasSelectedVehicle =
-                TryGetSelectedReadyRoadVehicle(
+            bool hasSelectedRoadVehicle =
+                TryGetSelectedRoadVehicle(
                     out SelectedObjectDebugSnapshot snapshot,
                     out Entity vehicle);
             bool watchedVehicle =
-                hasSelectedVehicle &&
+                hasSelectedRoadVehicle &&
                 FocusedLoggingService.IsWatched(vehicle);
+            bool hasSelectedVehicle =
+                hasSelectedRoadVehicle &&
+                (snapshot.TleApplicability == SelectedObjectTleApplicability.ApplicableReady ||
+                 watchedVehicle);
 
             string watchedVehicles =
                 hasWatchedVehicles
@@ -262,8 +266,11 @@ namespace Traffic_Law_Enforcement
                 Message = hasSelectedVehicle
                     ? string.Empty
                     : m_NoEligibleSelectionText,
-                WatchSelectedEnabled = hasSelectedVehicle && !watchedVehicle,
-                UnwatchSelectedEnabled = hasSelectedVehicle && watchedVehicle,
+                WatchSelectedEnabled =
+                    hasSelectedRoadVehicle &&
+                    snapshot.TleApplicability == SelectedObjectTleApplicability.ApplicableReady &&
+                    !watchedVehicle,
+                UnwatchSelectedEnabled = hasSelectedRoadVehicle && watchedVehicle,
                 ClearWatchedEnabled = hasWatchedVehicles,
                 ToggleBurstLoggingEnabled = true,
             };
@@ -375,7 +382,7 @@ namespace Traffic_Law_Enforcement
 
         private void HandleUnwatchSelectedRequested()
         {
-            if (TryGetSelectedReadyRoadVehicle(
+            if (TryGetSelectedRoadVehicle(
                     out SelectedObjectDebugSnapshot _,
                     out Entity vehicle))
             {
@@ -455,7 +462,7 @@ namespace Traffic_Law_Enforcement
             m_CachedBurstLoggingText = m_BurstLoggingInactiveText;
         }
 
-        private bool TryGetSelectedReadyRoadVehicle(
+        private bool TryGetSelectedRoadVehicle(
             out SelectedObjectDebugSnapshot snapshot,
             out Entity vehicle)
         {
@@ -467,7 +474,7 @@ namespace Traffic_Law_Enforcement
             }
 
             snapshot = m_SelectedObjectBridgeSystem.CurrentSnapshot;
-            if (snapshot.TleApplicability != SelectedObjectTleApplicability.ApplicableReady ||
+            if (!IsFocusedLoggingRoadVehicle(snapshot) ||
                 snapshot.ResolvedVehicleEntity == Entity.Null)
             {
                 return false;
@@ -475,6 +482,26 @@ namespace Traffic_Law_Enforcement
 
             vehicle = snapshot.ResolvedVehicleEntity;
             return true;
+        }
+
+        private bool TryGetSelectedReadyRoadVehicle(
+            out SelectedObjectDebugSnapshot snapshot,
+            out Entity vehicle)
+        {
+            if (!TryGetSelectedRoadVehicle(out snapshot, out vehicle) ||
+                snapshot.TleApplicability != SelectedObjectTleApplicability.ApplicableReady)
+            {
+                return false;
+            }
+
+            return true;
+        }
+
+        private static bool IsFocusedLoggingRoadVehicle(
+            SelectedObjectDebugSnapshot snapshot)
+        {
+            return snapshot.VehicleKind == SelectedObjectKind.RoadCar ||
+                snapshot.VehicleKind == SelectedObjectKind.ParkedRoadCar;
         }
 
         private static string NormalizeText(string text)
