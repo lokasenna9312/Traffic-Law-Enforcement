@@ -119,8 +119,15 @@ namespace Traffic_Law_Enforcement
                 context.PathOwnerData.TryGetComponent(vehicle, out PathOwner pathOwner);
             PathFlags currentPathFlags = hasPathOwner ? pathOwner.m_State : default;
 
+            bool needsInspection =
+                includeDebugFields ||
+                (includeDeferredDisplayFields &&
+                 hasCurrentTarget &&
+                 hasCurrentRoute);
+            DynamicBuffer<CarNavigationLane> navigationLanes = default;
             bool hasNavigationLanes =
-                context.NavigationLaneData.TryGetBuffer(vehicle, out DynamicBuffer<CarNavigationLane> navigationLanes);
+                needsInspection &&
+                context.NavigationLaneData.TryGetBuffer(vehicle, out navigationLanes);
             DynamicBuffer<PathElement> pathElements = default;
             bool hasPathElements = includeDebugFields &&
                 context.PathElementData.TryGetBuffer(vehicle, out pathElements);
@@ -128,7 +135,7 @@ namespace Traffic_Law_Enforcement
             RoutePenaltyInspectionResult inspection = default;
             string plannedPenaltiesText = string.Empty;
             string penaltyTagsText = string.Empty;
-            if (includeDeferredDisplayFields || includeDebugFields)
+            if (needsInspection)
             {
                 inspection =
                     RoutePenaltyInspection.InspectCurrentRoute(
