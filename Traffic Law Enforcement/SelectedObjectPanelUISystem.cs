@@ -427,18 +427,12 @@ namespace Traffic_Law_Enforcement
                 ClearDeferredSnapshotCaches();
             }
 
-            RefreshSummaryCache(snapshot);
-            ScheduleSummaryRefresh(snapshot);
-            bool summaryReady =
-                TryGetSummaryDisplaySnapshot(
-                    snapshot,
-                    out SelectedObjectDebugSnapshot summarySnapshot);
-            RefreshLaneDetailsCache(snapshot);
-            ScheduleLaneDetailsRefresh(snapshot);
+            bool summaryReady = true;
+            SelectedObjectDebugSnapshot summarySnapshot = snapshot;
             bool laneDetailsReady =
-                TryGetLaneDetailsDisplaySnapshot(
-                    snapshot,
-                    out SelectedObjectDebugSnapshot laneDetailsSnapshot);
+                m_IsLaneDetailsCollapsed ||
+                m_SelectedObjectBridgeSystem.AreLaneDetailsHydrated;
+            SelectedObjectDebugSnapshot laneDetailsSnapshot = snapshot;
             RefreshRouteDiagnosticsCache(snapshot);
             ScheduleRouteDiagnosticsRefresh(snapshot);
             bool routeDiagnosticsReady =
@@ -783,28 +777,26 @@ namespace Traffic_Law_Enforcement
             bool routeDiagnosticsReady)
         {
             bool summaryStateMatches =
-                (!summaryReady && !m_LastPanelSummaryReady) ||
-                (summaryReady == m_LastPanelSummaryReady &&
-                 summarySnapshot.SummaryClassificationText == m_LastPanelSummarySnapshot.SummaryClassificationText &&
-                 summarySnapshot.PublicTransportLanePolicyText == m_LastPanelSummarySnapshot.PublicTransportLanePolicyText &&
-                 summarySnapshot.PublicTransportLaneViolationActive == m_LastPanelSummarySnapshot.PublicTransportLaneViolationActive &&
-                 summarySnapshot.PendingExitActive == m_LastPanelSummarySnapshot.PendingExitActive &&
-                 summarySnapshot.TotalFines == m_LastPanelSummarySnapshot.TotalFines &&
-                 summarySnapshot.TotalViolations == m_LastPanelSummarySnapshot.TotalViolations &&
-                 summarySnapshot.CompactLastReasonText == m_LastPanelSummarySnapshot.CompactLastReasonText &&
-                 summarySnapshot.CompactRepeatPenaltyText == m_LastPanelSummarySnapshot.CompactRepeatPenaltyText &&
-                 summarySnapshot.HasPathOwner == m_LastPanelSummarySnapshot.HasPathOwner &&
-                 summarySnapshot.HasCurrentTarget == m_LastPanelSummarySnapshot.HasCurrentTarget &&
-                 summarySnapshot.HasCurrentRoute == m_LastPanelSummarySnapshot.HasCurrentRoute &&
-                 summarySnapshot.CurrentPathFlags == m_LastPanelSummarySnapshot.CurrentPathFlags &&
-                 summarySnapshot.HasRouteDiagnostics == m_LastPanelSummarySnapshot.HasRouteDiagnostics);
+                snapshot.SummaryClassificationText == m_LastPanelSnapshot.SummaryClassificationText &&
+                snapshot.PublicTransportLanePolicyText == m_LastPanelSnapshot.PublicTransportLanePolicyText &&
+                snapshot.PublicTransportLaneViolationActive == m_LastPanelSnapshot.PublicTransportLaneViolationActive &&
+                snapshot.PendingExitActive == m_LastPanelSnapshot.PendingExitActive &&
+                snapshot.TotalFines == m_LastPanelSnapshot.TotalFines &&
+                snapshot.TotalViolations == m_LastPanelSnapshot.TotalViolations &&
+                snapshot.CompactLastReasonText == m_LastPanelSnapshot.CompactLastReasonText &&
+                snapshot.CompactRepeatPenaltyText == m_LastPanelSnapshot.CompactRepeatPenaltyText &&
+                snapshot.HasPathOwner == m_LastPanelSnapshot.HasPathOwner &&
+                snapshot.CurrentPathFlags == m_LastPanelSnapshot.CurrentPathFlags;
             bool laneDetailsStateMatches =
                 m_IsLaneDetailsCollapsed ||
                 (!laneDetailsReady && !m_LastPanelLaneDetailsReady) ||
                 (laneDetailsReady == m_LastPanelLaneDetailsReady &&
-                 laneDetailsSnapshot.CurrentLaneText == m_LastPanelLaneDetailsSnapshot.CurrentLaneText &&
-                 laneDetailsSnapshot.PreviousLaneText == m_LastPanelLaneDetailsSnapshot.PreviousLaneText &&
-                 laneDetailsSnapshot.LaneChangeCount == m_LastPanelLaneDetailsSnapshot.LaneChangeCount);
+                 snapshot.CurrentLaneText == m_LastPanelSnapshot.CurrentLaneText &&
+                 snapshot.PreviousLaneText == m_LastPanelSnapshot.PreviousLaneText &&
+                 snapshot.LaneChangeCount == m_LastPanelSnapshot.LaneChangeCount &&
+                 snapshot.HasCurrentTarget == m_LastPanelSnapshot.HasCurrentTarget &&
+                 snapshot.HasCurrentRoute == m_LastPanelSnapshot.HasCurrentRoute &&
+                 snapshot.CurrentPathFlags == m_LastPanelSnapshot.CurrentPathFlags);
             bool routeDiagnosticsVisible = CanShowRouteDiagnosticsSection(snapshot);
             bool routeDiagnosticsRelevant =
                 routeDiagnosticsVisible &&
@@ -1113,10 +1105,10 @@ namespace Traffic_Law_Enforcement
         private void SyncSnapshotConsumers()
         {
             bool panelBodyVisible = m_IsPanelEnabled && !m_IsCollapsed;
-            SelectedObjectBridgeSystem.SetSelectedObjectPanelMinimalSnapshotConsumerActive(
-                panelBodyVisible);
-            SelectedObjectBridgeSystem.SetDetailedSnapshotConsumerActive(false);
-            SelectedObjectBridgeSystem.SetLaneDetailsConsumerActive(false);
+            SelectedObjectBridgeSystem.SetSelectedObjectPanelMinimalSnapshotConsumerActive(false);
+            SelectedObjectBridgeSystem.SetDetailedSnapshotConsumerActive(panelBodyVisible);
+            SelectedObjectBridgeSystem.SetLaneDetailsConsumerActive(
+                panelBodyVisible && !m_IsLaneDetailsCollapsed);
             SelectedObjectBridgeSystem.SetRouteDiagnosticsConsumerActive(false);
         }
 
