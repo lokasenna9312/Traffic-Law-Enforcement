@@ -198,6 +198,7 @@ namespace Traffic_Law_Enforcement
         private string m_FlagOffText = "Off";
         private string m_TotalsFormatText = "Violations {0}, Fines {1}";
         private bool m_HasCachedPanelState;
+        private int m_LastProcessedBridgeSnapshotSerial = -1;
         private SelectedObjectDebugSnapshot m_LastPanelSnapshot;
         private SelectedObjectDebugSnapshot m_LastPanelSummarySnapshot;
         private SelectedObjectDebugSnapshot m_LastPanelLaneDetailsSnapshot;
@@ -381,6 +382,7 @@ namespace Traffic_Law_Enforcement
             if (!m_IsPanelEnabled)
             {
                 m_HasCachedPanelState = false;
+                m_LastProcessedBridgeSnapshotSerial = -1;
                 m_CollapsedFastPathApplied = false;
                 ClearDeferredSnapshotCaches();
                 m_VisibleBinding.Update(false);
@@ -392,6 +394,7 @@ namespace Traffic_Law_Enforcement
             if (m_IsCollapsed)
             {
                 m_HasCachedPanelState = false;
+                m_LastProcessedBridgeSnapshotSerial = -1;
                 ApplyCollapsedBindings();
                 return;
             }
@@ -408,6 +411,7 @@ namespace Traffic_Law_Enforcement
             if (m_SelectedObjectBridgeSystem == null || !m_SelectedObjectBridgeSystem.HasSnapshot)
             {
                 m_HasCachedPanelState = false;
+                m_LastProcessedBridgeSnapshotSerial = -1;
                 ClearDeferredSnapshotCaches();
                 RefreshEntitySelectionStatus(currentSuggestedEntitySelectionValue);
                 RefreshPathObsoleteStatus(currentSuggestedEntitySelectionValue);
@@ -421,6 +425,13 @@ namespace Traffic_Law_Enforcement
             RefreshEntitySelectionStatus(currentSuggestedEntitySelectionValue);
             RefreshPathObsoleteStatus(currentSuggestedEntitySelectionValue);
             SelectedObjectDebugSnapshot snapshot = m_SelectedObjectBridgeSystem.CurrentSnapshot;
+            int currentBridgeSnapshotSerial = m_SelectedObjectBridgeSystem.SnapshotSerial;
+            if (m_HasCachedPanelState &&
+                currentBridgeSnapshotSerial == m_LastProcessedBridgeSnapshotSerial)
+            {
+                return;
+            }
+
             if (snapshot.ResolveState == SelectedObjectResolveState.None ||
                 snapshot.ResolveState == SelectedObjectResolveState.NotVehicle)
             {
@@ -472,6 +483,7 @@ namespace Traffic_Law_Enforcement
                 laneDetailsReady,
                 routeDiagnosticsReady,
                 state);
+            m_LastProcessedBridgeSnapshotSerial = currentBridgeSnapshotSerial;
             UpdateBindings(state);
         }
 
@@ -906,6 +918,7 @@ namespace Traffic_Law_Enforcement
         {
             m_IsPanelEnabled = false;
             m_CollapsedFastPathApplied = false;
+            m_LastProcessedBridgeSnapshotSerial = -1;
             SelectedObjectBridgeSystem.SetSelectedObjectPanelMinimalSnapshotConsumerActive(false);
             SelectedObjectBridgeSystem.SetDetailedSnapshotConsumerActive(false);
             SelectedObjectBridgeSystem.SetLaneDetailsConsumerActive(false);
@@ -926,11 +939,13 @@ namespace Traffic_Law_Enforcement
             m_HasCachedPanelState = false;
             if (m_IsCollapsed)
             {
+                m_LastProcessedBridgeSnapshotSerial = -1;
                 ApplyCollapsedBindings();
             }
             else
             {
                 m_CollapsedFastPathApplied = false;
+                m_LastProcessedBridgeSnapshotSerial = -1;
                 m_LastSummaryRequestFrame = int.MinValue;
                 m_LastLaneDetailsRequestFrame = int.MinValue;
                 m_LastRouteDiagnosticsRequestFrame = int.MinValue;
@@ -942,6 +957,7 @@ namespace Traffic_Law_Enforcement
         {
             m_IsLaneDetailsCollapsed = !m_IsLaneDetailsCollapsed;
             m_HasCachedPanelState = false;
+            m_LastProcessedBridgeSnapshotSerial = -1;
             m_LastLaneDetailsRequestFrame = int.MinValue;
             m_LaneDetailsCollapsedBinding.Update(m_IsLaneDetailsCollapsed);
         }
@@ -950,6 +966,7 @@ namespace Traffic_Law_Enforcement
         {
             m_IsRouteDiagnosticsCollapsed = !m_IsRouteDiagnosticsCollapsed;
             m_HasCachedPanelState = false;
+            m_LastProcessedBridgeSnapshotSerial = -1;
             m_LastRouteDiagnosticsRequestFrame = int.MinValue;
             m_RouteDiagnosticsCollapsedBinding.Update(m_IsRouteDiagnosticsCollapsed);
         }

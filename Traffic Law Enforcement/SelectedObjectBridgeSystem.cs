@@ -213,12 +213,14 @@ namespace Traffic_Law_Enforcement
 
         private SelectedObjectDebugSnapshot m_CurrentSnapshot;
         private bool m_HasSnapshot;
+        private int m_SnapshotSerial;
         private int m_LastSnapshotSettingsVersion = -1;
         private Entity m_LastHydratedSelectionSourceEntity;
         private Entity m_LastHydratedResolvedVehicleEntity;
         private int m_SelectionHydrationPhase = 3;
         public SelectedObjectDebugSnapshot CurrentSnapshot => m_CurrentSnapshot;
         public bool HasSnapshot => m_HasSnapshot;
+        internal int SnapshotSerial => m_SnapshotSerial;
         internal bool AreLaneDetailsHydrated => m_SelectionHydrationPhase >= 1;
         internal bool AreRouteDiagnosticsHydrated => m_SelectionHydrationPhase >= 2;
 
@@ -432,6 +434,7 @@ namespace Traffic_Law_Enforcement
                     includePathStateFields);
                 m_LastSnapshotSettingsVersion = EnforcementGameplaySettingsService.Version;
                 m_HasSnapshot = true;
+                m_SnapshotSerial++;
                 AdvanceSelectionHydrationPhase(panelSelectionHydrationActive);
                 return;
             }
@@ -507,6 +510,7 @@ namespace Traffic_Law_Enforcement
                 includePathStateFields);
             m_LastSnapshotSettingsVersion = EnforcementGameplaySettingsService.Version;
             m_HasSnapshot = true;
+            m_SnapshotSerial++;
             AdvanceSelectionHydrationPhase(panelSelectionHydrationActive);
         }
 
