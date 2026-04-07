@@ -1,6 +1,7 @@
 using Colossal.IO.AssetDatabase;
 using Colossal.Logging;
 using Game;
+using Game.Common;
 using Game.Modding;
 using Game.SceneFlow;
 using Game.Simulation;
@@ -81,6 +82,8 @@ namespace Traffic_Law_Enforcement
             updateSystem.UpdateAfter<EnforcementGameTimeSystem, CarNavigationSystem>(SystemUpdatePhase.GameSimulation);
             updateSystem.UpdateAfter<RouteAttemptTrackingSystem, CarNavigationSystem>(SystemUpdatePhase.GameSimulation);
             updateSystem.UpdateBefore<RouteAttemptTrackingSystem, RoutePenaltyRerouteLoggingSystem>(SystemUpdatePhase.GameSimulation);
+            updateSystem.UpdateBefore<FocusedLoggingWatchedVehicleMonitorSystem, RoutePenaltyRerouteLoggingSystem>(SystemUpdatePhase.GameSimulation);
+            updateSystem.UpdateBefore<FocusedLoggingWatchedVehicleMonitorSystem, PrepareCleanUpSystem>(SystemUpdatePhase.GameSimulation);
             updateSystem.UpdateBefore<RouteAttemptTrackingSystem, PublicTransportLaneViolationApplySystem>(SystemUpdatePhase.GameSimulation);
             updateSystem.UpdateAfter<MonthlyEnforcementChirperSystem, EnforcementGameTimeSystem>(SystemUpdatePhase.GameSimulation);
             updateSystem.UpdateBefore<MonthlyEnforcementChirperSystem, CreateChirpSystem>(SystemUpdatePhase.GameSimulation);
