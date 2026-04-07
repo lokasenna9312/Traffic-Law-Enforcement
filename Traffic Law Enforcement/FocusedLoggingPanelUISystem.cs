@@ -226,17 +226,14 @@ namespace Traffic_Law_Enforcement
             bool hasWatchedVehicles,
             int watchedVehicleCount)
         {
-            bool hasSelectedRoadVehicle =
-                TryGetSelectedRoadVehicle(
-                    out SelectedObjectDebugSnapshot snapshot,
-                    out Entity vehicle);
-            bool watchedVehicle =
-                hasSelectedRoadVehicle &&
-                FocusedLoggingService.IsWatched(vehicle);
-            bool hasSelectedVehicle =
-                hasSelectedRoadVehicle &&
-                (snapshot.TleApplicability == SelectedObjectTleApplicability.ApplicableReady ||
-                 watchedVehicle);
+            FocusedLoggingSelectionState selectionState = default;
+            SelectedObjectDebugSnapshot snapshot = default;
+            if (m_SelectedObjectBridgeSystem != null &&
+                m_SelectedObjectBridgeSystem.HasSnapshot)
+            {
+                snapshot = m_SelectedObjectBridgeSystem.CurrentSnapshot;
+                selectionState = FocusedLoggingSelectionPolicy.Build(snapshot);
+            }
 
             string watchedVehicles =
                 hasWatchedVehicles
@@ -248,14 +245,14 @@ namespace Traffic_Law_Enforcement
             return new PanelState
             {
                 Visible = windowVisible,
-                SelectedVehicle = hasSelectedVehicle
-                    ? FocusedLoggingService.FormatEntity(vehicle)
+                SelectedVehicle = selectionState.HasEligibleSelection
+                    ? FocusedLoggingService.FormatEntity(selectionState.Vehicle)
                     : m_NoneText,
-                SelectedRole = hasSelectedVehicle
+                SelectedRole = selectionState.HasEligibleSelection
                     ? NormalizeText(snapshot.RoleText)
                     : string.Empty,
-                SelectedWatchStatus = hasSelectedVehicle
-                    ? (watchedVehicle ? m_WatchedStatusText : m_NotWatchedStatusText)
+                SelectedWatchStatus = selectionState.HasEligibleSelection
+                    ? (selectionState.WatchedVehicle ? m_WatchedStatusText : m_NotWatchedStatusText)
                     : m_NoEligibleSelectionText,
                 WatchedCount = GetWatchedCountText(watchedVehicleCount),
                 WatchedVehicles = string.IsNullOrWhiteSpace(watchedVehicles)
@@ -263,14 +260,11 @@ namespace Traffic_Law_Enforcement
                     : watchedVehicles,
                 BurstLogging = BuildBurstLoggingText(burstLoggingRemainingSeconds),
                 BurstLoggingActive = burstLoggingActive,
-                Message = hasSelectedVehicle
+                Message = selectionState.HasEligibleSelection
                     ? string.Empty
                     : m_NoEligibleSelectionText,
-                WatchSelectedEnabled =
-                    hasSelectedRoadVehicle &&
-                    snapshot.TleApplicability == SelectedObjectTleApplicability.ApplicableReady &&
-                    !watchedVehicle,
-                UnwatchSelectedEnabled = hasSelectedRoadVehicle && watchedVehicle,
+                WatchSelectedEnabled = selectionState.CanWatch,
+                UnwatchSelectedEnabled = selectionState.CanUnwatch,
                 ClearWatchedEnabled = hasWatchedVehicles,
                 ToggleBurstLoggingEnabled = true,
             };
@@ -372,21 +366,19 @@ namespace Traffic_Law_Enforcement
 
         private void HandleWatchSelectedRequested()
         {
-            if (TryGetSelectedReadyRoadVehicle(
-                    out SelectedObjectDebugSnapshot _,
-                    out Entity vehicle))
+            if (TryGetCurrentSelectionState(out FocusedLoggingSelectionState selectionState) &&
+                selectionState.CanWatch)
             {
-                FocusedLoggingService.AddWatchedVehicle(vehicle);
+                FocusedLoggingService.AddWatchedVehicle(selectionState.Vehicle);
             }
         }
 
         private void HandleUnwatchSelectedRequested()
         {
-            if (TryGetSelectedRoadVehicle(
-                    out SelectedObjectDebugSnapshot _,
-                    out Entity vehicle))
+            if (TryGetCurrentSelectionState(out FocusedLoggingSelectionState selectionState) &&
+                selectionState.CanUnwatch)
             {
-                FocusedLoggingService.RemoveWatchedVehicle(vehicle);
+                FocusedLoggingService.RemoveWatchedVehicle(selectionState.Vehicle);
             }
         }
 
@@ -462,46 +454,18 @@ namespace Traffic_Law_Enforcement
             m_CachedBurstLoggingText = m_BurstLoggingInactiveText;
         }
 
-        private bool TryGetSelectedRoadVehicle(
-            out SelectedObjectDebugSnapshot snapshot,
-            out Entity vehicle)
+        private bool TryGetCurrentSelectionState(
+            out FocusedLoggingSelectionState selectionState)
         {
-            vehicle = Entity.Null;
             if (m_SelectedObjectBridgeSystem == null || !m_SelectedObjectBridgeSystem.HasSnapshot)
             {
-                snapshot = default;
+                selectionState = default;
                 return false;
             }
 
-            snapshot = m_SelectedObjectBridgeSystem.CurrentSnapshot;
-            if (!IsFocusedLoggingRoadVehicle(snapshot) ||
-                snapshot.ResolvedVehicleEntity == Entity.Null)
-            {
-                return false;
-            }
-
-            vehicle = snapshot.ResolvedVehicleEntity;
+            selectionState = FocusedLoggingSelectionPolicy.Build(
+                m_SelectedObjectBridgeSystem.CurrentSnapshot);
             return true;
-        }
-
-        private bool TryGetSelectedReadyRoadVehicle(
-            out SelectedObjectDebugSnapshot snapshot,
-            out Entity vehicle)
-        {
-            if (!TryGetSelectedRoadVehicle(out snapshot, out vehicle) ||
-                snapshot.TleApplicability != SelectedObjectTleApplicability.ApplicableReady)
-            {
-                return false;
-            }
-
-            return true;
-        }
-
-        private static bool IsFocusedLoggingRoadVehicle(
-            SelectedObjectDebugSnapshot snapshot)
-        {
-            return snapshot.VehicleKind == SelectedObjectKind.RoadCar ||
-                snapshot.VehicleKind == SelectedObjectKind.ParkedRoadCar;
         }
 
         private static string NormalizeText(string text)
