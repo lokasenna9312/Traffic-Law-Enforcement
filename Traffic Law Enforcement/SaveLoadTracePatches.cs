@@ -147,13 +147,13 @@ namespace Traffic_Law_Enforcement
         }
 
         private static void GameManagerSavePrefix(
-            string name,
-            SaveInfo saveInfo)
+            string saveName,
+            SaveInfo meta)
         {
             SaveLoadTraceService.CaptureFromSaveInfo(
-                saveInfo,
+                meta,
                 "GameManager.Save",
-                name);
+                saveName);
             Mod.log.Info(
                 "[SAVELOAD] " +
                 $"action=SaveRequested, source=GameManager.Save, name={SaveLoadTraceService.LastRequestedSaveName}, city={SaveLoadTraceService.LastRequestedCityName}, path={SaveLoadTraceService.LastRequestedSavePath}, id={SaveLoadTraceService.LastRequestedSaveId}");
