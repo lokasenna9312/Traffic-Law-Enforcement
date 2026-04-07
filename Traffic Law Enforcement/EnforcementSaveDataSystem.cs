@@ -640,7 +640,8 @@ namespace Traffic_Law_Enforcement {
                 context.purpose == Purpose.LoadGame
                     ? SaveLoadTraceRequestKind.Load
                     : SaveLoadTraceRequestKind.None,
-                $"runtimeWorldGeneration={previousGeneration}->{RuntimeWorldGeneration}");
+                $"runtimeWorldGeneration={previousGeneration}->{RuntimeWorldGeneration}",
+                includeCurrentRuntimeTime: false);
             ResetRuntimeState();
             EnforcementGameplaySettingsState previousSettings =
                 EnforcementGameplaySettingsService.Current;
@@ -669,7 +670,8 @@ namespace Traffic_Law_Enforcement {
             LogSaveLifecycleHook(
                 "PreDeserialize",
                 context,
-                SaveLoadTraceRequestKind.Load);
+                SaveLoadTraceRequestKind.Load,
+                includeCurrentRuntimeTime: false);
             ResetRuntimeState();
 
             m_LoadedPublicTransportLaneVehicleStates.Clear();
@@ -1101,20 +1103,25 @@ namespace Traffic_Law_Enforcement {
             Context context,
             SaveLoadTraceRequestKind expectedRequestKind =
                 SaveLoadTraceRequestKind.None,
-            string extra = null) {
+            string extra = null,
+            bool includeCurrentRuntimeTime = true) {
             string suffix =
                 string.IsNullOrWhiteSpace(extra)
                     ? string.Empty
                     : $", {extra}";
             string identitySuffix =
                 SaveLoadTraceService.FormatIdentitySuffix(expectedRequestKind);
+            string runtimeTimeFields =
+                includeCurrentRuntimeTime
+                    ? $"timeInitialized={EnforcementGameTime.IsInitialized}, " +
+                      $"monthTicks={EnforcementGameTime.CurrentTimestampMonthTicks}, "
+                    : string.Empty;
 
             Mod.log.Info(
                 "[ENFORCEMENT_SAVE_HOOK] " +
                 $"hook={hookName}, purpose={context.purpose}, version={context.version}, " +
                 $"runtimeWorldGeneration={RuntimeWorldGeneration}, " +
-                $"timeInitialized={EnforcementGameTime.IsInitialized}, " +
-                $"monthTicks={EnforcementGameTime.CurrentTimestampMonthTicks}, " +
+                runtimeTimeFields +
                 $"modVersion={GetCurrentModVersion()}, " +
                 $"gameVersion={GetCurrentGameVersion()}{identitySuffix}{suffix}");
         }
