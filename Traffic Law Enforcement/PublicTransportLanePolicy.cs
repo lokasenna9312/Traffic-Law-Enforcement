@@ -673,7 +673,8 @@ namespace Traffic_Law_Enforcement
                 return PublicTransportLaneFlagGrantExperimentRole.DeliveryTruck;
             }
 
-            if (lookups.CargoTransportData.HasComponent(vehicle))
+            if (lookups.CargoTransportData.HasComponent(vehicle) &&
+                lookups.CarData.HasComponent(vehicle))
             {
                 return PublicTransportLaneFlagGrantExperimentRole.CargoTransport;
             }
