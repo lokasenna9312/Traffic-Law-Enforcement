@@ -53,10 +53,10 @@ namespace Traffic_Law_Enforcement
         private static int s_CachedSelectedObjectBridgeSystemFrame = -1;
         private static SelectedObjectBridgeSystem s_CachedSelectedObjectBridgeSystem;
         private static bool s_CachedSelectedObjectBridgeSystemAvailable;
-        private static int s_CachedSelectedReadyRoadVehicleFrame = -1;
-        private static bool s_CachedSelectedReadyRoadVehicleAvailable;
-        private static SelectedObjectDebugSnapshot s_CachedSelectedReadyRoadVehicleSnapshot;
-        private static Entity s_CachedSelectedReadyRoadVehicle;
+        private static int s_CachedSelectedFocusedLoggingRoadVehicleFrame = -1;
+        private static bool s_CachedSelectedFocusedLoggingRoadVehicleAvailable;
+        private static SelectedObjectDebugSnapshot s_CachedSelectedFocusedLoggingRoadVehicleSnapshot;
+        private static Entity s_CachedSelectedFocusedLoggingRoadVehicle;
         private static int s_CachedFocusedLoggingStateFrame = -1;
         private static FocusedLoggingDebugState s_CachedFocusedLoggingState;
 
@@ -1140,7 +1140,7 @@ namespace Traffic_Law_Enforcement
                 ? "None"
                 : watchedVehiclesSummary;
 
-            if (TryGetSelectedReadyRoadVehicle(
+            if (TryGetSelectedFocusedLoggingRoadVehicle(
                     out SelectedObjectDebugSnapshot snapshot,
                     out Entity vehicle))
             {
@@ -1166,7 +1166,7 @@ namespace Traffic_Law_Enforcement
 
         private static void WatchSelectedRoadVehicle()
         {
-            if (TryGetSelectedReadyRoadVehicle(
+            if (TryGetSelectedFocusedLoggingRoadVehicle(
                     out SelectedObjectDebugSnapshot snapshot,
                     out Entity vehicle) &&
                 FocusedLoggingSelectionPolicy.Build(snapshot).CanWatch)
@@ -1177,7 +1177,7 @@ namespace Traffic_Law_Enforcement
 
         private static void UnwatchSelectedRoadVehicle()
         {
-            if (TryGetSelectedReadyRoadVehicle(
+            if (TryGetSelectedFocusedLoggingRoadVehicle(
                     out SelectedObjectDebugSnapshot snapshot,
                     out Entity vehicle) &&
                 FocusedLoggingSelectionPolicy.Build(snapshot).CanUnwatch)
@@ -1529,16 +1529,16 @@ namespace Traffic_Law_Enforcement
             return s_CachedSelectedObjectBridgeSystemAvailable;
         }
 
-        private static bool TryGetSelectedReadyRoadVehicle(
+        private static bool TryGetSelectedFocusedLoggingRoadVehicle(
             out SelectedObjectDebugSnapshot snapshot,
             out Entity vehicle)
         {
             int currentFrame = Time.frameCount;
-            if (s_CachedSelectedReadyRoadVehicleFrame == currentFrame)
+            if (s_CachedSelectedFocusedLoggingRoadVehicleFrame == currentFrame)
             {
-                snapshot = s_CachedSelectedReadyRoadVehicleSnapshot;
-                vehicle = s_CachedSelectedReadyRoadVehicle;
-                return s_CachedSelectedReadyRoadVehicleAvailable;
+                snapshot = s_CachedSelectedFocusedLoggingRoadVehicleSnapshot;
+                vehicle = s_CachedSelectedFocusedLoggingRoadVehicle;
+                return s_CachedSelectedFocusedLoggingRoadVehicleAvailable;
             }
 
             bool hasSelectedRoadVehicle =
@@ -1551,15 +1551,15 @@ namespace Traffic_Law_Enforcement
                 selectionState.HasSelectedRoadVehicle &&
                 selectionState.Vehicle != Entity.Null;
 
-            s_CachedSelectedReadyRoadVehicleFrame = currentFrame;
-            s_CachedSelectedReadyRoadVehicleAvailable = hasReadyRoadVehicle;
-            s_CachedSelectedReadyRoadVehicleSnapshot = selectedSnapshot;
-            s_CachedSelectedReadyRoadVehicle =
+            s_CachedSelectedFocusedLoggingRoadVehicleFrame = currentFrame;
+            s_CachedSelectedFocusedLoggingRoadVehicleAvailable = hasReadyRoadVehicle;
+            s_CachedSelectedFocusedLoggingRoadVehicleSnapshot = selectedSnapshot;
+            s_CachedSelectedFocusedLoggingRoadVehicle =
                 hasReadyRoadVehicle
                     ? selectionState.Vehicle
                     : Entity.Null;
             snapshot = selectedSnapshot;
-            vehicle = s_CachedSelectedReadyRoadVehicle;
+            vehicle = s_CachedSelectedFocusedLoggingRoadVehicle;
             return hasReadyRoadVehicle;
         }
 
