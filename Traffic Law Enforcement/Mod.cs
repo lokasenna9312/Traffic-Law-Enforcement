@@ -46,9 +46,17 @@ namespace Traffic_Law_Enforcement
             FocusedLoggingService.Reset();
             ObsoleteAttemptCorrelationService.Reset();
             PublicTransportLaneExitPressureTelemetry.Reset();
+            SaveLoadTraceService.Reset();
+            SaveLoadTracePatches.Apply();
             m_Setting = new Setting(this);
             Settings = m_Setting;
-            AssetDatabase.global.LoadSettings(nameof(Traffic_Law_Enforcement), m_Setting, new Setting(this));
+            using (m_Setting.BeginAuditSourceContext("LoadSettings"))
+            {
+                AssetDatabase.global.LoadSettings(
+                    nameof(Traffic_Law_Enforcement),
+                    m_Setting,
+                    new Setting(this, enableAuditEmission: false));
+            }
             m_Setting.ApplyEnforcementLoggingMigrationIfNeeded();
             m_Setting.RegisterKeyBindings();
 
@@ -56,7 +64,6 @@ namespace Traffic_Law_Enforcement
             LogModVersionInfo(modAssetPath);
             log.Info(
                 $"[MB-AHD-RAW] buildFingerprint={MidBlockAccessPathfindingPenaltyPatches.MbAhdRawBuildFingerprint}");
-            m_Setting.EnableSettingChangeLogging();
             m_Setting.LogDebugLoggingSettingsSnapshot("OnLoad");
 
             m_Setting.RegisterInOptionsUI();
@@ -111,6 +118,8 @@ namespace Traffic_Law_Enforcement
             FocusedLoggingService.Reset();
             ObsoleteAttemptCorrelationService.Reset();
             PublicTransportLaneExitPressureTelemetry.Reset();
+            SaveLoadTracePatches.Remove();
+            SaveLoadTraceService.Reset();
             BudgetUIPatches.Remove();
             FocusedRouteDiagnosticsPatchController.RemoveAll();
             PathfindRuntimeDiscoveryPatches.Remove();

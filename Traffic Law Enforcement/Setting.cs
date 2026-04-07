@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Collections.Generic;
+using System.Globalization;
 using Colossal;
 using Colossal.IO.AssetDatabase;
 using Colossal.Json;
@@ -49,8 +50,9 @@ namespace Traffic_Law_Enforcement
         private bool m_EnableAllVehicleRouteSelectionChangeLogging;
         private bool m_EnableFocusedRouteRebuildDiagnosticsLogging;
         private bool m_EnableFocusedVehicleOnlyRouteLogging;
-        private bool m_EnableSettingChangeLogging;
         private bool m_EnableChirperLifecycleLogging;
+        private readonly bool m_EnableAuditEmission;
+        private string m_AuditSourceContext;
         private bool m_DefaultEnablePublicTransportLaneEnforcement;
         private bool m_DefaultEnableMidBlockCrossingEnforcement;
         private bool m_DefaultEnableIntersectionMovementEnforcement;
@@ -85,6 +87,7 @@ namespace Traffic_Law_Enforcement
         private int m_DefaultIntersectionMovementRepeatWindowMonths;
         private int m_DefaultIntersectionMovementRepeatThreshold;
         private int m_DefaultIntersectionMovementRepeatMultiplierPercent;
+        private float m_DefaultPublicTransportLaneExitPressureThresholdDays;
 
         public const string kCurrentSaveTab = "CurrentSave";
         public const string kNewSaveDefaultsTab = "NewSaveDefaults";
@@ -105,9 +108,40 @@ namespace Traffic_Law_Enforcement
         public const string kChirperGroup = "ChirperGroup";
         public const string kLogPathGroup = "LogPathGroup";
 
-        public Setting(IMod mod) : base(mod)
+        public Setting(IMod mod, bool enableAuditEmission = true) : base(mod)
         {
+            m_EnableAuditEmission = enableAuditEmission;
             SetDefaults();
+        }
+
+        private sealed class AuditSourceContextScope : IDisposable
+        {
+            private readonly Setting m_Setting;
+            private readonly string m_PreviousSource;
+
+            public AuditSourceContextScope(
+                Setting setting,
+                string source)
+            {
+                m_Setting = setting;
+                m_PreviousSource = setting.m_AuditSourceContext;
+                setting.m_AuditSourceContext = source;
+            }
+
+            public void Dispose()
+            {
+                m_Setting.m_AuditSourceContext = m_PreviousSource;
+            }
+        }
+
+        private sealed class NullAuditScope : IDisposable
+        {
+            public static readonly NullAuditScope Instance =
+                new NullAuditScope();
+
+            public void Dispose()
+            {
+            }
         }
 
         [Exclude]
@@ -494,7 +528,26 @@ namespace Traffic_Law_Enforcement
         public float PublicTransportLaneExitPressureThresholdDays
         {
             get => EnforcementGameplaySettingsService.Current.PublicTransportLaneExitPressureThresholdDays;
-            set => UpdateCurrentSaveSettings((ref EnforcementGameplaySettingsState state) => state.PublicTransportLaneExitPressureThresholdDays = value);
+            set
+            {
+                float previous =
+                    EnforcementGameplaySettingsService.Current
+                        .PublicTransportLaneExitPressureThresholdDays;
+                if (AreEquivalent(previous, value))
+                {
+                    return;
+                }
+
+                UpdateCurrentSaveSettings(
+                    (ref EnforcementGameplaySettingsState state) =>
+                        state.PublicTransportLaneExitPressureThresholdDays =
+                            value);
+                LogEnforcementValueChange(
+                    "currentSave",
+                    "publicTransportLaneExitPressureThresholdDays",
+                    previous,
+                    value);
+            }
         }
 
         [Exclude]
@@ -1136,7 +1189,28 @@ namespace Traffic_Law_Enforcement
         [SettingsUISlider(min = 0f, max = 1f, step = 0.01f, unit = Unit.kFloatThreeFractions)]
         [SettingsUISection(kNewSaveDefaultsTab, kPublicTransportLanePressureGroup)]
         [SettingsUIDisableByCondition(typeof(Setting), nameof(IsNewSavePublicTransportLaneSettingsDisabled))]
-        public float DefaultPublicTransportLaneExitPressureThresholdDays { get; set; }
+        public float DefaultPublicTransportLaneExitPressureThresholdDays
+        {
+            get => m_DefaultPublicTransportLaneExitPressureThresholdDays;
+            set
+            {
+                if (AreEquivalent(
+                        m_DefaultPublicTransportLaneExitPressureThresholdDays,
+                        value))
+                {
+                    return;
+                }
+
+                float previous =
+                    m_DefaultPublicTransportLaneExitPressureThresholdDays;
+                m_DefaultPublicTransportLaneExitPressureThresholdDays = value;
+                LogEnforcementValueChange(
+                    "newSaveDefaults",
+                    "publicTransportLaneExitPressureThresholdDays",
+                    previous,
+                    value);
+            }
+        }
 
         [SettingsUISlider(min = 0, max = 5000, step = 25, scalarMultiplier = 1, unit = Unit.kMoney)]
         [SettingsUISection(kNewSaveDefaultsTab, kFineGroup)]
@@ -1433,14 +1507,20 @@ namespace Traffic_Law_Enforcement
                     return;
                 }
 
-                EnforcementGameplaySettingsState previous = EnforcementGameplaySettingsService.Current;
-                EnforcementGameplaySettingsService.ResetToCodeDefaults();
-                EnforcementGameplaySettingsState current = EnforcementGameplaySettingsService.Current;
-                LogTrackedEnforcementSettingChanges(
-                    "currentSave",
-                    previous,
-                    current,
-                    "ResetCurrentSaveSettingsToCodeDefaults");
+                using (BeginAuditSourceContext(
+                           "ResetCurrentSaveSettingsToCodeDefaults"))
+                {
+                    EnforcementGameplaySettingsState previous =
+                        EnforcementGameplaySettingsService.Current;
+                    EnforcementGameplaySettingsService.ResetToCodeDefaults();
+                    EnforcementGameplaySettingsState current =
+                        EnforcementGameplaySettingsService.Current;
+                    LogTrackedEnforcementSettingChanges(
+                        "currentSave",
+                        previous,
+                        current,
+                        "ResetCurrentSaveSettingsToCodeDefaults");
+                }
             }
         }
 
@@ -1457,8 +1537,13 @@ namespace Traffic_Law_Enforcement
                     return;
                 }
 
-                ApplyNewSaveDefaultSettings(EnforcementGameplaySettingsService.Current);
-                ApplyAndSave();
+                using (BeginAuditSourceContext(
+                           "CopyCurrentSaveSettingsToDefaults"))
+                {
+                    ApplyNewSaveDefaultSettings(
+                        EnforcementGameplaySettingsService.Current);
+                    ApplyAndSave();
+                }
             }
         }
 
@@ -1474,8 +1559,13 @@ namespace Traffic_Law_Enforcement
                     return;
                 }
 
-                ApplyNewSaveDefaultSettings(EnforcementGameplaySettingsState.CreateCodeDefaults());
-                ApplyAndSave();
+                using (BeginAuditSourceContext(
+                           "ResetDefaultsToCodeDefaults"))
+                {
+                    ApplyNewSaveDefaultSettings(
+                        EnforcementGameplaySettingsState.CreateCodeDefaults());
+                    ApplyAndSave();
+                }
             }
         }
 
@@ -1669,61 +1759,72 @@ namespace Traffic_Law_Enforcement
 
         public override void SetDefaults()
         {
-            ApplyNewSaveDefaultSettings(EnforcementGameplaySettingsState.CreateCodeDefaults());
-            // Keep debug logging opt-in by default.
-            EnableEstimatedRerouteLogging = false;
-            EnableEnforcementEventLogging = false;
-            EnablePolicyImpactSummaryLogging = false;
-            EnableFineIncomeLogging = false;
-            EnableType2PublicTransportLaneUsageLogging = false;
-            EnableType3PublicTransportLaneUsageLogging = false;
-            EnableType4PublicTransportLaneUsageLogging = false;
-            EnablePathfindingPenaltyDiagnosticLogging = false;
-            EnablePathObsoleteSourceLogging = false;
-            EnableAllVehicleRouteSelectionChangeLogging = false;
-            EnableFocusedRouteRebuildDiagnosticsLogging = false;
-            EnableFocusedVehicleOnlyRouteLogging = false;
-            EnableChirperLifecycleLogging = false;
-            ResetKeyBindings();
+            using (BeginAuditSourceContext("SetDefaults"))
+            {
+                ApplyNewSaveDefaultSettings(
+                    EnforcementGameplaySettingsState.CreateCodeDefaults());
+                // Keep debug logging opt-in by default.
+                EnableEstimatedRerouteLogging = false;
+                EnableEnforcementEventLogging = false;
+                EnablePolicyImpactSummaryLogging = false;
+                EnableFineIncomeLogging = false;
+                EnableType2PublicTransportLaneUsageLogging = false;
+                EnableType3PublicTransportLaneUsageLogging = false;
+                EnableType4PublicTransportLaneUsageLogging = false;
+                EnablePathfindingPenaltyDiagnosticLogging = false;
+                EnablePathObsoleteSourceLogging = false;
+                EnableAllVehicleRouteSelectionChangeLogging = false;
+                EnableFocusedRouteRebuildDiagnosticsLogging = false;
+                EnableFocusedVehicleOnlyRouteLogging = false;
+                EnableChirperLifecycleLogging = false;
+                ResetKeyBindings();
+            }
         }
 
         public void ApplyEnforcementLoggingMigrationIfNeeded()
         {
-            if (HasAppliedEnforcementLoggingMigration())
+            using (BeginAuditSourceContext("Migration"))
             {
-                return;
-            }
+                if (HasAppliedEnforcementLoggingMigration())
+                {
+                    return;
+                }
 
-            bool shouldSave = false;
-            if (EnableEnforcementEventLogging)
-            {
-                EnablePolicyImpactSummaryLogging = true;
-                EnableFineIncomeLogging = true;
-                shouldSave = true;
-            }
+                bool shouldSave = false;
+                if (EnableEnforcementEventLogging)
+                {
+                    EnablePolicyImpactSummaryLogging = true;
+                    EnableFineIncomeLogging = true;
+                    shouldSave = true;
+                }
 
-            if (shouldSave)
-            {
-                ApplyAndSave();
-            }
+                if (shouldSave)
+                {
+                    ApplyAndSave();
+                }
 
-            MarkEnforcementLoggingMigrationApplied();
+                MarkEnforcementLoggingMigrationApplied();
+            }
         }
 
-        internal void EnableSettingChangeLogging()
+        internal IDisposable BeginAuditSourceContext(string source)
         {
-            m_EnableSettingChangeLogging = true;
+            if (!m_EnableAuditEmission || string.IsNullOrWhiteSpace(source))
+            {
+                return NullAuditScope.Instance;
+            }
+
+            return new AuditSourceContextScope(this, source);
         }
 
         internal void LogDebugLoggingSettingsSnapshot(string source = null)
         {
-            if (!m_EnableSettingChangeLogging)
+            if (!m_EnableAuditEmission)
             {
                 return;
             }
 
-            string resolvedSource =
-                string.IsNullOrWhiteSpace(source) ? "unknown" : source;
+            string resolvedSource = ResolveAuditSource(source);
             Mod.log.Info(
                 "[LOGGING_SETTINGS_SNAPSHOT] " +
                 $"source={resolvedSource}, " +
@@ -1740,6 +1841,60 @@ namespace Traffic_Law_Enforcement
                 $"focusedRouteRebuildDiagnostics={EnableFocusedRouteRebuildDiagnosticsLogging}, " +
                 $"focusedVehicleOnlyRouteLogging={EnableFocusedVehicleOnlyRouteLogging}, " +
                 $"chirperLifecycle={EnableChirperLifecycleLogging}");
+        }
+
+        internal void LogEnforcementSettingsSnapshot(
+            string scope,
+            EnforcementGameplaySettingsState state,
+            string source = null)
+        {
+            if (!m_EnableAuditEmission)
+            {
+                return;
+            }
+
+            string resolvedScope =
+                string.IsNullOrWhiteSpace(scope) ? "unknown" : scope;
+            string resolvedSource = ResolveAuditSource(source);
+            Mod.log.Info(
+                "[ENFORCEMENT_SETTINGS_SNAPSHOT] " +
+                $"scope={resolvedScope}, " +
+                $"source={resolvedSource}, " +
+                $"publicTransportLane={state.EnablePublicTransportLaneEnforcement}, " +
+                $"midBlockCrossing={state.EnableMidBlockCrossingEnforcement}, " +
+                $"intersectionMovement={state.EnableIntersectionMovementEnforcement}, " +
+                $"allowRoadPublicTransportVehicles={state.AllowRoadPublicTransportVehicles}, " +
+                $"allowTaxis={state.AllowTaxis}, " +
+                $"allowPoliceCars={state.AllowPoliceCars}, " +
+                $"allowFireEngines={state.AllowFireEngines}, " +
+                $"allowAmbulances={state.AllowAmbulances}, " +
+                $"allowGarbageTrucks={state.AllowGarbageTrucks}, " +
+                $"allowPostVans={state.AllowPostVans}, " +
+                $"allowRoadMaintenanceVehicles={state.AllowRoadMaintenanceVehicles}, " +
+                $"allowSnowplows={state.AllowSnowplows}, " +
+                $"allowVehicleMaintenanceVehicles={state.AllowVehicleMaintenanceVehicles}, " +
+                $"allowPersonalCars={state.AllowPersonalCars}, " +
+                $"allowDeliveryTrucks={state.AllowDeliveryTrucks}, " +
+                $"allowCargoTransportVehicles={state.AllowCargoTransportVehicles}, " +
+                $"allowHearses={state.AllowHearses}, " +
+                $"allowPrisonerTransports={state.AllowPrisonerTransports}, " +
+                $"allowParkMaintenanceVehicles={state.AllowParkMaintenanceVehicles}, " +
+                $"publicTransportLaneExitPressureThresholdDays={FormatFloatValue(state.PublicTransportLaneExitPressureThresholdDays)}, " +
+                $"publicTransportLaneFineAmount={state.PublicTransportLaneFineAmount}, " +
+                $"midBlockCrossingFineAmount={state.MidBlockCrossingFineAmount}, " +
+                $"intersectionMovementFineAmount={state.IntersectionMovementFineAmount}, " +
+                $"publicTransportLaneRepeatPenalty={state.EnablePublicTransportLaneRepeatPenalty}, " +
+                $"publicTransportLaneRepeatWindowMonths={state.PublicTransportLaneRepeatWindowMonths}, " +
+                $"publicTransportLaneRepeatThreshold={state.PublicTransportLaneRepeatThreshold}, " +
+                $"publicTransportLaneRepeatMultiplierPercent={state.PublicTransportLaneRepeatMultiplierPercent}, " +
+                $"midBlockCrossingRepeatPenalty={state.EnableMidBlockCrossingRepeatPenalty}, " +
+                $"midBlockCrossingRepeatWindowMonths={state.MidBlockCrossingRepeatWindowMonths}, " +
+                $"midBlockCrossingRepeatThreshold={state.MidBlockCrossingRepeatThreshold}, " +
+                $"midBlockCrossingRepeatMultiplierPercent={state.MidBlockCrossingRepeatMultiplierPercent}, " +
+                $"intersectionMovementRepeatPenalty={state.EnableIntersectionMovementRepeatPenalty}, " +
+                $"intersectionMovementRepeatWindowMonths={state.IntersectionMovementRepeatWindowMonths}, " +
+                $"intersectionMovementRepeatThreshold={state.IntersectionMovementRepeatThreshold}, " +
+                $"intersectionMovementRepeatMultiplierPercent={state.IntersectionMovementRepeatMultiplierPercent}");
         }
 
         internal void LogTrackedEnforcementSettingChanges(
@@ -1861,6 +2016,12 @@ namespace Traffic_Law_Enforcement
                 "allowParkMaintenanceVehicles",
                 previous.AllowParkMaintenanceVehicles,
                 current.AllowParkMaintenanceVehicles,
+                source);
+            LogEnforcementValueChange(
+                scope,
+                "publicTransportLaneExitPressureThresholdDays",
+                previous.PublicTransportLaneExitPressureThresholdDays,
+                current.PublicTransportLaneExitPressureThresholdDays,
                 source);
             LogEnforcementValueChange(
                 scope,
@@ -2066,6 +2227,35 @@ namespace Traffic_Law_Enforcement
             return GameManager.instance != null && GameManager.instance.gameMode.IsGameOrEditor();
         }
 
+        private string ResolveAuditSource(
+            string source,
+            bool defaultToUserToggle = false)
+        {
+            if (!string.IsNullOrWhiteSpace(source))
+            {
+                return source;
+            }
+
+            if (!string.IsNullOrWhiteSpace(m_AuditSourceContext))
+            {
+                return m_AuditSourceContext;
+            }
+
+            return defaultToUserToggle ? "UserToggle" : "unknown";
+        }
+
+        private static bool AreEquivalent(
+            float previous,
+            float current)
+        {
+            return Math.Abs(previous - current) < 0.0001f;
+        }
+
+        private static string FormatFloatValue(float value)
+        {
+            return value.ToString("0.###", CultureInfo.InvariantCulture);
+        }
+
         private void LogEnforcementToggleChange(
             string scope,
             string option,
@@ -2073,15 +2263,16 @@ namespace Traffic_Law_Enforcement
             bool current,
             string source = null)
         {
-            if (!m_EnableSettingChangeLogging || previous == current)
+            if (!m_EnableAuditEmission || previous == current)
             {
                 return;
             }
 
-            string sourceSuffix =
-                string.IsNullOrWhiteSpace(source) ? string.Empty : $", source={source}";
+            string resolvedSource =
+                ResolveAuditSource(source, defaultToUserToggle: true);
             Mod.log.Info(
-                $"[ENFORCEMENT_SETTINGS] scope={scope}, option={option}, enabled={current}, previous={previous}{sourceSuffix}");
+                "[ENFORCEMENT_SETTINGS] " +
+                $"scope={scope}, option={option}, enabled={current}, previous={previous}, source={resolvedSource}");
         }
 
         private void LogEnforcementValueChange(
@@ -2091,15 +2282,35 @@ namespace Traffic_Law_Enforcement
             int current,
             string source = null)
         {
-            if (!m_EnableSettingChangeLogging || previous == current)
+            if (!m_EnableAuditEmission || previous == current)
             {
                 return;
             }
 
-            string sourceSuffix =
-                string.IsNullOrWhiteSpace(source) ? string.Empty : $", source={source}";
+            string resolvedSource =
+                ResolveAuditSource(source, defaultToUserToggle: true);
             Mod.log.Info(
-                $"[ENFORCEMENT_SETTINGS] scope={scope}, option={option}, value={current}, previous={previous}{sourceSuffix}");
+                "[ENFORCEMENT_SETTINGS] " +
+                $"scope={scope}, option={option}, value={current}, previous={previous}, source={resolvedSource}");
+        }
+
+        private void LogEnforcementValueChange(
+            string scope,
+            string option,
+            float previous,
+            float current,
+            string source = null)
+        {
+            if (!m_EnableAuditEmission || AreEquivalent(previous, current))
+            {
+                return;
+            }
+
+            string resolvedSource =
+                ResolveAuditSource(source, defaultToUserToggle: true);
+            Mod.log.Info(
+                "[ENFORCEMENT_SETTINGS] " +
+                $"scope={scope}, option={option}, value={FormatFloatValue(current)}, previous={FormatFloatValue(previous)}, source={resolvedSource}");
         }
 
         private void SetDebugLoggingToggle(
@@ -2123,15 +2334,16 @@ namespace Traffic_Law_Enforcement
             bool current,
             string source = null)
         {
-            if (!m_EnableSettingChangeLogging || previous == current)
+            if (!m_EnableAuditEmission || previous == current)
             {
                 return;
             }
 
-            string sourceSuffix =
-                string.IsNullOrWhiteSpace(source) ? string.Empty : $", source={source}";
+            string resolvedSource =
+                ResolveAuditSource(source, defaultToUserToggle: true);
             Mod.log.Info(
-                $"[LOGGING_SETTINGS] option={option}, enabled={current}, previous={previous}{sourceSuffix}");
+                "[LOGGING_SETTINGS] " +
+                $"option={option}, enabled={current}, previous={previous}, source={resolvedSource}");
         }
 
         private static string GetModLogPath()

@@ -637,6 +637,9 @@ namespace Traffic_Law_Enforcement {
             LogSaveLifecycleHook(
                 "SetDefaults",
                 context,
+                context.purpose == Purpose.LoadGame
+                    ? SaveLoadTraceRequestKind.Load
+                    : SaveLoadTraceRequestKind.None,
                 $"runtimeWorldGeneration={previousGeneration}->{RuntimeWorldGeneration}");
             ResetRuntimeState();
             EnforcementGameplaySettingsState previousSettings =
@@ -649,6 +652,12 @@ namespace Traffic_Law_Enforcement {
                 previousSettings,
                 initialSettings,
                 $"SetDefaults:{context.purpose}");
+            Mod.Settings?.LogDebugLoggingSettingsSnapshot(
+                $"SetDefaults:{context.purpose}");
+            Mod.Settings?.LogEnforcementSettingsSnapshot(
+                "currentSave",
+                EnforcementGameplaySettingsService.Current,
+                $"SetDefaults:{context.purpose}");
             m_LoadedPublicTransportLaneVehicleStates.Clear();
             m_HasDeserializedData = false;
             m_ShouldClearLegacyRuntimeState =
@@ -657,7 +666,10 @@ namespace Traffic_Law_Enforcement {
         }
 
         public void PreDeserialize(Context context) {
-            LogSaveLifecycleHook("PreDeserialize", context);
+            LogSaveLifecycleHook(
+                "PreDeserialize",
+                context,
+                SaveLoadTraceRequestKind.Load);
             ResetRuntimeState();
 
             m_LoadedPublicTransportLaneVehicleStates.Clear();
@@ -670,7 +682,9 @@ namespace Traffic_Law_Enforcement {
             LogSaveLifecycleHook(
                 "PostDeserialize",
                 context,
+                SaveLoadTraceRequestKind.Load,
                 $"hasDeserializedData={m_HasDeserializedData}, loadedVehicleStates={m_LoadedPublicTransportLaneVehicleStates.Count}");
+            SaveLoadTraceService.ClearIfKind(SaveLoadTraceRequestKind.Load);
             m_PendingPostDeserializeApply = true;
         }
 
@@ -689,6 +703,13 @@ namespace Traffic_Law_Enforcement {
             {
                 EnforcementPolicyImpactService.PrepareTrackingStateForPersistence();
             }
+
+            LogSerializeLifecycleHook();
+            Mod.Settings?.LogDebugLoggingSettingsSnapshot("Serialize");
+            Mod.Settings?.LogEnforcementSettingsSnapshot(
+                "currentSave",
+                EnforcementGameplaySettingsService.Current,
+                "Serialize");
 
             writer.Write(kSerializationVersion);
             writer.Write(string.IsNullOrWhiteSpace(Mod.CurrentModVersion) ? "unknown" : Mod.CurrentModVersion);
@@ -756,6 +777,7 @@ namespace Traffic_Law_Enforcement {
                                     avoidedRerouteEvents);
 
             WriteLoadedPublicTransportLaneVehicleStates(writer);
+            SaveLoadTraceService.ClearIfKind(SaveLoadTraceRequestKind.Save);
         }
 
         public void Deserialize<TReader>(TReader reader)
@@ -767,10 +789,12 @@ namespace Traffic_Law_Enforcement {
                 return;
             }
 
+            string fileModVersion = "unknown";
+            string fileGameVersion = "unknown";
             if (version >= 11)
             {
-                reader.Read(out string _);
-                reader.Read(out string _);
+                reader.Read(out fileModVersion);
+                reader.Read(out fileGameVersion);
             }
 
             EnforcementGameplaySettingsState gameplaySettings = ReadGameplaySettings(reader, version);
@@ -956,12 +980,20 @@ namespace Traffic_Law_Enforcement {
                     policyImpactEventsReadResult.ActualViolationEvents,
                     policyImpactEventsReadResult.AvoidedRerouteEvents));
 
-            Mod.log.Info(
-                "[ENFORCEMENT_SAVE_HOOK] hook=Deserialize, " +
-                $"fileVersion={version}, fineIncomeEvents={fineIncomeEvents.Count}, " +
-                $"reports={reports.Count}, pathRequests={policyImpactEventsReadResult.PathRequestEvents.Count}, " +
+            LogDeserializeLifecycleHook(
+                version,
+                fileModVersion,
+                fileGameVersion,
+                $"fineIncomeEvents={fineIncomeEvents.Count}, " +
+                $"reports={reports.Count}, " +
+                $"pathRequests={policyImpactEventsReadResult.PathRequestEvents.Count}, " +
                 $"actualViolations={policyImpactEventsReadResult.ActualViolationEvents.Count}, " +
                 $"avoidedReroutes={policyImpactEventsReadResult.AvoidedRerouteEvents.Count}");
+            Mod.Settings?.LogDebugLoggingSettingsSnapshot("Deserialize");
+            Mod.Settings?.LogEnforcementSettingsSnapshot(
+                "currentSave",
+                EnforcementGameplaySettingsService.Current,
+                "Deserialize");
 
             m_HasDeserializedData = true;
             m_ShouldClearLegacyRuntimeState = false;
@@ -1067,18 +1099,76 @@ namespace Traffic_Law_Enforcement {
         private static void LogSaveLifecycleHook(
             string hookName,
             Context context,
+            SaveLoadTraceRequestKind expectedRequestKind =
+                SaveLoadTraceRequestKind.None,
             string extra = null) {
             string suffix =
                 string.IsNullOrWhiteSpace(extra)
                     ? string.Empty
                     : $", {extra}";
+            string identitySuffix =
+                SaveLoadTraceService.FormatIdentitySuffix(expectedRequestKind);
 
             Mod.log.Info(
                 "[ENFORCEMENT_SAVE_HOOK] " +
                 $"hook={hookName}, purpose={context.purpose}, version={context.version}, " +
                 $"runtimeWorldGeneration={RuntimeWorldGeneration}, " +
                 $"timeInitialized={EnforcementGameTime.IsInitialized}, " +
-                $"monthTicks={EnforcementGameTime.CurrentTimestampMonthTicks}{suffix}");
+                $"monthTicks={EnforcementGameTime.CurrentTimestampMonthTicks}, " +
+                $"modVersion={GetCurrentModVersion()}, " +
+                $"gameVersion={GetCurrentGameVersion()}{identitySuffix}{suffix}");
+        }
+
+        private static void LogSerializeLifecycleHook() {
+            string identitySuffix =
+                SaveLoadTraceService.FormatIdentitySuffix(
+                    SaveLoadTraceRequestKind.Save);
+            Mod.log.Info(
+                "[ENFORCEMENT_SAVE_HOOK] " +
+                "hook=Serialize, " +
+                $"serializationVersion={kSerializationVersion}, " +
+                $"runtimeWorldGeneration={RuntimeWorldGeneration}, " +
+                $"timeInitialized={EnforcementGameTime.IsInitialized}, " +
+                $"monthTicks={EnforcementGameTime.CurrentTimestampMonthTicks}, " +
+                $"modVersion={GetCurrentModVersion()}, " +
+                $"gameVersion={GetCurrentGameVersion()}{identitySuffix}");
+        }
+
+        private static void LogDeserializeLifecycleHook(
+            int fileVersion,
+            string fileModVersion,
+            string fileGameVersion,
+            string extra = null) {
+            string suffix =
+                string.IsNullOrWhiteSpace(extra)
+                    ? string.Empty
+                    : $", {extra}";
+            string identitySuffix =
+                SaveLoadTraceService.FormatIdentitySuffix(
+                    SaveLoadTraceRequestKind.Load);
+            Mod.log.Info(
+                "[ENFORCEMENT_SAVE_HOOK] " +
+                "hook=Deserialize, " +
+                $"fileVersion={fileVersion}, " +
+                $"runtimeWorldGeneration={RuntimeWorldGeneration}, " +
+                $"timeInitialized={EnforcementGameTime.IsInitialized}, " +
+                $"monthTicks={EnforcementGameTime.CurrentTimestampMonthTicks}, " +
+                $"modVersion={GetCurrentModVersion()}, " +
+                $"gameVersion={GetCurrentGameVersion()}, " +
+                $"fileModVersion={NormalizeVersion(fileModVersion)}, " +
+                $"fileGameVersion={NormalizeVersion(fileGameVersion)}{identitySuffix}{suffix}");
+        }
+
+        private static string GetCurrentModVersion() {
+            return NormalizeVersion(Mod.CurrentModVersion);
+        }
+
+        private static string GetCurrentGameVersion() {
+            return NormalizeVersion(Mod.CurrentGameVersion);
+        }
+
+        private static string NormalizeVersion(string value) {
+            return string.IsNullOrWhiteSpace(value) ? "unknown" : value;
         }
 
         private static void ResetRuntimeState() {
