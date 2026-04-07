@@ -317,8 +317,8 @@ namespace Traffic_Law_Enforcement
             Mod.log.Info(
                 $"{DirectAccessHitLogPrefix} firstHit=true " +
                 $"reason={reasonCode} tag={tag} " +
-                $"sourceLane={RoutePenaltyInspection.FormatEntity(sourceLane)} " +
-                $"targetLane={RoutePenaltyInspection.FormatEntity(targetLane)}");
+                $"sourceLane={sourceLane} " +
+                $"targetLane={targetLane}");
         }
 
         private static void MaybeLogDirectOppositeFlowHit(
@@ -340,8 +340,9 @@ namespace Traffic_Law_Enforcement
             Mod.log.Info(
                 $"{DirectOppositeFlowHitLogPrefix} firstHit=true " +
                 $"reason={reasonCode} tag={tag} " +
-                $"sourceLane={RoutePenaltyInspection.FormatEntity(sourceLane)} " +
-                $"targetLane={RoutePenaltyInspection.FormatEntity(targetLane)}");
+                $"sourceLane={sourceLane} " +
+                $"targetLane={targetLane}");
         }
     }
 }
+

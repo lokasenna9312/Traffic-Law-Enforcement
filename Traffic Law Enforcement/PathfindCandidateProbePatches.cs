@@ -220,7 +220,7 @@ namespace Traffic_Law_Enforcement
                         : "none";
 
                 return
-                    $"{ordinal}) owner={FocusedLoggingService.FormatEntity(candidate.EdgeOwner)}, " +
+                    $"{ordinal}) owner={candidate.EdgeOwner}, " +
                     $"edgeId={candidate.EdgeId.m_Index}, nextEdgeId={nextEdge}, " +
                     $"methods={candidate.Methods}, access={candidate.AccessRequirement}, " +
                     $"flags={candidate.Flags}, rules={candidate.Rules}, " +
@@ -287,11 +287,11 @@ namespace Traffic_Law_Enforcement
             {
                 return
                     $"{IntersectionProbePrefix} " +
-                    $"veh={FocusedLoggingService.FormatEntity(vehicle)} " +
+                    $"veh={vehicle} " +
                     $"fromEdge={FromEdge.m_Index} " +
                     $"toEdge={ToEdge.m_Index} " +
-                    $"fromOwner={FocusedLoggingService.FormatEntity(FromOwner)} " +
-                    $"toOwner={FocusedLoggingService.FormatEntity(ToOwner)} " +
+                    $"fromOwner={FromOwner} " +
+                    $"toOwner={ToOwner} " +
                     $"fromCarLaneFlags={FormatCarLaneFlags(HasFromCarLane, FromCarLaneFlags)} " +
                     $"toCarLaneFlags={FormatCarLaneFlags(HasToCarLane, ToCarLaneFlags)} " +
                     $"sideConnection={SideConnection.ToString().ToLowerInvariant()} " +
@@ -1264,3 +1264,4 @@ namespace Traffic_Law_Enforcement
         }
     }
 }
+

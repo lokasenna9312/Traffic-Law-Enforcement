@@ -112,8 +112,8 @@ namespace Traffic_Law_Enforcement
                         {
                             string message =
                                 $"Mid-block crossing violation #{statistics.m_MidBlockCrossingViolationCount}: " +
-                                $"vehicle={FocusedLoggingService.FormatEntity(evt.Vehicle)}, " +
-                                $"lane={FocusedLoggingService.FormatEntity(evt.Lane)}, " +
+                                $"vehicle={evt.Vehicle}, " +
+                                $"lane={evt.Lane}, " +
                                 $"reason={reason}";
                             EnforcementLoggingPolicy.RecordEnforcementEvent(message, evt.Vehicle);
                         }
@@ -137,8 +137,8 @@ namespace Traffic_Law_Enforcement
                         {
                             string message =
                                 $"Intersection movement violation #{statistics.m_IntersectionMovementViolationCount}: " +
-                                $"vehicle={FocusedLoggingService.FormatEntity(evt.Vehicle)}, " +
-                                $"lane={FocusedLoggingService.FormatEntity(evt.Lane)}, " +
+                                $"vehicle={evt.Vehicle}, " +
+                                $"lane={evt.Lane}, " +
                                 $"actual={evt.ActualMovement}, allowed={evt.AllowedMovement}";
                             EnforcementLoggingPolicy.RecordEnforcementEvent(message, evt.Vehicle);
                         }
@@ -208,7 +208,7 @@ namespace Traffic_Law_Enforcement
 
             string message =
                 "[OPPFLOW_REALIZED_APPLY] " +
-                $"vehicle={FocusedLoggingService.FormatEntity(vehicle)} " +
+                $"vehicle={vehicle} " +
                 $"reason={reasonCode} " +
                 "applyHappened=true " +
                 $"midBlockViolationCount={violationCountBefore}->{violationCountAfter}";
@@ -233,7 +233,7 @@ namespace Traffic_Law_Enforcement
 
             string message =
                 "[ACCESS_REALIZED_APPLY] " +
-                $"vehicle={FocusedLoggingService.FormatEntity(vehicle)} " +
+                $"vehicle={vehicle} " +
                 $"reason={reasonCode} " +
                 "applyHappened=true " +
                 $"midBlockViolationCount={violationCountBefore}->{violationCountAfter}";
@@ -280,13 +280,13 @@ namespace Traffic_Law_Enforcement
 
             string message =
                 "[ACCESS_EGRESS_APPLY_RESULT] " +
-                $"vehicle={FocusedLoggingService.FormatEntity(evt.Vehicle)} " +
+                $"vehicle={evt.Vehicle} " +
                 $"branch={branch} " +
-                $"storedOriginLane={FocusedLoggingService.FormatEntity(evt.IllegalEgressOriginLane)} " +
-                $"previousLane={FocusedLoggingService.FormatEntity(evt.PreviousLane)} " +
-                $"currentLane={FocusedLoggingService.FormatEntity(evt.Lane)} " +
-                $"previousOwner={FocusedLoggingService.FormatEntity(evt.PreviousOwner)} " +
-                $"currentOwner={FocusedLoggingService.FormatEntity(evt.CurrentOwner)} " +
+                $"storedOriginLane={evt.IllegalEgressOriginLane} " +
+                $"previousLane={evt.PreviousLane} " +
+                $"currentLane={evt.Lane} " +
+                $"previousOwner={evt.PreviousOwner} " +
+                $"currentOwner={evt.CurrentOwner} " +
                 "candidateFormed=True " +
                 "legalityEvaluated=True " +
                 "legalityResult=Illegal " +
@@ -314,3 +314,4 @@ namespace Traffic_Law_Enforcement
         }
     }
 }
+

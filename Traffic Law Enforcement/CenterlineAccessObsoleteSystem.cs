@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using Game;
 using Game.Common;
 using Game.Net;
@@ -239,17 +239,17 @@ namespace Traffic_Law_Enforcement
                 if (repeatCount >= 3 && shouldLogVehicleSpecificEnforcementEvents)
                 {
                     Mod.log.Info(
-                        $"Repeated identical CENTERLINE invalidation: vehicle={FocusedLoggingService.FormatEntity(vehicle)}, role={role}, repeatCount={repeatCount}, " +
-                        $"reason={reason}, currentLane={FocusedLoggingService.FormatEntity(currentLane.m_Lane)}, " +
-                        $"sourceLane={FocusedLoggingService.FormatEntity(sourceLane)}, targetLane={FocusedLoggingService.FormatEntity(targetLane)}, " +
+                        $"Repeated identical CENTERLINE invalidation: vehicle={vehicle}, role={role}, repeatCount={repeatCount}, " +
+                        $"reason={reason}, currentLane={currentLane.m_Lane}, " +
+                        $"sourceLane={sourceLane}, targetLane={targetLane}, " +
                         $"transitionIndex={transitionIndex}, transitionKind={transitionKind}, transitionFamily={transitionFamily}");
                 }
 
                 if (shouldLogPathObsoleteSources)
                 {
                     string extra =
-                        $"sourceLane={FocusedLoggingService.FormatEntity(sourceLane)}, " +
-                        $"targetLane={FocusedLoggingService.FormatEntity(targetLane)}, transitionIndex={transitionIndex}, " +
+                        $"sourceLane={sourceLane}, " +
+                        $"targetLane={targetLane}, transitionIndex={transitionIndex}, " +
                         $"transitionKind={transitionKind}, transitionFamily={transitionFamily}, repeatCount={repeatCount}, " +
                         $"laneShapeCurrent={DescribeLaneShape(currentLane.m_Lane)}, " +
                         $"laneShapeSource={DescribeLaneShape(sourceLane)}, " +
@@ -273,9 +273,9 @@ namespace Traffic_Law_Enforcement
                 {
                     Mod.log.Info(
                         $"Planned center-line access route invalidated: " +
-                        $"vehicle={FocusedLoggingService.FormatEntity(vehicle)}, " +
-                        $"fromLane={FocusedLoggingService.FormatEntity(sourceLane)}, " +
-                        $"toLane={FocusedLoggingService.FormatEntity(targetLane)}, " +
+                        $"vehicle={vehicle}, " +
+                        $"fromLane={sourceLane}, " +
+                        $"toLane={targetLane}, " +
                         $"accessIndex={transitionIndex}, transition={transitionKind}, reason={reason}");
                     LogStructureSample(currentLane.m_Lane, sourceLane, targetLane, transitionKind);
                 }
@@ -837,3 +837,4 @@ namespace Traffic_Law_Enforcement
         }
     }
 }
+

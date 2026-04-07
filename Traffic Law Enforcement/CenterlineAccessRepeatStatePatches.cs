@@ -30,10 +30,11 @@ namespace Traffic_Law_Enforcement
                 {
                     Mod.log.Info(
                         $"Reset CENTERLINE repeat invalidation state after path refresh: " +
-                        $"vehicle={FocusedLoggingService.FormatEntity(vehicle)}, " +
+                        $"vehicle={vehicle}, " +
                         $"pathState={pathOwner.m_State}");
                 }
             }
         }
     }
 }
+

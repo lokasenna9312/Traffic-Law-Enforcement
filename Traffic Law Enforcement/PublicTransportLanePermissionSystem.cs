@@ -525,7 +525,7 @@ namespace Traffic_Law_Enforcement
                             out PathFlags stateAfter))
                     {
                         string extra = shouldLogPathObsoleteTrace
-                            ? $"currentLane={FocusedLoggingService.FormatEntity(currentLaneEntity)}, originalMask={originalMask}, engineUseFlag={(car.m_Flags & CarFlags.UsePublicTransportLanes) != 0}, canUsePublicTransportLane={canUsePublicTransportLane}"
+                            ? $"currentLane={currentLaneEntity}, originalMask={originalMask}, engineUseFlag={(car.m_Flags & CarFlags.UsePublicTransportLanes) != 0}, canUsePublicTransportLane={canUsePublicTransportLane}"
                             : null;
                         RecordPermissionPathObsolete(
                             vehicle,
@@ -564,7 +564,7 @@ namespace Traffic_Law_Enforcement
                             out PathFlags stateAfter))
                     {
                         string extra = shouldLogPathObsoleteTrace
-                            ? $"currentLane={FocusedLoggingService.FormatEntity(currentLaneEntity)}, graceGrantedLane={FocusedLoggingService.FormatEntity(pendingExit.m_LaneWhenGraceGranted)}, originalMask={originalMask}, engineUseFlag={(car.m_Flags & CarFlags.UsePublicTransportLanes) != 0}, canUsePublicTransportLane={canUsePublicTransportLane}"
+                            ? $"currentLane={currentLaneEntity}, graceGrantedLane={pendingExit.m_LaneWhenGraceGranted}, originalMask={originalMask}, engineUseFlag={(car.m_Flags & CarFlags.UsePublicTransportLanes) != 0}, canUsePublicTransportLane={canUsePublicTransportLane}"
                             : null;
                         RecordPermissionPathObsolete(
                             vehicle,
@@ -840,3 +840,4 @@ namespace Traffic_Law_Enforcement
         }
     }
 }
+

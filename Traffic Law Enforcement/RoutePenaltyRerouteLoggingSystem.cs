@@ -2349,7 +2349,7 @@ namespace Traffic_Law_Enforcement
         {
             return entity == Entity.Null
                 ? "none"
-                : RoutePenaltyInspection.FormatEntity(entity);
+                : entity.ToString();
         }
 
         private static string FormatRuleFlags(RuleFlags flags)

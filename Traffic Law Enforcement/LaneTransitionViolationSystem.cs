@@ -246,12 +246,12 @@ namespace Traffic_Law_Enforcement
             {
                 EnforcementLoggingPolicy.RecordEnforcementEvent(
                     "[NON_PARKING_BUILDING_INGRESS_LATE_SEAM_PROBE] " +
-                    $"vehicle={FocusedLoggingService.FormatEntity(vehicle)} " +
+                    $"vehicle={vehicle} " +
                     $"isDeliveryTruck={m_DeliveryTruckData.HasComponent(vehicle)} " +
-                    $"previousLane={FocusedLoggingService.FormatEntity(history.m_PreviousLane)} " +
-                    $"currentLane={FocusedLoggingService.FormatEntity(history.m_CurrentLane)} " +
-                    $"previousOwner={FocusedLoggingService.FormatEntity(history.m_PreviousLaneOwner)} " +
-                    $"currentOwner={FocusedLoggingService.FormatEntity(history.m_CurrentLaneOwner)} " +
+                    $"previousLane={history.m_PreviousLane} " +
+                    $"currentLane={history.m_CurrentLane} " +
+                    $"previousOwner={history.m_PreviousLaneOwner} " +
+                    $"currentOwner={history.m_CurrentLaneOwner} " +
                     $"ownerChanged={ownerChanged} " +
                     $"previousLaneKind={DescribeLaneKind(history.m_PreviousLane)} " +
                     $"currentLaneKind={DescribeLaneKind(history.m_CurrentLane)} " +
@@ -278,12 +278,12 @@ namespace Traffic_Law_Enforcement
 
             EnforcementLoggingPolicy.RecordEnforcementEvent(
                 "[NON_PARKING_BUILDING_INGRESS_TARGET_PROBE] " +
-                $"vehicle={FocusedLoggingService.FormatEntity(vehicle)} " +
+                $"vehicle={vehicle} " +
                 $"isDeliveryTruck={m_DeliveryTruckData.HasComponent(vehicle)} " +
-                $"previousLane={FocusedLoggingService.FormatEntity(history.m_PreviousLane)} " +
-                $"currentLane={FocusedLoggingService.FormatEntity(history.m_CurrentLane)} " +
-                $"previousOwner={FocusedLoggingService.FormatEntity(history.m_PreviousLaneOwner)} " +
-                $"currentOwner={FocusedLoggingService.FormatEntity(history.m_CurrentLaneOwner)} " +
+                $"previousLane={history.m_PreviousLane} " +
+                $"currentLane={history.m_CurrentLane} " +
+                $"previousOwner={history.m_PreviousLaneOwner} " +
+                $"currentOwner={history.m_CurrentLaneOwner} " +
                 $"previousLaneKind={DescribeLaneKind(history.m_PreviousLane)} " +
                 $"currentLaneKind={DescribeLaneKind(history.m_CurrentLane)} " +
                 $"previousConnectionFlags={FormatConnectionLaneFlags(history.m_PreviousLane)} " +
@@ -445,9 +445,9 @@ namespace Traffic_Law_Enforcement
                     : "(no ConnectionLane)";
 
                 Mod.log.Info(
-                    $"Intersection transition candidate: vehicle={FocusedLoggingService.FormatEntity(vehicle)}, " +
-                    $"fromLane={FocusedLoggingService.FormatEntity(history.m_PreviousLane)}, " +
-                    $"toLane={FocusedLoggingService.FormatEntity(history.m_CurrentLane)}, " +
+                    $"Intersection transition candidate: vehicle={vehicle}, " +
+                    $"fromLane={history.m_PreviousLane}, " +
+                    $"toLane={history.m_CurrentLane}, " +
                     $"illegal={hasIntersectionViolation}, actual={actualMovement}, allowed={allowedMovement}, " +
                     $"previousFlags={previousFlagsText}, currentFlags={currentFlagsText}, connectionFlags={connectionFlagsText}");
             }
@@ -496,11 +496,11 @@ namespace Traffic_Law_Enforcement
 
             string message =
                 "[OPPFLOW_REALIZED_NEARMISS] " +
-                $"vehicle={FocusedLoggingService.FormatEntity(vehicle)} " +
-                $"previousLane={FocusedLoggingService.FormatEntity(history.m_PreviousLane)} " +
-                $"currentLane={FocusedLoggingService.FormatEntity(history.m_CurrentLane)} " +
-                $"previousOwner={FocusedLoggingService.FormatEntity(history.m_PreviousLaneOwner)} " +
-                $"currentOwner={FocusedLoggingService.FormatEntity(history.m_CurrentLaneOwner)} " +
+                $"vehicle={vehicle} " +
+                $"previousLane={history.m_PreviousLane} " +
+                $"currentLane={history.m_CurrentLane} " +
+                $"previousOwner={history.m_PreviousLaneOwner} " +
+                $"currentOwner={history.m_CurrentLaneOwner} " +
                 $"previousCarriagewayGroup={previousCarriagewayGroup} " +
                 $"currentCarriagewayGroup={currentCarriagewayGroup} " +
                 $"previousDirectionSign={previousDirectionSign} " +
@@ -527,12 +527,12 @@ namespace Traffic_Law_Enforcement
 
             string message =
                 "[ACCESS_REALIZED_DETECTED] " +
-                $"vehicle={FocusedLoggingService.FormatEntity(vehicle)} " +
+                $"vehicle={vehicle} " +
                 $"reason={reasonCode} " +
-                $"previousLane={FocusedLoggingService.FormatEntity(history.m_PreviousLane)} " +
-                $"currentLane={FocusedLoggingService.FormatEntity(history.m_CurrentLane)} " +
-                $"previousOwner={FocusedLoggingService.FormatEntity(history.m_PreviousLaneOwner)} " +
-                $"currentOwner={FocusedLoggingService.FormatEntity(history.m_CurrentLaneOwner)} " +
+                $"previousLane={history.m_PreviousLane} " +
+                $"currentLane={history.m_CurrentLane} " +
+                $"previousOwner={history.m_PreviousLaneOwner} " +
+                $"currentOwner={history.m_CurrentLaneOwner} " +
                 $"previousLaneKind={DescribeLaneKind(history.m_PreviousLane)} " +
                 $"currentLaneKind={DescribeLaneKind(history.m_CurrentLane)}";
 
@@ -586,12 +586,12 @@ namespace Traffic_Law_Enforcement
                 {
                     EnforcementLoggingPolicy.RecordEnforcementEvent(
                         "[NON_PARKING_BUILDING_EGRESS_LATE_SEAM_PROBE] " +
-                        $"vehicle={FocusedLoggingService.FormatEntity(vehicle)} " +
+                        $"vehicle={vehicle} " +
                         $"isDeliveryTruck={m_DeliveryTruckData.HasComponent(vehicle)} " +
-                        $"previousLane={FocusedLoggingService.FormatEntity(history.m_PreviousLane)} " +
-                        $"currentLane={FocusedLoggingService.FormatEntity(history.m_CurrentLane)} " +
-                        $"previousOwner={FocusedLoggingService.FormatEntity(history.m_PreviousLaneOwner)} " +
-                        $"currentOwner={FocusedLoggingService.FormatEntity(history.m_CurrentLaneOwner)} " +
+                        $"previousLane={history.m_PreviousLane} " +
+                        $"currentLane={history.m_CurrentLane} " +
+                        $"previousOwner={history.m_PreviousLaneOwner} " +
+                        $"currentOwner={history.m_CurrentLaneOwner} " +
                         $"ownerChanged={ownerChanged} " +
                         $"previousLaneKind={DescribeLaneKind(history.m_PreviousLane)} " +
                         $"currentLaneKind={DescribeLaneKind(history.m_CurrentLane)} " +
@@ -611,10 +611,10 @@ namespace Traffic_Law_Enforcement
                 {
                     string nonParkingSourceProbeMessage =
                         "[NON_PARKING_BUILDING_EGRESS_SOURCE_PROBE] " +
-                        $"vehicle={FocusedLoggingService.FormatEntity(vehicle)} " +
+                        $"vehicle={vehicle} " +
                         $"isDeliveryTruck={m_DeliveryTruckData.HasComponent(vehicle)} " +
-                        $"previousLane={FocusedLoggingService.FormatEntity(history.m_PreviousLane)} " +
-                        $"currentLane={FocusedLoggingService.FormatEntity(history.m_CurrentLane)} " +
+                        $"previousLane={history.m_PreviousLane} " +
+                        $"currentLane={history.m_CurrentLane} " +
                         $"previousLaneKind={DescribeLaneKind(history.m_PreviousLane)} " +
                         $"currentLaneKind={DescribeLaneKind(history.m_CurrentLane)} " +
                         $"previousConnectionFlags={FormatConnectionLaneFlags(history.m_PreviousLane)} " +
@@ -631,9 +631,9 @@ namespace Traffic_Law_Enforcement
             {
                 string deliveryTruckMessage =
                     "[TRUCK_EGRESS_DIRECT_TRACE] " +
-                    $"vehicle={FocusedLoggingService.FormatEntity(vehicle)} " +
-                    $"previousLane={FocusedLoggingService.FormatEntity(history.m_PreviousLane)} " +
-                    $"currentLane={FocusedLoggingService.FormatEntity(history.m_CurrentLane)} " +
+                    $"vehicle={vehicle} " +
+                    $"previousLane={history.m_PreviousLane} " +
+                    $"currentLane={history.m_CurrentLane} " +
                     $"previousLaneKind={DescribeLaneKind(history.m_PreviousLane)} " +
                     $"currentLaneKind={DescribeLaneKind(history.m_CurrentLane)} " +
                     $"previousConnectionFlags={FormatConnectionLaneFlags(history.m_PreviousLane)} " +
@@ -659,15 +659,15 @@ namespace Traffic_Law_Enforcement
                 return;
             }
 
-            string vehicleText = FocusedLoggingService.FormatEntity(vehicle);
+            string vehicleText = vehicle.ToString();
             string accessTraceMessage =
                 "[ACCESS_EGRESS_REALIZED_TRACE] " +
                 $"vehicle={vehicleText} " +
                 $"vehicleId={vehicleText} " +
-                $"previousLane={FocusedLoggingService.FormatEntity(history.m_PreviousLane)} " +
-                $"currentLane={FocusedLoggingService.FormatEntity(history.m_CurrentLane)} " +
-                $"previousOwner={FocusedLoggingService.FormatEntity(history.m_PreviousLaneOwner)} " +
-                $"currentOwner={FocusedLoggingService.FormatEntity(history.m_CurrentLaneOwner)} " +
+                $"previousLane={history.m_PreviousLane} " +
+                $"currentLane={history.m_CurrentLane} " +
+                $"previousOwner={history.m_PreviousLaneOwner} " +
+                $"currentOwner={history.m_CurrentLaneOwner} " +
                 $"previousLaneKind={DescribeLaneKind(history.m_PreviousLane)} " +
                 $"currentLaneKind={DescribeLaneKind(history.m_CurrentLane)} " +
                 $"previousIsAccessOrigin={previousIsAccessOrigin} " +
@@ -722,9 +722,9 @@ namespace Traffic_Law_Enforcement
 
             string message =
                 "[ORDINARY_CAR_ACCESS_LATE_SEMANTIC_PROBE] " +
-                $"vehicle={FocusedLoggingService.FormatEntity(vehicle)} " +
+                $"vehicle={vehicle} " +
                 $"seamKind={seamKind} " +
-                $"target={FocusedLoggingService.FormatEntity(targetEntity)} " +
+                $"target={targetEntity} " +
                 $"transporting={transporting} " +
                 $"boarding={boarding} " +
                 $"disembarking={disembarking} " +
@@ -844,13 +844,13 @@ namespace Traffic_Law_Enforcement
 
             StringBuilder message = new StringBuilder(512);
             message.Append("[NON_PARKING_SERVICE_ACCESS_LATE_SEMANTIC_PROBE] ");
-            message.Append($"vehicle={FocusedLoggingService.FormatEntity(vehicle)} ");
+            message.Append($"vehicle={vehicle} ");
             message.Append($"seamKind={seamKind} ");
-            message.Append($"target={FocusedLoggingService.FormatEntity(targetEntity)} ");
-            message.Append($"owner={FocusedLoggingService.FormatEntity(ownerEntity)} ");
+            message.Append($"target={targetEntity} ");
+            message.Append($"owner={ownerEntity} ");
             message.Append($"hasPathInformation={hasPathInformation} ");
-            message.Append($"pathOrigin={FocusedLoggingService.FormatEntity(pathOrigin)} ");
-            message.Append($"pathDestination={FocusedLoggingService.FormatEntity(pathDestination)} ");
+            message.Append($"pathOrigin={pathOrigin} ");
+            message.Append($"pathDestination={pathDestination} ");
             message.Append($"hasServiceDispatch={hasServiceDispatch} ");
             message.Append($"serviceDispatchCount={serviceDispatchCount}");
 
@@ -981,12 +981,12 @@ namespace Traffic_Law_Enforcement
 
             string message =
                 "[OPPFLOW_REALIZED_DETECTED] " +
-                $"vehicle={FocusedLoggingService.FormatEntity(vehicle)} " +
+                $"vehicle={vehicle} " +
                 $"reason={reasonCode} " +
-                $"previousLane={FocusedLoggingService.FormatEntity(history.m_PreviousLane)} " +
-                $"currentLane={FocusedLoggingService.FormatEntity(history.m_CurrentLane)} " +
-                $"previousOwner={FocusedLoggingService.FormatEntity(history.m_PreviousLaneOwner)} " +
-                $"currentOwner={FocusedLoggingService.FormatEntity(history.m_CurrentLaneOwner)} " +
+                $"previousLane={history.m_PreviousLane} " +
+                $"currentLane={history.m_CurrentLane} " +
+                $"previousOwner={history.m_PreviousLaneOwner} " +
+                $"currentOwner={history.m_CurrentLaneOwner} " +
                 $"previousCarriagewayGroup={previousCarriagewayGroup} " +
                 $"currentCarriagewayGroup={currentCarriagewayGroup} " +
                 $"previousDirectionSign={previousDirectionSign} " +
@@ -1474,3 +1474,4 @@ namespace Traffic_Law_Enforcement
         }
     }
 }
+

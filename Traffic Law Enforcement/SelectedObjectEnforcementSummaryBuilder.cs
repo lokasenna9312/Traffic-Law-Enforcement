@@ -556,7 +556,7 @@ namespace Traffic_Law_Enforcement
 
             string message =
                 "[ACCESS_EGRESS_APPLY_MARKER_READ] " +
-                $"vehicle={FocusedLoggingService.FormatEntity(vehicle)} " +
+                $"vehicle={vehicle} " +
                 $"markerPresent={illegalEgressMarker.MarkerPresent} " +
                 $"mode={(illegalEgressMarker.MarkerPresent ? record.LastAppliedIllegalEgressMode : IllegalEgressApplyMode.None)} " +
                 $"timestampMonthTicks={(illegalEgressMarker.MarkerPresent ? record.LastAppliedIllegalEgressTimestampMonthTicks : 0L)} " +
@@ -567,3 +567,4 @@ namespace Traffic_Law_Enforcement
         }
     }
 }
+
