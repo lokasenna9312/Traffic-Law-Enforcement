@@ -100,6 +100,7 @@ namespace Traffic_Law_Enforcement
         private ValueBinding<string> m_RoleBinding;
         private ValueBinding<string> m_PublicTransportLanePolicyBinding;
         private ValueBinding<string> m_FocusLogStatusBinding;
+        private ValueBinding<bool> m_FocusLogToggleEnabledBinding;
         private ValueBinding<string> m_VehicleIndexBinding;
         private ValueBinding<string> m_ViolationPendingBinding;
         private ValueBinding<string> m_TotalsBinding;
@@ -246,6 +247,7 @@ namespace Traffic_Law_Enforcement
             public string Role;
             public string PublicTransportLanePolicy;
             public string FocusLogStatus;
+            public bool FocusLogToggleEnabled;
             public string VehicleIndex;
             public string ViolationPending;
             public string Totals;
@@ -274,6 +276,15 @@ namespace Traffic_Law_Enforcement
             public string ConnectedStop;
         }
 
+        private struct FocusLogInteractionState
+        {
+            public string StatusText;
+            public bool ToggleEnabled;
+            public Entity Vehicle;
+            public bool CanWatch;
+            public bool CanUnwatch;
+        }
+
         protected override void OnCreate()
         {
             base.OnCreate();
@@ -296,6 +307,7 @@ namespace Traffic_Law_Enforcement
             AddBinding(m_RoleBinding = new ValueBinding<string>(kGroup, "role", string.Empty));
             AddBinding(m_PublicTransportLanePolicyBinding = new ValueBinding<string>(kGroup, "publicTransportLanePolicy", string.Empty));
             AddBinding(m_FocusLogStatusBinding = new ValueBinding<string>(kGroup, "focusLogStatus", string.Empty));
+            AddBinding(m_FocusLogToggleEnabledBinding = new ValueBinding<bool>(kGroup, "focusLogToggleEnabled", false));
             AddBinding(m_VehicleIndexBinding = new ValueBinding<string>(kGroup, "vehicleIndex", string.Empty));
             AddBinding(m_ViolationPendingBinding = new ValueBinding<string>(kGroup, "violationPending", string.Empty));
             AddBinding(m_TotalsBinding = new ValueBinding<string>(kGroup, "totals", string.Empty));
@@ -359,6 +371,7 @@ namespace Traffic_Law_Enforcement
             AddBinding(new TriggerBinding(kGroup, "toggleLaneDetailsCollapsed", ToggleLaneDetailsCollapsed));
             AddBinding(new TriggerBinding(kGroup, "toggleRouteDiagnosticsCollapsed", ToggleRouteDiagnosticsCollapsed));
             AddBinding(new TriggerBinding<string>(kGroup, "submitEntitySelection", HandleSubmitEntitySelection));
+            AddBinding(new TriggerBinding(kGroup, "toggleFocusLogWatch", HandleToggleFocusLogWatchRequested));
             AddBinding(new TriggerBinding(kGroup, "markSelectedVehiclePathObsolete", HandleMarkSelectedVehiclePathObsolete));
         }
 
@@ -564,6 +577,8 @@ namespace Traffic_Law_Enforcement
             bool routeDiagnosticsContentReady =
                 routeDiagnosticsExpanded &&
                 routeDiagnosticsReady;
+            FocusLogInteractionState focusLogState =
+                BuildFocusLogInteractionState(snapshot);
             string pausedRouteDiagnosticsPlaceholder =
                 simulationPaused &&
                 routeDiagnosticsExpanded &&
@@ -585,7 +600,8 @@ namespace Traffic_Law_Enforcement
                 PublicTransportLanePolicy = summaryContentReady
                     ? NormalizeText(summarySnapshot.PublicTransportLanePolicyText)
                     : string.Empty,
-                FocusLogStatus = BuildFocusLogStatusText(snapshot),
+                FocusLogStatus = focusLogState.StatusText,
+                FocusLogToggleEnabled = focusLogState.ToggleEnabled,
                 VehicleIndex = BuildDisplayedVehicleEntityText(snapshot),
                 ViolationPending = tleReady && summaryContentReady
                     ? BuildActiveFlagsText(summarySnapshot)
@@ -662,6 +678,7 @@ namespace Traffic_Law_Enforcement
             m_RoleBinding.Update(state.Role ?? string.Empty);
             m_PublicTransportLanePolicyBinding.Update(state.PublicTransportLanePolicy ?? string.Empty);
             m_FocusLogStatusBinding.Update(state.FocusLogStatus ?? string.Empty);
+            m_FocusLogToggleEnabledBinding.Update(state.FocusLogToggleEnabled);
             m_VehicleIndexBinding.Update(state.VehicleIndex ?? string.Empty);
             m_ViolationPendingBinding.Update(state.ViolationPending ?? string.Empty);
             m_TotalsBinding.Update(state.Totals ?? string.Empty);
@@ -856,6 +873,8 @@ namespace Traffic_Law_Enforcement
             bool routeDiagnosticsRelevant =
                 routeDiagnosticsVisible &&
                 !m_IsRouteDiagnosticsCollapsed;
+            FocusLogInteractionState focusLogState =
+                BuildFocusLogInteractionState(snapshot);
             bool routeDiagnosticsStateMatches =
                 !routeDiagnosticsRelevant ||
                 (!routeDiagnosticsReady && !m_LastPanelRouteDiagnosticsReady) ||
@@ -876,7 +895,8 @@ namespace Traffic_Law_Enforcement
                 snapshot.ResolvedVehicleEntity == m_LastPanelSnapshot.ResolvedVehicleEntity &&
                 snapshot.VehicleKind == m_LastPanelSnapshot.VehicleKind &&
                 snapshot.RoleText == m_LastPanelSnapshot.RoleText &&
-                BuildFocusLogStatusText(snapshot) == (m_LastPanelState.FocusLogStatus ?? string.Empty) &&
+                focusLogState.StatusText == (m_LastPanelState.FocusLogStatus ?? string.Empty) &&
+                focusLogState.ToggleEnabled == m_LastPanelState.FocusLogToggleEnabled &&
                 suggestedEntitySelectionValue == m_LastPanelSuggestedEntitySelectionValue &&
                 m_EntitySelectionStatus == m_LastPanelEntitySelectionStatus &&
                 m_EntitySelectionStatusIsError == m_LastPanelEntitySelectionStatusIsError &&
@@ -1056,6 +1076,33 @@ namespace Traffic_Law_Enforcement
 
             m_SelectedInfoSystem.SetSelection(entity);
             SetEntitySelectionSuccessStatus(entity);
+        }
+
+        private void HandleToggleFocusLogWatchRequested()
+        {
+            if (m_SelectedObjectBridgeSystem == null || !m_SelectedObjectBridgeSystem.HasSnapshot)
+            {
+                return;
+            }
+
+            SelectedObjectDebugSnapshot snapshot = m_SelectedObjectBridgeSystem.CurrentSnapshot;
+            FocusLogInteractionState focusLogState =
+                BuildFocusLogInteractionState(snapshot);
+
+            if (focusLogState.CanWatch)
+            {
+                FocusedLoggingService.AddWatchedVehicle(focusLogState.Vehicle);
+            }
+            else if (focusLogState.CanUnwatch)
+            {
+                FocusedLoggingService.RemoveWatchedVehicle(focusLogState.Vehicle);
+            }
+            else
+            {
+                return;
+            }
+
+            RefreshFocusLogBindingIfNeeded(snapshot);
         }
 
         private void HandleMarkSelectedVehiclePathObsolete()
@@ -1780,23 +1827,52 @@ namespace Traffic_Law_Enforcement
             return EntityReferenceUtility.TryParse(NormalizeText(input), out entity);
         }
 
-        private string BuildFocusLogStatusText(SelectedObjectDebugSnapshot snapshot)
+        private FocusLogInteractionState BuildFocusLogInteractionState(
+            SelectedObjectDebugSnapshot snapshot)
         {
             if (snapshot.ResolveState == SelectedObjectResolveState.None ||
                 snapshot.ResolveState == SelectedObjectResolveState.NotVehicle)
             {
-                return string.Empty;
+                return default;
             }
 
-            if (snapshot.TleApplicability != SelectedObjectTleApplicability.ApplicableReady ||
-                snapshot.ResolvedVehicleEntity == Entity.Null)
+            FocusedLoggingSelectionState selectionState =
+                FocusedLoggingSelectionPolicy.Build(snapshot);
+            if (!selectionState.HasSelectedRoadVehicle ||
+                selectionState.Vehicle == Entity.Null)
             {
-                return m_NotApplicableText;
+                return new FocusLogInteractionState
+                {
+                    StatusText = m_NotApplicableText,
+                };
             }
 
-            return FocusedLoggingService.IsWatched(snapshot.ResolvedVehicleEntity)
-                ? m_FocusLogWatchedText
-                : m_FocusLogNotWatchedText;
+            if (selectionState.CanUnwatch)
+            {
+                return new FocusLogInteractionState
+                {
+                    StatusText = m_FocusLogWatchedText,
+                    ToggleEnabled = true,
+                    Vehicle = selectionState.Vehicle,
+                    CanUnwatch = true,
+                };
+            }
+
+            if (selectionState.CanWatch)
+            {
+                return new FocusLogInteractionState
+                {
+                    StatusText = m_FocusLogNotWatchedText,
+                    ToggleEnabled = true,
+                    Vehicle = selectionState.Vehicle,
+                    CanWatch = true,
+                };
+            }
+
+            return new FocusLogInteractionState
+            {
+                StatusText = m_NotApplicableText,
+            };
         }
 
         private void RefreshFocusLogBindingIfNeeded(SelectedObjectDebugSnapshot snapshot)
@@ -1806,15 +1882,21 @@ namespace Traffic_Law_Enforcement
                 return;
             }
 
-            string focusLogStatusText = BuildFocusLogStatusText(snapshot);
+            FocusLogInteractionState focusLogState =
+                BuildFocusLogInteractionState(snapshot);
+            string focusLogStatusText = focusLogState.StatusText ?? string.Empty;
             string cachedFocusLogStatusText = m_LastPanelState.FocusLogStatus ?? string.Empty;
-            if (focusLogStatusText == cachedFocusLogStatusText)
+            bool focusLogToggleEnabled = focusLogState.ToggleEnabled;
+            if (focusLogStatusText == cachedFocusLogStatusText &&
+                focusLogToggleEnabled == m_LastPanelState.FocusLogToggleEnabled)
             {
                 return;
             }
 
             m_FocusLogStatusBinding.Update(focusLogStatusText);
+            m_FocusLogToggleEnabledBinding.Update(focusLogToggleEnabled);
             m_LastPanelState.FocusLogStatus = focusLogStatusText;
+            m_LastPanelState.FocusLogToggleEnabled = focusLogToggleEnabled;
         }
 
         private void SetEntitySelectionStatus(string text, bool isError)

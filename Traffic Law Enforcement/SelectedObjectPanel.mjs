@@ -24,6 +24,7 @@ const tleStatusBinding = api.bindValue(group, "tleStatus", "");
 const roleBinding = api.bindValue(group, "role", "");
 const publicTransportLanePolicyBinding = api.bindValue(group, "publicTransportLanePolicy", "");
 const focusLogStatusBinding = api.bindValue(group, "focusLogStatus", "");
+const focusLogToggleEnabledBinding = api.bindValue(group, "focusLogToggleEnabled", false);
 const vehicleIndexBinding = api.bindValue(group, "vehicleIndex", "");
 const violationPendingBinding = api.bindValue(group, "violationPending", "");
 const totalsBinding = api.bindValue(group, "totals", "");
@@ -223,6 +224,18 @@ const styles = {
         lineHeight: 1.35,
         whiteSpace: "pre-line",
         wordBreak: "break-word",
+    },
+    valueActionButton: {
+        padding: "0",
+        margin: "0",
+        border: "0",
+        background: "transparent",
+        color: "#8fd7ff",
+        fontSize: "14px",
+        lineHeight: 1.35,
+        fontWeight: 700,
+        textAlign: "left",
+        cursor: "pointer",
     },
     valueMultiline: {
         display: "flex",
@@ -455,6 +468,37 @@ function CurrentRouteRow(props) {
     );
 }
 
+function FocusLogRow(props) {
+    if (!props.value) {
+        return null;
+    }
+
+    return h(
+        "div",
+        { style: styles.row },
+        h("div", { style: styles.label }, props.label),
+        h(
+            "div",
+            { style: styles.value },
+            props.toggleEnabled
+                ? h(
+                      "button",
+                      {
+                          type: "button",
+                          style: styles.valueActionButton,
+                          onMouseDown: stopEvent,
+                          onClick: function (event) {
+                              stopEvent(event);
+                              props.onToggle();
+                          },
+                      },
+                      props.value
+                  )
+                : props.value
+        )
+    );
+}
+
 function FoldoutRow(props) {
     return h(
         "div",
@@ -483,6 +527,7 @@ function SelectedObjectPanel() {
     const role = api.useValue(roleBinding);
     const publicTransportLanePolicy = api.useValue(publicTransportLanePolicyBinding);
     const focusLogStatus = api.useValue(focusLogStatusBinding);
+    const focusLogToggleEnabled = api.useValue(focusLogToggleEnabledBinding);
     const vehicleIndex = api.useValue(vehicleIndexBinding);
     const violationPending = api.useValue(violationPendingBinding);
     const totals = api.useValue(totalsBinding);
@@ -576,6 +621,10 @@ function SelectedObjectPanel() {
     const onMarkSelectedVehiclePathObsolete = React.useCallback(function (event) {
         stopEvent(event);
         api.trigger(group, "markSelectedVehiclePathObsolete");
+    }, []);
+
+    const onToggleFocusLogWatch = React.useCallback(function () {
+        api.trigger(group, "toggleFocusLogWatch");
     }, []);
 
     if (!visible) {
@@ -717,7 +766,12 @@ function SelectedObjectPanel() {
                             "div",
                             { style: styles.rows, key: "rows" },
                             h(Row, { label: tleStatusLabelText, value: tleStatus }),
-                            h(Row, { label: focusLogStatusLabelText, value: focusLogStatus })
+                            h(FocusLogRow, {
+                                label: focusLogStatusLabelText,
+                                value: focusLogStatus,
+                                toggleEnabled: focusLogToggleEnabled,
+                                onToggle: onToggleFocusLogWatch,
+                            })
                         ),
                     ],
               ]
@@ -741,7 +795,12 @@ function SelectedObjectPanel() {
                       { style: styles.rows },
                       h(Row, { label: tleStatusLabelText, value: tleStatus }),
                       h(Row, { label: roleLabelText, value: role }),
-                      h(Row, { label: focusLogStatusLabelText, value: focusLogStatus }),
+                      h(FocusLogRow, {
+                          label: focusLogStatusLabelText,
+                          value: focusLogStatus,
+                          toggleEnabled: focusLogToggleEnabled,
+                          onToggle: onToggleFocusLogWatch,
+                      }),
                       h(Row, { label: activeFlagsLabelText, value: violationPending }),
                       h(Row, { label: violationsFinesLabelText, value: totals }),
                       h(Row, { label: lastReasonLabelText, value: lastReason }),
