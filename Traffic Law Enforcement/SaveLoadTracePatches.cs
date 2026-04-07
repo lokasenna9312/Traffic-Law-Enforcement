@@ -150,10 +150,20 @@ namespace Traffic_Law_Enforcement
             string name,
             SaveInfo saveInfo)
         {
-            SaveLoadTraceService.CaptureFromSaveInfo(
-                saveInfo,
-                "GameManager.Save",
-                name);
+            if (saveInfo == null)
+            {
+                SaveLoadTraceService.CaptureFromSaveInfo(
+                    saveInfo,
+                    "GameManager.Save",
+                    name);
+            }
+            else
+            {
+                SaveLoadTraceService.CaptureFromSaveInfo(
+                    saveInfo,
+                    "GameManager.Save",
+                    name);
+            }
 
             Mod.log.Info(
                 "[SAVELOAD] " +

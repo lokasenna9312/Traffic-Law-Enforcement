@@ -76,6 +76,20 @@ namespace Traffic_Law_Enforcement
             string source,
             string fallbackName)
         {
+            if (saveInfo == null)
+            {
+                Capture(
+                    SaveLoadTraceRequestKind.Save,
+                    FirstNonBlank(
+                        fallbackName,
+                        Unknown),
+                    Unknown,
+                    Unknown,
+                    Unknown,
+                    source);
+                return;
+            }
+
             Capture(
                 SaveLoadTraceRequestKind.Save,
                 FirstNonBlank(
