@@ -150,21 +150,10 @@ namespace Traffic_Law_Enforcement
             string name,
             SaveInfo saveInfo)
         {
-            if (saveInfo == null)
-            {
-                SaveLoadTraceService.CaptureFromSaveInfo(
-                    saveInfo,
-                    "GameManager.Save",
-                    name);
-            }
-            else
-            {
-                SaveLoadTraceService.CaptureFromSaveInfo(
-                    saveInfo,
-                    "GameManager.Save",
-                    name);
-            }
-
+            SaveLoadTraceService.CaptureFromSaveInfo(
+                saveInfo,
+                "GameManager.Save",
+                name);
             Mod.log.Info(
                 "[SAVELOAD] " +
                 $"action=SaveRequested, source=GameManager.Save, name={SaveLoadTraceService.LastRequestedSaveName}, city={SaveLoadTraceService.LastRequestedCityName}, path={SaveLoadTraceService.LastRequestedSavePath}, id={SaveLoadTraceService.LastRequestedSaveId}");
