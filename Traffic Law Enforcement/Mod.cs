@@ -4,6 +4,7 @@ using Game;
 using Game.Common;
 using Game.Modding;
 using Game.SceneFlow;
+using Game.Serialization;
 using Game.Simulation;
 using Game.Triggers;
 using System;
@@ -78,6 +79,8 @@ namespace Traffic_Law_Enforcement
             {
                 IntersectionMovementPathfindingPenaltyReflectionPatches.Apply();
             }
+            updateSystem.UpdateBefore<PreDeserialize<EnforcementSaveDataSystem>>(SystemUpdatePhase.Deserialize);
+            updateSystem.UpdateAfter<PostDeserialize<EnforcementSaveDataSystem>>(SystemUpdatePhase.Deserialize);
             updateSystem.UpdateAfter<EnforcementSaveDataSystem, EnforcementGameTimeSystem>(SystemUpdatePhase.GameSimulation);
             updateSystem.UpdateBefore<EnforcementSaveDataSystem, VehicleTrafficLawProfileSystem>(SystemUpdatePhase.GameSimulation);
             updateSystem.UpdateBefore<VehicleTrafficLawProfileSystem, PublicTransportLanePermissionSystem>(SystemUpdatePhase.GameSimulation);
