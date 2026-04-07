@@ -89,6 +89,19 @@ namespace Traffic_Law_Enforcement
             return vehicle != Entity.Null && s_WatchedVehicles.Contains(vehicle);
         }
 
+        internal static void CopyWatchedVehicles(ICollection<Entity> destination)
+        {
+            if (destination == null)
+            {
+                return;
+            }
+
+            foreach (Entity vehicle in s_WatchedVehicles)
+            {
+                destination.Add(vehicle);
+            }
+        }
+
         internal static void AppendWatchedVehicles(
             ISet<Entity> destination,
             EntityManager entityManager)
@@ -142,6 +155,27 @@ namespace Traffic_Law_Enforcement
             s_RemovedVehiclesBuffer.Clear();
 
             return removedCount;
+        }
+
+        internal static bool RemoveWatchedVehicleBecauseMissing(
+            Entity vehicle,
+            string reason)
+        {
+            if (vehicle == Entity.Null)
+            {
+                return false;
+            }
+
+            bool removed = s_WatchedVehicles.Remove(vehicle);
+            if (removed)
+            {
+                MarkWatchedVehiclesChanged();
+                FocusedRouteDiagnosticsPatchController.Sync();
+                Mod.log.Info(
+                    $"[FocusedLogging] Auto-removed watched vehicle: {FormatEntity(vehicle)}, reason={NormalizeReason(reason)}");
+            }
+
+            return removed;
         }
 
         internal static string DescribeWatchedVehicles(int maxDisplayed = 6)
@@ -239,6 +273,13 @@ namespace Traffic_Law_Enforcement
             return indexComparison != 0
                 ? indexComparison
                 : left.Version.CompareTo(right.Version);
+        }
+
+        private static string NormalizeReason(string reason)
+        {
+            return string.IsNullOrWhiteSpace(reason)
+                ? "unknown"
+                : reason.Trim();
         }
     }
 }

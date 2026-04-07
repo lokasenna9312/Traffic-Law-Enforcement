@@ -25,7 +25,8 @@ namespace Traffic_Law_Enforcement
                 FocusedLoggingService.IsWatched(vehicle);
             bool canWatch =
                 hasSelectedRoadVehicle &&
-                snapshot.TleApplicability == SelectedObjectTleApplicability.ApplicableReady &&
+                (snapshot.TleApplicability == SelectedObjectTleApplicability.ApplicableReady ||
+                 snapshot.VehicleKind == SelectedObjectKind.ParkedRoadCar) &&
                 !watchedVehicle;
             bool canUnwatch =
                 hasSelectedRoadVehicle &&
