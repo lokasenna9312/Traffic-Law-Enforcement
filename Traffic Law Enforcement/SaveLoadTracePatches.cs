@@ -7,7 +7,6 @@ using Game.Assets;
 using Game.SceneFlow;
 using Game.UI;
 using HarmonyLib;
-using UnityEngine;
 
 namespace Traffic_Law_Enforcement
 {
@@ -27,18 +26,6 @@ namespace Traffic_Law_Enforcement
                     typeof(GameMode),
                     typeof(Purpose),
                     typeof(IAssetData),
-                });
-
-        private static readonly MethodInfo s_GameManagerSaveTextureMethod =
-            AccessTools.Method(
-                typeof(GameManager),
-                nameof(GameManager.Save),
-                new[]
-                {
-                    typeof(string),
-                    typeof(SaveInfo),
-                    typeof(ILocalAssetDatabase),
-                    typeof(Texture),
                 });
 
         private static readonly MethodInfo s_GameManagerSaveAsyncMethod =
@@ -74,7 +61,6 @@ namespace Traffic_Law_Enforcement
                         nameof(GameManagerSavePrefix));
 
                 PatchIfPresent(s_GameManagerLoadMethod, loadPrefix);
-                PatchIfPresent(s_GameManagerSaveTextureMethod, savePrefix);
                 PatchIfPresent(s_GameManagerSaveAsyncMethod, savePrefix);
             }
             catch (Exception ex)
