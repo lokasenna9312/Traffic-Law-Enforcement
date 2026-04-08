@@ -28,9 +28,13 @@ namespace Traffic_Law_Enforcement
 
                 if (EnforcementLoggingPolicy.ShouldLogVehicleSpecificEnforcementEvent(vehicle))
                 {
-                    Mod.log.Info($"Reset CENTERLINE repeat invalidation state after path refresh: vehicle={vehicle}, pathState={pathOwner.m_State}");
+                    Mod.log.Info(
+                        $"Reset CENTERLINE repeat invalidation state after path refresh: " +
+                        $"vehicle={vehicle}, " +
+                        $"pathState={pathOwner.m_State}");
                 }
             }
         }
     }
 }
+

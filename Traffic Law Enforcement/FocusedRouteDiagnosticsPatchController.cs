@@ -13,15 +13,9 @@ namespace Traffic_Law_Enforcement
                 enableFocusedRouteDiagnostics &&
                 FocusedLoggingService.HasWatchedVehicles;
             bool setupPatchWasApplied = PathfindSetupSystemPatches.IsApplied;
-            bool candidateProbePatchWasApplied = PathfindCandidateProbePatches.IsApplied;
 
             if (shouldApplyPatches)
             {
-                if (!PathfindCandidateProbePatches.IsApplied)
-                {
-                    PathfindCandidateProbePatches.Apply();
-                }
-
                 if (!PathfindSetupSystemPatches.IsApplied)
                 {
                     PathfindSetupSystemPatches.Apply();
@@ -33,15 +27,9 @@ namespace Traffic_Law_Enforcement
                 {
                     PathfindSetupSystemPatches.Remove();
                 }
-
-                if (PathfindCandidateProbePatches.IsApplied)
-                {
-                    PathfindCandidateProbePatches.Remove();
-                }
             }
 
-            if (setupPatchWasApplied == PathfindSetupSystemPatches.IsApplied &&
-                candidateProbePatchWasApplied == PathfindCandidateProbePatches.IsApplied)
+            if (setupPatchWasApplied == PathfindSetupSystemPatches.IsApplied)
             {
                 return;
             }
@@ -50,8 +38,7 @@ namespace Traffic_Law_Enforcement
                 $"Focused route diagnostics patch state updated: requested={enableFocusedRouteDiagnostics}, " +
                 $"effective={shouldApplyPatches}, " +
                 $"watchedCount={FocusedLoggingService.WatchedVehicleCount}, " +
-                $"setupPatch={PathfindSetupSystemPatches.IsApplied}, " +
-                $"candidateProbePatch={PathfindCandidateProbePatches.IsApplied}");
+                $"setupPatch={PathfindSetupSystemPatches.IsApplied}");
         }
 
         internal static void RemoveAll()

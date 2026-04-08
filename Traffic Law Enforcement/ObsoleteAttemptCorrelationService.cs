@@ -70,7 +70,7 @@ namespace Traffic_Law_Enforcement
             }
 
             s_AttemptSequence += 1L;
-            string attemptId = $"{FocusedLoggingService.FormatEntity(vehicle)}-o{s_AttemptSequence}";
+            string attemptId = $"{vehicle}-o{s_AttemptSequence}";
             string safeTargetKind =
                 string.IsNullOrWhiteSpace(targetKindNormalized)
                     ? RouteDebugNormalization.UnknownTargetKind
@@ -448,3 +448,4 @@ namespace Traffic_Law_Enforcement
         }
     }
 }
+

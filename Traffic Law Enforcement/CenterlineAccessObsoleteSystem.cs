@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using Game;
 using Game.Common;
 using Game.Net;
@@ -240,14 +240,16 @@ namespace Traffic_Law_Enforcement
                 {
                     Mod.log.Info(
                         $"Repeated identical CENTERLINE invalidation: vehicle={vehicle}, role={role}, repeatCount={repeatCount}, " +
-                        $"reason={reason}, currentLane={currentLane.m_Lane}, sourceLane={sourceLane}, targetLane={targetLane}, " +
+                        $"reason={reason}, currentLane={currentLane.m_Lane}, " +
+                        $"sourceLane={sourceLane}, targetLane={targetLane}, " +
                         $"transitionIndex={transitionIndex}, transitionKind={transitionKind}, transitionFamily={transitionFamily}");
                 }
 
                 if (shouldLogPathObsoleteSources)
                 {
                     string extra =
-                        $"sourceLane={sourceLane}, targetLane={targetLane}, transitionIndex={transitionIndex}, " +
+                        $"sourceLane={sourceLane}, " +
+                        $"targetLane={targetLane}, transitionIndex={transitionIndex}, " +
                         $"transitionKind={transitionKind}, transitionFamily={transitionFamily}, repeatCount={repeatCount}, " +
                         $"laneShapeCurrent={DescribeLaneShape(currentLane.m_Lane)}, " +
                         $"laneShapeSource={DescribeLaneShape(sourceLane)}, " +
@@ -269,7 +271,12 @@ namespace Traffic_Law_Enforcement
 
                 if (shouldLogVehicleSpecificEnforcementEvents)
                 {
-                    Mod.log.Info($"Planned center-line access route invalidated: vehicle={vehicle}, fromLane={sourceLane}, toLane={targetLane}, accessIndex={transitionIndex}, transition={transitionKind}, reason={reason}");
+                    Mod.log.Info(
+                        $"Planned center-line access route invalidated: " +
+                        $"vehicle={vehicle}, " +
+                        $"fromLane={sourceLane}, " +
+                        $"toLane={targetLane}, " +
+                        $"accessIndex={transitionIndex}, transition={transitionKind}, reason={reason}");
                     LogStructureSample(currentLane.m_Lane, sourceLane, targetLane, transitionKind);
                 }
             }
@@ -830,3 +837,4 @@ namespace Traffic_Law_Enforcement
         }
     }
 }
+

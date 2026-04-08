@@ -13,13 +13,17 @@ namespace Traffic_Law_Enforcement
     {
         private const string HarmonyId =
             "Traffic_Law_Enforcement.MidBlockAccessPathfindingPenaltyPatches";
+        internal const string MbAhdRawBuildFingerprint = "mb-access-ahd-2026-04-02-21-28";
+        private const string DirectAccessHitLogPrefix = "[MB-ACCESS-AHD-HIT]";
+        private const string DirectOppositeFlowHitLogPrefix = "[MB-OPPFLOW-AHD-HIT]";
 
         private static readonly Type s_PathfindExecutorType =
             AccessTools.Inner(typeof(PathfindJobs), "PathfindExecutor");
 
         private static Harmony s_Harmony;
         private static MethodInfo s_TargetMethod;
-        private static int s_LogCount;
+        private static int s_DirectAccessHitLogged;
+        private static int s_DirectOppositeFlowHitLogged;
 
         internal static bool IsApplied => s_Harmony != null && s_TargetMethod != null;
 
@@ -32,6 +36,8 @@ namespace Traffic_Law_Enforcement
 
             try
             {
+                Mod.log.Info($"[MB-AHD-RAW] patchSetup buildFingerprint={MbAhdRawBuildFingerprint}");
+
                 if (s_PathfindExecutorType == null)
                 {
                     Mod.log.Info("Mid-block access pathfind hook skipped: PathfindExecutor type not found.");
@@ -48,12 +54,14 @@ namespace Traffic_Law_Enforcement
                 }
 
                 s_Harmony = new Harmony(HarmonyId);
-                s_LogCount = 0;
-                HarmonyMethod postfix =
+                s_DirectAccessHitLogged = 0;
+                s_DirectOppositeFlowHitLogged = 0;
+                HarmonyMethod prefix =
                     new HarmonyMethod(
                         typeof(MidBlockAccessPathfindingPenaltyPatches),
                         nameof(AddHeapDataPrefix));
-                s_Harmony.Patch(s_TargetMethod, prefix: postfix);
+                s_Harmony.Patch(s_TargetMethod, prefix: prefix);
+                LogPatchInfo(s_TargetMethod);
 
                 Mod.log.Info(
                     $"Mid-block access pathfind hook patched: {DescribeMethod(s_TargetMethod)}");
@@ -75,7 +83,8 @@ namespace Traffic_Law_Enforcement
             s_Harmony.UnpatchAll(HarmonyId);
             s_Harmony = null;
             s_TargetMethod = null;
-            s_LogCount = 0;
+            s_DirectAccessHitLogged = 0;
+            s_DirectOppositeFlowHitLogged = 0;
         }
 
         private static MethodInfo FindTransitionExpansionMethod()
@@ -165,14 +174,69 @@ namespace Traffic_Law_Enforcement
                 $"{method.DeclaringType?.FullName}.{method.Name}({parameterList})";
         }
 
+        private static void LogPatchInfo(MethodInfo targetMethod)
+        {
+            Patches patchInfo = Harmony.GetPatchInfo(targetMethod);
+            Mod.log.Info(
+                "[MB-AHD] patchInfo " +
+                $"target={DescribeMethod(targetMethod)} " +
+                $"prefixes={GetPatchCount(patchInfo?.Prefixes)} " +
+                $"postfixes={GetPatchCount(patchInfo?.Postfixes)} " +
+                $"transpilers={GetPatchCount(patchInfo?.Transpilers)} " +
+                $"finalizers={GetPatchCount(patchInfo?.Finalizers)} " +
+                $"owners={FormatPatchOwners(patchInfo)} " +
+                $"prefixMethods={FormatPatchMethods(patchInfo?.Prefixes)} " +
+                $"postfixMethods={FormatPatchMethods(patchInfo?.Postfixes)}");
+        }
+
+        private static int GetPatchCount<T>(ICollection<T> patches)
+        {
+            return patches?.Count ?? 0;
+        }
+
+        private static string FormatPatchOwners(Patches patchInfo)
+        {
+            if (patchInfo?.Owners == null || patchInfo.Owners.Count == 0)
+            {
+                return "none";
+            }
+
+            return string.Join(",", patchInfo.Owners);
+        }
+
+        private static string FormatPatchMethods(ICollection<Patch> patches)
+        {
+            if (patches == null || patches.Count == 0)
+            {
+                return "none";
+            }
+
+            StringBuilder builder = new StringBuilder(patches.Count * 48);
+            int index = 0;
+            foreach (Patch patch in patches)
+            {
+                if (index > 0)
+                {
+                    builder.Append(',');
+                }
+
+                MethodInfo patchMethod = patch?.PatchMethod;
+                builder.Append(
+                    patchMethod == null
+                        ? "null"
+                        : $"{patchMethod.DeclaringType?.FullName}.{patchMethod.Name}");
+                index += 1;
+            }
+
+            return builder.ToString();
+        }
+
         private static void AddHeapDataPrefix(
-            EdgeID id,
             EdgeID id2,
             Edge edge,
             ref float baseCost,
             PathfindParameters ___m_Parameters,
-            UnsafePathfindData ___m_PathfindData,
-            MethodBase __originalMethod)
+            UnsafePathfindData ___m_PathfindData)
         {
             if (!Mod.IsMidBlockCrossingEnforcementEnabled)
             {
@@ -199,11 +263,27 @@ namespace Traffic_Law_Enforcement
 
             Entity sourceLane = edge.m_Owner;
             Entity targetLane = ___m_PathfindData.m_Edges[id2.m_Index].m_Owner;
-            if (!MidBlockCrossingPolicy.TryGetIllegalAccessTransition(
+
+            // This seam is a pre-pathfinding candidate-transition deterrence seam.
+            // Keep the existing access-only branch intact, and add opposite-flow as a
+            // separate exact-pair branch rather than broadening the seam wholesale.
+            if (MidBlockCrossingPolicy.TryGetIllegalAccessTransition(
                     entityManager,
                     sourceLane,
                     targetLane,
-                    out LaneTransitionViolationReasonCode reasonCode))
+                    out LaneTransitionViolationReasonCode accessReasonCode))
+            {
+                MaybeLogDirectAccessHit(sourceLane, targetLane, accessReasonCode);
+            }
+            else if (MidBlockCrossingPolicy.TryGetOppositeFlowSameRoadSegmentTransition(
+                    entityManager,
+                    sourceLane,
+                    targetLane,
+                    out LaneTransitionViolationReasonCode oppositeFlowReasonCode))
+            {
+                MaybeLogDirectOppositeFlowHit(sourceLane, targetLane, oppositeFlowReasonCode);
+            }
+            else
             {
                 return;
             }
@@ -216,18 +296,53 @@ namespace Traffic_Law_Enforcement
 
             float addedCost = penalty * moneyWeight;
             baseCost += addedCost;
+        }
 
-            if (EnforcementLoggingPolicy.ShouldLogPathfindingPenaltyDiagnostics() &&
-                s_LogCount < 16)
+        private static void MaybeLogDirectAccessHit(
+            Entity sourceLane,
+            Entity targetLane,
+            LaneTransitionViolationReasonCode reasonCode)
+        {
+            if (!MidBlockCrossingPolicy.IsAccessTransitionReason(reasonCode))
             {
-                s_LogCount += 1;
-                Mod.log.Info(
-                    $"Mid-block access pre-penalty applied: method={__originalMethod?.Name}, " +
-                    $"edgeId={id.m_Index}, nextEdgeId={id2.m_Index}, " +
-                    $"sourceLane={sourceLane}, targetLane={targetLane}, " +
-                    $"reason={RoutePenaltyInspection.FormatMidBlockReasonTag(reasonCode)}, " +
-                    $"moneyWeight={moneyWeight:0.###}, addedCost={addedCost:0.###}");
+                return;
             }
+
+            if (System.Threading.Interlocked.Exchange(ref s_DirectAccessHitLogged, 1) != 0)
+            {
+                return;
+            }
+
+            string tag = $"mid-block({RoutePenaltyInspection.FormatMidBlockReasonTag(reasonCode)})";
+            Mod.log.Info(
+                $"{DirectAccessHitLogPrefix} firstHit=true " +
+                $"reason={reasonCode} tag={tag} " +
+                $"sourceLane={sourceLane} " +
+                $"targetLane={targetLane}");
+        }
+
+        private static void MaybeLogDirectOppositeFlowHit(
+            Entity sourceLane,
+            Entity targetLane,
+            LaneTransitionViolationReasonCode reasonCode)
+        {
+            if (reasonCode != LaneTransitionViolationReasonCode.OppositeFlowSameRoadSegment)
+            {
+                return;
+            }
+
+            if (System.Threading.Interlocked.Exchange(ref s_DirectOppositeFlowHitLogged, 1) != 0)
+            {
+                return;
+            }
+
+            string tag = $"mid-block({RoutePenaltyInspection.FormatMidBlockReasonTag(reasonCode)})";
+            Mod.log.Info(
+                $"{DirectOppositeFlowHitLogPrefix} firstHit=true " +
+                $"reason={reasonCode} tag={tag} " +
+                $"sourceLane={sourceLane} " +
+                $"targetLane={targetLane}");
         }
     }
 }
+
