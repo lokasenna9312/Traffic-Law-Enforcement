@@ -840,4 +840,3 @@ namespace Traffic_Law_Enforcement
         }
     }
 }
-

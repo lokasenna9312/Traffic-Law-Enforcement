@@ -220,39 +220,14 @@ namespace Traffic_Law_Enforcement
             if (EnforcementLoggingPolicy.ShouldLogPathfindingPenaltyDiagnostics() &&
                 s_LogCount < 16)
             {
-                return;
+                s_LogCount += 1;
+                Mod.log.Info(
+                    $"Mid-block access pre-penalty applied: method={__originalMethod?.Name}, " +
+                    $"edgeId={id.m_Index}, nextEdgeId={id2.m_Index}, " +
+                    $"sourceLane={sourceLane}, targetLane={targetLane}, " +
+                    $"reason={RoutePenaltyInspection.FormatMidBlockReasonTag(reasonCode)}, " +
+                    $"moneyWeight={moneyWeight:0.###}, addedCost={addedCost:0.###}");
             }
-
-            string tag = $"mid-block({RoutePenaltyInspection.FormatMidBlockReasonTag(reasonCode)})";
-            Mod.log.Info(
-                $"{DirectAccessHitLogPrefix} firstHit=true " +
-                $"reason={reasonCode} tag={tag} " +
-                $"sourceLane={sourceLane} " +
-                $"targetLane={targetLane}");
-        }
-
-        private static void MaybeLogDirectOppositeFlowHit(
-            Entity sourceLane,
-            Entity targetLane,
-            LaneTransitionViolationReasonCode reasonCode)
-        {
-            if (reasonCode != LaneTransitionViolationReasonCode.OppositeFlowSameRoadSegment)
-            {
-                return;
-            }
-
-            if (System.Threading.Interlocked.Exchange(ref s_DirectOppositeFlowHitLogged, 1) != 0)
-            {
-                return;
-            }
-
-            string tag = $"mid-block({RoutePenaltyInspection.FormatMidBlockReasonTag(reasonCode)})";
-            Mod.log.Info(
-                $"{DirectOppositeFlowHitLogPrefix} firstHit=true " +
-                $"reason={reasonCode} tag={tag} " +
-                $"sourceLane={sourceLane} " +
-                $"targetLane={targetLane}");
         }
     }
 }
-
