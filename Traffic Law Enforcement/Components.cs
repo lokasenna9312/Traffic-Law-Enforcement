@@ -26,7 +26,6 @@ namespace Traffic_Law_Enforcement
         public Entity m_PendingOrdinaryEgressOriginLane;
         public Entity m_PendingGarageConnectionEgressBridgeConnectionLane;
         public Entity m_PendingGarageConnectionEgressBridgeOriginLane;
-        public int m_MidBlockUiWatchExpiryTick;
     }
 
     public struct OriginalPathfindCarData : IComponentData

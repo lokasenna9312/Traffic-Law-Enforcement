@@ -33,8 +33,6 @@ namespace Traffic_Law_Enforcement
         // first ordinary road arrival. This large budget is only a defensive
         // guardrail against stale carry surviving indefinitely.
         private const byte PendingOrdinaryEgressCorridorFailsafeBudget = 32;
-        private const int MidBlockUiWatchDurationTicks = 16;
-        private static int s_MidBlockUiWatchTick;
         private EntityTypeHandle m_EntityTypeHandle;
         private ComponentTypeHandle<VehicleLaneHistory> m_HistoryTypeHandle;
         private ComponentTypeHandle<CarCurrentLane> m_CurrentLaneTypeHandle;
@@ -110,8 +108,6 @@ namespace Traffic_Law_Enforcement
 
         protected override void OnUpdate()
         {
-            s_MidBlockUiWatchTick += 1;
-
             if (m_ChangedTransitionQuery.IsEmptyIgnoreFilter)
             {
                 return;
@@ -317,7 +313,6 @@ namespace Traffic_Law_Enforcement
             analysisState.m_LastProcessedLaneChangeCount = history.m_LaneChangeCount;
             ClearPendingOrdinaryEgress(ref analysisState);
             ClearPendingGarageConnectionEgressBridge(ref analysisState);
-            ClearMidBlockUiWatch(ref analysisState);
             if (m_AnalysisStateData.HasComponent(vehicle))
             {
                 EntityManager.SetComponentData(vehicle, analysisState);
@@ -352,7 +347,6 @@ namespace Traffic_Law_Enforcement
             {
                 ClearPendingOrdinaryEgress(ref analysisState);
                 ClearPendingGarageConnectionEgressBridge(ref analysisState);
-                ClearMidBlockUiWatch(ref analysisState);
                 EntityManager.SetComponentData(vehicle, analysisState);
                 return;
             }
@@ -374,7 +368,6 @@ namespace Traffic_Law_Enforcement
             {
                 ClearPendingOrdinaryEgress(ref analysisState);
                 ClearPendingGarageConnectionEgressBridge(ref analysisState);
-                ClearMidBlockUiWatch(ref analysisState);
             }
 
             bool hasMidBlockViolation = false;
@@ -450,13 +443,6 @@ namespace Traffic_Law_Enforcement
             else if (!accessExcluded && !HasPendingOrdinaryEgress(analysisState))
             {
                 WritePendingOrdinaryEgressIfNeeded(vehicle, history, ref analysisState);
-            }
-
-            if (hasMidBlockViolation ||
-                HasPendingOrdinaryEgress(analysisState) ||
-                HasPendingGarageConnectionEgressBridge(analysisState))
-            {
-                ArmMidBlockUiWatch(ref analysisState);
             }
 
             EntityManager.SetComponentData(vehicle, analysisState);
@@ -1286,25 +1272,6 @@ namespace Traffic_Law_Enforcement
         {
             return analysisState.m_PendingGarageConnectionEgressBridgeConnectionLane != Entity.Null &&
                 analysisState.m_PendingGarageConnectionEgressBridgeOriginLane != Entity.Null;
-        }
-
-        internal static bool IsMidBlockUiWatchActive(
-            LaneTransitionAnalysisState analysisState)
-        {
-            return analysisState.m_MidBlockUiWatchExpiryTick >= s_MidBlockUiWatchTick;
-        }
-
-        private static void ArmMidBlockUiWatch(
-            ref LaneTransitionAnalysisState analysisState)
-        {
-            analysisState.m_MidBlockUiWatchExpiryTick =
-                s_MidBlockUiWatchTick + MidBlockUiWatchDurationTicks;
-        }
-
-        private static void ClearMidBlockUiWatch(
-            ref LaneTransitionAnalysisState analysisState)
-        {
-            analysisState.m_MidBlockUiWatchExpiryTick = 0;
         }
 
         private void ClearPendingOrdinaryEgress(ref LaneTransitionAnalysisState analysisState)

@@ -199,7 +199,6 @@ namespace Traffic_Law_Enforcement
         private ComponentLookup<VehicleTrafficLawProfile> m_ProfileData;
         private ComponentLookup<PublicTransportLaneViolation> m_PublicTransportLaneViolationData;
         private ComponentLookup<PublicTransportLanePendingExit> m_PendingExitData;
-        private ComponentLookup<LaneTransitionAnalysisState> m_AnalysisStateData;
         private ComponentLookup<PublicTransportLanePermissionState> m_PermissionStateData;
         private ComponentLookup<Owner> m_OwnerData;
         private ComponentLookup<Aggregated> m_AggregatedData;
@@ -294,7 +293,6 @@ namespace Traffic_Law_Enforcement
             m_PublicTransportLaneViolationData =
                 GetComponentLookup<PublicTransportLaneViolation>(true);
             m_PendingExitData = GetComponentLookup<PublicTransportLanePendingExit>(true);
-            m_AnalysisStateData = GetComponentLookup<LaneTransitionAnalysisState>(true);
             m_PermissionStateData =
                 GetComponentLookup<PublicTransportLanePermissionState>(true);
             m_OwnerData = GetComponentLookup<Owner>(true);
@@ -488,7 +486,6 @@ namespace Traffic_Law_Enforcement
                 {
                     m_PublicTransportLaneViolationData.Update(this);
                     m_PendingExitData.Update(this);
-                    m_AnalysisStateData.Update(this);
                 }
                 if (includePermissionStateSummary && tleApplicable)
                 {
@@ -652,13 +649,6 @@ namespace Traffic_Law_Enforcement
                 hasVehicleEntity &&
                 m_PendingExitData.HasComponent(vehicle);
 
-            bool midBlockWatchActive =
-                includeViolationStateFields &&
-                tleReady &&
-                hasVehicleEntity &&
-                m_AnalysisStateData.TryGetComponent(vehicle, out LaneTransitionAnalysisState analysisState) &&
-                LaneTransitionViolationSystem.IsMidBlockUiWatchActive(analysisState);
-
             int totalFines = 0;
             int totalViolations = 0;
             string lastReason = string.Empty;
@@ -721,7 +711,6 @@ namespace Traffic_Law_Enforcement
                     laneChangeCount,
                     ptLaneViolationActive,
                     pendingExitActive,
-                    midBlockWatchActive,
                     totalFines,
                     totalViolations,
                     lastReason,
@@ -901,7 +890,6 @@ namespace Traffic_Law_Enforcement
                 laneChangeCount,
                 ptLaneViolationActive,
                 pendingExitActive,
-                midBlockWatchActive,
                 enforcementSummary.PermissionStateSummary,
                 totalFines,
                 totalViolations,
@@ -1029,7 +1017,6 @@ namespace Traffic_Law_Enforcement
             int laneChangeCount,
             bool ptLaneViolationActive,
             bool pendingExitActive,
-            bool midBlockWatchActive,
             int totalFines,
             int totalViolations,
             string lastReason,
@@ -1086,7 +1073,6 @@ namespace Traffic_Law_Enforcement
                 hasTrafficLawProfile == m_CurrentSnapshot.HasTrafficLawProfile &&
                 ptLaneViolationActive == m_CurrentSnapshot.PublicTransportLaneViolationActive &&
                 pendingExitActive == m_CurrentSnapshot.PendingExitActive &&
-                midBlockWatchActive == m_CurrentSnapshot.MidBlockWatchActive &&
                 totalFines == m_CurrentSnapshot.TotalFines &&
                 totalViolations == m_CurrentSnapshot.TotalViolations &&
                 string.Equals(
@@ -1221,8 +1207,6 @@ namespace Traffic_Law_Enforcement
                     m_CurrentSnapshot.PublicTransportLaneViolationActive,
                 retainDeferredSnapshotFields &&
                     m_CurrentSnapshot.PendingExitActive,
-                retainDeferredSnapshotFields &&
-                    m_CurrentSnapshot.MidBlockWatchActive,
                 retainDeferredSnapshotFields
                     ? m_CurrentSnapshot.PermissionStateSummary
                     : string.Empty,

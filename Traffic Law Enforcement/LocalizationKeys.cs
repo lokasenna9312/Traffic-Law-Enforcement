@@ -179,7 +179,6 @@ namespace Traffic_Law_Enforcement
             map["SelectedObjectPanel.ActiveFlagsPendingName"] = SelectedObjectPanelUISystem.kActiveFlagsPendingNameLocaleId;
             map["SelectedObjectPanel.FlagOn"] = SelectedObjectPanelUISystem.kFlagOnLocaleId;
             map["SelectedObjectPanel.FlagOff"] = SelectedObjectPanelUISystem.kFlagOffLocaleId;
-            map["SelectedObjectPanel.LastReasonMidBlockWatch"] = SelectedObjectPanelUISystem.kLastReasonMidBlockWatchLocaleId;
             map["SelectedObjectPanel.TotalsFormat"] = SelectedObjectPanelUISystem.kTotalsValueFormatLocaleId;
             map["SelectedObjectPanel.NoSelection"] = SelectedObjectPanelUISystem.kNoSelectionLocaleId;
             map["SelectedObjectPanel.NotVehicle"] = SelectedObjectPanelUISystem.kNotVehicleLocaleId;
