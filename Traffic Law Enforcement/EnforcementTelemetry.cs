@@ -151,28 +151,6 @@ namespace Traffic_Law_Enforcement
             vehicleRecord.LastTimestampMonthTicks = nowMonthTicks;
         }
 
-        public static void RecordAppliedIllegalEgressMarker(
-            int vehicleId,
-            IllegalEgressApplyMode mode,
-            int originLaneId,
-            int roadLaneId)
-        {
-            if (vehicleId < 0 ||
-                mode == IllegalEgressApplyMode.None ||
-                originLaneId < 0 ||
-                roadLaneId < 0)
-            {
-                return;
-            }
-
-            VehicleEnforcementRecord vehicleRecord = GetOrCreateVehicleRecord(vehicleId);
-            vehicleRecord.LastAppliedIllegalEgressMode = mode;
-            vehicleRecord.LastAppliedIllegalEgressTimestampMonthTicks =
-                EnforcementGameTime.CurrentTimestampMonthTicks;
-            vehicleRecord.LastAppliedIllegalEgressOriginLaneId = originLaneId;
-            vehicleRecord.LastAppliedIllegalEgressRoadLaneId = roadLaneId;
-        }
-
         public static int GetVehicleViolationCount(int vehicleId)
         {
             return s_VehicleRecords.TryGetValue(vehicleId, out VehicleEnforcementRecord record)

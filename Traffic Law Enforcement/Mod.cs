@@ -4,7 +4,6 @@ using Game;
 using Game.Common;
 using Game.Modding;
 using Game.SceneFlow;
-using Game.Serialization;
 using Game.Simulation;
 using Game.Triggers;
 using System;
@@ -47,40 +46,26 @@ namespace Traffic_Law_Enforcement
             FocusedLoggingService.Reset();
             ObsoleteAttemptCorrelationService.Reset();
             PublicTransportLaneExitPressureTelemetry.Reset();
-            SaveLoadTraceService.Reset();
-            SaveLoadTracePatches.Apply();
             m_Setting = new Setting(this);
             Settings = m_Setting;
-            using (m_Setting.BeginAuditSourceContext("LoadSettings"))
-            {
-                AssetDatabase.global.LoadSettings(
-                    nameof(Traffic_Law_Enforcement),
-                    m_Setting,
-                    new Setting(this, enableAuditEmission: false));
-            }
+            AssetDatabase.global.LoadSettings(nameof(Traffic_Law_Enforcement), m_Setting, new Setting(this));
             m_Setting.ApplyEnforcementLoggingMigrationIfNeeded();
             m_Setting.RegisterKeyBindings();
 
             ResolveAndCacheModMetadata(modAssetPath);
             LogModVersionInfo(modAssetPath);
-            log.Info(
-                $"[MB-AHD-RAW] buildFingerprint={MidBlockAccessPathfindingPenaltyPatches.MbAhdRawBuildFingerprint}");
-            m_Setting.LogDebugLoggingSettingsSnapshot("OnLoad");
 
             m_Setting.RegisterInOptionsUI();
             RegisterTextLocales();
             BudgetUIPatches.Apply();
             VehicleUtilsPatches.Apply();
             FocusedRouteDiagnosticsPatchController.Sync();
-            PathfindRuntimeDiscoveryPatches.Apply();
             MidBlockAccessPathfindingPenaltyPatches.Apply();
             IntersectionMovementPathfindingPenaltyPatches.Apply();
             if (!IntersectionMovementPathfindingPenaltyPatches.IsApplied)
             {
                 IntersectionMovementPathfindingPenaltyReflectionPatches.Apply();
             }
-            updateSystem.UpdateBefore<PreDeserialize<EnforcementSaveDataSystem>>(SystemUpdatePhase.Deserialize);
-            updateSystem.UpdateAfter<PostDeserialize<EnforcementSaveDataSystem>>(SystemUpdatePhase.Deserialize);
             updateSystem.UpdateAfter<EnforcementSaveDataSystem, EnforcementGameTimeSystem>(SystemUpdatePhase.GameSimulation);
             updateSystem.UpdateBefore<EnforcementSaveDataSystem, VehicleTrafficLawProfileSystem>(SystemUpdatePhase.GameSimulation);
             updateSystem.UpdateBefore<VehicleTrafficLawProfileSystem, PublicTransportLanePermissionSystem>(SystemUpdatePhase.GameSimulation);
@@ -121,11 +106,8 @@ namespace Traffic_Law_Enforcement
             FocusedLoggingService.Reset();
             ObsoleteAttemptCorrelationService.Reset();
             PublicTransportLaneExitPressureTelemetry.Reset();
-            SaveLoadTracePatches.Remove();
-            SaveLoadTraceService.Reset();
             BudgetUIPatches.Remove();
             FocusedRouteDiagnosticsPatchController.RemoveAll();
-            PathfindRuntimeDiscoveryPatches.Remove();
             VehicleUtilsPatches.Remove();
             MidBlockAccessPathfindingPenaltyPatches.Remove();
             IntersectionMovementPathfindingPenaltyPatches.Remove();

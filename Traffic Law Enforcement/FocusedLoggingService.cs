@@ -50,7 +50,7 @@ namespace Traffic_Law_Enforcement
             {
                 MarkWatchedVehiclesChanged();
                 FocusedRouteDiagnosticsPatchController.Sync();
-                Mod.log.Info($"[FocusedLogging] Added watched vehicle: {vehicle}");
+                Mod.log.Info($"[FocusedLogging] Added watched vehicle: {FormatEntity(vehicle)}");
             }
 
             return added;
@@ -68,7 +68,7 @@ namespace Traffic_Law_Enforcement
             {
                 MarkWatchedVehiclesChanged();
                 FocusedRouteDiagnosticsPatchController.Sync();
-                Mod.log.Info($"[FocusedLogging] Removed watched vehicle: {vehicle}");
+                Mod.log.Info($"[FocusedLogging] Removed watched vehicle: {FormatEntity(vehicle)}");
             }
 
             return removed;
@@ -172,7 +172,7 @@ namespace Traffic_Law_Enforcement
                 MarkWatchedVehiclesChanged();
                 FocusedRouteDiagnosticsPatchController.Sync();
                 Mod.log.Info(
-                    $"[FocusedLogging] Auto-removed watched vehicle: {vehicle}, reason={NormalizeReason(reason)}");
+                    $"[FocusedLogging] Auto-removed watched vehicle: {FormatEntity(vehicle)}, reason={NormalizeReason(reason)}");
             }
 
             return removed;

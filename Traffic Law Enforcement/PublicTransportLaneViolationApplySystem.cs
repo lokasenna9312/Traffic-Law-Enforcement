@@ -241,10 +241,7 @@ namespace Traffic_Law_Enforcement
             }
 
             string message =
-                $"Public transport lane violation #{violationCount}: " +
-                $"vehicle={evt.Vehicle}, " +
-                $"lane={evt.Lane}, " +
-                $"reason={reason}";
+                $"Public transport lane violation #{violationCount}: vehicle={evt.Vehicle}, lane={evt.Lane}, reason={reason}";
             EnforcementLoggingPolicy.RecordEnforcementEvent(message, evt.Vehicle);
         }
 
@@ -258,9 +255,7 @@ namespace Traffic_Law_Enforcement
             }
 
             string message =
-                "PT-lane usage by vanilla-allowed but mod-denied vehicle (Type 2): " +
-                $"vehicle={evt.Vehicle}, " +
-                $"lane={evt.Lane}";
+                $"PT-lane usage by vanilla-allowed but mod-denied vehicle (Type 2): vehicle={evt.Vehicle}, lane={evt.Lane}";
             EnforcementLoggingPolicy.RecordType2Usage(message, evt.Vehicle);
         }
 
@@ -274,9 +269,7 @@ namespace Traffic_Law_Enforcement
             }
 
             string message =
-                "PT-lane usage by vanilla-denied but mod-allowed vehicle (Type 3): " +
-                $"vehicle={evt.Vehicle}, " +
-                $"lane={evt.Lane}";
+                $"PT-lane usage by vanilla-denied but mod-allowed vehicle (Type 3): vehicle={evt.Vehicle}, lane={evt.Lane}";
             EnforcementLoggingPolicy.RecordType3Usage(message, evt.Vehicle);
         }
 
@@ -290,9 +283,7 @@ namespace Traffic_Law_Enforcement
             }
 
             string message =
-                "PT-lane usage by vanilla-denied and mod-denied vehicle (Type 4): " +
-                $"vehicle={evt.Vehicle}, " +
-                $"lane={evt.Lane}";
+                $"PT-lane usage by vanilla-denied and mod-denied vehicle (Type 4): vehicle={evt.Vehicle}, lane={evt.Lane}";
             EnforcementLoggingPolicy.RecordType4Usage(message, evt.Vehicle);
         }
 
@@ -332,4 +323,3 @@ namespace Traffic_Law_Enforcement
         }
     }
 }
-

@@ -80,8 +80,6 @@ namespace Traffic_Law_Enforcement
                 {
                     case LaneTransitionViolationKind.MidBlockCrossing:
                     {
-                        int midBlockViolationCountBefore =
-                            statistics.m_MidBlockCrossingViolationCount;
                         statistics.m_MidBlockCrossingViolationCount += 1;
                         statisticsChanged = true;
 
@@ -91,30 +89,11 @@ namespace Traffic_Law_Enforcement
                             evt.Vehicle,
                             evt.Lane,
                             reason);
-                        bool illegalEgressMarkerWritten =
-                            TryRecordAppliedIllegalEgressMarker(evt);
-                        MaybeLogOrdinaryEgressApplyResult(
-                            evt,
-                            illegalEgressMarkerWritten);
-
-                        MaybeLogRealizedOppositeFlowApply(
-                            evt.Vehicle,
-                            evt.ReasonCode,
-                            midBlockViolationCountBefore,
-                            statistics.m_MidBlockCrossingViolationCount);
-                        MaybeLogRealizedAccessApply(
-                            evt.Vehicle,
-                            evt.ReasonCode,
-                            midBlockViolationCountBefore,
-                            statistics.m_MidBlockCrossingViolationCount);
 
                         if (EnforcementLoggingPolicy.ShouldLogVehicleSpecificEnforcementEvent(evt.Vehicle))
                         {
                             string message =
-                                $"Mid-block crossing violation #{statistics.m_MidBlockCrossingViolationCount}: " +
-                                $"vehicle={evt.Vehicle}, " +
-                                $"lane={evt.Lane}, " +
-                                $"reason={reason}";
+                                $"Mid-block crossing violation #{statistics.m_MidBlockCrossingViolationCount}: vehicle={evt.Vehicle}, lane={evt.Lane}, reason={reason}";
                             EnforcementLoggingPolicy.RecordEnforcementEvent(message, evt.Vehicle);
                         }
                         break;
@@ -136,10 +115,7 @@ namespace Traffic_Law_Enforcement
                         if (EnforcementLoggingPolicy.ShouldLogVehicleSpecificEnforcementEvent(evt.Vehicle))
                         {
                             string message =
-                                $"Intersection movement violation #{statistics.m_IntersectionMovementViolationCount}: " +
-                                $"vehicle={evt.Vehicle}, " +
-                                $"lane={evt.Lane}, " +
-                                $"actual={evt.ActualMovement}, allowed={evt.AllowedMovement}";
+                                $"Intersection movement violation #{statistics.m_IntersectionMovementViolationCount}: vehicle={evt.Vehicle}, lane={evt.Lane}, actual={evt.ActualMovement}, allowed={evt.AllowedMovement}";
                             EnforcementLoggingPolicy.RecordEnforcementEvent(message, evt.Vehicle);
                         }
                         break;
@@ -191,127 +167,5 @@ namespace Traffic_Law_Enforcement
                     return "lane transition violation";
             }
         }
-
-        // Debug-only apply confirmation for realized OppositeFlowSameRoadSegment.
-        // This does not alter violation application behavior.
-        private static void MaybeLogRealizedOppositeFlowApply(
-            Entity vehicle,
-            LaneTransitionViolationReasonCode reasonCode,
-            int violationCountBefore,
-            int violationCountAfter)
-        {
-            if (reasonCode != LaneTransitionViolationReasonCode.OppositeFlowSameRoadSegment ||
-                !EnforcementLoggingPolicy.ShouldLogVehicleSpecificEnforcementEvent(vehicle))
-            {
-                return;
-            }
-
-            string message =
-                "[OPPFLOW_REALIZED_APPLY] " +
-                $"vehicle={vehicle} " +
-                $"reason={reasonCode} " +
-                "applyHappened=true " +
-                $"midBlockViolationCount={violationCountBefore}->{violationCountAfter}";
-
-            EnforcementLoggingPolicy.RecordEnforcementEvent(message, vehicle);
-        }
-
-        // Debug-only apply confirmation for realized illegal ingress/egress.
-        // This confirms that the buffered realized access event was later applied.
-        // This does not alter violation application behavior.
-        private static void MaybeLogRealizedAccessApply(
-            Entity vehicle,
-            LaneTransitionViolationReasonCode reasonCode,
-            int violationCountBefore,
-            int violationCountAfter)
-        {
-            if (!MidBlockCrossingPolicy.IsAccessTransitionReason(reasonCode) ||
-                !EnforcementLoggingPolicy.ShouldLogVehicleSpecificEnforcementEvent(vehicle))
-            {
-                return;
-            }
-
-            string message =
-                "[ACCESS_REALIZED_APPLY] " +
-                $"vehicle={vehicle} " +
-                $"reason={reasonCode} " +
-                "applyHappened=true " +
-                $"midBlockViolationCount={violationCountBefore}->{violationCountAfter}";
-
-            EnforcementLoggingPolicy.RecordEnforcementEvent(message, vehicle);
-        }
-
-        private static bool TryRecordAppliedIllegalEgressMarker(
-            DetectedLaneTransitionViolation evt)
-        {
-            if (!IsIllegalEgressReason(evt.ReasonCode) ||
-                evt.IllegalEgressMode == IllegalEgressApplyMode.None ||
-                evt.Vehicle == Entity.Null ||
-                evt.IllegalEgressOriginLane == Entity.Null ||
-                evt.IllegalEgressRoadLane == Entity.Null)
-            {
-                return false;
-            }
-
-            EnforcementTelemetry.RecordAppliedIllegalEgressMarker(
-                evt.Vehicle.Index,
-                evt.IllegalEgressMode,
-                evt.IllegalEgressOriginLane.Index,
-                evt.IllegalEgressRoadLane.Index);
-            return true;
-        }
-
-        private static void MaybeLogOrdinaryEgressApplyResult(
-            DetectedLaneTransitionViolation evt,
-            bool markerWritten)
-        {
-            if (!IsIllegalEgressReason(evt.ReasonCode) ||
-                !EnforcementLoggingPolicy.ShouldLogVehicleSpecificEnforcementEvent(evt.Vehicle))
-            {
-                return;
-            }
-
-            string branch = evt.IllegalEgressMode switch
-            {
-                IllegalEgressApplyMode.Direct => "Direct",
-                IllegalEgressApplyMode.Carried => "Carried",
-                _ => "None",
-            };
-
-            string message =
-                "[ACCESS_EGRESS_APPLY_RESULT] " +
-                $"vehicle={evt.Vehicle} " +
-                $"branch={branch} " +
-                $"storedOriginLane={evt.IllegalEgressOriginLane} " +
-                $"previousLane={evt.PreviousLane} " +
-                $"currentLane={evt.Lane} " +
-                $"previousOwner={evt.PreviousOwner} " +
-                $"currentOwner={evt.CurrentOwner} " +
-                "candidateFormed=True " +
-                "legalityEvaluated=True " +
-                "legalityResult=Illegal " +
-                "buffered=True " +
-                "applied=True " +
-                $"reasonCode={evt.ReasonCode} " +
-                $"dropReason={(markerWritten ? "None" : "MarkerWriteSkipped")}";
-
-            EnforcementLoggingPolicy.RecordEnforcementEvent(message, evt.Vehicle);
-        }
-
-        private static bool IsIllegalEgressReason(LaneTransitionViolationReasonCode reasonCode)
-        {
-            switch (reasonCode)
-            {
-                case LaneTransitionViolationReasonCode.ExitedParkingAccessWithoutSideAccess:
-                case LaneTransitionViolationReasonCode.ExitedGarageAccessWithoutSideAccess:
-                case LaneTransitionViolationReasonCode.ExitedParkingConnectionWithoutSideAccess:
-                case LaneTransitionViolationReasonCode.ExitedBuildingAccessConnectionWithoutSideAccess:
-                    return true;
-
-                default:
-                    return false;
-            }
-        }
     }
 }
-

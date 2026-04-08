@@ -12,7 +12,7 @@ namespace Traffic_Law_Enforcement {
                                                      ISerializable,
                                                      IPreDeserialize,
                                                      IPostDeserialize {
-        private const int kSerializationVersion = 13;
+        private const int kSerializationVersion = 12;
 
         private EntityQuery m_StatisticsQuery;
         private EntityQuery m_PublicTransportLaneViolationQuery;
@@ -637,28 +637,10 @@ namespace Traffic_Law_Enforcement {
             LogSaveLifecycleHook(
                 "SetDefaults",
                 context,
-                context.purpose == Purpose.LoadGame
-                    ? SaveLoadTraceRequestKind.Load
-                    : SaveLoadTraceRequestKind.None,
-                $"runtimeWorldGeneration={previousGeneration}->{RuntimeWorldGeneration}",
-                includeCurrentRuntimeTime: false);
+                $"runtimeWorldGeneration={previousGeneration}->{RuntimeWorldGeneration}");
             ResetRuntimeState();
-            EnforcementGameplaySettingsState previousSettings =
-                EnforcementGameplaySettingsService.Current;
-            EnforcementGameplaySettingsState initialSettings =
-                CreateInitialGameplaySettings(context);
-            EnforcementGameplaySettingsService.Apply(initialSettings);
-            Mod.Settings?.LogTrackedEnforcementSettingChanges(
-                "currentSave",
-                previousSettings,
-                initialSettings,
-                $"SetDefaults:{context.purpose}");
-            Mod.Settings?.LogDebugLoggingSettingsSnapshot(
-                $"SetDefaults:{context.purpose}");
-            Mod.Settings?.LogEnforcementSettingsSnapshot(
-                "currentSave",
-                EnforcementGameplaySettingsService.Current,
-                $"SetDefaults:{context.purpose}");
+            EnforcementGameplaySettingsService.Apply(
+                CreateInitialGameplaySettings(context));
             m_LoadedPublicTransportLaneVehicleStates.Clear();
             m_HasDeserializedData = false;
             m_ShouldClearLegacyRuntimeState =
@@ -667,11 +649,7 @@ namespace Traffic_Law_Enforcement {
         }
 
         public void PreDeserialize(Context context) {
-            LogSaveLifecycleHook(
-                "PreDeserialize",
-                context,
-                SaveLoadTraceRequestKind.Load,
-                includeCurrentRuntimeTime: false);
+            LogSaveLifecycleHook("PreDeserialize", context);
             ResetRuntimeState();
 
             m_LoadedPublicTransportLaneVehicleStates.Clear();
@@ -684,9 +662,7 @@ namespace Traffic_Law_Enforcement {
             LogSaveLifecycleHook(
                 "PostDeserialize",
                 context,
-                SaveLoadTraceRequestKind.Load,
                 $"hasDeserializedData={m_HasDeserializedData}, loadedVehicleStates={m_LoadedPublicTransportLaneVehicleStates.Count}");
-            SaveLoadTraceService.ClearIfKind(SaveLoadTraceRequestKind.Load);
             m_PendingPostDeserializeApply = true;
         }
 
@@ -705,13 +681,6 @@ namespace Traffic_Law_Enforcement {
             {
                 EnforcementPolicyImpactService.PrepareTrackingStateForPersistence();
             }
-
-            LogSerializeLifecycleHook();
-            Mod.Settings?.LogDebugLoggingSettingsSnapshot("Serialize");
-            Mod.Settings?.LogEnforcementSettingsSnapshot(
-                "currentSave",
-                EnforcementGameplaySettingsService.Current,
-                "Serialize");
 
             writer.Write(kSerializationVersion);
             writer.Write(string.IsNullOrWhiteSpace(Mod.CurrentModVersion) ? "unknown" : Mod.CurrentModVersion);
@@ -779,7 +748,6 @@ namespace Traffic_Law_Enforcement {
                                     avoidedRerouteEvents);
 
             WriteLoadedPublicTransportLaneVehicleStates(writer);
-            SaveLoadTraceService.ClearIfKind(SaveLoadTraceRequestKind.Save);
         }
 
         public void Deserialize<TReader>(TReader reader)
@@ -791,12 +759,10 @@ namespace Traffic_Law_Enforcement {
                 return;
             }
 
-            string fileModVersion = "unknown";
-            string fileGameVersion = "unknown";
             if (version >= 11)
             {
-                reader.Read(out fileModVersion);
-                reader.Read(out fileGameVersion);
+                reader.Read(out string _);
+                reader.Read(out string _);
             }
 
             EnforcementGameplaySettingsState gameplaySettings = ReadGameplaySettings(reader, version);
@@ -817,7 +783,7 @@ namespace Traffic_Law_Enforcement {
                 for (int index = 0; index < vehicleRecordCount; index += 1) {
                     reader.Read(out int vehicleId);
                     vehicleRecords[vehicleId] =
-                        ReadVehicleEnforcementRecord(reader, version);
+                        ReadVehicleEnforcementRecord(reader);
                 }
 
                 reader.Read(out int recordCount);
@@ -941,14 +907,7 @@ namespace Traffic_Law_Enforcement {
             PolicyImpactEventsReadResult policyImpactEventsReadResult =
                 ReadPolicyImpactEvents(reader, version);
 
-            EnforcementGameplaySettingsState previousSettings =
-                EnforcementGameplaySettingsService.Current;
             EnforcementGameplaySettingsService.Apply(gameplaySettings);
-            Mod.Settings?.LogTrackedEnforcementSettingChanges(
-                "currentSave",
-                previousSettings,
-                gameplaySettings,
-                "Deserialize");
             EnforcementTelemetry.LoadPersistentData(
                 statistics,
                 totalFineAmount,
@@ -982,20 +941,12 @@ namespace Traffic_Law_Enforcement {
                     policyImpactEventsReadResult.ActualViolationEvents,
                     policyImpactEventsReadResult.AvoidedRerouteEvents));
 
-            LogDeserializeLifecycleHook(
-                version,
-                fileModVersion,
-                fileGameVersion,
-                $"fineIncomeEvents={fineIncomeEvents.Count}, " +
-                $"reports={reports.Count}, " +
-                $"pathRequests={policyImpactEventsReadResult.PathRequestEvents.Count}, " +
+            Mod.log.Info(
+                "[ENFORCEMENT_SAVE_HOOK] hook=Deserialize, " +
+                $"fileVersion={version}, fineIncomeEvents={fineIncomeEvents.Count}, " +
+                $"reports={reports.Count}, pathRequests={policyImpactEventsReadResult.PathRequestEvents.Count}, " +
                 $"actualViolations={policyImpactEventsReadResult.ActualViolationEvents.Count}, " +
                 $"avoidedReroutes={policyImpactEventsReadResult.AvoidedRerouteEvents.Count}");
-            Mod.Settings?.LogDebugLoggingSettingsSnapshot("Deserialize");
-            Mod.Settings?.LogEnforcementSettingsSnapshot(
-                "currentSave",
-                EnforcementGameplaySettingsService.Current,
-                "Deserialize");
 
             m_HasDeserializedData = true;
             m_ShouldClearLegacyRuntimeState = false;
@@ -1101,81 +1052,18 @@ namespace Traffic_Law_Enforcement {
         private static void LogSaveLifecycleHook(
             string hookName,
             Context context,
-            SaveLoadTraceRequestKind expectedRequestKind =
-                SaveLoadTraceRequestKind.None,
-            string extra = null,
-            bool includeCurrentRuntimeTime = true) {
-            string suffix =
-                string.IsNullOrWhiteSpace(extra)
-                    ? string.Empty
-                    : $", {extra}";
-            string identitySuffix =
-                SaveLoadTraceService.FormatIdentitySuffix(expectedRequestKind);
-            string runtimeTimeFields =
-                includeCurrentRuntimeTime
-                    ? $"timeInitialized={EnforcementGameTime.IsInitialized}, " +
-                      $"monthTicks={EnforcementGameTime.CurrentTimestampMonthTicks}, "
-                    : string.Empty;
-
-            Mod.log.Info(
-                "[ENFORCEMENT_SAVE_HOOK] " +
-                $"hook={hookName}, purpose={context.purpose}, version={context.version}, " +
-                $"runtimeWorldGeneration={RuntimeWorldGeneration}, " +
-                runtimeTimeFields +
-                $"modVersion={GetCurrentModVersion()}, " +
-                $"gameVersion={GetCurrentGameVersion()}{identitySuffix}{suffix}");
-        }
-
-        private static void LogSerializeLifecycleHook() {
-            string identitySuffix =
-                SaveLoadTraceService.FormatIdentitySuffix(
-                    SaveLoadTraceRequestKind.Save);
-            Mod.log.Info(
-                "[ENFORCEMENT_SAVE_HOOK] " +
-                "hook=Serialize, " +
-                $"serializationVersion={kSerializationVersion}, " +
-                $"runtimeWorldGeneration={RuntimeWorldGeneration}, " +
-                $"timeInitialized={EnforcementGameTime.IsInitialized}, " +
-                $"monthTicks={EnforcementGameTime.CurrentTimestampMonthTicks}, " +
-                $"modVersion={GetCurrentModVersion()}, " +
-                $"gameVersion={GetCurrentGameVersion()}{identitySuffix}");
-        }
-
-        private static void LogDeserializeLifecycleHook(
-            int fileVersion,
-            string fileModVersion,
-            string fileGameVersion,
             string extra = null) {
             string suffix =
                 string.IsNullOrWhiteSpace(extra)
                     ? string.Empty
                     : $", {extra}";
-            string identitySuffix =
-                SaveLoadTraceService.FormatIdentitySuffix(
-                    SaveLoadTraceRequestKind.Load);
+
             Mod.log.Info(
                 "[ENFORCEMENT_SAVE_HOOK] " +
-                "hook=Deserialize, " +
-                $"fileVersion={fileVersion}, " +
+                $"hook={hookName}, purpose={context.purpose}, version={context.version}, " +
                 $"runtimeWorldGeneration={RuntimeWorldGeneration}, " +
                 $"timeInitialized={EnforcementGameTime.IsInitialized}, " +
-                $"monthTicks={EnforcementGameTime.CurrentTimestampMonthTicks}, " +
-                $"modVersion={GetCurrentModVersion()}, " +
-                $"gameVersion={GetCurrentGameVersion()}, " +
-                $"fileModVersion={NormalizeVersion(fileModVersion)}, " +
-                $"fileGameVersion={NormalizeVersion(fileGameVersion)}{identitySuffix}{suffix}");
-        }
-
-        private static string GetCurrentModVersion() {
-            return NormalizeVersion(Mod.CurrentModVersion);
-        }
-
-        private static string GetCurrentGameVersion() {
-            return NormalizeVersion(Mod.CurrentGameVersion);
-        }
-
-        private static string NormalizeVersion(string value) {
-            return string.IsNullOrWhiteSpace(value) ? "unknown" : value;
+                $"monthTicks={EnforcementGameTime.CurrentTimestampMonthTicks}{suffix}");
         }
 
         private static void ResetRuntimeState() {
@@ -1475,15 +1363,10 @@ namespace Traffic_Law_Enforcement {
             WriteTimestampList(writer, record.PublicTransportLaneTimestamps);
             WriteTimestampList(writer, record.MidBlockCrossingTimestamps);
             WriteTimestampList(writer, record.IntersectionMovementTimestamps);
-            writer.Write((byte)record.LastAppliedIllegalEgressMode);
-            writer.Write(record.LastAppliedIllegalEgressTimestampMonthTicks);
-            writer.Write(record.LastAppliedIllegalEgressOriginLaneId);
-            writer.Write(record.LastAppliedIllegalEgressRoadLaneId);
         }
 
         private static VehicleEnforcementRecord ReadVehicleEnforcementRecord<TReader>(
-            TReader reader,
-            int version)
+            TReader reader)
             where TReader : IReader {
             VehicleEnforcementRecord record = new VehicleEnforcementRecord();
             reader.Read(out record.TotalViolations);
@@ -1496,31 +1379,7 @@ namespace Traffic_Law_Enforcement {
             ReadTimestampList(reader, record.PublicTransportLaneTimestamps);
             ReadTimestampList(reader, record.MidBlockCrossingTimestamps);
             ReadTimestampList(reader, record.IntersectionMovementTimestamps);
-            if (version >= 13)
-            {
-                reader.Read(out byte illegalEgressModeValue);
-                record.LastAppliedIllegalEgressMode =
-                    ClampIllegalEgressApplyMode(illegalEgressModeValue);
-                reader.Read(out record.LastAppliedIllegalEgressTimestampMonthTicks);
-                reader.Read(out record.LastAppliedIllegalEgressOriginLaneId);
-                reader.Read(out record.LastAppliedIllegalEgressRoadLaneId);
-            }
             return record;
-        }
-
-        private static IllegalEgressApplyMode ClampIllegalEgressApplyMode(
-            byte value)
-        {
-            switch ((IllegalEgressApplyMode)value)
-            {
-                case IllegalEgressApplyMode.None:
-                case IllegalEgressApplyMode.Direct:
-                case IllegalEgressApplyMode.Carried:
-                    return (IllegalEgressApplyMode)value;
-
-                default:
-                    return IllegalEgressApplyMode.None;
-            }
         }
 
         private static void WriteTimestampList<TWriter>(

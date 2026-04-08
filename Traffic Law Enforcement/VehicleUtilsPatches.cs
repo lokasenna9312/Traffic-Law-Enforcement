@@ -417,6 +417,7 @@ namespace Traffic_Law_Enforcement
 
             Mod.log.Info(
                 $"FOCUSED_PT_LANE_COST: vehicle={vehicle}, " +
+                $"vehicleEntity={FocusedLoggingService.FormatEntity(vehicle)}, " +
                 $"logIndex={nextCount}, " +
                 $"rules={FormatRuleFlags(rules)}, " +
                 $"ignoredRules={FormatRuleFlags(parameters.m_IgnoredRules)}, " +
@@ -427,7 +428,7 @@ namespace Traffic_Law_Enforcement
                 $"moneyWeight={moneyWeight:0.###}, " +
                 $"configuredFine={configuredFine}, " +
                 $"addedPenalty={addedPenalty:0.###}, " +
-                $"parkingTarget={parameters.m_ParkingTarget}");
+                $"parkingTarget={FocusedLoggingService.FormatEntity(parameters.m_ParkingTarget)}");
         }
 
         private static void SetRuleFlag(ref RuleFlags rules, RuleFlags flag, bool enabled)
@@ -518,4 +519,3 @@ namespace Traffic_Law_Enforcement
         }
     }
 }
-

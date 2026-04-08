@@ -58,7 +58,7 @@ The following options can be configured either for the currently loaded save fil
 - I would like serious habitual traffic offenders to face harsher penalties, such as having their driver's licenses suspended or revoked, or having them sent to jail, but I could not implement that either because of my limited coding skills.
 
 ### 7. Known Issues : Investigation and Fixing in Progress
-- Mid-block enforcement requires total rebuild. If this mod distorts vehicles' paths, try disabling that enforcement option.
+- Holefully path churning issue may be fixed. I alomst negated mid-block enforcement which is the main cause of path churning, but I need more testing to confirm that.
 - If you find bugs or issues, please be free to report them here or at GitHub.
 
 ## 한국어 설명
@@ -101,7 +101,7 @@ The following options can be configured either for the currently loaded save fil
 - 심각한 상습 교통법규 위반자들에게는 더욱 강한 처벌(예: 운전면허 정지 또는 취소, 교도소 수감)을 적용하고 싶었지만, 그 기능 역시 제 코딩 실력이 부족해서 구현하지 못했습니다.
 
 ### 7. 알려진 문제점 : 조사 및 수정 진행 중
-- 중앙선 침범 단속 로직은 아예 처음부터 새로 만들어야 합니다. 이 모드 때문에 차량 경로가 왜곡된다면, 그 단속 옵션을 꺼 보세요.
+- 차량 경로 왜곡 문제가 해결됐기를 바랍니다. 차량 경로 왜곡의 주요 원인인 중앙선 침범 단속 로직을 거의 없애긴 했지만, 그게 정말 효과가 있는지는 더 많은 테스트가 필요합니다.
 - 버그나 문제점을 발견하시면, 이 글이나 GitHub에 자유롭게 제보해주세요.
 	</LongDescription>
 	<!--Thumbnail-->

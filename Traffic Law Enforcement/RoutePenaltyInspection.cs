@@ -1,5 +1,4 @@
 using System.Text;
-using System.Collections.Generic;
 using Game.Common;
 using Game.Net;
 using Game.Pathfind;
@@ -86,7 +85,6 @@ namespace Traffic_Law_Enforcement
         public readonly int TotalPenalty;
         public readonly string Breakdown;
         public readonly RoutePenaltyTagSnapshot TagSnapshot;
-        public readonly RoutePenaltyTagSnapshot NormalizedTagSnapshot;
         public readonly bool PublicTransportLanePolicyResolved;
         public readonly bool AllowedOnPublicTransportLane;
 
@@ -95,7 +93,6 @@ namespace Traffic_Law_Enforcement
             RoutePenaltyProfile profile,
             string breakdown,
             RoutePenaltyTagSnapshot tagSnapshot,
-            RoutePenaltyTagSnapshot normalizedTagSnapshot,
             bool publicTransportLanePolicyResolved,
             bool allowedOnPublicTransportLane)
         {
@@ -104,7 +101,6 @@ namespace Traffic_Law_Enforcement
             TotalPenalty = RoutePenaltyInspection.CalculateTotalPenalty(profile);
             Breakdown = breakdown;
             TagSnapshot = tagSnapshot;
-            NormalizedTagSnapshot = normalizedTagSnapshot;
             PublicTransportLanePolicyResolved = publicTransportLanePolicyResolved;
             AllowedOnPublicTransportLane = allowedOnPublicTransportLane;
         }
@@ -125,30 +121,6 @@ namespace Traffic_Law_Enforcement
         private const int LaneKindTokenGarageLane = 4;
         private const int LaneKindTokenAccessConnection = 5;
         private const int LaneKindTokenIntersectionBase = 0x100;
-
-        private enum NormalizedAccessConnectionKind : byte
-        {
-            None = 0,
-            Parking = 1,
-            NonRoad = 2,
-        }
-
-        private enum NormalizedAccessEndpointKind : byte
-        {
-            None = 0,
-            Parking = 1,
-            Garage = 2,
-        }
-
-        private enum AccessWindowBlockedReason : byte
-        {
-            None = 0,
-            NoThreeLaneWindowInCurrentSequence = 1,
-            NoAccessConnectionInCurrentSequence = 2,
-            MiddleRoadConnectionExcluded = 3,
-            MissingExplicitEndpoint = 4,
-            ExactAnchorPairNotIllegal = 5,
-        }
 
         private struct RoutePenaltyTagCollector
         {
@@ -252,38 +224,53 @@ namespace Traffic_Law_Enforcement
                     ref context,
                     out bool allowedOnPublicTransportLane);
 
-            List<Entity> laneSequence =
-                BuildLaneSequence(currentLane, navigationLanes, hasNavigationLanes);
             RoutePenaltyTagCollector penaltyTags = default;
-            RoutePenaltyTagCollector normalizedPenaltyTags = default;
 
             uint hash = kInitialRouteHash;
             bool previousUnauthorizedPublicTransportLane = false;
             Entity previousLane = Entity.Null;
 
-            for (int index = 0; index < laneSequence.Count; index += 1)
-            {
-                AppendLaneToProfile(
-                    laneSequence[index],
-                    publicTransportLanePolicyResolved,
-                    allowedOnPublicTransportLane,
-                    ref previousLane,
-                    ref previousUnauthorizedPublicTransportLane,
-                    ref profile,
-                    ref hash,
-                    ref penaltyTags,
-                    ref context,
-                    captureTagSummary,
-                    maxPenaltyTags);
-            }
+            AppendLaneToProfile(
+                currentLane,
+                publicTransportLanePolicyResolved,
+                allowedOnPublicTransportLane,
+                ref previousLane,
+                ref previousUnauthorizedPublicTransportLane,
+                ref profile,
+                ref hash,
+                ref penaltyTags,
+                ref context,
+                captureTagSummary,
+                maxPenaltyTags);
 
-            if (captureTagSummary)
+            if (hasNavigationLanes)
             {
-                AppendNormalizedAccessTags(
-                    laneSequence,
-                    ref normalizedPenaltyTags,
-                    ref context,
-                    maxPenaltyTags);
+                for (int index = 0; index < navigationLanes.Length; index++)
+                {
+                    Entity nextLane = navigationLanes[index].m_Lane;
+                    if (nextLane == Entity.Null)
+                    {
+                        continue;
+                    }
+
+                    if (index == 0 && nextLane == previousLane)
+                    {
+                        continue;
+                    }
+
+                    AppendLaneToProfile(
+                        nextLane,
+                        publicTransportLanePolicyResolved,
+                        allowedOnPublicTransportLane,
+                        ref previousLane,
+                        ref previousUnauthorizedPublicTransportLane,
+                        ref profile,
+                        ref hash,
+                        ref penaltyTags,
+                        ref context,
+                        captureTagSummary,
+                        maxPenaltyTags);
+                }
             }
 
             return new RoutePenaltyInspectionResult(
@@ -291,7 +278,6 @@ namespace Traffic_Law_Enforcement
                 profile,
                 captureBreakdown ? BuildBreakdown(profile) : null,
                 captureTagSummary ? penaltyTags.ToSnapshot() : default,
-                captureTagSummary ? normalizedPenaltyTags.ToSnapshot() : default,
                 publicTransportLanePolicyResolved,
                 allowedOnPublicTransportLane);
         }
@@ -364,61 +350,6 @@ namespace Traffic_Law_Enforcement
             }
 
             return summary.ToString();
-        }
-
-        // Diagnostic-only summary of what the current inspection lane sequence
-        // contains for exact and normalized illegal-access evidence.
-        internal static string BuildFocusedAccessWindowDiagnostic(
-            Entity vehicle,
-            Entity currentLane,
-            DynamicBuffer<CarNavigationLane> navigationLanes,
-            bool hasNavigationLanes,
-            ref RoutePenaltyInspectionContext context)
-        {
-            List<Entity> laneSequence =
-                BuildLaneSequence(currentLane, navigationLanes, hasNavigationLanes);
-
-            FindFirstExactIllegalAccessPair(
-                laneSequence,
-                out Entity exactSource,
-                out Entity exactTarget,
-                out LaneTransitionViolationReasonCode exactReasonCode,
-                ref context);
-
-            AccessWindowBlockedReason blockedReason =
-                FindFirstNormalizedAccessWindow(
-                    laneSequence,
-                    out Entity normalizedPrevious,
-                    out Entity normalizedCurrent,
-                    out Entity normalizedNext,
-                    out LaneTransitionViolationReasonCode normalizedReasonCode,
-                    out Entity blockedPrevious,
-                    out Entity blockedCurrent,
-                    out Entity blockedNext,
-                    ref context);
-
-            string exactFirst =
-                exactReasonCode == LaneTransitionViolationReasonCode.None
-                    ? "none"
-                    : $"{FormatEntity(exactSource)}->{FormatEntity(exactTarget)}:{exactReasonCode}";
-
-            string normalizedFirst =
-                FormatNormalizedAccessMatch(
-                    normalizedPrevious,
-                    normalizedCurrent,
-                    normalizedNext,
-                    normalizedReasonCode);
-
-            string normalizedBlocked =
-                normalizedReasonCode != LaneTransitionViolationReasonCode.None
-                    ? "none"
-                    : FormatBlockedReason(blockedReason, blockedPrevious, blockedCurrent, blockedNext);
-
-            return
-                $"[FOCUSED_ACCESS_WINDOW] vehicle={FormatEntity(vehicle)}, " +
-                $"exactFirst={exactFirst}, " +
-                $"normalizedFirst={normalizedFirst}, " +
-                $"normalizedBlocked={normalizedBlocked}";
         }
 
         internal static bool TryResolveAllowedOnPublicTransportLane(
@@ -779,721 +710,6 @@ namespace Traffic_Law_Enforcement
             return entity == Entity.Null
                 ? "none"
                 : $"#{entity.Index}:v{entity.Version}";
-        }
-
-        private static List<Entity> BuildLaneSequence(
-            Entity currentLane,
-            DynamicBuffer<CarNavigationLane> navigationLanes,
-            bool hasNavigationLanes)
-        {
-            int capacity = hasNavigationLanes ? navigationLanes.Length + 1 : 1;
-            List<Entity> laneSequence = new List<Entity>(capacity);
-            AppendLaneToSequence(currentLane, laneSequence);
-
-            if (!hasNavigationLanes)
-            {
-                return laneSequence;
-            }
-
-            for (int index = 0; index < navigationLanes.Length; index += 1)
-            {
-                AppendLaneToSequence(navigationLanes[index].m_Lane, laneSequence);
-            }
-
-            return laneSequence;
-        }
-
-        private static void AppendLaneToSequence(Entity lane, List<Entity> laneSequence)
-        {
-            if (lane == Entity.Null)
-            {
-                return;
-            }
-
-            if (laneSequence.Count > 0 &&
-                laneSequence[laneSequence.Count - 1] == lane)
-            {
-                return;
-            }
-
-            laneSequence.Add(lane);
-        }
-
-        private static void FindFirstExactIllegalAccessPair(
-            List<Entity> laneSequence,
-            out Entity sourceLane,
-            out Entity targetLane,
-            out LaneTransitionViolationReasonCode reasonCode,
-            ref RoutePenaltyInspectionContext context)
-        {
-            sourceLane = Entity.Null;
-            targetLane = Entity.Null;
-            reasonCode = LaneTransitionViolationReasonCode.None;
-
-            for (int index = 1; index < laneSequence.Count; index += 1)
-            {
-                Entity previousLane = laneSequence[index - 1];
-                Entity currentLane = laneSequence[index];
-
-                if (!MidBlockCrossingPolicy.TryGetIllegalAccessTransition(
-                        context.EntityManager,
-                        previousLane,
-                        currentLane,
-                        out LaneTransitionViolationReasonCode exactReasonCode))
-                {
-                    continue;
-                }
-
-                sourceLane = previousLane;
-                targetLane = currentLane;
-                reasonCode = exactReasonCode;
-                return;
-            }
-        }
-
-        private static AccessWindowBlockedReason FindFirstNormalizedAccessWindow(
-            List<Entity> laneSequence,
-            out Entity previousLane,
-            out Entity currentLane,
-            out Entity nextLane,
-            out LaneTransitionViolationReasonCode reasonCode,
-            out Entity blockedPreviousLane,
-            out Entity blockedCurrentLane,
-            out Entity blockedNextLane,
-            ref RoutePenaltyInspectionContext context)
-        {
-            previousLane = Entity.Null;
-            currentLane = Entity.Null;
-            nextLane = Entity.Null;
-            reasonCode = LaneTransitionViolationReasonCode.None;
-            blockedPreviousLane = Entity.Null;
-            blockedCurrentLane = Entity.Null;
-            blockedNextLane = Entity.Null;
-
-            if (laneSequence.Count >= 2 &&
-                TryNormalizeTerminalAccessEgress(
-                    laneSequence[0],
-                    laneSequence[1],
-                    out reasonCode,
-                    ref context))
-            {
-                previousLane = laneSequence[0];
-                currentLane = laneSequence[1];
-                nextLane = Entity.Null;
-                return AccessWindowBlockedReason.None;
-            }
-
-            if (laneSequence.Count == 2 &&
-                TryNormalizeTerminalAccessIngress(
-                    laneSequence[laneSequence.Count - 2],
-                    laneSequence[laneSequence.Count - 1],
-                    out reasonCode,
-                    ref context))
-            {
-                previousLane = laneSequence[laneSequence.Count - 2];
-                currentLane = laneSequence[laneSequence.Count - 1];
-                nextLane = Entity.Null;
-                return AccessWindowBlockedReason.None;
-            }
-
-            if (laneSequence.Count < 3)
-            {
-                return AccessWindowBlockedReason.NoThreeLaneWindowInCurrentSequence;
-            }
-
-            bool sawAccessConnection = false;
-            AccessWindowBlockedReason firstBlockedReason = AccessWindowBlockedReason.None;
-
-            for (int index = 1; index + 1 < laneSequence.Count; index += 1)
-            {
-                Entity candidatePreviousLane = laneSequence[index - 1];
-                Entity candidateCurrentLane = laneSequence[index];
-                Entity candidateNextLane = laneSequence[index + 1];
-
-                if (!context.ConnectionLaneData.TryGetComponent(
-                        candidateCurrentLane,
-                        out _))
-                {
-                    continue;
-                }
-
-                sawAccessConnection = true;
-
-                if (!TryGetNormalizableAccessConnectionKind(
-                        candidateCurrentLane,
-                        out NormalizedAccessConnectionKind connectionKind,
-                        ref context))
-                {
-                    RecordBlockedWindow(
-                        ref firstBlockedReason,
-                        AccessWindowBlockedReason.MiddleRoadConnectionExcluded,
-                        candidatePreviousLane,
-                        candidateCurrentLane,
-                        candidateNextLane,
-                        ref blockedPreviousLane,
-                        ref blockedCurrentLane,
-                        ref blockedNextLane);
-                    continue;
-                }
-
-                bool previousIsRoad =
-                    IsRoadLane(candidatePreviousLane, ref context);
-                bool nextIsRoad =
-                    IsRoadLane(candidateNextLane, ref context);
-                bool previousIsExplicitEndpoint =
-                    TryGetExplicitAccessEndpointKind(
-                        candidatePreviousLane,
-                        out _,
-                        ref context);
-                bool nextIsExplicitEndpoint =
-                    TryGetExplicitAccessEndpointKind(
-                        candidateNextLane,
-                        out _,
-                        ref context);
-
-                if (TryNormalizeAccessIngress(
-                        candidatePreviousLane,
-                        candidateCurrentLane,
-                        candidateNextLane,
-                        connectionKind,
-                        out reasonCode,
-                        ref context))
-                {
-                    previousLane = candidatePreviousLane;
-                    currentLane = candidateCurrentLane;
-                    nextLane = candidateNextLane;
-                    return AccessWindowBlockedReason.None;
-                }
-
-                if (TryNormalizeAccessEgress(
-                        candidatePreviousLane,
-                        candidateCurrentLane,
-                        candidateNextLane,
-                        connectionKind,
-                        out reasonCode,
-                        ref context))
-                {
-                    previousLane = candidatePreviousLane;
-                    currentLane = candidateCurrentLane;
-                    nextLane = candidateNextLane;
-                    return AccessWindowBlockedReason.None;
-                }
-
-                if ((previousIsRoad && nextIsExplicitEndpoint) ||
-                    (previousIsExplicitEndpoint && nextIsRoad))
-                {
-                    RecordBlockedWindow(
-                        ref firstBlockedReason,
-                        AccessWindowBlockedReason.ExactAnchorPairNotIllegal,
-                        candidatePreviousLane,
-                        candidateCurrentLane,
-                        candidateNextLane,
-                        ref blockedPreviousLane,
-                        ref blockedCurrentLane,
-                        ref blockedNextLane);
-                    continue;
-                }
-
-                RecordBlockedWindow(
-                    ref firstBlockedReason,
-                    AccessWindowBlockedReason.MissingExplicitEndpoint,
-                    candidatePreviousLane,
-                    candidateCurrentLane,
-                    candidateNextLane,
-                    ref blockedPreviousLane,
-                    ref blockedCurrentLane,
-                    ref blockedNextLane);
-            }
-
-            if (!sawAccessConnection)
-            {
-                if (laneSequence.Count >= 2 &&
-                    context.ConnectionLaneData.HasComponent(laneSequence[0]))
-                {
-                    return AccessWindowBlockedReason.MissingExplicitEndpoint;
-                }
-
-                if (laneSequence.Count >= 2 &&
-                    context.ConnectionLaneData.HasComponent(
-                        laneSequence[laneSequence.Count - 1]))
-                {
-                    return AccessWindowBlockedReason.MissingExplicitEndpoint;
-                }
-
-                return AccessWindowBlockedReason.NoAccessConnectionInCurrentSequence;
-            }
-
-            if (laneSequence.Count > 2 &&
-                TryNormalizeTerminalAccessIngress(
-                    laneSequence[laneSequence.Count - 2],
-                    laneSequence[laneSequence.Count - 1],
-                    out reasonCode,
-                    ref context))
-            {
-                previousLane = laneSequence[laneSequence.Count - 2];
-                currentLane = laneSequence[laneSequence.Count - 1];
-                nextLane = Entity.Null;
-                return AccessWindowBlockedReason.None;
-            }
-
-            return firstBlockedReason == AccessWindowBlockedReason.None
-                ? AccessWindowBlockedReason.NoAccessConnectionInCurrentSequence
-                : firstBlockedReason;
-        }
-
-        private static void RecordBlockedWindow(
-            ref AccessWindowBlockedReason firstBlockedReason,
-            AccessWindowBlockedReason candidateReason,
-            Entity candidatePreviousLane,
-            Entity candidateCurrentLane,
-            Entity candidateNextLane,
-            ref Entity blockedPreviousLane,
-            ref Entity blockedCurrentLane,
-            ref Entity blockedNextLane)
-        {
-            if (firstBlockedReason != AccessWindowBlockedReason.None)
-            {
-                return;
-            }
-
-            firstBlockedReason = candidateReason;
-            blockedPreviousLane = candidatePreviousLane;
-            blockedCurrentLane = candidateCurrentLane;
-            blockedNextLane = candidateNextLane;
-        }
-
-        private static string FormatBlockedReason(
-            AccessWindowBlockedReason blockedReason,
-            Entity previousLane,
-            Entity currentLane,
-            Entity nextLane)
-        {
-            if (blockedReason == AccessWindowBlockedReason.None)
-            {
-                return "none";
-            }
-
-            string reasonText = blockedReason.ToString();
-            if (previousLane == Entity.Null ||
-                currentLane == Entity.Null ||
-                nextLane == Entity.Null)
-            {
-                return reasonText;
-            }
-
-            return
-                $"{reasonText}@" +
-                $"{FormatEntity(previousLane)}->{FormatEntity(currentLane)}->{FormatEntity(nextLane)}";
-        }
-
-        // Patch 2 keeps exact-pair legality in MidBlockCrossingPolicy and adds a
-        // separate interpretation layer for user-facing route inspection.
-        // A qualifying 3-lane road->connection->final-access window or a terminal
-        // road<->ConnectionLane(Parking) pair can produce one conceptual access
-        // label without replacing the exact tags.
-        private static void AppendNormalizedAccessTags(
-            List<Entity> laneSequence,
-            ref RoutePenaltyTagCollector normalizedPenaltyTags,
-            ref RoutePenaltyInspectionContext context,
-            int maxPenaltyTags)
-        {
-            if (laneSequence.Count >= 2 &&
-                TryNormalizeTerminalAccessEgress(
-                    laneSequence[0],
-                    laneSequence[1],
-                    out LaneTransitionViolationReasonCode headReasonCode,
-                    ref context))
-            {
-                normalizedPenaltyTags.Append(
-                    EncodeMidBlockPenaltyTag(headReasonCode),
-                    maxPenaltyTags);
-            }
-
-            for (int index = 1; index + 1 < laneSequence.Count; index += 1)
-            {
-                if (TryGetNormalizedAccessPenaltyToken(
-                        laneSequence[index - 1],
-                        laneSequence[index],
-                        laneSequence[index + 1],
-                        out int token,
-                        ref context))
-                {
-                    normalizedPenaltyTags.Append(token, maxPenaltyTags);
-                }
-            }
-
-            if (laneSequence.Count >= 2 &&
-                TryNormalizeTerminalAccessIngress(
-                    laneSequence[laneSequence.Count - 2],
-                    laneSequence[laneSequence.Count - 1],
-                    out LaneTransitionViolationReasonCode tailReasonCode,
-                    ref context))
-            {
-                normalizedPenaltyTags.Append(
-                    EncodeMidBlockPenaltyTag(tailReasonCode),
-                    maxPenaltyTags);
-            }
-        }
-
-        private static bool TryGetNormalizedAccessPenaltyToken(
-            Entity previousLane,
-            Entity currentLane,
-            Entity nextLane,
-            out int token,
-            ref RoutePenaltyInspectionContext context)
-        {
-            token = 0;
-
-            if (!TryGetNormalizedAccessReason(
-                    previousLane,
-                    currentLane,
-                    nextLane,
-                    out LaneTransitionViolationReasonCode reasonCode,
-                    ref context))
-            {
-                return false;
-            }
-
-            token = EncodeMidBlockPenaltyTag(reasonCode);
-            return true;
-        }
-
-        private static bool TryGetNormalizedAccessReason(
-            Entity previousLane,
-            Entity currentLane,
-            Entity nextLane,
-            out LaneTransitionViolationReasonCode reasonCode,
-            ref RoutePenaltyInspectionContext context)
-        {
-            reasonCode = LaneTransitionViolationReasonCode.None;
-
-            if (!TryGetNormalizableAccessConnectionKind(
-                    currentLane,
-                    out NormalizedAccessConnectionKind connectionKind,
-                    ref context))
-            {
-                return false;
-            }
-
-            if (TryNormalizeAccessIngress(
-                    previousLane,
-                    currentLane,
-                    nextLane,
-                    connectionKind,
-                    out reasonCode,
-                    ref context))
-            {
-                return true;
-            }
-
-            return TryNormalizeAccessEgress(
-                previousLane,
-                currentLane,
-                nextLane,
-                connectionKind,
-                out reasonCode,
-                ref context);
-        }
-
-        private static bool TryNormalizeTerminalAccessIngress(
-            Entity previousLane,
-            Entity terminalLane,
-            out LaneTransitionViolationReasonCode reasonCode,
-            ref RoutePenaltyInspectionContext context)
-        {
-            reasonCode = LaneTransitionViolationReasonCode.None;
-
-            if (!IsRoadLane(previousLane, ref context) ||
-                !TryGetTerminalParkingConnectionEndpointKind(
-                    terminalLane,
-                    out NormalizedAccessEndpointKind endpointKind,
-                    ref context))
-            {
-                return false;
-            }
-
-            if (!MidBlockCrossingPolicy.TryGetIllegalAccessTransition(
-                    context.EntityManager,
-                    previousLane,
-                    terminalLane,
-                    out LaneTransitionViolationReasonCode exactReason) ||
-                !IsAccessIngressReason(exactReason))
-            {
-                return false;
-            }
-
-            reasonCode = endpointKind switch
-            {
-                NormalizedAccessEndpointKind.Garage =>
-                    LaneTransitionViolationReasonCode.EnteredGarageAccessWithoutSideAccess,
-                NormalizedAccessEndpointKind.Parking =>
-                    LaneTransitionViolationReasonCode.EnteredParkingAccessWithoutSideAccess,
-                _ => LaneTransitionViolationReasonCode.None,
-            };
-
-            return reasonCode != LaneTransitionViolationReasonCode.None;
-        }
-
-        private static bool TryNormalizeTerminalAccessEgress(
-            Entity terminalLane,
-            Entity nextLane,
-            out LaneTransitionViolationReasonCode reasonCode,
-            ref RoutePenaltyInspectionContext context)
-        {
-            reasonCode = LaneTransitionViolationReasonCode.None;
-
-            if (!IsRoadLane(nextLane, ref context) ||
-                !TryGetTerminalParkingConnectionEndpointKind(
-                    terminalLane,
-                    out NormalizedAccessEndpointKind endpointKind,
-                    ref context))
-            {
-                return false;
-            }
-
-            if (!MidBlockCrossingPolicy.TryGetIllegalAccessTransition(
-                    context.EntityManager,
-                    terminalLane,
-                    nextLane,
-                    out LaneTransitionViolationReasonCode exactReason) ||
-                !IsAccessEgressReason(exactReason))
-            {
-                return false;
-            }
-
-            reasonCode = endpointKind switch
-            {
-                NormalizedAccessEndpointKind.Garage =>
-                    LaneTransitionViolationReasonCode.ExitedGarageAccessWithoutSideAccess,
-                NormalizedAccessEndpointKind.Parking =>
-                    LaneTransitionViolationReasonCode.ExitedParkingAccessWithoutSideAccess,
-                _ => LaneTransitionViolationReasonCode.None,
-            };
-
-            return reasonCode != LaneTransitionViolationReasonCode.None;
-        }
-
-        private static bool TryNormalizeAccessIngress(
-            Entity previousLane,
-            Entity currentLane,
-            Entity nextLane,
-            NormalizedAccessConnectionKind connectionKind,
-            out LaneTransitionViolationReasonCode reasonCode,
-            ref RoutePenaltyInspectionContext context)
-        {
-            reasonCode = LaneTransitionViolationReasonCode.None;
-
-            if (connectionKind == NormalizedAccessConnectionKind.None ||
-                !IsRoadLane(previousLane, ref context) ||
-                !TryGetExplicitAccessEndpointKind(
-                    nextLane,
-                    out NormalizedAccessEndpointKind endpointKind,
-                    ref context))
-            {
-                return false;
-            }
-
-            if (!MidBlockCrossingPolicy.TryGetIllegalAccessTransition(
-                    context.EntityManager,
-                    previousLane,
-                    currentLane,
-                    out LaneTransitionViolationReasonCode exactReason) ||
-                !IsAccessIngressReason(exactReason))
-            {
-                return false;
-            }
-
-            reasonCode = endpointKind switch
-            {
-                NormalizedAccessEndpointKind.Garage =>
-                    LaneTransitionViolationReasonCode.EnteredGarageAccessWithoutSideAccess,
-                NormalizedAccessEndpointKind.Parking =>
-                    LaneTransitionViolationReasonCode.EnteredParkingAccessWithoutSideAccess,
-                _ => LaneTransitionViolationReasonCode.None,
-            };
-
-            return reasonCode != LaneTransitionViolationReasonCode.None;
-        }
-
-        private static bool TryNormalizeAccessEgress(
-            Entity previousLane,
-            Entity currentLane,
-            Entity nextLane,
-            NormalizedAccessConnectionKind connectionKind,
-            out LaneTransitionViolationReasonCode reasonCode,
-            ref RoutePenaltyInspectionContext context)
-        {
-            reasonCode = LaneTransitionViolationReasonCode.None;
-
-            if (connectionKind == NormalizedAccessConnectionKind.None ||
-                !TryGetExplicitAccessEndpointKind(
-                    previousLane,
-                    out NormalizedAccessEndpointKind endpointKind,
-                    ref context) ||
-                !IsRoadLane(nextLane, ref context))
-            {
-                return false;
-            }
-
-            if (!MidBlockCrossingPolicy.TryGetIllegalAccessTransition(
-                    context.EntityManager,
-                    currentLane,
-                    nextLane,
-                    out LaneTransitionViolationReasonCode exactReason) ||
-                !IsAccessEgressReason(exactReason))
-            {
-                return false;
-            }
-
-            reasonCode = endpointKind switch
-            {
-                NormalizedAccessEndpointKind.Garage =>
-                    LaneTransitionViolationReasonCode.ExitedGarageAccessWithoutSideAccess,
-                NormalizedAccessEndpointKind.Parking =>
-                    LaneTransitionViolationReasonCode.ExitedParkingAccessWithoutSideAccess,
-                _ => LaneTransitionViolationReasonCode.None,
-            };
-
-            return reasonCode != LaneTransitionViolationReasonCode.None;
-        }
-
-        private static bool TryGetNormalizableAccessConnectionKind(
-            Entity lane,
-            out NormalizedAccessConnectionKind kind,
-            ref RoutePenaltyInspectionContext context)
-        {
-            kind = NormalizedAccessConnectionKind.None;
-
-            if (!context.ConnectionLaneData.TryGetComponent(lane, out ConnectionLane connectionLane))
-            {
-                return false;
-            }
-
-            if ((connectionLane.m_Flags & ConnectionLaneFlags.Parking) != 0)
-            {
-                kind = NormalizedAccessConnectionKind.Parking;
-                return true;
-            }
-
-            if ((connectionLane.m_Flags & ConnectionLaneFlags.Road) == 0)
-            {
-                kind = NormalizedAccessConnectionKind.NonRoad;
-                return true;
-            }
-
-            return false;
-        }
-
-        private static bool TryGetExplicitAccessEndpointKind(
-            Entity lane,
-            out NormalizedAccessEndpointKind kind,
-            ref RoutePenaltyInspectionContext context)
-        {
-            kind = NormalizedAccessEndpointKind.None;
-
-            if (context.GarageLaneData.HasComponent(lane))
-            {
-                kind = NormalizedAccessEndpointKind.Garage;
-                return true;
-            }
-
-            if (context.ParkingLaneData.HasComponent(lane))
-            {
-                kind = NormalizedAccessEndpointKind.Parking;
-                return true;
-            }
-
-            return false;
-        }
-
-        private static bool TryGetTerminalParkingConnectionEndpointKind(
-            Entity lane,
-            out NormalizedAccessEndpointKind kind,
-            ref RoutePenaltyInspectionContext context)
-        {
-            kind = NormalizedAccessEndpointKind.None;
-
-            // Vanilla roadside-building car traversal can end directly on a
-            // ConnectionLane(Parking). Treat that terminal parking connection as
-            // sufficient conceptual endpoint evidence in the interpretation layer.
-            if (!context.ConnectionLaneData.TryGetComponent(lane, out ConnectionLane connectionLane) ||
-                (connectionLane.m_Flags & ConnectionLaneFlags.Parking) == 0)
-            {
-                return false;
-            }
-
-            if (context.GarageLaneData.HasComponent(lane))
-            {
-                kind = NormalizedAccessEndpointKind.Garage;
-                return true;
-            }
-
-            kind = NormalizedAccessEndpointKind.Parking;
-            return true;
-        }
-
-        private static string FormatNormalizedAccessMatch(
-            Entity previousLane,
-            Entity currentLane,
-            Entity nextLane,
-            LaneTransitionViolationReasonCode reasonCode)
-        {
-            if (reasonCode == LaneTransitionViolationReasonCode.None)
-            {
-                return "none";
-            }
-
-            if (nextLane == Entity.Null)
-            {
-                return
-                    $"{FormatEntity(previousLane)}->" +
-                    $"{FormatEntity(currentLane)}:{reasonCode}";
-            }
-
-            return
-                $"{FormatEntity(previousLane)}->" +
-                $"{FormatEntity(currentLane)}->" +
-                $"{FormatEntity(nextLane)}:{reasonCode}";
-        }
-
-        private static bool IsRoadLane(
-            Entity lane,
-            ref RoutePenaltyInspectionContext context)
-        {
-            return context.EdgeLaneData.HasComponent(lane) &&
-                context.CarLaneData.HasComponent(lane);
-        }
-
-        private static bool IsAccessIngressReason(
-            LaneTransitionViolationReasonCode reasonCode)
-        {
-            switch (reasonCode)
-            {
-                case LaneTransitionViolationReasonCode.EnteredGarageAccessWithoutSideAccess:
-                case LaneTransitionViolationReasonCode.EnteredParkingAccessWithoutSideAccess:
-                case LaneTransitionViolationReasonCode.EnteredParkingConnectionWithoutSideAccess:
-                case LaneTransitionViolationReasonCode.EnteredBuildingAccessConnectionWithoutSideAccess:
-                    return true;
-
-                default:
-                    return false;
-            }
-        }
-
-        private static bool IsAccessEgressReason(
-            LaneTransitionViolationReasonCode reasonCode)
-        {
-            switch (reasonCode)
-            {
-                case LaneTransitionViolationReasonCode.ExitedParkingAccessWithoutSideAccess:
-                case LaneTransitionViolationReasonCode.ExitedGarageAccessWithoutSideAccess:
-                case LaneTransitionViolationReasonCode.ExitedParkingConnectionWithoutSideAccess:
-                case LaneTransitionViolationReasonCode.ExitedBuildingAccessConnectionWithoutSideAccess:
-                    return true;
-
-                default:
-                    return false;
-            }
         }
 
         private static void AppendLaneToProfile(

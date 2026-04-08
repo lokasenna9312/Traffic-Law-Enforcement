@@ -7,149 +7,6 @@ namespace Traffic_Law_Enforcement
 {
     public static class MidBlockCrossingPolicy
     {
-        internal enum AccessIngressTraceFailReason : byte
-        {
-            None = 0,
-            PreviousNotRoad = 1,
-            CurrentNotConnectionLikeTarget = 2,
-            CurrentRoadFlaggedConnection = 3,
-            CurrentNotInsideAccessConnection = 4,
-            RoadAllowsGarageAccess = 5,
-            RoadAllowsParkingAccess = 6,
-            RoadAllowsParkingConnectionAccess = 7,
-            RoadAllowsBuildingAccess = 8,
-            NoIllegalIngressDetected = 9
-        }
-
-        internal static void TraceIllegalIngressTransition(
-            EntityManager entityManager,
-            Entity previousLane,
-            Entity currentLane,
-            out bool previousIsRoad,
-            out bool currentIsAccessTarget,
-            out bool ingressDetectResult,
-            out AccessIngressTraceFailReason failReason,
-            out LaneTransitionViolationReasonCode reasonCode)
-        {
-            reasonCode = LaneTransitionViolationReasonCode.None;
-            ingressDetectResult = false;
-            failReason = AccessIngressTraceFailReason.None;
-            currentIsAccessTarget = false;
-
-            previousIsRoad =
-                TryGetRoadCarLane(entityManager, previousLane, out CarLane sourceCarLane);
-
-            if (!previousIsRoad)
-            {
-                failReason = AccessIngressTraceFailReason.PreviousNotRoad;
-                return;
-            }
-
-            if (entityManager.HasComponent<GarageLane>(currentLane))
-            {
-                currentIsAccessTarget = true;
-
-                if (TryGetConnectionLane(entityManager, currentLane, out ConnectionLane garageConnectionLane))
-                {
-                    if (RoadAllowsGarageAccess(sourceCarLane, garageConnectionLane))
-                    {
-                        failReason = AccessIngressTraceFailReason.RoadAllowsGarageAccess;
-                        return;
-                    }
-                }
-                else if (RoadHasGenericSideConnection(sourceCarLane))
-                {
-                    failReason = AccessIngressTraceFailReason.RoadAllowsGarageAccess;
-                    return;
-                }
-
-                ingressDetectResult = true;
-                reasonCode = LaneTransitionViolationReasonCode.EnteredGarageAccessWithoutSideAccess;
-                return;
-            }
-
-            if (entityManager.HasComponent<ParkingLane>(currentLane))
-            {
-                currentIsAccessTarget = true;
-
-                ParkingLane parkingLane = entityManager.GetComponentData<ParkingLane>(currentLane);
-                if (RoadAllowsParkingAccess(sourceCarLane, parkingLane))
-                {
-                    failReason = AccessIngressTraceFailReason.RoadAllowsParkingAccess;
-                    return;
-                }
-
-                ingressDetectResult = true;
-                reasonCode = LaneTransitionViolationReasonCode.EnteredParkingAccessWithoutSideAccess;
-                return;
-            }
-
-            if (!entityManager.HasComponent<ConnectionLane>(currentLane))
-            {
-                failReason = AccessIngressTraceFailReason.CurrentNotConnectionLikeTarget;
-                return;
-            }
-
-            ConnectionLane connectionLane = entityManager.GetComponentData<ConnectionLane>(currentLane);
-
-            if ((connectionLane.m_Flags & ConnectionLaneFlags.Parking) != 0)
-            {
-                currentIsAccessTarget = true;
-
-                if (RoadAllowsParkingConnectionAccess(sourceCarLane, connectionLane))
-                {
-                    failReason = AccessIngressTraceFailReason.RoadAllowsParkingConnectionAccess;
-                    return;
-                }
-
-                ingressDetectResult = true;
-                reasonCode = LaneTransitionViolationReasonCode.EnteredParkingConnectionWithoutSideAccess;
-                return;
-            }
-
-            if ((connectionLane.m_Flags & ConnectionLaneFlags.Road) != 0)
-            {
-                failReason = AccessIngressTraceFailReason.CurrentRoadFlaggedConnection;
-                return;
-            }
-
-            if (!IsInsideAccessConnection(connectionLane))
-            {
-                failReason = AccessIngressTraceFailReason.CurrentNotInsideAccessConnection;
-                return;
-            }
-
-            currentIsAccessTarget = true;
-
-            if (RoadAllowsBuildingAccess(sourceCarLane))
-            {
-                failReason = AccessIngressTraceFailReason.RoadAllowsBuildingAccess;
-                return;
-            }
-
-            ingressDetectResult = true;
-            reasonCode = LaneTransitionViolationReasonCode.EnteredBuildingAccessConnectionWithoutSideAccess;
-        }
-
-        internal enum AccessEgressTraceFailReason : byte
-        {
-            None = 0,
-            PreviousNotAccessOrigin = 1,
-            CurrentNotRoad = 2,
-            RoadAllowsParkingAccess = 3,
-            RoadAllowsGarageAccess = 4,
-            RoadAllowsParkingConnectionAccess = 5,
-            RoadAllowsBuildingAccess = 6,
-        }
-
-        [System.Flags]
-        private enum AccessSide : byte
-        {
-            None = 0,
-            Left = 1 << 0,
-            Right = 1 << 1,
-        }
-
         public static bool TryGetIllegalTransition(
             EntityManager entityManager,
             Entity sourceLane,
@@ -222,46 +79,6 @@ namespace Traffic_Law_Enforcement
                 out reasonCode);
         }
 
-        public static bool TryGetIllegalEgressTransition(
-            EntityManager entityManager,
-            Entity sourceLane,
-            Entity targetLane,
-            out LaneTransitionViolationReasonCode reasonCode)
-        {
-            reasonCode = LaneTransitionViolationReasonCode.None;
-
-            if (sourceLane == Entity.Null || targetLane == Entity.Null || sourceLane == targetLane)
-            {
-                return false;
-            }
-
-            return TryDetectIllegalEgress(
-                entityManager,
-                sourceLane,
-                targetLane,
-                out reasonCode);
-        }
-
-        public static bool TryGetOppositeFlowSameRoadSegmentTransition(
-            EntityManager entityManager,
-            Entity sourceLane,
-            Entity targetLane,
-            out LaneTransitionViolationReasonCode reasonCode)
-        {
-            reasonCode = LaneTransitionViolationReasonCode.None;
-
-            if (sourceLane == Entity.Null || targetLane == Entity.Null || sourceLane == targetLane)
-            {
-                return false;
-            }
-
-            return TryDetectOppositeFlowSameRoadSegment(
-                entityManager,
-                sourceLane,
-                targetLane,
-                out reasonCode);
-        }
-
         public static bool IsAccessTransitionReason(
             LaneTransitionViolationReasonCode reasonCode)
         {
@@ -280,132 +97,6 @@ namespace Traffic_Law_Enforcement
                 default:
                     return false;
             }
-        }
-
-        public static bool TryGetIllegalIngressTransition(
-            EntityManager entityManager,
-            Entity sourceLane,
-            Entity targetLane,
-            out LaneTransitionViolationReasonCode reasonCode)
-        {
-            reasonCode = LaneTransitionViolationReasonCode.None;
-
-            if (sourceLane == Entity.Null || targetLane == Entity.Null || sourceLane == targetLane)
-            {
-                return false;
-            }
-
-            return TryDetectIllegalIngress(
-                entityManager,
-                sourceLane,
-                targetLane,
-                out reasonCode);
-        }
-
-        internal static void TraceIllegalEgressTransition(
-            EntityManager entityManager,
-            Entity sourceLane,
-            Entity targetLane,
-            out bool previousIsAccessOrigin,
-            out bool currentIsRoad,
-            out bool egressDetectResult,
-            out AccessEgressTraceFailReason failReason,
-            out LaneTransitionViolationReasonCode reasonCode)
-        {
-            previousIsAccessOrigin = IsAccessOrigin(entityManager, sourceLane);
-            currentIsRoad = TryGetRoadCarLane(entityManager, targetLane, out CarLane targetCarLane);
-            egressDetectResult = false;
-            failReason = AccessEgressTraceFailReason.None;
-            reasonCode = LaneTransitionViolationReasonCode.None;
-
-            if (!previousIsAccessOrigin)
-            {
-                failReason = AccessEgressTraceFailReason.PreviousNotAccessOrigin;
-                return;
-            }
-
-            if (!currentIsRoad)
-            {
-                failReason = AccessEgressTraceFailReason.CurrentNotRoad;
-                return;
-            }
-
-            if (entityManager.HasComponent<ParkingLane>(sourceLane))
-            {
-                ParkingLane parkingLane = entityManager.GetComponentData<ParkingLane>(sourceLane);
-                if (RoadAllowsParkingAccess(targetCarLane, parkingLane))
-                {
-                    failReason = AccessEgressTraceFailReason.RoadAllowsParkingAccess;
-                    return;
-                }
-
-                egressDetectResult = true;
-                reasonCode = LaneTransitionViolationReasonCode.ExitedParkingAccessWithoutSideAccess;
-                return;
-            }
-
-            if (entityManager.HasComponent<GarageLane>(sourceLane))
-            {
-                if (TryGetConnectionLane(entityManager, sourceLane, out ConnectionLane garageConnectionLane))
-                {
-                    if (RoadAllowsGarageAccess(targetCarLane, garageConnectionLane))
-                    {
-                        failReason = AccessEgressTraceFailReason.RoadAllowsGarageAccess;
-                        return;
-                    }
-                }
-                else if (RoadHasGenericSideConnection(targetCarLane))
-                {
-                    failReason = AccessEgressTraceFailReason.RoadAllowsGarageAccess;
-                    return;
-                }
-
-                egressDetectResult = true;
-                reasonCode = LaneTransitionViolationReasonCode.ExitedGarageAccessWithoutSideAccess;
-                return;
-            }
-
-            if (!entityManager.HasComponent<ConnectionLane>(sourceLane))
-            {
-                failReason = AccessEgressTraceFailReason.PreviousNotAccessOrigin;
-                return;
-            }
-
-            ConnectionLane connectionLane = entityManager.GetComponentData<ConnectionLane>(sourceLane);
-
-            if ((connectionLane.m_Flags & ConnectionLaneFlags.Parking) != 0)
-            {
-                if (RoadAllowsParkingConnectionAccess(targetCarLane, connectionLane))
-                {
-                    failReason = AccessEgressTraceFailReason.RoadAllowsParkingConnectionAccess;
-                    return;
-                }
-
-                egressDetectResult = true;
-                reasonCode = LaneTransitionViolationReasonCode.ExitedParkingConnectionWithoutSideAccess;
-                return;
-            }
-
-            if ((connectionLane.m_Flags & ConnectionLaneFlags.Road) == 0)
-            {
-                if (!IsInsideAccessConnection(connectionLane))
-                {
-                    failReason = AccessEgressTraceFailReason.PreviousNotAccessOrigin;
-                    return;
-                }
-
-                if (RoadAllowsBuildingAccess(targetCarLane))
-                {
-                    failReason = AccessEgressTraceFailReason.RoadAllowsBuildingAccess;
-                    return;
-                }
-
-                egressDetectResult = true;
-                reasonCode = LaneTransitionViolationReasonCode.ExitedBuildingAccessConnectionWithoutSideAccess;
-                return;
-            }
-
-            failReason = AccessEgressTraceFailReason.PreviousNotAccessOrigin;
         }
 
         private static bool TryDetectOppositeFlowSameRoadSegment(
@@ -453,37 +144,26 @@ namespace Traffic_Law_Enforcement
         {
             reasonCode = LaneTransitionViolationReasonCode.None;
 
-            if (!TryGetRoadCarLane(entityManager, sourceLane, out CarLane sourceCarLane))
+            if (!entityManager.HasComponent<EdgeLane>(sourceLane) ||
+                !entityManager.HasComponent<CarLane>(sourceLane))
+            {
+                return false;
+            }
+
+            CarLane sourceCarLane = entityManager.GetComponentData<CarLane>(sourceLane);
+            if (LaneAllowsSideAccess(sourceCarLane))
             {
                 return false;
             }
 
             if (entityManager.HasComponent<GarageLane>(targetLane))
             {
-                if (TryGetConnectionLane(entityManager, targetLane, out ConnectionLane garageConnectionLane))
-                {
-                    if (RoadAllowsGarageAccess(sourceCarLane, garageConnectionLane))
-                    {
-                        return false;
-                    }
-                }
-                else if (RoadHasGenericSideConnection(sourceCarLane))
-                {
-                    return false;
-                }
-
                 reasonCode = LaneTransitionViolationReasonCode.EnteredGarageAccessWithoutSideAccess;
                 return true;
             }
 
             if (entityManager.HasComponent<ParkingLane>(targetLane))
             {
-                ParkingLane parkingLane = entityManager.GetComponentData<ParkingLane>(targetLane);
-                if (RoadAllowsParkingAccess(sourceCarLane, parkingLane))
-                {
-                    return false;
-                }
-
                 reasonCode = LaneTransitionViolationReasonCode.EnteredParkingAccessWithoutSideAccess;
                 return true;
             }
@@ -497,27 +177,12 @@ namespace Traffic_Law_Enforcement
 
             if ((connectionLane.m_Flags & ConnectionLaneFlags.Parking) != 0)
             {
-                if (RoadAllowsParkingConnectionAccess(sourceCarLane, connectionLane))
-                {
-                    return false;
-                }
-
                 reasonCode = LaneTransitionViolationReasonCode.EnteredParkingConnectionWithoutSideAccess;
                 return true;
             }
 
             if ((connectionLane.m_Flags & ConnectionLaneFlags.Road) == 0)
             {
-                if (!IsInsideAccessConnection(connectionLane))
-                {
-                    return false;
-                }
-
-                if (RoadAllowsBuildingAccess(sourceCarLane))
-                {
-                    return false;
-                }
-
                 reasonCode = LaneTransitionViolationReasonCode.EnteredBuildingAccessConnectionWithoutSideAccess;
                 return true;
             }
@@ -534,37 +199,26 @@ namespace Traffic_Law_Enforcement
             reasonCode = LaneTransitionViolationReasonCode.None;
 
             if (!IsAccessOrigin(entityManager, sourceLane) ||
-                !TryGetRoadCarLane(entityManager, targetLane, out CarLane targetCarLane))
+                !entityManager.HasComponent<EdgeLane>(targetLane) ||
+                !entityManager.HasComponent<CarLane>(targetLane))
+            {
+                return false;
+            }
+
+            CarLane targetCarLane = entityManager.GetComponentData<CarLane>(targetLane);
+            if (LaneAllowsSideAccess(targetCarLane))
             {
                 return false;
             }
 
             if (entityManager.HasComponent<ParkingLane>(sourceLane))
             {
-                ParkingLane parkingLane = entityManager.GetComponentData<ParkingLane>(sourceLane);
-                if (RoadAllowsParkingAccess(targetCarLane, parkingLane))
-                {
-                    return false;
-                }
-
                 reasonCode = LaneTransitionViolationReasonCode.ExitedParkingAccessWithoutSideAccess;
                 return true;
             }
 
             if (entityManager.HasComponent<GarageLane>(sourceLane))
             {
-                if (TryGetConnectionLane(entityManager, sourceLane, out ConnectionLane garageConnectionLane))
-                {
-                    if (RoadAllowsGarageAccess(targetCarLane, garageConnectionLane))
-                    {
-                        return false;
-                    }
-                }
-                else if (RoadHasGenericSideConnection(targetCarLane))
-                {
-                    return false;
-                }
-
                 reasonCode = LaneTransitionViolationReasonCode.ExitedGarageAccessWithoutSideAccess;
                 return true;
             }
@@ -578,27 +232,12 @@ namespace Traffic_Law_Enforcement
 
             if ((connectionLane.m_Flags & ConnectionLaneFlags.Parking) != 0)
             {
-                if (RoadAllowsParkingConnectionAccess(targetCarLane, connectionLane))
-                {
-                    return false;
-                }
-
                 reasonCode = LaneTransitionViolationReasonCode.ExitedParkingConnectionWithoutSideAccess;
                 return true;
             }
 
             if ((connectionLane.m_Flags & ConnectionLaneFlags.Road) == 0)
             {
-                if (!IsInsideAccessConnection(connectionLane))
-                {
-                    return false;
-                }
-
-                if (RoadAllowsBuildingAccess(targetCarLane))
-                {
-                    return false;
-                }
-
                 reasonCode = LaneTransitionViolationReasonCode.ExitedBuildingAccessConnectionWithoutSideAccess;
                 return true;
             }
@@ -642,137 +281,12 @@ namespace Traffic_Law_Enforcement
             return sourceDirection * targetDirection < 0f;
         }
 
-        private static bool TryGetRoadCarLane(
-            EntityManager entityManager,
-            Entity lane,
-            out CarLane carLane)
+        private static bool LaneAllowsSideAccess(CarLane lane)
         {
-            if (entityManager.HasComponent<EdgeLane>(lane) &&
-                entityManager.HasComponent<CarLane>(lane))
-            {
-                carLane = entityManager.GetComponentData<CarLane>(lane);
-                return true;
-            }
-
-            carLane = default;
-            return false;
-        }
-
-        private static bool TryGetConnectionLane(
-            EntityManager entityManager,
-            Entity lane,
-            out ConnectionLane connectionLane)
-        {
-            if (entityManager.HasComponent<ConnectionLane>(lane))
-            {
-                connectionLane = entityManager.GetComponentData<ConnectionLane>(lane);
-                return true;
-            }
-
-            connectionLane = default;
-            return false;
-        }
-
-        // Patch 1.5 keeps the classifier exact-pair based. It refines patch 1 by
-        // treating ConnectionLaneFlags.Inside as the primary signal that a direct
-        // access connection is internal-facing. Parking-side flags alone no longer
-        // legalize those Inside connection pairs.
-        private static bool RoadHasGenericSideConnection(CarLane lane)
-        {
-            return (lane.m_Flags & CarLaneFlags.SideConnection) != 0;
-        }
-
-        private static bool IsInsideAccessConnection(ConnectionLane connectionLane)
-        {
-            return (connectionLane.m_Flags & ConnectionLaneFlags.Inside) != 0;
-        }
-
-        private static bool RoadAllowsBuildingAccess(CarLane roadLane)
-        {
-            return RoadHasGenericSideConnection(roadLane);
-        }
-
-        private static bool RoadAllowsGarageAccess(CarLane roadLane, ConnectionLane connectionLane)
-        {
-            if (RoadHasGenericSideConnection(roadLane))
-            {
-                return true;
-            }
-
-            if (IsInsideAccessConnection(connectionLane))
-            {
-                return false;
-            }
-
-            return (connectionLane.m_Flags & ConnectionLaneFlags.Parking) != 0 &&
-                GetRoadParkingSides(roadLane) != AccessSide.None;
-        }
-
-        private static bool RoadAllowsParkingConnectionAccess(
-            CarLane roadLane,
-            ConnectionLane connectionLane)
-        {
-            if (RoadHasGenericSideConnection(roadLane))
-            {
-                return true;
-            }
-
-            if (IsInsideAccessConnection(connectionLane))
-            {
-                return false;
-            }
-
-            return GetRoadParkingSides(roadLane) != AccessSide.None;
-        }
-
-        private static bool RoadAllowsParkingAccess(CarLane roadLane, ParkingLane parkingLane)
-        {
-            if (RoadHasGenericSideConnection(roadLane))
-            {
-                return true;
-            }
-
-            AccessSide roadSides = GetRoadParkingSides(roadLane);
-            if (roadSides == AccessSide.None)
-            {
-                return false;
-            }
-
-            AccessSide parkingSides = GetParkingSides(parkingLane);
-            return parkingSides == AccessSide.None ||
-                (roadSides & parkingSides) != 0;
-        }
-
-        private static AccessSide GetRoadParkingSides(CarLane lane)
-        {
-            AccessSide sides = AccessSide.None;
-            if ((lane.m_Flags & CarLaneFlags.ParkingLeft) != 0)
-            {
-                sides |= AccessSide.Left;
-            }
-
-            if ((lane.m_Flags & CarLaneFlags.ParkingRight) != 0)
-            {
-                sides |= AccessSide.Right;
-            }
-
-            return sides;
-        }
-
-        private static AccessSide GetParkingSides(ParkingLane lane)
-        {
-            AccessSide sides = AccessSide.None;
-            if ((lane.m_Flags & (ParkingLaneFlags.LeftSide | ParkingLaneFlags.ParkingLeft)) != 0)
-            {
-                sides |= AccessSide.Left;
-            }
-
-            if ((lane.m_Flags & (ParkingLaneFlags.RightSide | ParkingLaneFlags.ParkingRight)) != 0)
-            {
-                sides |= AccessSide.Right;
-            }
-
-            return sides;
+            return (lane.m_Flags &
+                (CarLaneFlags.SideConnection |
+                 CarLaneFlags.ParkingLeft |
+                 CarLaneFlags.ParkingRight)) != 0;
         }
     }
 }

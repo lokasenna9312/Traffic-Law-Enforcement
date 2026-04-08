@@ -145,8 +145,7 @@ namespace Traffic_Law_Enforcement
                 s_DiagnosticLogCount += 1;
                 Mod.log.Info(
                     $"Intersection pre-penalty applied (reflection fallback): method={DescribeMethod(__originalMethod as MethodInfo)}, " +
-                    $"sourceLane={sourceLane}, " +
-                    $"targetLane={targetLane}, " +
+                    $"sourceLane={sourceLane}, targetLane={targetLane}, " +
                     $"actual={IntersectionMovementPolicy.FormatMovement(actualMovement)}, " +
                     $"allowed={IntersectionMovementPolicy.FormatMovement(allowedMovement)}, " +
                     $"moneyWeight={moneyWeight:0.###}, addedCost={addedCost:0.###}");
@@ -346,4 +345,3 @@ namespace Traffic_Law_Enforcement
         }
     }
 }
-
