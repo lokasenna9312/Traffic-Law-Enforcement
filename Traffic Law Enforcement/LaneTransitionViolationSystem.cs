@@ -424,7 +424,6 @@ namespace Traffic_Law_Enforcement
             {
                 MaybeLogRealizedAccessDetection(vehicle, history, reasonCode);
                 MaybeLogRealizedOppositeFlowDetection(vehicle, history, reasonCode);
-
                 events.Add(new DetectedLaneTransitionViolation
                 {
                     Vehicle = vehicle,
@@ -660,24 +659,6 @@ namespace Traffic_Law_Enforcement
                     EnforcementLoggingPolicy.RecordEnforcementEvent(nonParkingSourceProbeMessage, vehicle);
                 }
                 
-            if (m_DeliveryTruckData.HasComponent(vehicle))
-            {
-                string deliveryTruckMessage =
-                    "[TRUCK_EGRESS_DIRECT_TRACE] " +
-                    $"vehicle={vehicle} " +
-                    $"previousLane={history.m_PreviousLane} " +
-                    $"currentLane={history.m_CurrentLane} " +
-                    $"previousLaneKind={DescribeLaneKind(history.m_PreviousLane)} " +
-                    $"currentLaneKind={DescribeLaneKind(history.m_CurrentLane)} " +
-                    $"previousConnectionFlags={FormatConnectionLaneFlags(history.m_PreviousLane)} " +
-                    $"currentConnectionFlags={FormatConnectionLaneFlags(history.m_CurrentLane)} " +
-                    $"previousIsAccessOrigin={previousIsAccessOrigin} " +
-                    $"currentIsRoad={currentIsRoad} " +
-                    $"egressDetectResult={egressDetectResult} " +
-                    $"failReason={failReason} " +
-                    $"currentLaneFlags={currentLane.m_LaneFlags}";
-                EnforcementLoggingPolicy.RecordEnforcementEvent(deliveryTruckMessage, vehicle);
-            }
             if (!currentIsRoad)
             {
                 return;
@@ -1119,6 +1100,25 @@ namespace Traffic_Law_Enforcement
             return "lane";
         }
 
+        private bool TryDetectIntersectionMovementViolation(VehicleLaneHistory history, CarCurrentLane currentLane, out LaneMovement actualMovement, out LaneMovement allowedMovement)
+        {
+            actualMovement = LaneMovement.None;
+            allowedMovement = LaneMovement.None;
+
+            if ((currentLane.m_LaneFlags & Game.Vehicles.CarLaneFlags.Connection) == 0)
+            {
+                return false;
+            }
+
+            return IntersectionMovementPolicy.TryGetIllegalIntersectionMovement(
+                m_ConnectionLaneData,
+                m_CarLaneData,
+                history.m_PreviousLane,
+                history.m_CurrentLane,
+                out actualMovement,
+                out allowedMovement);
+        }
+
         private bool TryGetOppositeFlowNearMissReason(
             VehicleLaneHistory history,
             out OppositeFlowNearMissReason failReason)
@@ -1172,32 +1172,6 @@ namespace Traffic_Law_Enforcement
             }
 
             return false;
-        }
-
-        private bool TryDetectIntersectionMovementViolation(VehicleLaneHistory history, CarCurrentLane currentLane, out LaneMovement actualMovement, out LaneMovement allowedMovement)
-        {
-            actualMovement = LaneMovement.None;
-            allowedMovement = LaneMovement.None;
-
-            if ((currentLane.m_LaneFlags & Game.Vehicles.CarLaneFlags.Connection) == 0)
-            {
-                return false;
-            }
-
-            return IntersectionMovementPolicy.TryGetIllegalIntersectionMovement(
-                m_ConnectionLaneData,
-                m_CarLaneData,
-                history.m_PreviousLane,
-                history.m_CurrentLane,
-                out actualMovement,
-                out allowedMovement);
-        }
-
-        private static bool IsOppositeDirection(EdgeLane previousLane, EdgeLane currentLane)
-        {
-            float previousDirection = previousLane.m_EdgeDelta.y - previousLane.m_EdgeDelta.x;
-            float currentDirection = currentLane.m_EdgeDelta.y - currentLane.m_EdgeDelta.x;
-            return previousDirection * currentDirection < 0f;
         }
 
         private bool IsAccessOrigin(Entity lane)

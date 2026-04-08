@@ -201,15 +201,6 @@ namespace Traffic_Law_Enforcement
 
                 Mod.log.Info(message);
 
-                if (endItem.m_Owner != Entity.Null)
-                {
-                    PathfindCandidateProbePatches.RegisterWatchedRequest(
-                        startItem.m_Owner,
-                        pair.Key,
-                        startItem.m_Parameters,
-                        startItem.m_Buffer,
-                        endItem.m_Buffer);
-                }
             }
         }
 
