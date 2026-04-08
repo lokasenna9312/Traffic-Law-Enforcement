@@ -49,6 +49,7 @@ namespace Traffic_Law_Enforcement
         public readonly int LaneChangeCount;
         public readonly bool PublicTransportLaneViolationActive;
         public readonly bool PendingExitActive;
+        public readonly bool MidBlockWatchActive;
         public readonly string PermissionStateSummary;
         public readonly int TotalFines;
         public readonly int TotalViolations;
@@ -112,6 +113,7 @@ namespace Traffic_Law_Enforcement
             int laneChangeCount,
             bool ptLaneViolationActive,
             bool pendingExitActive,
+            bool midBlockWatchActive,
             string permissionStateSummary,
             int totalFines,
             int totalViolations,
@@ -174,6 +176,7 @@ namespace Traffic_Law_Enforcement
             LaneChangeCount = laneChangeCount;
             PublicTransportLaneViolationActive = ptLaneViolationActive;
             PendingExitActive = pendingExitActive;
+            MidBlockWatchActive = midBlockWatchActive;
             PermissionStateSummary = permissionStateSummary;
             TotalFines = totalFines;
             TotalViolations = totalViolations;

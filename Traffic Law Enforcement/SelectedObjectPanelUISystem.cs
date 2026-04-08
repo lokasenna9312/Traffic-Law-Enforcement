@@ -35,6 +35,7 @@ namespace Traffic_Law_Enforcement
         internal const string kActiveFlagsPendingNameLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Text.ActiveFlagsPendingName";
         internal const string kFlagOnLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Text.FlagOn";
         internal const string kFlagOffLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Text.FlagOff";
+        internal const string kLastReasonMidBlockWatchLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Text.LastReasonMidBlockWatch";
         internal const string kTotalsValueFormatLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Text.TotalsFormat";
         internal const string kNoSelectionLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Text.NoSelection";
         internal const string kNotVehicleLocaleId = "TrafficLawEnforcement.SelectedObjectPanel.Text.NotVehicle";
@@ -200,6 +201,7 @@ namespace Traffic_Law_Enforcement
         private string m_ActiveFlagsPendingNameText = "Pending";
         private string m_FlagOnText = "On";
         private string m_FlagOffText = "Off";
+        private string m_LastReasonMidBlockWatchText = "Mid-block crossing in progress";
         private string m_TotalsFormatText = "Violations {0}, Fines {1}";
         private bool m_HasCachedPanelState;
         private int m_LastProcessedBridgeSnapshotSerial = -1;
@@ -610,7 +612,7 @@ namespace Traffic_Law_Enforcement
                     ? BuildTotalsText(summarySnapshot)
                     : string.Empty,
                 LastReason = tleReady && summaryContentReady
-                    ? NormalizeText(summarySnapshot.CompactLastReasonText)
+                    ? BuildDisplayedLastReason(summarySnapshot)
                     : string.Empty,
                 RepeatPenalty = tleReady && summaryContentReady
                     ? NormalizeText(summarySnapshot.CompactRepeatPenaltyText)
@@ -803,6 +805,9 @@ namespace Traffic_Law_Enforcement
                 "Pending");
             m_FlagOnText = LocalizeText(kFlagOnLocaleId, "On");
             m_FlagOffText = LocalizeText(kFlagOffLocaleId, "Off");
+            m_LastReasonMidBlockWatchText = LocalizeText(
+                kLastReasonMidBlockWatchLocaleId,
+                "Mid-block crossing in progress");
             m_TotalsFormatText = LocalizeText(
                 kTotalsValueFormatLocaleId,
                 "Violations {0}, Fines {1}");
@@ -853,6 +858,7 @@ namespace Traffic_Law_Enforcement
                 snapshot.PublicTransportLanePolicyText == m_LastPanelSnapshot.PublicTransportLanePolicyText &&
                 snapshot.PublicTransportLaneViolationActive == m_LastPanelSnapshot.PublicTransportLaneViolationActive &&
                 snapshot.PendingExitActive == m_LastPanelSnapshot.PendingExitActive &&
+                snapshot.MidBlockWatchActive == m_LastPanelSnapshot.MidBlockWatchActive &&
                 snapshot.TotalFines == m_LastPanelSnapshot.TotalFines &&
                 snapshot.TotalViolations == m_LastPanelSnapshot.TotalViolations &&
                 snapshot.CompactLastReasonText == m_LastPanelSnapshot.CompactLastReasonText &&
@@ -1730,6 +1736,16 @@ namespace Traffic_Law_Enforcement
                 snapshot.PublicTransportLaneViolationActive ? m_FlagOnText : m_FlagOffText,
                 m_ActiveFlagsPendingNameText,
                 snapshot.PendingExitActive ? m_FlagOnText : m_FlagOffText);
+        }
+
+        private string BuildDisplayedLastReason(SelectedObjectDebugSnapshot snapshot)
+        {
+            if (snapshot.MidBlockWatchActive)
+            {
+                return m_LastReasonMidBlockWatchText;
+            }
+
+            return NormalizeText(snapshot.CompactLastReasonText);
         }
 
         private string BuildTotalsText(SelectedObjectDebugSnapshot snapshot)
