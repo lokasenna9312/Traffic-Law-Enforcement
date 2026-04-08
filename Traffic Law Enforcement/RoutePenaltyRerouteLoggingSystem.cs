@@ -2301,7 +2301,9 @@ namespace Traffic_Law_Enforcement
 
         private static string FormatEntityOrNone(Entity entity)
         {
-            return entity == Entity.Null ? "none" : entity.ToString();
+            return entity == Entity.Null
+                ? "none"
+                : entity.ToString();
         }
 
         private static string FormatRuleFlags(RuleFlags flags)
