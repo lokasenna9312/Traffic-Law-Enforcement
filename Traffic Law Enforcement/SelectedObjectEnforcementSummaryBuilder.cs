@@ -80,8 +80,13 @@ namespace Traffic_Law_Enforcement
             bool includeDebugFields,
             ref SelectedObjectEnforcementSummaryContext context)
         {
+            bool shouldReadIllegalEgressMarker =
+                tleApplicable &&
+                vehicle != Entity.Null &&
+                (includeDebugFields ||
+                 EnforcementLoggingPolicy.ShouldLogEnforcementEvents());
             IllegalEgressApplyMarkerReadResult illegalEgressMarker =
-                tleApplicable && vehicle != Entity.Null
+                shouldReadIllegalEgressMarker
                     ? ReadIllegalEgressApplyMarker(vehicle)
                     : default;
             LogIllegalEgressApplyMarkerRead(vehicle, illegalEgressMarker);
@@ -547,6 +552,7 @@ namespace Traffic_Law_Enforcement
             IllegalEgressApplyMarkerReadResult illegalEgressMarker)
         {
             if (vehicle == Entity.Null ||
+                !illegalEgressMarker.MarkerPresent ||
                 !EnforcementLoggingPolicy.ShouldLogEnforcementEvents())
             {
                 return;

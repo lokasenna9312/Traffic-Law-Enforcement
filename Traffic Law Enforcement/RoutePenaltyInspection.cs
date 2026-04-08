@@ -125,6 +125,8 @@ namespace Traffic_Law_Enforcement
         private const int LaneKindTokenGarageLane = 4;
         private const int LaneKindTokenAccessConnection = 5;
         private const int LaneKindTokenIntersectionBase = 0x100;
+        [System.ThreadStatic]
+        private static List<Entity> s_TemporaryLaneSequence;
 
         private enum NormalizedAccessConnectionKind : byte
         {
@@ -252,19 +254,15 @@ namespace Traffic_Law_Enforcement
                     ref context,
                     out bool allowedOnPublicTransportLane);
 
-            List<Entity> laneSequence =
-                BuildLaneSequence(currentLane, navigationLanes, hasNavigationLanes);
             RoutePenaltyTagCollector penaltyTags = default;
-            RoutePenaltyTagCollector normalizedPenaltyTags = default;
-
             uint hash = kInitialRouteHash;
             bool previousUnauthorizedPublicTransportLane = false;
             Entity previousLane = Entity.Null;
 
-            for (int index = 0; index < laneSequence.Count; index += 1)
+            if (!captureTagSummary)
             {
                 AppendLaneToProfile(
-                    laneSequence[index],
+                    currentLane,
                     publicTransportLanePolicyResolved,
                     allowedOnPublicTransportLane,
                     ref previousLane,
@@ -273,27 +271,95 @@ namespace Traffic_Law_Enforcement
                     ref hash,
                     ref penaltyTags,
                     ref context,
-                    captureTagSummary,
+                    captureTagSummary: false,
                     maxPenaltyTags);
+
+                if (hasNavigationLanes)
+                {
+                    Entity previousSequenceLane = previousLane;
+                    for (int index = 0; index < navigationLanes.Length; index += 1)
+                    {
+                        Entity nextLane = navigationLanes[index].m_Lane;
+                        if (nextLane == Entity.Null ||
+                            nextLane == previousSequenceLane)
+                        {
+                            continue;
+                        }
+
+                        AppendLaneToProfile(
+                            nextLane,
+                            publicTransportLanePolicyResolved,
+                            allowedOnPublicTransportLane,
+                            ref previousLane,
+                            ref previousUnauthorizedPublicTransportLane,
+                            ref profile,
+                            ref hash,
+                            ref penaltyTags,
+                            ref context,
+                            captureTagSummary: false,
+                            maxPenaltyTags);
+                        previousSequenceLane = nextLane;
+                    }
+                }
+
+                return new RoutePenaltyInspectionResult(
+                    hash,
+                    profile,
+                    captureBreakdown ? BuildBreakdown(profile) : null,
+                    default,
+                    default,
+                    publicTransportLanePolicyResolved,
+                    allowedOnPublicTransportLane);
             }
 
-            if (captureTagSummary)
+            RoutePenaltyTagCollector normalizedPenaltyTags = default;
+            List<Entity> laneSequence =
+                AcquireTemporaryLaneSequence(
+                    hasNavigationLanes ? navigationLanes.Length + 1 : 1);
+
+            try
             {
+                BuildLaneSequence(
+                    currentLane,
+                    navigationLanes,
+                    hasNavigationLanes,
+                    laneSequence);
+
+                for (int index = 0; index < laneSequence.Count; index += 1)
+                {
+                    AppendLaneToProfile(
+                        laneSequence[index],
+                        publicTransportLanePolicyResolved,
+                        allowedOnPublicTransportLane,
+                        ref previousLane,
+                        ref previousUnauthorizedPublicTransportLane,
+                        ref profile,
+                        ref hash,
+                        ref penaltyTags,
+                        ref context,
+                        captureTagSummary: true,
+                        maxPenaltyTags);
+                }
+
                 AppendNormalizedAccessTags(
                     laneSequence,
                     ref normalizedPenaltyTags,
                     ref context,
                     maxPenaltyTags);
-            }
 
-            return new RoutePenaltyInspectionResult(
-                hash,
-                profile,
-                captureBreakdown ? BuildBreakdown(profile) : null,
-                captureTagSummary ? penaltyTags.ToSnapshot() : default,
-                captureTagSummary ? normalizedPenaltyTags.ToSnapshot() : default,
-                publicTransportLanePolicyResolved,
-                allowedOnPublicTransportLane);
+                return new RoutePenaltyInspectionResult(
+                    hash,
+                    profile,
+                    captureBreakdown ? BuildBreakdown(profile) : null,
+                    penaltyTags.ToSnapshot(),
+                    normalizedPenaltyTags.ToSnapshot(),
+                    publicTransportLanePolicyResolved,
+                    allowedOnPublicTransportLane);
+            }
+            finally
+            {
+                laneSequence.Clear();
+            }
         }
 
         internal static string BuildNavigationPreview(
@@ -376,49 +442,63 @@ namespace Traffic_Law_Enforcement
             ref RoutePenaltyInspectionContext context)
         {
             List<Entity> laneSequence =
-                BuildLaneSequence(currentLane, navigationLanes, hasNavigationLanes);
+                AcquireTemporaryLaneSequence(
+                    hasNavigationLanes ? navigationLanes.Length + 1 : 1);
 
-            FindFirstExactIllegalAccessPair(
-                laneSequence,
-                out Entity exactSource,
-                out Entity exactTarget,
-                out LaneTransitionViolationReasonCode exactReasonCode,
-                ref context);
+            try
+            {
+                BuildLaneSequence(
+                    currentLane,
+                    navigationLanes,
+                    hasNavigationLanes,
+                    laneSequence);
 
-            AccessWindowBlockedReason blockedReason =
-                FindFirstNormalizedAccessWindow(
+                FindFirstExactIllegalAccessPair(
                     laneSequence,
-                    out Entity normalizedPrevious,
-                    out Entity normalizedCurrent,
-                    out Entity normalizedNext,
-                    out LaneTransitionViolationReasonCode normalizedReasonCode,
-                    out Entity blockedPrevious,
-                    out Entity blockedCurrent,
-                    out Entity blockedNext,
+                    out Entity exactSource,
+                    out Entity exactTarget,
+                    out LaneTransitionViolationReasonCode exactReasonCode,
                     ref context);
 
-            string exactFirst =
-                exactReasonCode == LaneTransitionViolationReasonCode.None
-                    ? "none"
-                    : $"{FormatEntity(exactSource)}->{FormatEntity(exactTarget)}:{exactReasonCode}";
+                AccessWindowBlockedReason blockedReason =
+                    FindFirstNormalizedAccessWindow(
+                        laneSequence,
+                        out Entity normalizedPrevious,
+                        out Entity normalizedCurrent,
+                        out Entity normalizedNext,
+                        out LaneTransitionViolationReasonCode normalizedReasonCode,
+                        out Entity blockedPrevious,
+                        out Entity blockedCurrent,
+                        out Entity blockedNext,
+                        ref context);
 
-            string normalizedFirst =
-                FormatNormalizedAccessMatch(
-                    normalizedPrevious,
-                    normalizedCurrent,
-                    normalizedNext,
-                    normalizedReasonCode);
+                string exactFirst =
+                    exactReasonCode == LaneTransitionViolationReasonCode.None
+                        ? "none"
+                        : $"{FormatEntity(exactSource)}->{FormatEntity(exactTarget)}:{exactReasonCode}";
 
-            string normalizedBlocked =
-                normalizedReasonCode != LaneTransitionViolationReasonCode.None
-                    ? "none"
-                    : FormatBlockedReason(blockedReason, blockedPrevious, blockedCurrent, blockedNext);
+                string normalizedFirst =
+                    FormatNormalizedAccessMatch(
+                        normalizedPrevious,
+                        normalizedCurrent,
+                        normalizedNext,
+                        normalizedReasonCode);
 
-            return
-                $"[FOCUSED_ACCESS_WINDOW] vehicle={FormatEntity(vehicle)}, " +
-                $"exactFirst={exactFirst}, " +
-                $"normalizedFirst={normalizedFirst}, " +
-                $"normalizedBlocked={normalizedBlocked}";
+                string normalizedBlocked =
+                    normalizedReasonCode != LaneTransitionViolationReasonCode.None
+                        ? "none"
+                        : FormatBlockedReason(blockedReason, blockedPrevious, blockedCurrent, blockedNext);
+
+                return
+                    $"[FOCUSED_ACCESS_WINDOW] vehicle={FormatEntity(vehicle)}, " +
+                    $"exactFirst={exactFirst}, " +
+                    $"normalizedFirst={normalizedFirst}, " +
+                    $"normalizedBlocked={normalizedBlocked}";
+            }
+            finally
+            {
+                laneSequence.Clear();
+            }
         }
 
         internal static bool TryResolveAllowedOnPublicTransportLane(
@@ -781,26 +861,41 @@ namespace Traffic_Law_Enforcement
                 : $"#{entity.Index}:v{entity.Version}";
         }
 
-        private static List<Entity> BuildLaneSequence(
+        private static List<Entity> AcquireTemporaryLaneSequence(
+            int minimumCapacity)
+        {
+            List<Entity> laneSequence = s_TemporaryLaneSequence;
+            if (laneSequence == null)
+            {
+                laneSequence = new List<Entity>(minimumCapacity);
+                s_TemporaryLaneSequence = laneSequence;
+            }
+            else if (laneSequence.Capacity < minimumCapacity)
+            {
+                laneSequence.Capacity = minimumCapacity;
+            }
+
+            return laneSequence;
+        }
+
+        private static void BuildLaneSequence(
             Entity currentLane,
             DynamicBuffer<CarNavigationLane> navigationLanes,
-            bool hasNavigationLanes)
+            bool hasNavigationLanes,
+            List<Entity> laneSequence)
         {
-            int capacity = hasNavigationLanes ? navigationLanes.Length + 1 : 1;
-            List<Entity> laneSequence = new List<Entity>(capacity);
+            laneSequence.Clear();
             AppendLaneToSequence(currentLane, laneSequence);
 
             if (!hasNavigationLanes)
             {
-                return laneSequence;
+                return;
             }
 
             for (int index = 0; index < navigationLanes.Length; index += 1)
             {
                 AppendLaneToSequence(navigationLanes[index].m_Lane, laneSequence);
             }
-
-            return laneSequence;
         }
 
         private static void AppendLaneToSequence(Entity lane, List<Entity> laneSequence)
