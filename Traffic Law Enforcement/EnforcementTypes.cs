@@ -90,13 +90,6 @@ namespace Traffic_Law_Enforcement
         }
     }
 
-    public enum IllegalEgressApplyMode : byte
-    {
-        None = 0,
-        Direct = 1,
-        Carried = 2,
-    }
-
     public sealed class VehicleEnforcementRecord
     {
         public int TotalViolations;
@@ -106,10 +99,6 @@ namespace Traffic_Law_Enforcement
         public int LastLaneId = -1;
         public int LastFineAmount;
         public long LastTimestampMonthTicks;
-        public IllegalEgressApplyMode LastAppliedIllegalEgressMode = IllegalEgressApplyMode.None;
-        public long LastAppliedIllegalEgressTimestampMonthTicks;
-        public int LastAppliedIllegalEgressOriginLaneId = -1;
-        public int LastAppliedIllegalEgressRoadLaneId = -1;
         public readonly List<long> PublicTransportLaneTimestamps = new List<long>();
         public readonly List<long> MidBlockCrossingTimestamps = new List<long>();
         public readonly List<long> IntersectionMovementTimestamps = new List<long>();
@@ -151,11 +140,7 @@ namespace Traffic_Law_Enforcement
                 LastKind = LastKind ?? string.Empty,
                 LastLaneId = LastLaneId,
                 LastFineAmount = LastFineAmount,
-                LastTimestampMonthTicks = LastTimestampMonthTicks,
-                LastAppliedIllegalEgressMode = LastAppliedIllegalEgressMode,
-                LastAppliedIllegalEgressTimestampMonthTicks = LastAppliedIllegalEgressTimestampMonthTicks,
-                LastAppliedIllegalEgressOriginLaneId = LastAppliedIllegalEgressOriginLaneId,
-                LastAppliedIllegalEgressRoadLaneId = LastAppliedIllegalEgressRoadLaneId
+                LastTimestampMonthTicks = LastTimestampMonthTicks
             };
 
             clone.PublicTransportLaneTimestamps.AddRange(PublicTransportLaneTimestamps);

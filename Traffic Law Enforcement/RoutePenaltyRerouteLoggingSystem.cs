@@ -1143,18 +1143,6 @@ namespace Traffic_Law_Enforcement
             return true;
         }
 
-        private static bool AreInspectionTagSnapshotsEqual(
-            RoutePenaltyInspectionResult previousInspection,
-            RoutePenaltyInspectionResult currentInspection)
-        {
-            return AreTagSnapshotsEqual(
-                       previousInspection.TagSnapshot,
-                       currentInspection.TagSnapshot) &&
-                AreTagSnapshotsEqual(
-                    previousInspection.NormalizedTagSnapshot,
-                    currentInspection.NormalizedTagSnapshot);
-        }
-
         private static bool IsLowValueNonWatchedRouteSelectionChange(
             RouteSelectionChangeSnapshot previousSnapshot,
             RouteSelectionChangeSnapshot currentSnapshot,
@@ -1181,9 +1169,9 @@ namespace Traffic_Law_Enforcement
                 previousSnapshot.Inspection.TotalPenalty == currentSnapshot.Inspection.TotalPenalty;
 
             bool tagsUnchanged =
-                AreInspectionTagSnapshotsEqual(
-                    previousSnapshot.Inspection,
-                    currentSnapshot.Inspection);
+                AreTagSnapshotsEqual(
+                    previousSnapshot.Inspection.TagSnapshot,
+                    currentSnapshot.Inspection.TagSnapshot);
 
             bool existingLowValueCase =
                 routeEndpointsUnchanged &&
@@ -1200,12 +1188,8 @@ namespace Traffic_Law_Enforcement
                 currentSnapshot.Inspection.TotalPenalty == 0 &&
                 previousSnapshot.Inspection.TagSnapshot.Count == 0 &&
                 currentSnapshot.Inspection.TagSnapshot.Count == 0 &&
-                previousSnapshot.Inspection.NormalizedTagSnapshot.Count == 0 &&
-                currentSnapshot.Inspection.NormalizedTagSnapshot.Count == 0 &&
                 previousSnapshot.Inspection.TagSnapshot.OmittedCount == 0 &&
-                currentSnapshot.Inspection.TagSnapshot.OmittedCount == 0 &&
-                previousSnapshot.Inspection.NormalizedTagSnapshot.OmittedCount == 0 &&
-                currentSnapshot.Inspection.NormalizedTagSnapshot.OmittedCount == 0;
+                currentSnapshot.Inspection.TagSnapshot.OmittedCount == 0;
 
             bool acceptedResultRebuildChurn =
                 previousSnapshot.HasPathOwner != currentSnapshot.HasPathOwner ||
@@ -1265,16 +1249,10 @@ namespace Traffic_Law_Enforcement
             string currentTags =
                 RoutePenaltyInspection.BuildTagSummary(
                     currentSnapshot.Inspection.TagSnapshot);
-            string previousNormalizedTags =
-                RoutePenaltyInspection.BuildTagSummary(
-                    previousSnapshot.Inspection.NormalizedTagSnapshot);
-            string currentNormalizedTags =
-                RoutePenaltyInspection.BuildTagSummary(
-                    currentSnapshot.Inspection.NormalizedTagSnapshot);
 
             string message =
-                $"Route selection change: vehicle={FormatEntityOrNone(vehicle)}, role={role}, focusedWatch={focusedWatch}, reasons={reasons}, " +
-                $"currentLane={FormatEntityOrNone(currentSnapshot.CurrentLane)}, " +
+                $"Route selection change: vehicle={vehicle}, role={role}, focusedWatch={focusedWatch}, reasons={reasons}, " +
+                $"currentLane={currentSnapshot.CurrentLane}, " +
                 $"routeHash={previousSnapshot.RouteHash}->{currentSnapshot.RouteHash}, " +
                 $"currentRoute={FormatOptionalEntity(previousSnapshot.HasCurrentRoute, previousSnapshot.CurrentRoute)}->{FormatOptionalEntity(currentSnapshot.HasCurrentRoute, currentSnapshot.CurrentRoute)}, " +
                 $"currentTarget={FormatOptionalEntity(previousSnapshot.HasCurrentTarget, previousSnapshot.CurrentTarget)}->{FormatOptionalEntity(currentSnapshot.HasCurrentTarget, currentSnapshot.CurrentTarget)}, " +
@@ -1283,8 +1261,7 @@ namespace Traffic_Law_Enforcement
                 $"acceptedPathHash={FormatHashChange(previousSnapshot.AcceptedPathHash, currentSnapshot.AcceptedPathHash)}, " +
                 $"acceptedResultHash={FormatHashChange(previousSnapshot.AcceptedResultHash, currentSnapshot.AcceptedResultHash)}, " +
                 $"plannedPenalty={previousSnapshot.Inspection.TotalPenalty} [{previousBreakdown}] -> {currentSnapshot.Inspection.TotalPenalty} [{currentBreakdown}], " +
-                $"tags={previousTags} -> {currentTags}, " +
-                $"normalizedTags={previousNormalizedTags} -> {currentNormalizedTags}";
+                $"tags={previousTags} -> {currentTags}";
 
             EnforcementTelemetry.RecordEvent(message);
             Mod.log.Info(message);
@@ -1305,13 +1282,6 @@ namespace Traffic_Law_Enforcement
                         currentSnapshot);
                 EnforcementTelemetry.RecordEvent(transitionPreviewMessage);
                 Mod.log.Info(transitionPreviewMessage);
-
-                string accessWindowMessage =
-                    BuildFocusedAccessWindowPreview(
-                        vehicle,
-                        currentSnapshot);
-                EnforcementTelemetry.RecordEvent(accessWindowMessage);
-                Mod.log.Info(accessWindowMessage);
 
                 string nameResolutionMessage =
                     BuildFocusedLaneNameResolutionPreview(
@@ -1432,7 +1402,7 @@ namespace Traffic_Law_Enforcement
         private static string FormatOptionalEntity(bool hasValue, Entity entity)
         {
             return hasValue && entity != Entity.Null
-                ? FormatEntityOrNone(entity)
+                ? entity.ToString()
                 : "none";
         }
 
@@ -1500,13 +1470,13 @@ namespace Traffic_Law_Enforcement
                     targetKindNormalized);
 
             string message =
-                $"FOCUSED_ROUTE_REBUILD: vehicle={FormatEntityOrNone(vehicle)}, " +
+                $"FOCUSED_ROUTE_REBUILD: vehicle={vehicle}, " +
                 $"obsoleteAttemptId={obsoleteAttemptId}, " +
                 $"elapsedSinceObsolete={elapsedSinceObsolete}, " +
                 $"targetKindNormalized={targetKindNormalized}, " +
                 $"previousTarget={FormatOptionalEntity(previousSnapshot.HasCurrentTarget, previousTarget)}, " +
                 $"currentTarget={FormatOptionalEntity(currentSnapshot.HasCurrentTarget, currentTarget)}, " +
-                $"currentLane={FormatEntityOrNone(currentLane)}, normalizedCurrentLane={FormatEntityOrNone(normalizedCurrentLane)}, " +
+                $"currentLane={currentLane}, normalizedCurrentLane={normalizedCurrentLane}, " +
                 $"targetChanged={targetChanged}, " +
                 $"predictedOriginSource={predictedOriginSource}, " +
                 $"previousTargetEndMatchesCurrent={previousTargetEndMatchesCurrent}, " +
@@ -1571,7 +1541,7 @@ namespace Traffic_Law_Enforcement
                     targetKindNormalized);
 
             string message =
-                $"FOCUSED_ROUTE_ACCEPTED_RESULT: vehicle={FormatEntityOrNone(vehicle)}, " +
+                $"FOCUSED_ROUTE_ACCEPTED_RESULT: vehicle={vehicle}, " +
                 $"obsoleteAttemptId={obsoleteAttemptId}, " +
                 $"elapsedSinceObsolete={elapsedSinceObsolete}, " +
                 $"targetKindNormalized={targetKindNormalized}, " +
@@ -1678,26 +1648,10 @@ namespace Traffic_Law_Enforcement
                     : transitions.ToString();
 
             return
-                $"FOCUSED_ROUTE_TRANSITIONS: vehicle={FormatEntityOrNone(vehicle)}, " +
+                $"FOCUSED_ROUTE_TRANSITIONS: vehicle={vehicle}, " +
                 $"targetStartLane={FormatEntityOrNone(targetStartLane)}, " +
                 $"targetEndLane={FormatEntityOrNone(targetEndLane)}, " +
                 $"chosenTransitions={transitionSummary}";
-        }
-
-        private string BuildFocusedAccessWindowPreview(
-            Entity vehicle,
-            RouteSelectionChangeSnapshot currentSnapshot)
-        {
-            bool hasNavigationLanes =
-                m_NavigationLaneData.TryGetBuffer(vehicle, out DynamicBuffer<CarNavigationLane> navigationLanes);
-
-            RoutePenaltyInspectionContext context = CreateInspectionContext();
-            return RoutePenaltyInspection.BuildFocusedAccessWindowDiagnostic(
-                vehicle,
-                currentSnapshot.CurrentLane,
-                navigationLanes,
-                hasNavigationLanes,
-                ref context);
         }
 
         private string BuildFocusedLaneNameResolutionPreview(
@@ -1763,7 +1717,7 @@ namespace Traffic_Law_Enforcement
                     : navigationLaneResolutions.ToString();
 
             return
-                $"FOCUSED_ROUTE_NAME_RESOLUTION: vehicle={FormatEntityOrNone(vehicle)}, " +
+                $"FOCUSED_ROUTE_NAME_RESOLUTION: vehicle={vehicle}, " +
                 $"current={currentLaneResolution}, " +
                 $"targetStart={targetStartResolution}, " +
                 $"targetEnd={targetEndResolution}, " +
@@ -2347,9 +2301,7 @@ namespace Traffic_Law_Enforcement
 
         private static string FormatEntityOrNone(Entity entity)
         {
-            return entity == Entity.Null
-                ? "none"
-                : entity.ToString();
+            return entity == Entity.Null ? "none" : entity.ToString();
         }
 
         private static string FormatRuleFlags(RuleFlags flags)
@@ -2647,7 +2599,7 @@ namespace Traffic_Law_Enforcement
             }
 
             string message =
-                $"PT_ROUTE_DIAG: vehicle={FormatEntityOrNone(vehicle)}, role={role}, lane={FormatEntityOrNone(lane)}, laneKind={laneKind}, " +
+                $"PT_ROUTE_DIAG: vehicle={vehicle}, role={role}, lane={lane}, laneKind={laneKind}, " +
                 $"forceLogging={forceLogging}, " +
                 $"publicOnly={publicOnly}, hasResolvedPolicy={hasResolvedPublicTransportLanePolicy}, " +
                 $"hasProfile={hasProfile}, allowedOnPublicTransportLane={allowedOnPublicTransportLane}, " +
@@ -2969,22 +2921,17 @@ namespace Traffic_Law_Enforcement
                 RoutePenaltyInspection.BuildTagSummary(previousSnapshot.TagSnapshot);
             string currentTags =
                 RoutePenaltyInspection.BuildTagSummary(currentSnapshot.TagSnapshot);
-            string previousNormalizedTags =
-                RoutePenaltyInspection.BuildTagSummary(previousSnapshot.NormalizedTagSnapshot);
-            string currentNormalizedTags =
-                RoutePenaltyInspection.BuildTagSummary(currentSnapshot.NormalizedTagSnapshot);
 
             string comparisonMode = allowPublicTransportLaneComparison
                 ? "full"
                 : "excluding-unresolved-pt";
 
             string message =
-                $"Pathfinding reroute (estimated): vehicle={FormatEntityOrNone(vehicle)}, role={role}, focusedWatch={focusedWatch}, comparisonMode={comparisonMode}, " +
+                $"Pathfinding reroute (estimated): vehicle={vehicle}, role={role}, focusedWatch={focusedWatch}, comparisonMode={comparisonMode}, " +
                 $"avoidedPenalty={avoidedPenalty}, " +
                 $"fromPenalty={previousComparablePenalty} [{previousComparableBreakdown}], " +
                 $"toPenalty={currentComparablePenalty} [{currentComparableBreakdown}], " +
-                $"fromTags={previousTags}, toTags={currentTags}, " +
-                $"fromNormalizedTags={previousNormalizedTags}, toNormalizedTags={currentNormalizedTags}";
+                $"fromTags={previousTags}, toTags={currentTags}";
 
             EnforcementTelemetry.RecordEvent(message);
             Mod.log.Info(message);
