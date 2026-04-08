@@ -71,6 +71,7 @@ Desktop.ini
 .dotnet/
 .tmp/
 logs/
+expired logs/
 docs/
 
 
