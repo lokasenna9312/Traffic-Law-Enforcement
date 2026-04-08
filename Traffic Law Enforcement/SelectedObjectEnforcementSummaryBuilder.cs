@@ -43,6 +43,20 @@ namespace Traffic_Law_Enforcement
         private static string s_CachedReasonSummaryLocaleId = string.Empty;
         private static string s_CachedPolicyTextLocaleId = string.Empty;
 
+        private readonly struct IllegalEgressApplyMarkerReadResult
+        {
+            internal readonly bool MarkerPresent;
+            internal readonly VehicleEnforcementRecord Record;
+
+            internal IllegalEgressApplyMarkerReadResult(
+                bool markerPresent,
+                VehicleEnforcementRecord record)
+            {
+                MarkerPresent = markerPresent;
+                Record = record;
+            }
+        }
+
         private readonly struct CompactReasonSummary
         {
             internal readonly string CompactLastReasonText;
@@ -66,8 +80,18 @@ namespace Traffic_Law_Enforcement
             bool includeDebugFields,
             ref SelectedObjectEnforcementSummaryContext context)
         {
+            IllegalEgressApplyMarkerReadResult illegalEgressMarker =
+                tleApplicable && vehicle != Entity.Null
+                    ? ReadIllegalEgressApplyMarker(vehicle)
+                    : default;
+            LogIllegalEgressApplyMarkerRead(vehicle, illegalEgressMarker);
+
             string permissionStateSummary = tleApplicable && includeDebugFields
-                ? BuildPermissionStateSummary(vehicle, hasTrafficLawProfile, ref context)
+                ? BuildPermissionStateSummary(
+                    vehicle,
+                    hasTrafficLawProfile,
+                    illegalEgressMarker,
+                    ref context)
                 : string.Empty;
             CompactReasonSummary compactReasonSummary = tleApplicable
                 ? GetCompactReasonSummary(lastReason)
@@ -433,6 +457,7 @@ namespace Traffic_Law_Enforcement
         private static string BuildPermissionStateSummary(
             Entity vehicle,
             bool hasTrafficLawProfile,
+            IllegalEgressApplyMarkerReadResult illegalEgressMarker,
             ref SelectedObjectEnforcementSummaryContext context)
         {
             if (vehicle == Entity.Null)
@@ -440,13 +465,15 @@ namespace Traffic_Law_Enforcement
                 return string.Empty;
             }
 
+            string baseSummary;
             if (!context.PermissionStateData.TryGetComponent(
                     vehicle,
                     out PublicTransportLanePermissionState permissionState))
             {
-                return hasTrafficLawProfile
+                baseSummary = hasTrafficLawProfile
                     ? "No active permission state"
                     : "Not tracked by Traffic Law Enforcement";
+                return AppendIllegalEgressDebugSummary(baseSummary, illegalEgressMarker);
             }
 
             PublicTransportLaneAccessBits accessBits =
@@ -460,7 +487,7 @@ namespace Traffic_Law_Enforcement
                     accessBits,
                     emergencyActive);
 
-            return
+            baseSummary =
                 $"type={PublicTransportLanePolicy.DescribeType(accessBits)}, " +
                 $"vanillaAllow={PublicTransportLanePolicy.VanillaAllowsAccess(accessBits)}, " +
                 $"modAllow={PublicTransportLanePolicy.ModAllowsAccess(accessBits)}, " +
@@ -471,6 +498,73 @@ namespace Traffic_Law_Enforcement
                 $"emergency={emergencyActive}, " +
                 $"emergencyOverride={emergencyOverrideActive}, " +
                 $"graceConsumed={permissionState.m_ImmediateEntryGraceConsumed != 0}";
+
+            return AppendIllegalEgressDebugSummary(baseSummary, illegalEgressMarker);
+        }
+
+        private static string AppendIllegalEgressDebugSummary(
+            string baseSummary,
+            IllegalEgressApplyMarkerReadResult illegalEgressMarker)
+        {
+            if (!illegalEgressMarker.MarkerPresent)
+            {
+                return baseSummary;
+            }
+
+            VehicleEnforcementRecord record = illegalEgressMarker.Record;
+            string debugSummary =
+                "ordinaryEgressApply=" +
+                $"mode={record.LastAppliedIllegalEgressMode}, " +
+                $"timestampMonthTicks={record.LastAppliedIllegalEgressTimestampMonthTicks}, " +
+                $"originLaneId={record.LastAppliedIllegalEgressOriginLaneId}, " +
+                $"roadLaneId={record.LastAppliedIllegalEgressRoadLaneId}";
+
+            return string.IsNullOrWhiteSpace(baseSummary)
+                ? debugSummary
+                : $"{baseSummary} | {debugSummary}";
+        }
+
+        private static IllegalEgressApplyMarkerReadResult ReadIllegalEgressApplyMarker(
+            Entity vehicle)
+        {
+            bool recordFound =
+                EnforcementTelemetry.TryGetVehicleEnforcementRecord(
+                    vehicle.Index,
+                    out VehicleEnforcementRecord record);
+            bool markerPresent =
+                recordFound &&
+                record.LastAppliedIllegalEgressMode != IllegalEgressApplyMode.None;
+
+            return new IllegalEgressApplyMarkerReadResult(
+                markerPresent,
+                recordFound
+                    ? record
+                    : default);
+        }
+
+        private static void LogIllegalEgressApplyMarkerRead(
+            Entity vehicle,
+            IllegalEgressApplyMarkerReadResult illegalEgressMarker)
+        {
+            if (vehicle == Entity.Null ||
+                !EnforcementLoggingPolicy.ShouldLogEnforcementEvents())
+            {
+                return;
+            }
+
+            VehicleEnforcementRecord record = illegalEgressMarker.Record;
+
+            string message =
+                "[ACCESS_EGRESS_APPLY_MARKER_READ] " +
+                $"vehicle={vehicle} " +
+                $"markerPresent={illegalEgressMarker.MarkerPresent} " +
+                $"mode={(illegalEgressMarker.MarkerPresent ? record.LastAppliedIllegalEgressMode : IllegalEgressApplyMode.None)} " +
+                $"timestampMonthTicks={(illegalEgressMarker.MarkerPresent ? record.LastAppliedIllegalEgressTimestampMonthTicks : 0L)} " +
+                $"originLaneId={(illegalEgressMarker.MarkerPresent ? record.LastAppliedIllegalEgressOriginLaneId : -1)} " +
+                $"roadLaneId={(illegalEgressMarker.MarkerPresent ? record.LastAppliedIllegalEgressRoadLaneId : -1)}";
+
+            Mod.log.Info(message);
         }
     }
 }
+

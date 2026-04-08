@@ -174,7 +174,7 @@ namespace Traffic_Law_Enforcement
                 string message =
                     $"FOCUSED_SETUP_PATHFIND: source=PathfindSetupSystem.CompleteSetup, " +
                     $"vehicle={startItem.m_Owner}, " +
-                    $"vehicleEntity={FocusedLoggingService.FormatEntity(startItem.m_Owner)}, " +
+                    $"vehicleEntity={startItem.m_Owner}, " +
                     $"actionIndex={pair.Key}, " +
                     $"obsoleteAttemptId={obsoleteAttemptId}, " +
                     $"elapsedSinceObsolete={elapsedSinceObsolete}, " +
@@ -190,7 +190,7 @@ namespace Traffic_Law_Enforcement
                     $"pathfindFlags={FormatPathfindFlags(startItem.m_Parameters.m_PathfindFlags)}, " +
                     $"methods={FormatPathMethods(startItem.m_Parameters.m_Methods)}, " +
                     $"weights={FormatWeights(startItem.m_Parameters.m_Weights)}, " +
-                    $"parkingTarget={FocusedLoggingService.FormatEntity(startItem.m_Parameters.m_ParkingTarget)}, " +
+                    $"parkingTarget={startItem.m_Parameters.m_ParkingTarget}, " +
                     $"origin={FormatTarget(startItem.m_Target)}, " +
                     $"destination={(endItem.m_Owner != Entity.Null ? FormatTarget(endItem.m_Target) : "missing")}";
 
@@ -201,15 +201,6 @@ namespace Traffic_Law_Enforcement
 
                 Mod.log.Info(message);
 
-                if (endItem.m_Owner != Entity.Null)
-                {
-                    PathfindCandidateProbePatches.RegisterWatchedRequest(
-                        startItem.m_Owner,
-                        pair.Key,
-                        startItem.m_Parameters,
-                        startItem.m_Buffer,
-                        endItem.m_Buffer);
-                }
             }
         }
 
@@ -217,8 +208,8 @@ namespace Traffic_Law_Enforcement
         {
             return
                 $"type={target.m_Type}, " +
-                $"entity={FocusedLoggingService.FormatEntity(target.m_Entity)}, " +
-                $"entity2={FocusedLoggingService.FormatEntity(target.m_Entity2)}, " +
+                $"entity={target.m_Entity}, " +
+                $"entity2={target.m_Entity2}, " +
                 $"methods={FormatPathMethods(target.m_Methods)}, " +
                 $"roadTypes={target.m_RoadTypes}, " +
                 $"flags={target.m_Flags}, " +
@@ -338,7 +329,9 @@ namespace Traffic_Law_Enforcement
 
         private static string FormatEntityOrNone(Entity entity)
         {
-            return entity == Entity.Null ? "none" : entity.ToString();
+            return entity == Entity.Null
+                ? "none"
+                : entity.ToString();
         }
 
         private static string FormatFloat3(float3 value)
@@ -367,3 +360,4 @@ namespace Traffic_Law_Enforcement
         }
     }
 }
+
