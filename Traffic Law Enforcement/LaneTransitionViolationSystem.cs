@@ -1156,9 +1156,22 @@ namespace Traffic_Law_Enforcement
                 return false;
             }
 
-            if (IsRoadWithoutBuildingServiceAllowance(history.m_CurrentLane) &&
+            bool ordinaryRoadExit =
+                IsRoadWithoutBuildingServiceAllowance(history.m_CurrentLane) &&
                 (!IsRoadLane(history.m_PreviousLane) ||
-                    IsBuildingServiceCarryRoad(history.m_PreviousLane)))
+                    IsBuildingServiceCarryRoad(history.m_PreviousLane));
+
+            bool sameOwnerFrontageExit =
+                analysisState.m_PendingBuildingServiceEgressSawIntermediate != 0 &&
+                !IsRoadLane(history.m_PreviousLane) &&
+                IsRoadLane(history.m_CurrentLane) &&
+                GetOwner(history.m_PreviousLane) != Entity.Null &&
+                GetOwner(history.m_PreviousLane) == GetOwner(history.m_CurrentLane) &&
+                !AccessEndpointClassifier.HasBuildingServiceRoadAllowanceAnchor(
+                    EntityManager,
+                    history.m_CurrentLane);
+
+            if (ordinaryRoadExit || sameOwnerFrontageExit)
             {
                 if (analysisState.m_PendingBuildingServiceEgressRequiresIntermediate != 0 &&
                     analysisState.m_PendingBuildingServiceEgressSawIntermediate == 0)

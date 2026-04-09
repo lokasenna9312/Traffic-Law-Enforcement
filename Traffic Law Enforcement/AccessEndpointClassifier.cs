@@ -162,9 +162,18 @@ namespace Traffic_Law_Enforcement
             Entity currentTarget = targetEntity;
             while (currentTarget != Entity.Null && targetDepth < 12)
             {
+                bool laneOwnerChainContainsTarget =
+                    OwnerChainContainsEntity(entityManager, laneOwner, currentTarget);
+
+                if (laneOwnerChainContainsTarget &&
+                    !IsPlainRoadLikeEntity(entityManager, currentTarget))
+                {
+                    return true;
+                }
+
                 if ((entityManager.HasComponent<Building>(currentTarget) ||
                         entityManager.HasComponent<ServiceUpgrade>(currentTarget)) &&
-                    OwnerChainContainsEntity(entityManager, laneOwner, currentTarget))
+                    laneOwnerChainContainsTarget)
                 {
                     return true;
                 }
