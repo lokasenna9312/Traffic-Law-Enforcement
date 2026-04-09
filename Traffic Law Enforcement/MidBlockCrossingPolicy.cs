@@ -714,7 +714,7 @@ namespace Traffic_Law_Enforcement
             CarLane roadLane)
         {
             return RoadHasGenericSideConnection(roadLane) ||
-                AccessEndpointClassifier.HasBuildingServiceAnchor(entityManager, roadLaneEntity);
+                AccessEndpointClassifier.HasBuildingServiceRoadAllowanceAnchor(entityManager, roadLaneEntity);
         }
 
         private static bool RoadAllowsGarageAccess(CarLane roadLane, ConnectionLane connectionLane)

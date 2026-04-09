@@ -1720,14 +1720,14 @@ namespace Traffic_Law_Enforcement
         {
             return TryGetRoadCarLane(lane, out CarLane roadLane) &&
                 !LaneAllowsSideAccess(roadLane) &&
-                AccessEndpointClassifier.HasBuildingServiceAnchor(EntityManager, lane);
+                AccessEndpointClassifier.HasBuildingServiceRoadAllowanceAnchor(EntityManager, lane);
         }
 
         private bool IsRoadWithoutBuildingServiceAllowance(Entity lane)
         {
             return TryGetRoadCarLane(lane, out CarLane roadLane) &&
                 !LaneAllowsSideAccess(roadLane) &&
-                !AccessEndpointClassifier.HasBuildingServiceAnchor(EntityManager, lane);
+                !AccessEndpointClassifier.HasBuildingServiceRoadAllowanceAnchor(EntityManager, lane);
         }
 
         private bool TryGetRoadCarLane(Entity lane, out CarLane roadLane)

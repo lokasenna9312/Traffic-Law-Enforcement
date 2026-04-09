@@ -130,6 +130,18 @@ namespace Traffic_Law_Enforcement
                 connectionType == RouteConnectionType.Cargo;
         }
 
+        public static bool HasBuildingServiceRoadAllowanceAnchor(
+            EntityManager entityManager,
+            Entity lane)
+        {
+            if (lane == Entity.Null)
+            {
+                return false;
+            }
+
+            return HasBuildingServiceOwnerAnchor(entityManager, lane);
+        }
+
         public static bool HasBuildingServiceAnchor(
             Entity lane,
             ref AccessEndpointLookupContext context)
@@ -146,6 +158,18 @@ namespace Traffic_Law_Enforcement
 
             return TryGetSpawnLocationConnectionType(lane, ref context, out RouteConnectionType connectionType) &&
                 connectionType == RouteConnectionType.Cargo;
+        }
+
+        public static bool HasBuildingServiceRoadAllowanceAnchor(
+            Entity lane,
+            ref AccessEndpointLookupContext context)
+        {
+            if (lane == Entity.Null)
+            {
+                return false;
+            }
+
+            return HasBuildingServiceOwnerAnchor(lane, ref context);
         }
 
         public static bool IsAccessOrigin(
