@@ -107,7 +107,7 @@ namespace Traffic_Law_Enforcement
 
             if (accessKind == AccessEndpointKind.BuildingService)
             {
-                if (RoadAllowsBuildingAccess(sourceCarLane))
+                if (RoadAllowsBuildingAccess(entityManager, previousLane, sourceCarLane))
                 {
                     failReason = AccessIngressTraceFailReason.RoadAllowsBuildingAccess;
                     return;
@@ -437,7 +437,7 @@ namespace Traffic_Law_Enforcement
 
             if (accessKind == AccessEndpointKind.BuildingService)
             {
-                if (RoadAllowsBuildingAccess(targetCarLane))
+                if (RoadAllowsBuildingAccess(entityManager, targetLane, targetCarLane))
                 {
                     failReason = AccessEgressTraceFailReason.RoadAllowsBuildingAccess;
                     return;
@@ -552,7 +552,7 @@ namespace Traffic_Law_Enforcement
 
             if (accessKind == AccessEndpointKind.BuildingService)
             {
-                if (RoadAllowsBuildingAccess(sourceCarLane))
+                if (RoadAllowsBuildingAccess(entityManager, sourceLane, sourceCarLane))
                 {
                     return false;
                 }
@@ -629,7 +629,7 @@ namespace Traffic_Law_Enforcement
 
             if (accessKind == AccessEndpointKind.BuildingService)
             {
-                if (RoadAllowsBuildingAccess(targetCarLane))
+                if (RoadAllowsBuildingAccess(entityManager, targetLane, targetCarLane))
                 {
                     return false;
                 }
@@ -708,9 +708,13 @@ namespace Traffic_Law_Enforcement
             return (connectionLane.m_Flags & ConnectionLaneFlags.Inside) != 0;
         }
 
-        private static bool RoadAllowsBuildingAccess(CarLane roadLane)
+        private static bool RoadAllowsBuildingAccess(
+            EntityManager entityManager,
+            Entity roadLaneEntity,
+            CarLane roadLane)
         {
-            return RoadHasGenericSideConnection(roadLane);
+            return RoadHasGenericSideConnection(roadLane) ||
+                AccessEndpointClassifier.HasBuildingServiceAnchor(entityManager, roadLaneEntity);
         }
 
         private static bool RoadAllowsGarageAccess(CarLane roadLane, ConnectionLane connectionLane)

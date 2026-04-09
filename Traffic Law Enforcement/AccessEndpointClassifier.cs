@@ -56,8 +56,8 @@ namespace Traffic_Law_Enforcement
             bool hasCarLane = entityManager.HasComponent<CarLane>(lane);
             bool isRoadLane = entityManager.HasComponent<EdgeLane>(lane) && hasCarLane;
             bool hasConnectionLane = TryGetConnectionLane(entityManager, lane, out ConnectionLane connectionLane);
-            bool hasDirectBuildingOwnerAnchor =
-                HasDirectBuildingServiceOwnerAnchor(entityManager, lane);
+            bool hasBuildingOwnerAnchor =
+                HasBuildingServiceOwnerAnchor(entityManager, lane);
             bool hasCargoSpawnAnchor =
                 TryGetSpawnLocationConnectionType(entityManager, lane, out RouteConnectionType connectionType) &&
                 connectionType == RouteConnectionType.Cargo;
@@ -71,7 +71,7 @@ namespace Traffic_Law_Enforcement
                 isRoadLane,
                 hasConnectionLane,
                 connectionLane,
-                hasDirectBuildingOwnerAnchor,
+                hasBuildingOwnerAnchor,
                 hasCargoSpawnAnchor,
                 hasCargoLoadingHint);
         }
@@ -92,8 +92,8 @@ namespace Traffic_Law_Enforcement
             bool isRoadLane = context.EdgeLaneData.HasComponent(lane) && hasCarLane;
             bool hasConnectionLane =
                 context.ConnectionLaneData.TryGetComponent(lane, out ConnectionLane connectionLane);
-            bool hasDirectBuildingOwnerAnchor =
-                HasDirectBuildingServiceOwnerAnchor(lane, ref context);
+            bool hasBuildingOwnerAnchor =
+                HasBuildingServiceOwnerAnchor(lane, ref context);
             bool hasCargoSpawnAnchor =
                 TryGetSpawnLocationConnectionType(lane, ref context, out RouteConnectionType connectionType) &&
                 connectionType == RouteConnectionType.Cargo;
@@ -107,9 +107,45 @@ namespace Traffic_Law_Enforcement
                 isRoadLane,
                 hasConnectionLane,
                 connectionLane,
-                hasDirectBuildingOwnerAnchor,
+                hasBuildingOwnerAnchor,
                 hasCargoSpawnAnchor,
                 hasCargoLoadingHint);
+        }
+
+        public static bool HasBuildingServiceAnchor(
+            EntityManager entityManager,
+            Entity lane)
+        {
+            if (lane == Entity.Null)
+            {
+                return false;
+            }
+
+            if (HasBuildingServiceOwnerAnchor(entityManager, lane))
+            {
+                return true;
+            }
+
+            return TryGetSpawnLocationConnectionType(entityManager, lane, out RouteConnectionType connectionType) &&
+                connectionType == RouteConnectionType.Cargo;
+        }
+
+        public static bool HasBuildingServiceAnchor(
+            Entity lane,
+            ref AccessEndpointLookupContext context)
+        {
+            if (lane == Entity.Null)
+            {
+                return false;
+            }
+
+            if (HasBuildingServiceOwnerAnchor(lane, ref context))
+            {
+                return true;
+            }
+
+            return TryGetSpawnLocationConnectionType(lane, ref context, out RouteConnectionType connectionType) &&
+                connectionType == RouteConnectionType.Cargo;
         }
 
         public static bool IsAccessOrigin(
@@ -147,7 +183,7 @@ namespace Traffic_Law_Enforcement
             bool isRoadLane,
             bool hasConnectionLane,
             ConnectionLane connectionLane,
-            bool hasDirectBuildingOwnerAnchor,
+            bool hasBuildingOwnerAnchor,
             bool hasCargoSpawnAnchor,
             bool hasCargoLoadingHint)
         {
@@ -170,7 +206,7 @@ namespace Traffic_Law_Enforcement
 
                 if (IsAnchoredNonParkingBuildingServiceConnection(
                         connectionLane,
-                        hasDirectBuildingOwnerAnchor,
+                        hasBuildingOwnerAnchor,
                         hasCargoSpawnAnchor,
                         hasCargoLoadingHint))
                 {
@@ -186,24 +222,23 @@ namespace Traffic_Law_Enforcement
             }
 
             if (!hasCarLane &&
-                !hasDirectBuildingOwnerAnchor &&
+                !hasBuildingOwnerAnchor &&
                 !hasCargoSpawnAnchor)
             {
                 return AccessEndpointKind.None;
             }
 
-            // Bare generic non-road lanes qualify only when they are directly owned by
-            // the terminal building/service entity or expose an explicit cargo anchor.
-            // This keeps internal invisible-path/service-road segments out of the
-            // access family while still recognizing the true terminal building lane.
-            return (hasDirectBuildingOwnerAnchor || hasCargoSpawnAnchor)
+            // Bare generic non-road lanes belong to the non-parking building/service
+            // access family when their owner chain resolves to the serviced
+            // building/facility or when they expose an explicit cargo anchor.
+            return (hasBuildingOwnerAnchor || hasCargoSpawnAnchor)
                 ? AccessEndpointKind.BuildingService
                 : AccessEndpointKind.None;
         }
 
         private static bool IsAnchoredNonParkingBuildingServiceConnection(
             ConnectionLane connectionLane,
-            bool hasDirectBuildingOwnerAnchor,
+            bool hasBuildingOwnerAnchor,
             bool hasCargoSpawnAnchor,
             bool hasCargoLoadingHint)
         {
@@ -217,7 +252,7 @@ namespace Traffic_Law_Enforcement
                 return insideConnection ||
                     cargoConnection ||
                     hasCargoSpawnAnchor ||
-                    hasDirectBuildingOwnerAnchor ||
+                    hasBuildingOwnerAnchor ||
                     hasCargoLoadingHint ||
                     !pedestrianConnection;
             }
@@ -229,27 +264,75 @@ namespace Traffic_Law_Enforcement
 
             return cargoConnection ||
                 hasCargoSpawnAnchor ||
-                (hasCargoLoadingHint && hasDirectBuildingOwnerAnchor);
+                (hasCargoLoadingHint && hasBuildingOwnerAnchor);
         }
 
-        private static bool HasDirectBuildingServiceOwnerAnchor(
+        private static bool HasBuildingServiceOwnerAnchor(
             EntityManager entityManager,
             Entity lane)
         {
-            Entity ownerEntity = GetOwner(entityManager, lane);
-            return ownerEntity != Entity.Null &&
-                (entityManager.HasComponent<Building>(ownerEntity) ||
-                entityManager.HasComponent<ServiceUpgrade>(ownerEntity));
+            return HasBuildingServiceEntityInOwnerChain(
+                entityManager,
+                GetOwner(entityManager, lane));
         }
 
-        private static bool HasDirectBuildingServiceOwnerAnchor(
+        private static bool HasBuildingServiceOwnerAnchor(
             Entity lane,
             ref AccessEndpointLookupContext context)
         {
-            Entity ownerEntity = GetOwner(lane, ref context);
-            return ownerEntity != Entity.Null &&
-                (context.BuildingData.HasComponent(ownerEntity) ||
-                context.ServiceUpgradeData.HasComponent(ownerEntity));
+            return HasBuildingServiceEntityInOwnerChain(
+                GetOwner(lane, ref context),
+                ref context);
+        }
+
+        private static bool HasBuildingServiceEntityInOwnerChain(
+            EntityManager entityManager,
+            Entity entity)
+        {
+            byte depth = 0;
+            while (entity != Entity.Null && depth < 12)
+            {
+                if (entityManager.HasComponent<Building>(entity) ||
+                    entityManager.HasComponent<ServiceUpgrade>(entity))
+                {
+                    return true;
+                }
+
+                if (!entityManager.HasComponent<Owner>(entity))
+                {
+                    break;
+                }
+
+                entity = entityManager.GetComponentData<Owner>(entity).m_Owner;
+                depth += 1;
+            }
+
+            return false;
+        }
+
+        private static bool HasBuildingServiceEntityInOwnerChain(
+            Entity entity,
+            ref AccessEndpointLookupContext context)
+        {
+            byte depth = 0;
+            while (entity != Entity.Null && depth < 12)
+            {
+                if (context.BuildingData.HasComponent(entity) ||
+                    context.ServiceUpgradeData.HasComponent(entity))
+                {
+                    return true;
+                }
+
+                if (!context.OwnerData.TryGetComponent(entity, out Owner owner))
+                {
+                    break;
+                }
+
+                entity = owner.m_Owner;
+                depth += 1;
+            }
+
+            return false;
         }
 
         private static bool IsPlainRoadLikeEntity(
