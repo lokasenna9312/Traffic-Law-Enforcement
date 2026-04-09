@@ -149,9 +149,7 @@ namespace Traffic_Law_Enforcement
                 plannedPenaltiesText = includeDebugFields
                     ? NormalizeInspectionText(inspection.Breakdown)
                     : string.Empty;
-                penaltyTagsText =
-                    NormalizeInspectionText(
-                        RoutePenaltyInspection.BuildTagSummary(inspection.TagSnapshot));
+                penaltyTagsText = BuildPenaltyTagsText(inspection);
             }
 
             return new SelectedObjectRouteDiagnosticsData(
@@ -633,6 +631,47 @@ namespace Traffic_Law_Enforcement
             PublicTransportLaneVehicleCategory categories =
                 PublicTransportLanePolicy.GetVanillaAuthorizedCategories(vehicle, ref context.TypeLookups);
             return (categories & PublicTransportLaneVehicleCategory.RoadPublicTransportVehicle) != 0;
+        }
+
+        private static string BuildPenaltyTagsText(
+            RoutePenaltyInspectionResult inspection)
+        {
+            string rawTags =
+                NormalizeInspectionText(
+                    RoutePenaltyInspection.BuildTagSummary(inspection.TagSnapshot));
+            string normalizedTags =
+                NormalizeInspectionText(
+                    RoutePenaltyInspection.BuildTagSummary(
+                        inspection.NormalizedTagSnapshot));
+
+            bool hasRawTags =
+                inspection.TagSnapshot.Count > 0 ||
+                inspection.TagSnapshot.OmittedCount > 0;
+            bool hasNormalizedTags =
+                inspection.NormalizedTagSnapshot.Count > 0 ||
+                inspection.NormalizedTagSnapshot.OmittedCount > 0;
+
+            if (!hasRawTags && !hasNormalizedTags)
+            {
+                return rawTags;
+            }
+
+            if (!hasNormalizedTags)
+            {
+                return rawTags;
+            }
+
+            if (!hasRawTags)
+            {
+                return $"normalized={normalizedTags}";
+            }
+
+            if (rawTags == normalizedTags)
+            {
+                return rawTags;
+            }
+
+            return $"raw={rawTags} | normalized={normalizedTags}";
         }
 
         private static string NormalizeInspectionText(string text)

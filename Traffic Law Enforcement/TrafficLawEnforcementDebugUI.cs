@@ -501,7 +501,7 @@ namespace Traffic_Law_Enforcement
             });
             routeDiagnostics.children.Add(new DebugUI.Value
             {
-                displayName = "Penalty tags",
+                displayName = "Penalty tags (raw/normalized)",
                 getter = GetRouteDiagnosticsPenaltyTagsText
             });
             routeDiagnostics.children.Add(new DebugUI.Value
