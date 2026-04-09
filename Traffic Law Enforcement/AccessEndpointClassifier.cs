@@ -190,10 +190,12 @@ namespace Traffic_Law_Enforcement
                 return AccessEndpointKind.None;
             }
 
-            // Bare generic non-road lanes are only treated as access endpoints when they
-            // expose an explicit cargo/service anchor. Owner-only generic lanes caused
-            // repeated false ingress/egress hits on internal invisible service paths.
-            return hasCargoSpawnAnchor
+            // Bare generic non-road lanes can qualify when they are actually owned by a
+            // building/service chain or expose an explicit cargo/service anchor. The
+            // previous false positives came from treating any non-roadlike owner as an
+            // anchor; the tightened owner-chain check above limits this to real
+            // building/service ownership.
+            return (hasBuildingOwnerAnchor || hasCargoSpawnAnchor)
                 ? AccessEndpointKind.BuildingService
                 : AccessEndpointKind.None;
         }
