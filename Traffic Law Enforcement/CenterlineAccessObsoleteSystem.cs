@@ -34,6 +34,8 @@ namespace Traffic_Law_Enforcement
         private ComponentLookup<PathOwner> m_PathOwnerData;
         private ComponentLookup<Owner> m_OwnerData;
         private ComponentLookup<PrefabRef> m_PrefabRefData;
+        private ComponentLookup<Game.Objects.SpawnLocation> m_SpawnLocationData;
+        private ComponentLookup<Game.Prefabs.SpawnLocationData> m_PrefabSpawnLocationData;
         private ComponentLookup<Car> m_CarData;
         private ComponentLookup<CenterlineAccessOriginWatch> m_AccessOriginWatchData;
         private ComponentLookup<CenterlineAccessObsoleteState> m_ObsoleteStateData;
@@ -90,6 +92,8 @@ namespace Traffic_Law_Enforcement
             m_PathOwnerData = GetComponentLookup<PathOwner>(true);
             m_OwnerData = GetComponentLookup<Owner>(true);
             m_PrefabRefData = GetComponentLookup<PrefabRef>(true);
+            m_SpawnLocationData = GetComponentLookup<Game.Objects.SpawnLocation>(true);
+            m_PrefabSpawnLocationData = GetComponentLookup<Game.Prefabs.SpawnLocationData>(true);
             m_CarData = GetComponentLookup<Car>(true);
             m_AccessOriginWatchData = GetComponentLookup<CenterlineAccessOriginWatch>();
             m_ObsoleteStateData = GetComponentLookup<CenterlineAccessObsoleteState>();
@@ -121,6 +125,8 @@ namespace Traffic_Law_Enforcement
             m_CurrentLaneData.Update(this);
             m_PathOwnerData.Update(this);
             m_OwnerData.Update(this);
+            m_SpawnLocationData.Update(this);
+            m_PrefabSpawnLocationData.Update(this);
             m_CarData.Update(this);
             m_AccessOriginWatchData.Update(this);
             m_ObsoleteStateData.Update(this);
@@ -145,10 +151,7 @@ namespace Traffic_Law_Enforcement
                 m_TypeLookups.Update(this);
             }
 
-            if (shouldCollectPrefabLoggingContext)
-            {
-                m_PrefabRefData.Update(this);
-            }
+            m_PrefabRefData.Update(this);
 
             m_CandidateVehicles.Clear();
             CollectCandidateVehicles(m_CurrentLaneChangedQuery);
@@ -626,7 +629,9 @@ namespace Traffic_Law_Enforcement
 
         private bool IsAccessTransition(Entity sourceLane, Entity targetLane)
         {
-            return IsAccessOrigin(sourceLane) || IsAccessTarget(targetLane);
+            AccessEndpointLookupContext accessContext = CreateAccessEndpointLookupContext();
+            return AccessEndpointClassifier.IsAccessOrigin(sourceLane, ref accessContext) ||
+                AccessEndpointClassifier.IsAccessOrigin(targetLane, ref accessContext);
         }
 
         private byte GetTransitionFamily(Entity sourceLane, Entity targetLane, byte evaluationResult)
@@ -636,89 +641,48 @@ namespace Traffic_Law_Enforcement
                 return TransitionFamilyNone;
             }
 
-            if (IsAccessOrigin(sourceLane))
+            AccessEndpointLookupContext accessContext = CreateAccessEndpointLookupContext();
+            AccessEndpointKind sourceKind =
+                AccessEndpointClassifier.Classify(sourceLane, ref accessContext);
+            if (sourceKind != AccessEndpointKind.None)
             {
                 return TransitionFamilyIllegalEgress;
             }
 
-            if (m_ParkingLaneData.HasComponent(targetLane))
+            return AccessEndpointClassifier.Classify(targetLane, ref accessContext) switch
             {
-                return TransitionFamilyParkingLaneIngress;
-            }
-
-            if (m_GarageLaneData.HasComponent(targetLane))
-            {
-                return TransitionFamilyGarageLaneIngress;
-            }
-
-            if (!m_ConnectionLaneData.TryGetComponent(targetLane, out ConnectionLane connectionLane))
-            {
-                return TransitionFamilyNone;
-            }
-
-            if ((connectionLane.m_Flags & ConnectionLaneFlags.Parking) != 0)
-            {
-                return TransitionFamilyParkingConnectionIngress;
-            }
-
-            if ((connectionLane.m_Flags & ConnectionLaneFlags.Road) == 0)
-            {
-                return TransitionFamilyBuildingServiceIngress;
-            }
-
-            return TransitionFamilyNone;
+                AccessEndpointKind.ParkingLane => TransitionFamilyParkingLaneIngress,
+                AccessEndpointKind.GarageLane => TransitionFamilyGarageLaneIngress,
+                AccessEndpointKind.ParkingConnection => TransitionFamilyParkingConnectionIngress,
+                AccessEndpointKind.BuildingService => TransitionFamilyBuildingServiceIngress,
+                _ => TransitionFamilyNone,
+            };
         }
 
         private string DescribeTransitionKind(Entity sourceLane, Entity targetLane)
         {
-            if (IsAccessOrigin(sourceLane))
+            AccessEndpointLookupContext accessContext = CreateAccessEndpointLookupContext();
+            AccessEndpointKind sourceKind =
+                AccessEndpointClassifier.Classify(sourceLane, ref accessContext);
+            if (sourceKind != AccessEndpointKind.None)
             {
                 return $"egress:{DescribeAccessOrigin(sourceLane)}";
             }
 
-            if (m_ParkingLaneData.HasComponent(targetLane))
+            return AccessEndpointClassifier.Classify(targetLane, ref accessContext) switch
             {
-                return "ingress:parking-lane";
-            }
-
-            if (m_GarageLaneData.HasComponent(targetLane))
-            {
-                return "ingress:garage-lane";
-            }
-
-            if (!m_ConnectionLaneData.TryGetComponent(targetLane, out ConnectionLane connectionLane))
-            {
-                return "ingress:other";
-            }
-
-            if ((connectionLane.m_Flags & ConnectionLaneFlags.Parking) != 0)
-            {
-                return "ingress:parking-connection";
-            }
-
-            if ((connectionLane.m_Flags & ConnectionLaneFlags.Road) == 0)
-            {
-                return "ingress:building-service-access-connection";
-            }
-
-            return "ingress:road-connection";
+                AccessEndpointKind.ParkingLane => "ingress:parking-lane",
+                AccessEndpointKind.GarageLane => "ingress:garage-lane",
+                AccessEndpointKind.ParkingConnection => "ingress:parking-connection",
+                AccessEndpointKind.BuildingService => "ingress:building-service-access-connection",
+                _ => "ingress:other",
+            };
         }
 
         private bool IsAccessTarget(Entity lane)
         {
-            if (m_ParkingLaneData.HasComponent(lane) || m_GarageLaneData.HasComponent(lane))
-            {
-                return true;
-            }
-
-            if (!m_ConnectionLaneData.TryGetComponent(lane, out ConnectionLane connectionLane))
-            {
-                return false;
-            }
-
-            bool parkingAccess = (connectionLane.m_Flags & ConnectionLaneFlags.Parking) != 0;
-            bool roadConnection = (connectionLane.m_Flags & ConnectionLaneFlags.Road) != 0;
-            return parkingAccess || !roadConnection;
+            AccessEndpointLookupContext accessContext = CreateAccessEndpointLookupContext();
+            return AccessEndpointClassifier.IsAccessOrigin(lane, ref accessContext);
         }
 
         private bool IsIllegalIngress(Entity sourceLane, Entity targetLane, out string reason)
@@ -729,36 +693,28 @@ namespace Traffic_Law_Enforcement
                 return false;
             }
 
-            if (m_ParkingLaneData.HasComponent(targetLane))
+            AccessEndpointLookupContext accessContext = CreateAccessEndpointLookupContext();
+            switch (AccessEndpointClassifier.Classify(targetLane, ref accessContext))
             {
-                reason = "planned parking-access ingress from a lane without side-access permission";
-                return true;
-            }
+                case AccessEndpointKind.ParkingLane:
+                    reason = "planned parking-access ingress from a lane without side-access permission";
+                    return true;
 
-            if (m_GarageLaneData.HasComponent(targetLane))
-            {
-                reason = "planned garage-access ingress from a lane without side-access permission";
-                return true;
-            }
+                case AccessEndpointKind.GarageLane:
+                    reason = "planned garage-access ingress from a lane without side-access permission";
+                    return true;
 
-            if (!m_ConnectionLaneData.TryGetComponent(targetLane, out ConnectionLane connectionLane))
-            {
-                return false;
-            }
+                case AccessEndpointKind.ParkingConnection:
+                    reason = "planned parking-connection ingress from a lane without side-access permission";
+                    return true;
 
-            if ((connectionLane.m_Flags & ConnectionLaneFlags.Parking) != 0)
-            {
-                reason = "planned parking-connection ingress from a lane without side-access permission";
-                return true;
-            }
+                case AccessEndpointKind.BuildingService:
+                    reason = "planned building/service access ingress from a lane without side-access permission";
+                    return true;
 
-            if ((connectionLane.m_Flags & ConnectionLaneFlags.Road) == 0)
-            {
-                reason = "planned building/service access ingress from a lane without side-access permission";
-                return true;
+                default:
+                    return false;
             }
-
-            return false;
         }
 
         private bool IsIllegalEgress(Entity sourceLane, Entity targetLane, out string reason)
@@ -775,49 +731,31 @@ namespace Traffic_Law_Enforcement
 
         private bool IsAccessOrigin(Entity lane)
         {
-            if (m_ParkingLaneData.HasComponent(lane) || m_GarageLaneData.HasComponent(lane))
-            {
-                return true;
-            }
-
-            if (!m_ConnectionLaneData.TryGetComponent(lane, out ConnectionLane connectionLane))
-            {
-                return false;
-            }
-
-            bool parkingAccess = (connectionLane.m_Flags & ConnectionLaneFlags.Parking) != 0;
-            bool roadConnection = (connectionLane.m_Flags & ConnectionLaneFlags.Road) != 0;
-            return parkingAccess || !roadConnection;
+            AccessEndpointLookupContext accessContext = CreateAccessEndpointLookupContext();
+            return AccessEndpointClassifier.IsAccessOrigin(lane, ref accessContext);
         }
 
         private string DescribeAccessOrigin(Entity lane)
         {
-            if (m_ParkingLaneData.HasComponent(lane))
-            {
-                return "parking access";
-            }
+            AccessEndpointLookupContext accessContext = CreateAccessEndpointLookupContext();
+            return AccessEndpointClassifier.Describe(
+                AccessEndpointClassifier.Classify(lane, ref accessContext));
+        }
 
-            if (m_GarageLaneData.HasComponent(lane))
+        private AccessEndpointLookupContext CreateAccessEndpointLookupContext()
+        {
+            return new AccessEndpointLookupContext
             {
-                return "garage access";
-            }
-
-            if (!m_ConnectionLaneData.TryGetComponent(lane, out ConnectionLane connectionLane))
-            {
-                return "building access";
-            }
-
-            if ((connectionLane.m_Flags & ConnectionLaneFlags.Parking) != 0)
-            {
-                return "parking connection";
-            }
-
-            if ((connectionLane.m_Flags & ConnectionLaneFlags.Road) == 0)
-            {
-                return "building/service access connection";
-            }
-
-            return "building access";
+                CarLaneData = m_CarLaneData,
+                EdgeLaneData = m_EdgeLaneData,
+                ParkingLaneData = m_ParkingLaneData,
+                GarageLaneData = m_GarageLaneData,
+                ConnectionLaneData = m_ConnectionLaneData,
+                OwnerData = m_OwnerData,
+                SpawnLocationData = m_SpawnLocationData,
+                PrefabRefData = m_PrefabRefData,
+                PrefabSpawnLocationData = m_PrefabSpawnLocationData,
+            };
         }
 
         private bool TryGetRoadCarLane(Entity lane, out CarLane carLane)

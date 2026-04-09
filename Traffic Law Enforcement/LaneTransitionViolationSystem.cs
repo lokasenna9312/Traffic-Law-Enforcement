@@ -221,7 +221,8 @@ namespace Traffic_Law_Enforcement
                 out bool currentIsAccessTarget,
                 out bool ingressDetectResult,
                 out MidBlockCrossingPolicy.AccessIngressTraceFailReason failReason,
-                out LaneTransitionViolationReasonCode reasonCode);
+                out LaneTransitionViolationReasonCode reasonCode,
+                GetLiveAccessPathMethodsHint(vehicle));
 
             bool currentIsConnection =
                 m_ConnectionLaneData.HasComponent(history.m_CurrentLane);
@@ -377,6 +378,7 @@ namespace Traffic_Law_Enforcement
             {
                 hasMidBlockViolation =
                     TryDetectIllegalAccessMidBlockCrossing(
+                        vehicle,
                         history,
                         out reasonCode);
 
@@ -594,7 +596,8 @@ namespace Traffic_Law_Enforcement
                 out bool currentIsRoad,
                 out bool egressDetectResult,
                 out MidBlockCrossingPolicy.AccessEgressTraceFailReason failReason,
-                out _);
+                out _,
+                GetLiveAccessPathMethodsHint(vehicle));
 
                 bool previousIsConnection =
                     m_ConnectionLaneData.HasComponent(history.m_PreviousLane);
@@ -903,6 +906,7 @@ namespace Traffic_Law_Enforcement
         }
 
         private bool TryDetectIllegalAccessMidBlockCrossing(
+            Entity vehicle,
             VehicleLaneHistory history,
             out LaneTransitionViolationReasonCode reasonCode)
         {
@@ -910,6 +914,7 @@ namespace Traffic_Law_Enforcement
                 EntityManager,
                 history.m_PreviousLane,
                 history.m_CurrentLane,
+                GetLiveAccessPathMethodsHint(vehicle),
                 out reasonCode);
         }
 
@@ -955,6 +960,7 @@ namespace Traffic_Law_Enforcement
                         EntityManager,
                         pendingOriginLane,
                         history.m_CurrentLane,
+                        GetLiveAccessPathMethodsHint(vehicle),
                         out reasonCode);
                     if (detected)
                     {
@@ -1176,9 +1182,17 @@ namespace Traffic_Law_Enforcement
 
         private bool IsAccessOrigin(Entity lane)
         {
-            return m_ParkingLaneData.HasComponent(lane) ||
-                m_GarageLaneData.HasComponent(lane) ||
-                IsAccessConnection(lane);
+            return AccessEndpointClassifier.IsAccessOrigin(
+                EntityManager,
+                lane);
+        }
+
+        private bool IsAccessOrigin(Entity vehicle, Entity lane)
+        {
+            return AccessEndpointClassifier.IsAccessOrigin(
+                EntityManager,
+                lane,
+                GetLiveAccessPathMethodsHint(vehicle));
         }
 
         private void CaptureDirectIllegalEgressApplyMarker(
@@ -1220,7 +1234,7 @@ namespace Traffic_Law_Enforcement
             bool currentIsNarrowIntermediate =
                 IsNarrowOrdinaryEgressIntermediate(history.m_CurrentLane);
             bool previousIsAccessOrigin =
-                IsAccessOrigin(history.m_PreviousLane);
+                IsAccessOrigin(vehicle, history.m_PreviousLane);
 
             if (TryRememberPendingGarageConnectionEgressBridge(
                     vehicle,
@@ -1292,8 +1306,7 @@ namespace Traffic_Law_Enforcement
             VehicleLaneHistory history,
             ref LaneTransitionAnalysisState analysisState)
         {
-            if (!CanUseLegacyGarageConnectionEgressBridgeQuarantine(vehicle) ||
-                !m_GarageLaneData.HasComponent(history.m_PreviousLane) ||
+            if (!m_GarageLaneData.HasComponent(history.m_PreviousLane) ||
                 !IsQualifyingGarageConnectionEgressBridgeConnection(history.m_CurrentLane) ||
                 history.m_PreviousLaneOwner == Entity.Null ||
                 history.m_PreviousLaneOwner != history.m_CurrentLaneOwner)
@@ -1323,8 +1336,7 @@ namespace Traffic_Law_Enforcement
             Entity bridgeOriginLane =
                 analysisState.m_PendingGarageConnectionEgressBridgeOriginLane;
 
-            if (!CanUseLegacyGarageConnectionEgressBridgeQuarantine(vehicle) ||
-                history.m_PreviousLane != bridgeConnectionLane ||
+            if (history.m_PreviousLane != bridgeConnectionLane ||
                 !IsNarrowOrdinaryEgressIntermediate(history.m_CurrentLane))
             {
                 ClearPendingGarageConnectionEgressBridge(ref analysisState);
@@ -1336,11 +1348,6 @@ namespace Traffic_Law_Enforcement
             analysisState.m_PendingOrdinaryEgressCorridorFailsafeBudget =
                 PendingOrdinaryEgressCorridorFailsafeBudget;
             return true;
-        }
-
-        private bool CanUseLegacyGarageConnectionEgressBridgeQuarantine(Entity vehicle)
-        {
-            return !m_DeliveryTruckData.HasComponent(vehicle);
         }
 
         private bool IsRoadLane(Entity lane)
@@ -1409,54 +1416,29 @@ namespace Traffic_Law_Enforcement
 
         private bool IsAccessConnection(Entity lane)
         {
-            if (!m_ConnectionLaneData.TryGetComponent(lane, out ConnectionLane connectionLane))
-            {
-                return false;
-            }
-
-            bool parkingAccess = (connectionLane.m_Flags & ConnectionLaneFlags.Parking) != 0;
-            bool roadConnection = (connectionLane.m_Flags & ConnectionLaneFlags.Road) != 0;
-            return parkingAccess || !roadConnection;
+            AccessEndpointKind accessKind =
+                AccessEndpointClassifier.Classify(EntityManager, lane);
+            return accessKind == AccessEndpointKind.ParkingConnection ||
+                accessKind == AccessEndpointKind.BuildingService;
         }
 
         private string DescribeAccessOrigin(Entity lane)
         {
-            if (m_ParkingLaneData.HasComponent(lane))
-            {
-                return "parking access";
-            }
-
-            if (m_GarageLaneData.HasComponent(lane))
-            {
-                return "garage access";
-            }
-
-            if (IsAccessConnection(lane))
-            {
-                return DescribeAccessConnection(lane);
-            }
-
-            return "building access";
+            return AccessEndpointClassifier.Describe(
+                AccessEndpointClassifier.Classify(EntityManager, lane));
         }
 
         private string DescribeAccessConnection(Entity lane)
         {
-            if (!m_ConnectionLaneData.TryGetComponent(lane, out ConnectionLane connectionLane))
-            {
-                return "access connection";
-            }
+            return AccessEndpointClassifier.Describe(
+                AccessEndpointClassifier.Classify(EntityManager, lane));
+        }
 
-            if ((connectionLane.m_Flags & ConnectionLaneFlags.Parking) != 0)
-            {
-                return "parking connection";
-            }
-
-            if ((connectionLane.m_Flags & ConnectionLaneFlags.Road) == 0)
-            {
-                return "building/service access connection";
-            }
-
-            return "access connection";
+        private PathMethod GetLiveAccessPathMethodsHint(Entity vehicle)
+        {
+            return m_PathInformationData.TryGetComponent(vehicle, out PathInformation pathInformation)
+                ? pathInformation.m_Methods
+                : 0;
         }
 
         private static bool LaneAllowsSideAccess(CarLane lane)
