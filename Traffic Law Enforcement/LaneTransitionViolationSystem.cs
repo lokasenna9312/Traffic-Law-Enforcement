@@ -1053,7 +1053,7 @@ namespace Traffic_Law_Enforcement
             if (previousIsRoad &&
                 currentAccessKind == AccessEndpointKind.BuildingService &&
                 failReason == MidBlockCrossingPolicy.AccessIngressTraceFailReason.RoadAllowsBuildingAccess &&
-                IsAnchoredBuildingServiceRoad(history.m_PreviousLane) &&
+                IsBuildingServiceClusterRoad(history.m_PreviousLane) &&
                 analysisState.m_PendingBuildingServiceIngressTarget != Entity.Null &&
                 AccessEndpointClassifier.LaneMatchesBuildingServiceTarget(
                     EntityManager,
@@ -1157,7 +1157,8 @@ namespace Traffic_Law_Enforcement
             }
 
             if (IsRoadWithoutBuildingServiceAllowance(history.m_CurrentLane) &&
-                !IsRoadLane(history.m_PreviousLane))
+                (!IsRoadLane(history.m_PreviousLane) ||
+                    IsBuildingServiceClusterRoad(history.m_PreviousLane)))
             {
                 originLane = analysisState.m_PendingBuildingServiceEgressOriginLane;
                 roadLane = history.m_CurrentLane;
@@ -1552,11 +1553,18 @@ namespace Traffic_Law_Enforcement
                 out _,
                 GetLiveAccessPathMethodsHint(vehicle));
 
-            if (!previousIsAccessOrigin ||
-                !currentIsRoad ||
-                previousAccessKind != AccessEndpointKind.BuildingService ||
-                failReason != MidBlockCrossingPolicy.AccessEgressTraceFailReason.RoadAllowsBuildingAccess ||
-                !IsAnchoredBuildingServiceRoad(history.m_CurrentLane))
+            bool directAccessOriginSeed =
+                previousIsAccessOrigin &&
+                currentIsRoad &&
+                previousAccessKind == AccessEndpointKind.BuildingService &&
+                failReason == MidBlockCrossingPolicy.AccessEgressTraceFailReason.RoadAllowsBuildingAccess &&
+                IsBuildingServiceClusterRoad(history.m_CurrentLane);
+
+            bool corridorBoundarySeed =
+                IsPotentialBuildingServiceEgressSeed(vehicle, history);
+
+            if (!directAccessOriginSeed &&
+                !corridorBoundarySeed)
             {
                 ClearPendingBuildingServiceEgress(ref analysisState);
                 return;
@@ -1734,7 +1742,7 @@ namespace Traffic_Law_Enforcement
             }
 
             if (LaneAllowsSideAccess(previousRoadLane) ||
-                IsAnchoredBuildingServiceRoad(history.m_PreviousLane))
+                IsBuildingServiceClusterRoad(history.m_PreviousLane))
             {
                 return false;
             }
@@ -1746,6 +1754,27 @@ namespace Traffic_Law_Enforcement
                     GetLiveAccessPathMethodsHint(vehicle));
 
             return currentAccessKind == AccessEndpointKind.None;
+        }
+
+        private bool IsPotentialBuildingServiceEgressSeed(
+            Entity vehicle,
+            VehicleLaneHistory history)
+        {
+            if (!TryGetRoadCarLane(history.m_CurrentLane, out _) ||
+                !IsBuildingServiceClusterRoad(history.m_CurrentLane) ||
+                m_ConnectionLaneData.HasComponent(history.m_PreviousLane) ||
+                m_ParkingLaneData.HasComponent(history.m_PreviousLane) ||
+                m_GarageLaneData.HasComponent(history.m_PreviousLane) ||
+                IsRoadLane(history.m_PreviousLane) ||
+                !TryGetBuildingServiceIntentTarget(vehicle, out _))
+            {
+                return false;
+            }
+
+            return AccessEndpointClassifier.Classify(
+                    EntityManager,
+                    history.m_PreviousLane,
+                    GetLiveAccessPathMethodsHint(vehicle)) == AccessEndpointKind.None;
         }
 
         private bool TryGetBuildingServiceIntentTarget(
@@ -1804,10 +1833,16 @@ namespace Traffic_Law_Enforcement
 
             if (IsRoadLane(lane))
             {
-                return IsAnchoredBuildingServiceRoad(lane);
+                return IsBuildingServiceClusterRoad(lane);
             }
 
             return true;
+        }
+
+        private bool IsBuildingServiceClusterRoad(Entity lane)
+        {
+            return TryGetRoadCarLane(lane, out _) &&
+                AccessEndpointClassifier.HasBuildingServiceRoadAllowanceAnchor(EntityManager, lane);
         }
 
         private bool IsAnchoredBuildingServiceRoad(Entity lane)
