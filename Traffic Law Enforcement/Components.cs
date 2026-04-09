@@ -30,6 +30,8 @@ namespace Traffic_Law_Enforcement
         public Entity m_PendingBuildingServiceIngressTarget;
         public byte m_PendingBuildingServiceEgressCorridorFailsafeBudget;
         public Entity m_PendingBuildingServiceEgressOriginLane;
+        public byte m_PendingBuildingServiceEgressRequiresIntermediate;
+        public byte m_PendingBuildingServiceEgressSawIntermediate;
         public Entity m_PendingGarageConnectionEgressBridgeConnectionLane;
         public Entity m_PendingGarageConnectionEgressBridgeOriginLane;
     }

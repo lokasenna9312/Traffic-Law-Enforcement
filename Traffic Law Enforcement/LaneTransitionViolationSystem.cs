@@ -1053,7 +1053,7 @@ namespace Traffic_Law_Enforcement
             if (previousIsRoad &&
                 currentAccessKind == AccessEndpointKind.BuildingService &&
                 failReason == MidBlockCrossingPolicy.AccessIngressTraceFailReason.RoadAllowsBuildingAccess &&
-                IsBuildingServiceClusterRoad(history.m_PreviousLane) &&
+                IsBuildingServiceCarryRoad(history.m_PreviousLane) &&
                 analysisState.m_PendingBuildingServiceIngressTarget != Entity.Null &&
                 AccessEndpointClassifier.LaneMatchesBuildingServiceTarget(
                     EntityManager,
@@ -1158,8 +1158,15 @@ namespace Traffic_Law_Enforcement
 
             if (IsRoadWithoutBuildingServiceAllowance(history.m_CurrentLane) &&
                 (!IsRoadLane(history.m_PreviousLane) ||
-                    IsBuildingServiceClusterRoad(history.m_PreviousLane)))
+                    IsBuildingServiceCarryRoad(history.m_PreviousLane)))
             {
+                if (analysisState.m_PendingBuildingServiceEgressRequiresIntermediate != 0 &&
+                    analysisState.m_PendingBuildingServiceEgressSawIntermediate == 0)
+                {
+                    ClearPendingBuildingServiceEgress(ref analysisState);
+                    return false;
+                }
+
                 originLane = analysisState.m_PendingBuildingServiceEgressOriginLane;
                 roadLane = history.m_CurrentLane;
                 previousLane = originLane;
@@ -1171,6 +1178,9 @@ namespace Traffic_Law_Enforcement
 
             if (IsBuildingServiceCorridorTransition(history))
             {
+                MarkPendingBuildingServiceEgressSawIntermediate(
+                    history,
+                    ref analysisState);
                 AdvancePendingBuildingServiceEgressCorridor(ref analysisState);
                 return false;
             }
@@ -1558,7 +1568,7 @@ namespace Traffic_Law_Enforcement
                 currentIsRoad &&
                 previousAccessKind == AccessEndpointKind.BuildingService &&
                 failReason == MidBlockCrossingPolicy.AccessEgressTraceFailReason.RoadAllowsBuildingAccess &&
-                IsBuildingServiceClusterRoad(history.m_CurrentLane);
+                IsBuildingServiceCarryRoad(history.m_CurrentLane);
 
             bool corridorBoundarySeed =
                 IsPotentialBuildingServiceEgressSeed(vehicle, history);
@@ -1574,6 +1584,13 @@ namespace Traffic_Law_Enforcement
                 history.m_PreviousLane;
             analysisState.m_PendingBuildingServiceEgressCorridorFailsafeBudget =
                 PendingBuildingServiceEgressCorridorFailsafeBudget;
+            analysisState.m_PendingBuildingServiceEgressRequiresIntermediate =
+                (byte)((directAccessOriginSeed &&
+                    !IsBuildingServiceClusterRoad(history.m_CurrentLane))
+                    ? 1
+                    : 0);
+            analysisState.m_PendingBuildingServiceEgressSawIntermediate =
+                (byte)(corridorBoundarySeed ? 1 : 0);
         }
 
         private void AdvancePendingOrdinaryEgressCorridor(
@@ -1670,6 +1687,8 @@ namespace Traffic_Law_Enforcement
         {
             analysisState.m_PendingBuildingServiceEgressCorridorFailsafeBudget = 0;
             analysisState.m_PendingBuildingServiceEgressOriginLane = Entity.Null;
+            analysisState.m_PendingBuildingServiceEgressRequiresIntermediate = 0;
+            analysisState.m_PendingBuildingServiceEgressSawIntermediate = 0;
         }
 
         private void ClearPendingGarageConnectionEgressBridge(
@@ -1742,7 +1761,7 @@ namespace Traffic_Law_Enforcement
             }
 
             if (LaneAllowsSideAccess(previousRoadLane) ||
-                IsBuildingServiceClusterRoad(history.m_PreviousLane))
+                IsBuildingServiceCarryRoad(history.m_PreviousLane))
             {
                 return false;
             }
@@ -1761,7 +1780,7 @@ namespace Traffic_Law_Enforcement
             VehicleLaneHistory history)
         {
             if (!TryGetRoadCarLane(history.m_CurrentLane, out _) ||
-                !IsBuildingServiceClusterRoad(history.m_CurrentLane) ||
+                !IsBuildingServiceCarryRoad(history.m_CurrentLane) ||
                 m_ConnectionLaneData.HasComponent(history.m_PreviousLane) ||
                 m_ParkingLaneData.HasComponent(history.m_PreviousLane) ||
                 m_GarageLaneData.HasComponent(history.m_PreviousLane) ||
@@ -1833,10 +1852,17 @@ namespace Traffic_Law_Enforcement
 
             if (IsRoadLane(lane))
             {
-                return IsBuildingServiceClusterRoad(lane);
+                return IsBuildingServiceCarryRoad(lane);
             }
 
             return true;
+        }
+
+        private bool IsBuildingServiceCarryRoad(Entity lane)
+        {
+            return TryGetRoadCarLane(lane, out CarLane roadLane) &&
+                (LaneAllowsSideAccess(roadLane) ||
+                    AccessEndpointClassifier.HasBuildingServiceRoadAllowanceAnchor(EntityManager, lane));
         }
 
         private bool IsBuildingServiceClusterRoad(Entity lane)
@@ -1857,6 +1883,22 @@ namespace Traffic_Law_Enforcement
             return TryGetRoadCarLane(lane, out CarLane roadLane) &&
                 !LaneAllowsSideAccess(roadLane) &&
                 !AccessEndpointClassifier.HasBuildingServiceRoadAllowanceAnchor(EntityManager, lane);
+        }
+
+        private void MarkPendingBuildingServiceEgressSawIntermediate(
+            VehicleLaneHistory history,
+            ref LaneTransitionAnalysisState analysisState)
+        {
+            if (analysisState.m_PendingBuildingServiceEgressSawIntermediate != 0)
+            {
+                return;
+            }
+
+            if (!IsRoadLane(history.m_PreviousLane) ||
+                !IsRoadLane(history.m_CurrentLane))
+            {
+                analysisState.m_PendingBuildingServiceEgressSawIntermediate = 1;
+            }
         }
 
         private bool TryGetRoadCarLane(Entity lane, out CarLane roadLane)
