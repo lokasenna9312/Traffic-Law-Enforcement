@@ -142,6 +142,45 @@ namespace Traffic_Law_Enforcement
             return HasBuildingServiceOwnerAnchor(entityManager, lane);
         }
 
+        public static bool LaneMatchesBuildingServiceTarget(
+            EntityManager entityManager,
+            Entity lane,
+            Entity targetEntity)
+        {
+            if (lane == Entity.Null || targetEntity == Entity.Null)
+            {
+                return false;
+            }
+
+            Entity laneOwner = GetOwner(entityManager, lane);
+            if (laneOwner == Entity.Null)
+            {
+                return false;
+            }
+
+            byte targetDepth = 0;
+            Entity currentTarget = targetEntity;
+            while (currentTarget != Entity.Null && targetDepth < 12)
+            {
+                if ((entityManager.HasComponent<Building>(currentTarget) ||
+                        entityManager.HasComponent<ServiceUpgrade>(currentTarget)) &&
+                    OwnerChainContainsEntity(entityManager, laneOwner, currentTarget))
+                {
+                    return true;
+                }
+
+                if (!entityManager.HasComponent<Owner>(currentTarget))
+                {
+                    break;
+                }
+
+                currentTarget = entityManager.GetComponentData<Owner>(currentTarget).m_Owner;
+                targetDepth += 1;
+            }
+
+            return false;
+        }
+
         public static bool HasBuildingServiceAnchor(
             Entity lane,
             ref AccessEndpointLookupContext context)
@@ -318,6 +357,31 @@ namespace Traffic_Law_Enforcement
             {
                 if (entityManager.HasComponent<Building>(entity) ||
                     entityManager.HasComponent<ServiceUpgrade>(entity))
+                {
+                    return true;
+                }
+
+                if (!entityManager.HasComponent<Owner>(entity))
+                {
+                    break;
+                }
+
+                entity = entityManager.GetComponentData<Owner>(entity).m_Owner;
+                depth += 1;
+            }
+
+            return false;
+        }
+
+        private static bool OwnerChainContainsEntity(
+            EntityManager entityManager,
+            Entity entity,
+            Entity candidate)
+        {
+            byte depth = 0;
+            while (entity != Entity.Null && depth < 12)
+            {
+                if (entity == candidate)
                 {
                     return true;
                 }
