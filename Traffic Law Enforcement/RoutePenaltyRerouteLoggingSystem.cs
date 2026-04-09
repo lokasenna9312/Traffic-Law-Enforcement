@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Text;
 using Game;
+using Game.Buildings;
 using Game.Common;
 using Game.Net;
 using Game.Pathfind;
@@ -202,6 +203,8 @@ namespace Traffic_Law_Enforcement
         private ComponentLookup<Game.Prefabs.PrefabRef> m_PrefabRefData;
         private ComponentLookup<Game.Objects.SpawnLocation> m_SpawnLocationData;
         private ComponentLookup<Game.Prefabs.SpawnLocationData> m_PrefabSpawnLocationData;
+        private ComponentLookup<Building> m_BuildingData;
+        private ComponentLookup<ServiceUpgrade> m_ServiceUpgradeData;
         private ComponentLookup<CarLane> m_CarLaneData;
         private ComponentLookup<Game.Prefabs.CarData> m_PrefabCarData;
         private ComponentLookup<CargoTransport> m_CargoTransportData;
@@ -288,6 +291,8 @@ namespace Traffic_Law_Enforcement
             m_PrefabRefData = GetComponentLookup<Game.Prefabs.PrefabRef>(true);
             m_SpawnLocationData = GetComponentLookup<Game.Objects.SpawnLocation>(true);
             m_PrefabSpawnLocationData = GetComponentLookup<Game.Prefabs.SpawnLocationData>(true);
+            m_BuildingData = GetComponentLookup<Building>(true);
+            m_ServiceUpgradeData = GetComponentLookup<ServiceUpgrade>(true);
             m_CarLaneData = GetComponentLookup<CarLane>(true);
             m_PrefabCarData = GetComponentLookup<Game.Prefabs.CarData>(true);
             m_CargoTransportData = GetComponentLookup<CargoTransport>(true);
@@ -877,6 +882,8 @@ namespace Traffic_Law_Enforcement
             m_PrefabRefData.Update(this);
             m_SpawnLocationData.Update(this);
             m_PrefabSpawnLocationData.Update(this);
+            m_BuildingData.Update(this);
+            m_ServiceUpgradeData.Update(this);
             m_CarLaneData.Update(this);
             m_EdgeLaneData.Update(this);
             m_ParkingLaneData.Update(this);
@@ -3163,6 +3170,8 @@ namespace Traffic_Law_Enforcement
                 SpawnLocationData = m_SpawnLocationData,
                 PrefabRefData = m_PrefabRefData,
                 PrefabSpawnLocationData = m_PrefabSpawnLocationData,
+                BuildingData = m_BuildingData,
+                ServiceUpgradeData = m_ServiceUpgradeData,
             };
         }
 
