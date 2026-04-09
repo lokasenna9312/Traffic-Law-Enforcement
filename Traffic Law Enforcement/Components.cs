@@ -24,6 +24,11 @@ namespace Traffic_Law_Enforcement
         public byte m_LastProcessedLaneChangeCount;
         public byte m_PendingOrdinaryEgressCorridorFailsafeBudget;
         public Entity m_PendingOrdinaryEgressOriginLane;
+        public byte m_PendingBuildingServiceIngressCorridorFailsafeBudget;
+        public Entity m_PendingBuildingServiceIngressRoadLane;
+        public Entity m_PendingBuildingServiceIngressEntryLane;
+        public byte m_PendingBuildingServiceEgressCorridorFailsafeBudget;
+        public Entity m_PendingBuildingServiceEgressOriginLane;
         public Entity m_PendingGarageConnectionEgressBridgeConnectionLane;
         public Entity m_PendingGarageConnectionEgressBridgeOriginLane;
     }
