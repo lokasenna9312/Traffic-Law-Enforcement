@@ -490,7 +490,7 @@ namespace Traffic_Law_Enforcement
                         : FormatBlockedReason(blockedReason, blockedPrevious, blockedCurrent, blockedNext);
 
                 return
-                    $"[FOCUSED_ACCESS_WINDOW] vehicle={FormatEntity(vehicle)}, " +
+                    $"[FOCUSED_ACCESS_WINDOW] vehicle={vehicle}, " +
                     $"exactFirst={exactFirst}, " +
                     $"normalizedFirst={normalizedFirst}, " +
                     $"normalizedBlocked={normalizedBlocked}";
