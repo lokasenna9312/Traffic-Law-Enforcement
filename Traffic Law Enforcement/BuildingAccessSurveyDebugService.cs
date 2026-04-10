@@ -57,7 +57,7 @@ namespace Traffic_Law_Enforcement
             if (surveyRoot == Entity.Null)
             {
                 Mod.log.Info(
-                    $"[BUILDING_ACCESS_SURVEY] selected={FormatEntity(selected)} has no building/service root in owner chain");
+                    $"[BUILDING_ACCESS_SURVEY] selected={selected} has no building/service root in owner chain");
                 return;
             }
 
@@ -87,10 +87,10 @@ namespace Traffic_Law_Enforcement
             entries.Sort(static (left, right) => left.Entity.Index.CompareTo(right.Entity.Index));
 
             Mod.log.Info(
-                $"[BUILDING_ACCESS_SURVEY] begin selected={FormatEntity(selected)} root={FormatEntity(surveyRoot)} ownedRelevant={entries.Count}");
+                $"[BUILDING_ACCESS_SURVEY] begin selected={selected} root={surveyRoot} ownedRelevant={entries.Count}");
 
             Mod.log.Info(
-                $"[BUILDING_ACCESS_SURVEY] root-summary root={FormatEntity(surveyRoot)} kind={DescribeRootKind(entityManager, surveyRoot)} ownerChain={BuildOwnerChainText(entityManager, surveyRoot)}");
+                $"[BUILDING_ACCESS_SURVEY] root-summary root={surveyRoot} kind={DescribeRootKind(entityManager, surveyRoot)} ownerChain={BuildOwnerChainText(entityManager, surveyRoot)}");
 
             for (int index = 0; index < entries.Count; index++)
             {
@@ -98,7 +98,7 @@ namespace Traffic_Law_Enforcement
             }
 
             Mod.log.Info(
-                $"[BUILDING_ACCESS_SURVEY] end root={FormatEntity(surveyRoot)} ownedRelevant={entries.Count}");
+                $"[BUILDING_ACCESS_SURVEY] end root={surveyRoot} ownedRelevant={entries.Count}");
         }
 
         private static Entity ResolveSurveyRoot(EntityManager entityManager, Entity entity)
@@ -167,7 +167,7 @@ namespace Traffic_Law_Enforcement
             Entity surveyRoot)
         {
             StringBuilder builder = new StringBuilder(384);
-            builder.Append("entity=").Append(FormatEntity(entity));
+            builder.Append("entity=").Append(entity);
             builder.Append(" classify=").Append(AccessEndpointClassifier.Classify(entityManager, entity));
             builder.Append(" plainRoadLike=").Append(FormatBool(IsPlainRoadLike(entityManager, entity)));
             builder.Append(" buildingAnchor=").Append(FormatBool(AccessEndpointClassifier.HasBuildingServiceAnchor(entityManager, entity)));
@@ -242,7 +242,7 @@ namespace Traffic_Law_Enforcement
 
             Entity prefab = entityManager.GetComponentData<PrefabRef>(entity).m_Prefab;
             builder.Append(" spawnLocation=true");
-            builder.Append(" prefab=").Append(FormatEntity(prefab));
+            builder.Append(" prefab=").Append(prefab);
 
             if (prefab != Entity.Null &&
                 entityManager.HasComponent<PrefabSpawnLocationData>(prefab))
@@ -280,7 +280,7 @@ namespace Traffic_Law_Enforcement
                     builder.Append(">");
                 }
 
-                builder.Append(FormatEntity(current));
+                builder.Append(current);
 
                 if (!entityManager.HasComponent<Owner>(current))
                 {
@@ -324,11 +324,6 @@ namespace Traffic_Law_Enforcement
             }
 
             return false;
-        }
-
-        private static string FormatEntity(Entity entity)
-        {
-            return entity == Entity.Null ? "None" : $"#{entity.Index}:v{entity.Version}";
         }
 
         private static string FormatBool(bool value)
