@@ -564,6 +564,8 @@ namespace Traffic_Law_Enforcement
                 };
             }
 
+            bool tleApplicable =
+                snapshot.TleApplicability != SelectedObjectTleApplicability.NotApplicable;
             bool tleReady =
                 snapshot.TleApplicability == SelectedObjectTleApplicability.ApplicableReady;
             bool summaryContentReady = summaryReady;
@@ -609,10 +611,10 @@ namespace Traffic_Law_Enforcement
                 Totals = tleReady && summaryContentReady
                     ? BuildTotalsText(summarySnapshot)
                     : string.Empty,
-                LastReason = tleReady && summaryContentReady
+                LastReason = tleApplicable && summaryContentReady
                     ? NormalizeText(summarySnapshot.CompactLastReasonText)
                     : string.Empty,
-                RepeatPenalty = tleReady && summaryContentReady
+                RepeatPenalty = tleApplicable && summaryContentReady
                     ? NormalizeText(summarySnapshot.CompactRepeatPenaltyText)
                     : string.Empty,
                 EntitySelectionSuggestedValue = suggestedEntitySelectionValue,
