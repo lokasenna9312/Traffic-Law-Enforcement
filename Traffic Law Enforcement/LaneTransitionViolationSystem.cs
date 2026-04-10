@@ -238,6 +238,13 @@ namespace Traffic_Law_Enforcement
             bool currentIsRoad =
                 IsRoadLane(history.m_CurrentLane);
 
+            GetBuildingServiceRoadAllowanceDebug(
+                history.m_PreviousLane,
+                out bool previousRoadIsRoad,
+                out bool previousRoadGenericAccess,
+                out bool previousRoadAllowanceAnchor,
+                out bool previousRoadAllowsBuildingAccess);
+
             bool ownerChanged =
                 history.m_PreviousLaneOwner != Entity.Null &&
                 history.m_PreviousLaneOwner != history.m_CurrentLaneOwner;
@@ -264,6 +271,10 @@ namespace Traffic_Law_Enforcement
                     $"previousConnectionFlags={FormatConnectionLaneFlags(history.m_PreviousLane)} " +
                     $"currentConnectionFlags={FormatConnectionLaneFlags(history.m_CurrentLane)} " +
                     $"previousIsRoad={previousIsRoad} " +
+                    $"previousRoadProbeIsRoad={previousRoadIsRoad} " +
+                    $"previousRoadGenericAccess={previousRoadGenericAccess} " +
+                    $"previousRoadAllowanceAnchor={previousRoadAllowanceAnchor} " +
+                    $"previousRoadAllowsBuildingAccess={previousRoadAllowsBuildingAccess} " +
                     $"currentIsRoad={currentIsRoad} " +
                     $"currentIsAccessTarget={currentIsAccessTarget} " +
                     $"ingressDetectResult={ingressDetectResult} " +
@@ -295,6 +306,10 @@ namespace Traffic_Law_Enforcement
                 $"previousConnectionFlags={FormatConnectionLaneFlags(history.m_PreviousLane)} " +
                 $"currentConnectionFlags={FormatConnectionLaneFlags(history.m_CurrentLane)} " +
                 $"previousIsRoad={previousIsRoad} " +
+                $"previousRoadProbeIsRoad={previousRoadIsRoad} " +
+                $"previousRoadGenericAccess={previousRoadGenericAccess} " +
+                $"previousRoadAllowanceAnchor={previousRoadAllowanceAnchor} " +
+                $"previousRoadAllowsBuildingAccess={previousRoadAllowsBuildingAccess} " +
                 $"currentIsAccessTarget={currentIsAccessTarget} " +
                 $"ingressDetectResult={ingressDetectResult} " +
                 $"failReason={failReason} " +
@@ -699,6 +714,13 @@ namespace Traffic_Law_Enforcement
                     history.m_PreviousLaneOwner != Entity.Null &&
                     history.m_PreviousLaneOwner != history.m_CurrentLaneOwner;
 
+                GetBuildingServiceRoadAllowanceDebug(
+                    history.m_CurrentLane,
+                    out bool currentRoadProbeIsRoad,
+                    out bool currentRoadGenericAccess,
+                    out bool currentRoadAllowanceAnchor,
+                    out bool currentRoadAllowsBuildingAccess);
+
                 bool isLateNonParkingEgressSeam =
                     !previousIsAccessOrigin &&
                     !IsRoadLane(history.m_PreviousLane) &&
@@ -721,6 +743,10 @@ namespace Traffic_Law_Enforcement
                         $"currentConnectionFlags={FormatConnectionLaneFlags(history.m_CurrentLane)} " +
                         $"previousIsAccessOrigin={previousIsAccessOrigin} " +
                         $"currentIsRoad={currentIsRoad} " +
+                        $"currentRoadProbeIsRoad={currentRoadProbeIsRoad} " +
+                        $"currentRoadGenericAccess={currentRoadGenericAccess} " +
+                        $"currentRoadAllowanceAnchor={currentRoadAllowanceAnchor} " +
+                        $"currentRoadAllowsBuildingAccess={currentRoadAllowsBuildingAccess} " +
                         $"egressDetectResult={egressDetectResult} " +
                         $"failReason={failReason}",
                         vehicle);
@@ -743,6 +769,10 @@ namespace Traffic_Law_Enforcement
                         $"currentConnectionFlags={FormatConnectionLaneFlags(history.m_CurrentLane)} " +
                         $"previousIsAccessOrigin={previousIsAccessOrigin} " +
                         $"currentIsRoad={currentIsRoad} " +
+                        $"currentRoadProbeIsRoad={currentRoadProbeIsRoad} " +
+                        $"currentRoadGenericAccess={currentRoadGenericAccess} " +
+                        $"currentRoadAllowanceAnchor={currentRoadAllowanceAnchor} " +
+                        $"currentRoadAllowsBuildingAccess={currentRoadAllowsBuildingAccess} " +
                         $"egressDetectResult={egressDetectResult} " +
                         $"failReason={failReason}";
 
@@ -776,6 +806,10 @@ namespace Traffic_Law_Enforcement
                 $"currentLaneKind={DescribeLaneKind(history.m_CurrentLane)} " +
                 $"previousIsAccessOrigin={previousIsAccessOrigin} " +
                 $"currentIsRoad={currentIsRoad} " +
+                $"currentRoadProbeIsRoad={currentRoadProbeIsRoad} " +
+                $"currentRoadGenericAccess={currentRoadGenericAccess} " +
+                $"currentRoadAllowanceAnchor={currentRoadAllowanceAnchor} " +
+                $"currentRoadAllowsBuildingAccess={currentRoadAllowsBuildingAccess} " +
                 $"egressDetectResult={egressDetectResult} " +
                 $"failReason={failReason}";
 
@@ -1909,6 +1943,29 @@ namespace Traffic_Law_Enforcement
         private static bool RoadHasGenericBuildingAccess(CarLane lane)
         {
             return (lane.m_Flags & Game.Net.CarLaneFlags.SideConnection) != 0;
+        }
+
+        private void GetBuildingServiceRoadAllowanceDebug(
+            Entity lane,
+            out bool isRoad,
+            out bool genericAccess,
+            out bool allowanceAnchor,
+            out bool allowsBuildingAccess)
+        {
+            isRoad = TryGetRoadCarLane(lane, out CarLane roadLane);
+            genericAccess = false;
+            allowanceAnchor = false;
+            allowsBuildingAccess = false;
+
+            if (!isRoad)
+            {
+                return;
+            }
+
+            genericAccess = RoadHasGenericBuildingAccess(roadLane);
+            allowanceAnchor =
+                AccessEndpointClassifier.HasBuildingServiceRoadAllowanceAnchor(EntityManager, lane);
+            allowsBuildingAccess = genericAccess || allowanceAnchor;
         }
 
         private void MarkPendingBuildingServiceEgressSawIntermediate(
