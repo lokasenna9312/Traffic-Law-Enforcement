@@ -422,26 +422,30 @@ namespace Traffic_Law_Enforcement
                 else
                 {
                     hasMidBlockViolation =
-                        TryDetectTargetOwnedBuildingServiceIngress(
+                        TryDetectOrAdvancePendingBuildingServiceIngress(
                             vehicle,
                             history,
-                            out reasonCode);
+                            ref analysisState,
+                            out reasonCode,
+                            out eventPreviousLane,
+                            out eventCurrentLane);
 
-                    if (!hasMidBlockViolation)
+                    if (hasMidBlockViolation)
+                    {
+                        eventPreviousOwner = GetOwner(eventPreviousLane);
+                        eventCurrentOwner = GetOwner(eventCurrentLane);
+                    }
+                    else
                     {
                         hasMidBlockViolation =
-                            TryDetectOrAdvancePendingBuildingServiceIngress(
+                            TryDetectTargetOwnedBuildingServiceIngress(
                                 vehicle,
                                 history,
-                                ref analysisState,
-                                out reasonCode,
-                                out eventPreviousLane,
-                                out eventCurrentLane);
+                                out reasonCode);
 
                         if (hasMidBlockViolation)
                         {
-                            eventPreviousOwner = GetOwner(eventPreviousLane);
-                            eventCurrentOwner = GetOwner(eventCurrentLane);
+                            // Direct ingress uses the current seam owners/lanes.
                         }
                         else
                         {
@@ -1086,7 +1090,6 @@ namespace Traffic_Law_Enforcement
 
             if (previousIsRoad &&
                 currentAccessKind == AccessEndpointKind.BuildingService &&
-                failReason == MidBlockCrossingPolicy.AccessIngressTraceFailReason.RoadAllowsBuildingAccess &&
                 IsBuildingServiceCarryRoad(history.m_PreviousLane) &&
                 analysisState.m_PendingBuildingServiceIngressTarget != Entity.Null &&
                 AccessEndpointClassifier.LaneMatchesBuildingServiceTarget(
@@ -1119,7 +1122,7 @@ namespace Traffic_Law_Enforcement
             reasonCode = LaneTransitionViolationReasonCode.None;
 
             if (!TryGetRoadCarLane(history.m_PreviousLane, out CarLane previousRoadLane) ||
-                RoadAllowsBuildingServiceFromRoad(history.m_PreviousLane, previousRoadLane))
+                RoadHasGenericBuildingAccess(previousRoadLane))
             {
                 return false;
             }
@@ -1807,7 +1810,7 @@ namespace Traffic_Law_Enforcement
                 return false;
             }
 
-            if (IsBuildingServiceCarryRoad(history.m_PreviousLane))
+            if (RoadHasGenericBuildingAccess(previousRoadLane))
             {
                 return false;
             }

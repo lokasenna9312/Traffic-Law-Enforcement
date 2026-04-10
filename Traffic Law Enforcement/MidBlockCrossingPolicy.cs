@@ -107,7 +107,7 @@ namespace Traffic_Law_Enforcement
 
             if (accessKind == AccessEndpointKind.BuildingService)
             {
-                if (RoadAllowsBuildingAccess(entityManager, previousLane, sourceCarLane))
+                if (RoadAllowsBuildingIngress(sourceCarLane))
                 {
                     failReason = AccessIngressTraceFailReason.RoadAllowsBuildingAccess;
                     return;
@@ -552,7 +552,7 @@ namespace Traffic_Law_Enforcement
 
             if (accessKind == AccessEndpointKind.BuildingService)
             {
-                if (RoadAllowsBuildingAccess(entityManager, sourceLane, sourceCarLane))
+                if (RoadAllowsBuildingIngress(sourceCarLane))
                 {
                     return false;
                 }
@@ -715,6 +715,11 @@ namespace Traffic_Law_Enforcement
         {
             return RoadHasGenericSideConnection(roadLane) ||
                 AccessEndpointClassifier.HasBuildingServiceRoadAllowanceAnchor(entityManager, roadLaneEntity);
+        }
+
+        private static bool RoadAllowsBuildingIngress(CarLane roadLane)
+        {
+            return RoadHasGenericSideConnection(roadLane);
         }
 
         private static bool RoadAllowsGarageAccess(CarLane roadLane, ConnectionLane connectionLane)
