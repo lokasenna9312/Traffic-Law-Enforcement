@@ -343,6 +343,11 @@ namespace Traffic_Law_Enforcement
                 displayName = "Flags",
                 getter = GetSelectedObjectFlagsText
             });
+            SelectedObject.children.Add(new DebugUI.Button
+            {
+                displayName = "Dump selected building access survey",
+                action = BuildingAccessSurveyDebugService.DumpSelectedBuildingAccessSurvey
+            });
 
             DebugUI.Foldout vehicleInfo = new DebugUI.Foldout
             {
