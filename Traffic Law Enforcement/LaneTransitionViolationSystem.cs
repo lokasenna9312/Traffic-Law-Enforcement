@@ -1085,7 +1085,7 @@ namespace Traffic_Law_Enforcement
             reasonCode = LaneTransitionViolationReasonCode.None;
 
             if (!TryGetRoadCarLane(history.m_PreviousLane, out CarLane previousRoadLane) ||
-                LaneAllowsSideAccess(previousRoadLane))
+                RoadAllowsBuildingServiceFromRoad(history.m_PreviousLane, previousRoadLane))
             {
                 return false;
             }
@@ -1773,8 +1773,7 @@ namespace Traffic_Law_Enforcement
                 return false;
             }
 
-            if (LaneAllowsSideAccess(previousRoadLane) ||
-                IsBuildingServiceCarryRoad(history.m_PreviousLane))
+            if (IsBuildingServiceCarryRoad(history.m_PreviousLane))
             {
                 return false;
             }
@@ -1874,8 +1873,7 @@ namespace Traffic_Law_Enforcement
         private bool IsBuildingServiceCarryRoad(Entity lane)
         {
             return TryGetRoadCarLane(lane, out CarLane roadLane) &&
-                (LaneAllowsSideAccess(roadLane) ||
-                    AccessEndpointClassifier.HasBuildingServiceRoadAllowanceAnchor(EntityManager, lane));
+                RoadAllowsBuildingServiceFromRoad(lane, roadLane);
         }
 
         private bool IsBuildingServiceClusterRoad(Entity lane)
@@ -1887,15 +1885,30 @@ namespace Traffic_Law_Enforcement
         private bool IsAnchoredBuildingServiceRoad(Entity lane)
         {
             return TryGetRoadCarLane(lane, out CarLane roadLane) &&
-                !LaneAllowsSideAccess(roadLane) &&
+                !RoadHasGenericBuildingAccess(roadLane) &&
                 AccessEndpointClassifier.HasBuildingServiceRoadAllowanceAnchor(EntityManager, lane);
         }
 
         private bool IsRoadWithoutBuildingServiceAllowance(Entity lane)
         {
             return TryGetRoadCarLane(lane, out CarLane roadLane) &&
-                !LaneAllowsSideAccess(roadLane) &&
+                !RoadHasGenericBuildingAccess(roadLane) &&
                 !AccessEndpointClassifier.HasBuildingServiceRoadAllowanceAnchor(EntityManager, lane);
+        }
+
+        private bool RoadAllowsBuildingServiceFromRoad(
+            Entity roadLaneEntity,
+            CarLane roadLane)
+        {
+            return RoadHasGenericBuildingAccess(roadLane) ||
+                AccessEndpointClassifier.HasBuildingServiceRoadAllowanceAnchor(
+                    EntityManager,
+                    roadLaneEntity);
+        }
+
+        private static bool RoadHasGenericBuildingAccess(CarLane lane)
+        {
+            return (lane.m_Flags & Game.Net.CarLaneFlags.SideConnection) != 0;
         }
 
         private void MarkPendingBuildingServiceEgressSawIntermediate(
