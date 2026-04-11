@@ -522,7 +522,7 @@ namespace Traffic_Law_Enforcement
                 ClearPendingGarageConnectionEgressBridge(ref analysisState);
                 RememberActiveIllegalIngressClusterIfNeeded(
                     vehicle,
-                    eventCurrentLane,
+                    history.m_CurrentLane,
                     reasonCode,
                     ref analysisState);
             }
@@ -1125,10 +1125,11 @@ namespace Traffic_Law_Enforcement
             if (currentMatchesPendingTarget &&
                 !previousMatchesPendingTarget)
             {
-                // Confirm on the current seam that first reaches the target cluster,
-                // rather than attributing the violation back to the older generic seed.
-                previousLane = history.m_PreviousLane;
-                currentLane = history.m_CurrentLane;
+                // Ordinary-road departure is the ingress boundary. When a later seam
+                // finally proves that the earlier generic departure was into the
+                // target cluster, attribute the ingress back to that stored departure.
+                previousLane = analysisState.m_PendingBuildingServiceIngressRoadLane;
+                currentLane = analysisState.m_PendingBuildingServiceIngressEntryLane;
                 reasonCode = LaneTransitionViolationReasonCode.EnteredBuildingAccessConnectionWithoutSideAccess;
                 ClearPendingBuildingServiceIngress(ref analysisState);
                 return true;
