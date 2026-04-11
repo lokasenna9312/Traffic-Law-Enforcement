@@ -1132,8 +1132,10 @@ namespace Traffic_Law_Enforcement
             if (currentMatchesPendingTarget &&
                 !previousMatchesPendingTarget)
             {
-                previousLane = analysisState.m_PendingBuildingServiceIngressRoadLane;
-                currentLane = analysisState.m_PendingBuildingServiceIngressEntryLane;
+                // Confirm on the current seam that first reaches the target cluster,
+                // rather than attributing the violation back to the older generic seed.
+                previousLane = history.m_PreviousLane;
+                currentLane = history.m_CurrentLane;
                 reasonCode = LaneTransitionViolationReasonCode.EnteredBuildingAccessConnectionWithoutSideAccess;
                 ClearPendingBuildingServiceIngress(ref analysisState);
                 return true;
@@ -1162,12 +1164,6 @@ namespace Traffic_Law_Enforcement
                 return false;
             }
 
-            if (!TryGetRoadCarLane(history.m_PreviousLane, out CarLane previousRoadLane) ||
-                RoadHasGenericBuildingAccess(previousRoadLane))
-            {
-                return false;
-            }
-
             if (!TryGetResolvedBuildingServiceIntentTarget(vehicle, out Entity targetEntity))
             {
                 return false;
@@ -1178,16 +1174,38 @@ namespace Traffic_Law_Enforcement
                 return false;
             }
 
-            if (!IsBuildingServiceIngressBoundaryLane(
+            bool currentMatchesTarget =
+                IsBuildingServiceIngressBoundaryLane(
                     vehicle,
                     history.m_CurrentLane,
-                    targetEntity))
+                    targetEntity);
+            bool previousMatchesTarget =
+                IsBuildingServiceIngressBoundaryLane(
+                    vehicle,
+                    history.m_PreviousLane,
+                    targetEntity);
+
+            if (!currentMatchesTarget ||
+                previousMatchesTarget)
             {
                 return false;
             }
 
-            if (IsBuildingServiceIngressBoundaryLane(
-                    vehicle,
+            bool currentIsTargetClusterRoad =
+                IsTargetOwnedBuildingServiceIngressRoad(
+                    history.m_CurrentLane,
+                    targetEntity);
+
+            if (TryGetRoadCarLane(history.m_PreviousLane, out CarLane previousRoadLane) &&
+                RoadHasGenericBuildingAccess(previousRoadLane))
+            {
+                return false;
+            }
+
+            // Once a target-owned internal road boundary exists, treat that as the
+            // committed ingress point and do not wait for a deeper lane seam.
+            if (!currentIsTargetClusterRoad &&
+                IsTargetOwnedBuildingServiceIngressRoad(
                     history.m_PreviousLane,
                     targetEntity))
             {
@@ -2031,6 +2049,19 @@ namespace Traffic_Law_Enforcement
                     EntityManager,
                     lane,
                     GetLiveAccessPathMethodsHint(vehicle)) == AccessEndpointKind.BuildingService;
+        }
+
+        private bool IsTargetOwnedBuildingServiceIngressRoad(
+            Entity lane,
+            Entity targetEntity)
+        {
+            return lane != Entity.Null &&
+                IsRoadLane(lane) &&
+                IsBuildingServiceClusterRoad(lane) &&
+                AccessEndpointClassifier.LaneMatchesBuildingServiceTarget(
+                    EntityManager,
+                    lane,
+                    targetEntity);
         }
 
         private void RememberActiveBuildingServiceIngressClusterIfNeeded(
