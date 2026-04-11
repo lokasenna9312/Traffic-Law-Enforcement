@@ -34,6 +34,7 @@ namespace Traffic_Law_Enforcement
         public byte m_PendingBuildingServiceEgressSawIntermediate;
         public Entity m_PendingGarageConnectionEgressBridgeConnectionLane;
         public Entity m_PendingGarageConnectionEgressBridgeOriginLane;
+        public Entity m_ActiveBuildingServiceIngressClusterTarget;
     }
 
     public struct OriginalPathfindCarData : IComponentData

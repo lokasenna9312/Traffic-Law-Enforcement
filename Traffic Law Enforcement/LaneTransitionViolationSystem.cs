@@ -1,5 +1,6 @@
 using System.Text;
 using Game;
+using Game.Buildings;
 using Game.Common;
 using Game.Net;
 using Game.Pathfind;
@@ -357,6 +358,7 @@ namespace Traffic_Law_Enforcement
             }
 
             analysisState.m_LastProcessedLaneChangeCount = history.m_LaneChangeCount;
+            RefreshActiveBuildingServiceIngressCluster(history, ref analysisState);
 
             if (!m_CarData.TryGetComponent(vehicle, out Car car))
             {
@@ -369,6 +371,7 @@ namespace Traffic_Law_Enforcement
                 ClearPendingBuildingServiceIngress(ref analysisState);
                 ClearPendingBuildingServiceEgress(ref analysisState);
                 ClearPendingGarageConnectionEgressBridge(ref analysisState);
+                ClearActiveBuildingServiceIngressCluster(ref analysisState);
                 EntityManager.SetComponentData(vehicle, analysisState);
                 return;
             }
@@ -396,6 +399,7 @@ namespace Traffic_Law_Enforcement
                 ClearPendingBuildingServiceIngress(ref analysisState);
                 ClearPendingBuildingServiceEgress(ref analysisState);
                 ClearPendingGarageConnectionEgressBridge(ref analysisState);
+                ClearActiveBuildingServiceIngressCluster(ref analysisState);
             }
 
             bool hasMidBlockViolation = false;
@@ -408,6 +412,16 @@ namespace Traffic_Law_Enforcement
                         vehicle,
                         history,
                         out reasonCode);
+
+                if (hasMidBlockViolation &&
+                    IsDuplicateActiveBuildingServiceIngress(
+                        vehicle,
+                        reasonCode,
+                        analysisState))
+                {
+                    hasMidBlockViolation = false;
+                    reasonCode = LaneTransitionViolationReasonCode.None;
+                }
 
                 if (hasMidBlockViolation)
                 {
@@ -441,6 +455,7 @@ namespace Traffic_Law_Enforcement
                             TryDetectTargetOwnedBuildingServiceIngress(
                                 vehicle,
                                 history,
+                                ref analysisState,
                                 out reasonCode);
 
                         if (hasMidBlockViolation)
@@ -498,6 +513,11 @@ namespace Traffic_Law_Enforcement
                 ClearPendingBuildingServiceIngress(ref analysisState);
                 ClearPendingBuildingServiceEgress(ref analysisState);
                 ClearPendingGarageConnectionEgressBridge(ref analysisState);
+                RememberActiveBuildingServiceIngressClusterIfNeeded(
+                    vehicle,
+                    history.m_CurrentLane,
+                    reasonCode,
+                    ref analysisState);
             }
 
             if (hasMidBlockViolation)
@@ -1071,31 +1091,26 @@ namespace Traffic_Law_Enforcement
                 return false;
             }
 
-            AccessEndpointKind currentAccessKind =
-                AccessEndpointClassifier.Classify(
-                    EntityManager,
-                    history.m_CurrentLane,
-                    GetLiveAccessPathMethodsHint(vehicle));
+            Entity pendingTarget = analysisState.m_PendingBuildingServiceIngressTarget;
+            if (HasActiveBuildingServiceIngressCluster(analysisState, pendingTarget))
+            {
+                ClearPendingBuildingServiceIngress(ref analysisState);
+                return false;
+            }
 
-            MidBlockCrossingPolicy.TraceIllegalIngressTransition(
-                EntityManager,
-                history.m_PreviousLane,
-                history.m_CurrentLane,
-                out bool previousIsRoad,
-                out _,
-                out _,
-                out MidBlockCrossingPolicy.AccessIngressTraceFailReason failReason,
-                out _,
-                GetLiveAccessPathMethodsHint(vehicle));
-
-            if (previousIsRoad &&
-                currentAccessKind == AccessEndpointKind.BuildingService &&
-                IsBuildingServiceCarryRoad(history.m_PreviousLane) &&
-                analysisState.m_PendingBuildingServiceIngressTarget != Entity.Null &&
-                AccessEndpointClassifier.LaneMatchesBuildingServiceTarget(
-                    EntityManager,
+            bool currentMatchesPendingTarget =
+                IsBuildingServiceIngressBoundaryLane(
+                    vehicle,
                     history.m_CurrentLane,
-                    analysisState.m_PendingBuildingServiceIngressTarget))
+                    pendingTarget);
+            bool previousMatchesPendingTarget =
+                IsBuildingServiceIngressBoundaryLane(
+                    vehicle,
+                    history.m_PreviousLane,
+                    pendingTarget);
+
+            if (currentMatchesPendingTarget &&
+                !previousMatchesPendingTarget)
             {
                 previousLane = analysisState.m_PendingBuildingServiceIngressRoadLane;
                 currentLane = analysisState.m_PendingBuildingServiceIngressEntryLane;
@@ -1117,6 +1132,7 @@ namespace Traffic_Law_Enforcement
         private bool TryDetectTargetOwnedBuildingServiceIngress(
             Entity vehicle,
             VehicleLaneHistory history,
+            ref LaneTransitionAnalysisState analysisState,
             out LaneTransitionViolationReasonCode reasonCode)
         {
             reasonCode = LaneTransitionViolationReasonCode.None;
@@ -1127,29 +1143,26 @@ namespace Traffic_Law_Enforcement
                 return false;
             }
 
-            if (AccessEndpointClassifier.Classify(
-                    EntityManager,
-                    history.m_CurrentLane,
-                    GetLiveAccessPathMethodsHint(vehicle)) != AccessEndpointKind.BuildingService)
+            if (!TryGetResolvedBuildingServiceIntentTarget(vehicle, out Entity targetEntity))
             {
                 return false;
             }
 
-            if (!TryGetBuildingServiceIntentTarget(vehicle, out Entity targetEntity))
+            if (HasActiveBuildingServiceIngressCluster(analysisState, targetEntity))
             {
                 return false;
             }
 
-            if (!AccessEndpointClassifier.LaneMatchesBuildingServiceTarget(
-                    EntityManager,
+            if (!IsBuildingServiceIngressBoundaryLane(
+                    vehicle,
                     history.m_CurrentLane,
                     targetEntity))
             {
                 return false;
             }
 
-            if (AccessEndpointClassifier.LaneMatchesBuildingServiceTarget(
-                    EntityManager,
+            if (IsBuildingServiceIngressBoundaryLane(
+                    vehicle,
                     history.m_PreviousLane,
                     targetEntity))
             {
@@ -1575,7 +1588,13 @@ namespace Traffic_Law_Enforcement
             ref LaneTransitionAnalysisState analysisState)
         {
             if (!IsPotentialBuildingServiceIngressSeed(vehicle, history) ||
-                !TryGetBuildingServiceIntentTarget(vehicle, out Entity targetEntity))
+                !TryGetResolvedBuildingServiceIntentTarget(vehicle, out Entity targetEntity))
+            {
+                ClearPendingBuildingServiceIngress(ref analysisState);
+                return;
+            }
+
+            if (HasActiveBuildingServiceIngressCluster(analysisState, targetEntity))
             {
                 ClearPendingBuildingServiceIngress(ref analysisState);
                 return;
@@ -1717,6 +1736,30 @@ namespace Traffic_Law_Enforcement
                 analysisState.m_PendingGarageConnectionEgressBridgeOriginLane != Entity.Null;
         }
 
+        private bool HasActiveBuildingServiceIngressCluster(
+            LaneTransitionAnalysisState analysisState)
+        {
+            return analysisState.m_ActiveBuildingServiceIngressClusterTarget != Entity.Null;
+        }
+
+        private bool HasActiveBuildingServiceIngressCluster(
+            LaneTransitionAnalysisState analysisState,
+            Entity targetEntity)
+        {
+            return targetEntity != Entity.Null &&
+                analysisState.m_ActiveBuildingServiceIngressClusterTarget == targetEntity;
+        }
+
+        private bool IsDuplicateActiveBuildingServiceIngress(
+            Entity vehicle,
+            LaneTransitionViolationReasonCode reasonCode,
+            LaneTransitionAnalysisState analysisState)
+        {
+            return reasonCode == LaneTransitionViolationReasonCode.EnteredBuildingAccessConnectionWithoutSideAccess &&
+                TryGetResolvedBuildingServiceIntentTarget(vehicle, out Entity targetEntity) &&
+                HasActiveBuildingServiceIngressCluster(analysisState, targetEntity);
+        }
+
         private void ClearPendingOrdinaryEgress(ref LaneTransitionAnalysisState analysisState)
         {
             analysisState.m_PendingOrdinaryEgressCorridorFailsafeBudget = 0;
@@ -1739,6 +1782,12 @@ namespace Traffic_Law_Enforcement
             analysisState.m_PendingBuildingServiceEgressOriginLane = Entity.Null;
             analysisState.m_PendingBuildingServiceEgressRequiresIntermediate = 0;
             analysisState.m_PendingBuildingServiceEgressSawIntermediate = 0;
+        }
+
+        private void ClearActiveBuildingServiceIngressCluster(
+            ref LaneTransitionAnalysisState analysisState)
+        {
+            analysisState.m_ActiveBuildingServiceIngressClusterTarget = Entity.Null;
         }
 
         private void ClearPendingGarageConnectionEgressBridge(
@@ -1872,6 +1921,127 @@ namespace Traffic_Law_Enforcement
 
             targetEntity = Entity.Null;
             return false;
+        }
+
+        private bool TryGetResolvedBuildingServiceIntentTarget(
+            Entity vehicle,
+            out Entity targetEntity)
+        {
+            if (!TryGetBuildingServiceIntentTarget(vehicle, out Entity rawTarget))
+            {
+                targetEntity = Entity.Null;
+                return false;
+            }
+
+            targetEntity = ResolveBuildingServiceClusterTarget(rawTarget);
+            return targetEntity != Entity.Null;
+        }
+
+        private Entity ResolveBuildingServiceClusterTarget(Entity entity)
+        {
+            byte depth = 0;
+            Entity current = entity;
+            while (current != Entity.Null && depth < 16)
+            {
+                if (EntityManager.HasComponent<Building>(current) ||
+                    EntityManager.HasComponent<ServiceUpgrade>(current))
+                {
+                    return current;
+                }
+
+                if (!m_OwnerData.TryGetComponent(current, out Owner owner))
+                {
+                    break;
+                }
+
+                current = owner.m_Owner;
+                depth += 1;
+            }
+
+            return entity;
+        }
+
+        private bool IsBuildingServiceIngressBoundaryLane(
+            Entity vehicle,
+            Entity lane,
+            Entity targetEntity)
+        {
+            if (lane == Entity.Null ||
+                targetEntity == Entity.Null ||
+                !AccessEndpointClassifier.LaneMatchesBuildingServiceTarget(
+                    EntityManager,
+                    lane,
+                    targetEntity))
+            {
+                return false;
+            }
+
+            if (m_ParkingLaneData.HasComponent(lane) ||
+                m_GarageLaneData.HasComponent(lane))
+            {
+                return false;
+            }
+
+            if (m_ConnectionLaneData.HasComponent(lane))
+            {
+                return AccessEndpointClassifier.Classify(
+                        EntityManager,
+                        lane,
+                        GetLiveAccessPathMethodsHint(vehicle)) == AccessEndpointKind.BuildingService;
+            }
+
+            if (IsRoadLane(lane))
+            {
+                return IsBuildingServiceClusterRoad(lane);
+            }
+
+            return IsBuildingServiceCorridorLane(lane) ||
+                AccessEndpointClassifier.Classify(
+                    EntityManager,
+                    lane,
+                    GetLiveAccessPathMethodsHint(vehicle)) == AccessEndpointKind.BuildingService;
+        }
+
+        private void RememberActiveBuildingServiceIngressClusterIfNeeded(
+            Entity vehicle,
+            Entity currentLane,
+            LaneTransitionViolationReasonCode reasonCode,
+            ref LaneTransitionAnalysisState analysisState)
+        {
+            if (reasonCode != LaneTransitionViolationReasonCode.EnteredBuildingAccessConnectionWithoutSideAccess)
+            {
+                return;
+            }
+
+            if (TryGetResolvedBuildingServiceIntentTarget(vehicle, out Entity targetEntity))
+            {
+                analysisState.m_ActiveBuildingServiceIngressClusterTarget = targetEntity;
+                return;
+            }
+
+            if (currentLane != Entity.Null &&
+                m_OwnerData.TryGetComponent(currentLane, out Owner owner) &&
+                owner.m_Owner != Entity.Null)
+            {
+                analysisState.m_ActiveBuildingServiceIngressClusterTarget =
+                    ResolveBuildingServiceClusterTarget(owner.m_Owner);
+            }
+        }
+
+        private void RefreshActiveBuildingServiceIngressCluster(
+            VehicleLaneHistory history,
+            ref LaneTransitionAnalysisState analysisState)
+        {
+            if (!HasActiveBuildingServiceIngressCluster(analysisState) ||
+                history.m_CurrentLane == Entity.Null)
+            {
+                return;
+            }
+
+            if (IsRoadWithoutBuildingServiceAllowance(history.m_CurrentLane))
+            {
+                ClearActiveBuildingServiceIngressCluster(ref analysisState);
+            }
         }
 
         private bool IsBuildingServiceAccessOrigin(Entity vehicle, Entity lane)
