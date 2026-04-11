@@ -12,14 +12,15 @@ namespace Traffic_Law_Enforcement
         {
             None = 0,
             PreviousNotRoad = 1,
-            CurrentNotConnectionLikeTarget = 2,
-            CurrentRoadFlaggedConnection = 3,
-            CurrentNotInsideAccessConnection = 4,
-            RoadAllowsGarageAccess = 5,
-            RoadAllowsParkingAccess = 6,
-            RoadAllowsParkingConnectionAccess = 7,
-            RoadAllowsBuildingAccess = 8,
-            NoIllegalIngressDetected = 9
+            PreviousRoadAlreadyClusterInternal = 2,
+            CurrentNotConnectionLikeTarget = 3,
+            CurrentRoadFlaggedConnection = 4,
+            CurrentNotInsideAccessConnection = 5,
+            RoadAllowsGarageAccess = 6,
+            RoadAllowsParkingAccess = 7,
+            RoadAllowsParkingConnectionAccess = 8,
+            RoadAllowsBuildingAccess = 9,
+            NoIllegalIngressDetected = 10
         }
 
         internal static void TraceIllegalIngressTransition(
@@ -47,13 +48,26 @@ namespace Traffic_Law_Enforcement
                 return;
             }
 
+            bool previousIsOrdinaryRoad = IsOrdinaryRoadLane(entityManager, previousLane);
+
             AccessEndpointKind accessKind =
                 AccessEndpointClassifier.Classify(
                     entityManager,
                     currentLane,
                     pathMethodsHint);
 
-            currentIsAccessTarget = accessKind != AccessEndpointKind.None;
+            currentIsAccessTarget =
+                accessKind != AccessEndpointKind.None ||
+                IsGenericIngressBoundaryTarget(
+                    entityManager,
+                    currentLane,
+                    pathMethodsHint);
+
+            if (!previousIsOrdinaryRoad)
+            {
+                failReason = AccessIngressTraceFailReason.PreviousRoadAlreadyClusterInternal;
+                return;
+            }
 
             if (accessKind == AccessEndpointKind.GarageLane)
             {
@@ -110,6 +124,27 @@ namespace Traffic_Law_Enforcement
                 if (RoadAllowsBuildingIngress(sourceCarLane))
                 {
                     failReason = AccessIngressTraceFailReason.RoadAllowsBuildingAccess;
+                    return;
+                }
+
+                ingressDetectResult = true;
+                reasonCode = LaneTransitionViolationReasonCode.EnteredBuildingAccessConnectionWithoutSideAccess;
+                return;
+            }
+
+            if (IsGenericIngressBoundaryTarget(entityManager, currentLane, pathMethodsHint))
+            {
+                bool roadAllowsAccess =
+                    HasParkingIntent(pathMethodsHint)
+                        ? RoadHasGenericSideConnection(sourceCarLane) ||
+                            GetRoadParkingSides(sourceCarLane) != AccessSide.None
+                        : RoadAllowsBuildingIngress(sourceCarLane);
+
+                if (roadAllowsAccess)
+                {
+                    failReason = HasParkingIntent(pathMethodsHint)
+                        ? AccessIngressTraceFailReason.RoadAllowsParkingAccess
+                        : AccessIngressTraceFailReason.RoadAllowsBuildingAccess;
                     return;
                 }
 
@@ -316,6 +351,32 @@ namespace Traffic_Law_Enforcement
             }
         }
 
+        public static bool IsAccessIngressReason(
+            LaneTransitionViolationReasonCode reasonCode)
+        {
+            switch (reasonCode)
+            {
+                case LaneTransitionViolationReasonCode.EnteredGarageAccessWithoutSideAccess:
+                case LaneTransitionViolationReasonCode.EnteredParkingAccessWithoutSideAccess:
+                case LaneTransitionViolationReasonCode.EnteredParkingConnectionWithoutSideAccess:
+                case LaneTransitionViolationReasonCode.EnteredBuildingAccessConnectionWithoutSideAccess:
+                    return true;
+
+                default:
+                    return false;
+            }
+        }
+
+        public static bool IsOrdinaryRoadLane(
+            EntityManager entityManager,
+            Entity lane)
+        {
+            return TryGetRoadCarLane(entityManager, lane, out _) &&
+                !AccessEndpointClassifier.HasBuildingServiceRoadAllowanceAnchor(
+                    entityManager,
+                    lane);
+        }
+
         public static bool TryGetIllegalIngressTransition(
             EntityManager entityManager,
             Entity sourceLane,
@@ -502,6 +563,8 @@ namespace Traffic_Law_Enforcement
                 return false;
             }
 
+            bool previousIsOrdinaryRoad = IsOrdinaryRoadLane(entityManager, sourceLane);
+
             AccessEndpointKind accessKind =
                 AccessEndpointClassifier.Classify(
                     entityManager,
@@ -510,6 +573,11 @@ namespace Traffic_Law_Enforcement
 
             if (accessKind == AccessEndpointKind.GarageLane)
             {
+                if (!previousIsOrdinaryRoad)
+                {
+                    return false;
+                }
+
                 if (TryGetConnectionLane(entityManager, targetLane, out ConnectionLane garageConnectionLane))
                 {
                     if (RoadAllowsGarageAccess(sourceCarLane, garageConnectionLane))
@@ -528,6 +596,11 @@ namespace Traffic_Law_Enforcement
 
             if (accessKind == AccessEndpointKind.ParkingLane)
             {
+                if (!previousIsOrdinaryRoad)
+                {
+                    return false;
+                }
+
                 ParkingLane parkingLane = entityManager.GetComponentData<ParkingLane>(targetLane);
                 if (RoadAllowsParkingAccess(sourceCarLane, parkingLane))
                 {
@@ -540,6 +613,11 @@ namespace Traffic_Law_Enforcement
 
             if (accessKind == AccessEndpointKind.ParkingConnection)
             {
+                if (!previousIsOrdinaryRoad)
+                {
+                    return false;
+                }
+
                 ConnectionLane connectionLane = entityManager.GetComponentData<ConnectionLane>(targetLane);
                 if (RoadAllowsParkingConnectionAccess(sourceCarLane, connectionLane))
                 {
@@ -552,6 +630,11 @@ namespace Traffic_Law_Enforcement
 
             if (accessKind == AccessEndpointKind.BuildingService)
             {
+                if (!previousIsOrdinaryRoad)
+                {
+                    return false;
+                }
+
                 if (RoadAllowsBuildingIngress(sourceCarLane))
                 {
                     return false;
@@ -561,7 +644,30 @@ namespace Traffic_Law_Enforcement
                 return true;
             }
 
-            return false;
+            if (!previousIsOrdinaryRoad ||
+                !IsGenericIngressBoundaryTarget(
+                    entityManager,
+                    targetLane,
+                    pathMethodsHint))
+            {
+                return false;
+            }
+
+            if (HasParkingIntent(pathMethodsHint))
+            {
+                if (RoadHasGenericSideConnection(sourceCarLane) ||
+                    GetRoadParkingSides(sourceCarLane) != AccessSide.None)
+                {
+                    return false;
+                }
+            }
+            else if (RoadAllowsBuildingIngress(sourceCarLane))
+            {
+                return false;
+            }
+
+            reasonCode = LaneTransitionViolationReasonCode.EnteredBuildingAccessConnectionWithoutSideAccess;
+            return true;
         }
 
         private static bool TryDetectIllegalEgress(
@@ -701,6 +807,48 @@ namespace Traffic_Law_Enforcement
         private static bool RoadHasGenericSideConnection(CarLane lane)
         {
             return (lane.m_Flags & CarLaneFlags.SideConnection) != 0;
+        }
+
+        private static bool HasParkingIntent(PathMethod pathMethodsHint)
+        {
+            return (pathMethodsHint & (PathMethod.Parking | PathMethod.SpecialParking)) != 0;
+        }
+
+        private static bool IsGenericIngressBoundaryTarget(
+            EntityManager entityManager,
+            Entity lane,
+            PathMethod pathMethodsHint)
+        {
+            if (lane == Entity.Null)
+            {
+                return false;
+            }
+
+            if (AccessEndpointClassifier.Classify(
+                    entityManager,
+                    lane,
+                    pathMethodsHint) != AccessEndpointKind.None)
+            {
+                return false;
+            }
+
+            if (TryGetRoadCarLane(entityManager, lane, out _))
+            {
+                return AccessEndpointClassifier.HasBuildingServiceRoadAllowanceAnchor(
+                    entityManager,
+                    lane);
+            }
+
+            if (entityManager.HasComponent<ConnectionLane>(lane) ||
+                entityManager.HasComponent<ParkingLane>(lane) ||
+                entityManager.HasComponent<GarageLane>(lane))
+            {
+                return false;
+            }
+
+            return AccessEndpointClassifier.HasBuildingServiceAnchor(
+                entityManager,
+                lane);
         }
 
         private static bool IsInsideAccessConnection(ConnectionLane connectionLane)

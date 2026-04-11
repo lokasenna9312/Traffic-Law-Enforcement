@@ -636,6 +636,11 @@ namespace Traffic_Law_Enforcement
 
         private bool IsAccessTransition(Entity sourceLane, Entity targetLane)
         {
+            if (IsPotentialIngressBoundaryTarget(targetLane))
+            {
+                return true;
+            }
+
             AccessEndpointLookupContext accessContext = CreateAccessEndpointLookupContext();
             return AccessEndpointClassifier.IsAccessOrigin(sourceLane, ref accessContext) ||
                 AccessEndpointClassifier.IsAccessOrigin(targetLane, ref accessContext);
@@ -656,12 +661,27 @@ namespace Traffic_Law_Enforcement
                 return TransitionFamilyIllegalEgress;
             }
 
-            return AccessEndpointClassifier.Classify(targetLane, ref accessContext) switch
+            AccessEndpointKind targetKind =
+                AccessEndpointClassifier.Classify(targetLane, ref accessContext);
+            if (targetKind != AccessEndpointKind.None)
             {
-                AccessEndpointKind.ParkingLane => TransitionFamilyParkingLaneIngress,
-                AccessEndpointKind.GarageLane => TransitionFamilyGarageLaneIngress,
-                AccessEndpointKind.ParkingConnection => TransitionFamilyParkingConnectionIngress,
-                AccessEndpointKind.BuildingService => TransitionFamilyBuildingServiceIngress,
+                return targetKind switch
+                {
+                    AccessEndpointKind.ParkingLane => TransitionFamilyParkingLaneIngress,
+                    AccessEndpointKind.GarageLane => TransitionFamilyGarageLaneIngress,
+                    AccessEndpointKind.ParkingConnection => TransitionFamilyParkingConnectionIngress,
+                    AccessEndpointKind.BuildingService => TransitionFamilyBuildingServiceIngress,
+                    _ => TransitionFamilyNone,
+                };
+            }
+
+            if (IsPotentialIngressBoundaryTarget(targetLane))
+            {
+                return TransitionFamilyBuildingServiceIngress;
+            }
+
+            return targetKind switch
+            {
                 _ => TransitionFamilyNone,
             };
         }
@@ -676,52 +696,101 @@ namespace Traffic_Law_Enforcement
                 return $"egress:{DescribeAccessOrigin(sourceLane)}";
             }
 
-            return AccessEndpointClassifier.Classify(targetLane, ref accessContext) switch
+            AccessEndpointKind targetKind =
+                AccessEndpointClassifier.Classify(targetLane, ref accessContext);
+            if (targetKind != AccessEndpointKind.None)
             {
-                AccessEndpointKind.ParkingLane => "ingress:parking-lane",
-                AccessEndpointKind.GarageLane => "ingress:garage-lane",
-                AccessEndpointKind.ParkingConnection => "ingress:parking-connection",
-                AccessEndpointKind.BuildingService => "ingress:building-service-access-connection",
+                return targetKind switch
+                {
+                    AccessEndpointKind.ParkingLane => "ingress:parking-lane",
+                    AccessEndpointKind.GarageLane => "ingress:garage-lane",
+                    AccessEndpointKind.ParkingConnection => "ingress:parking-connection",
+                    AccessEndpointKind.BuildingService => "ingress:building-service-access-connection",
+                    _ => "ingress:other",
+                };
+            }
+
+            if (IsPotentialIngressBoundaryTarget(targetLane))
+            {
+                return "ingress:building-service-access-connection";
+            }
+
+            return targetKind switch
+            {
                 _ => "ingress:other",
             };
         }
 
         private bool IsAccessTarget(Entity lane)
         {
-            AccessEndpointLookupContext accessContext = CreateAccessEndpointLookupContext();
-            return AccessEndpointClassifier.IsAccessOrigin(lane, ref accessContext);
+            return IsPotentialIngressBoundaryTarget(lane);
         }
 
         private bool IsIllegalIngress(Entity sourceLane, Entity targetLane, out string reason)
         {
             reason = null;
-            if (!TryGetRoadCarLane(sourceLane, out CarLane sourceCarLane) || LaneAllowsSideAccess(sourceCarLane))
+            if (!MidBlockCrossingPolicy.TryGetIllegalIngressTransition(
+                    EntityManager,
+                    sourceLane,
+                    targetLane,
+                    out LaneTransitionViolationReasonCode reasonCode))
             {
                 return false;
             }
 
-            AccessEndpointLookupContext accessContext = CreateAccessEndpointLookupContext();
-            switch (AccessEndpointClassifier.Classify(targetLane, ref accessContext))
+            switch (reasonCode)
             {
-                case AccessEndpointKind.ParkingLane:
+                case LaneTransitionViolationReasonCode.EnteredParkingAccessWithoutSideAccess:
                     reason = "planned parking-access ingress from a lane without side-access permission";
                     return true;
 
-                case AccessEndpointKind.GarageLane:
+                case LaneTransitionViolationReasonCode.EnteredGarageAccessWithoutSideAccess:
                     reason = "planned garage-access ingress from a lane without side-access permission";
                     return true;
 
-                case AccessEndpointKind.ParkingConnection:
+                case LaneTransitionViolationReasonCode.EnteredParkingConnectionWithoutSideAccess:
                     reason = "planned parking-connection ingress from a lane without side-access permission";
                     return true;
 
-                case AccessEndpointKind.BuildingService:
+                case LaneTransitionViolationReasonCode.EnteredBuildingAccessConnectionWithoutSideAccess:
                     reason = "planned building/service access ingress from a lane without side-access permission";
                     return true;
 
                 default:
                     return false;
             }
+        }
+
+        private bool IsPotentialIngressBoundaryTarget(Entity lane)
+        {
+            if (lane == Entity.Null)
+            {
+                return false;
+            }
+
+            AccessEndpointLookupContext accessContext = CreateAccessEndpointLookupContext();
+            if (AccessEndpointClassifier.IsAccessOrigin(lane, ref accessContext))
+            {
+                return true;
+            }
+
+            if (TryGetRoadCarLane(lane, out _))
+            {
+                return AccessEndpointClassifier.HasBuildingServiceRoadAllowanceAnchor(
+                    lane,
+                    ref accessContext);
+            }
+
+            if (m_ConnectionLaneData.HasComponent(lane) ||
+                m_ParkingLaneData.HasComponent(lane) ||
+                m_GarageLaneData.HasComponent(lane))
+            {
+                return false;
+            }
+
+            return AccessEndpointClassifier.HasBuildingServiceAnchor(
+                lane,
+                ref accessContext);
         }
 
         private bool IsIllegalEgress(Entity sourceLane, Entity targetLane, out string reason)
