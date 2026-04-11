@@ -379,6 +379,13 @@ namespace Traffic_Law_Enforcement
             MaybeLogRealizedOppositeFlowNearMiss(vehicle, history);
             MaybeLogRealizedEgressTrace(vehicle, currentLane, history);
             MaybeLogRealizedIngressTrace(vehicle, currentLane, history);
+            bool parkingIntent = HasParkingIntent(vehicle);
+
+            if (parkingIntent)
+            {
+                ClearPendingBuildingServiceIngress(ref analysisState);
+                ClearActiveBuildingServiceIngressCluster(ref analysisState);
+            }
 
             IllegalEgressApplyMode illegalEgressMode = IllegalEgressApplyMode.None;
             Entity illegalEgressOriginLane = Entity.Null;
@@ -412,6 +419,13 @@ namespace Traffic_Law_Enforcement
                         vehicle,
                         history,
                         out reasonCode);
+
+                if (parkingIntent &&
+                    reasonCode == LaneTransitionViolationReasonCode.EnteredBuildingAccessConnectionWithoutSideAccess)
+                {
+                    hasMidBlockViolation = false;
+                    reasonCode = LaneTransitionViolationReasonCode.None;
+                }
 
                 if (hasMidBlockViolation &&
                     IsDuplicateActiveBuildingServiceIngress(
@@ -1091,6 +1105,12 @@ namespace Traffic_Law_Enforcement
                 return false;
             }
 
+            if (HasParkingIntent(vehicle))
+            {
+                ClearPendingBuildingServiceIngress(ref analysisState);
+                return false;
+            }
+
             Entity pendingTarget = analysisState.m_PendingBuildingServiceIngressTarget;
             if (HasActiveBuildingServiceIngressCluster(analysisState, pendingTarget))
             {
@@ -1136,6 +1156,11 @@ namespace Traffic_Law_Enforcement
             out LaneTransitionViolationReasonCode reasonCode)
         {
             reasonCode = LaneTransitionViolationReasonCode.None;
+
+            if (HasParkingIntent(vehicle))
+            {
+                return false;
+            }
 
             if (!TryGetRoadCarLane(history.m_PreviousLane, out CarLane previousRoadLane) ||
                 RoadHasGenericBuildingAccess(previousRoadLane))
@@ -1587,6 +1612,12 @@ namespace Traffic_Law_Enforcement
             VehicleLaneHistory history,
             ref LaneTransitionAnalysisState analysisState)
         {
+            if (HasParkingIntent(vehicle))
+            {
+                ClearPendingBuildingServiceIngress(ref analysisState);
+                return;
+            }
+
             if (!IsPotentialBuildingServiceIngressSeed(vehicle, history) ||
                 !TryGetResolvedBuildingServiceIntentTarget(vehicle, out Entity targetEntity))
             {
@@ -2265,6 +2296,12 @@ namespace Traffic_Law_Enforcement
             return m_PathInformationData.TryGetComponent(vehicle, out PathInformation pathInformation)
                 ? pathInformation.m_Methods
                 : 0;
+        }
+
+        private bool HasParkingIntent(Entity vehicle)
+        {
+            PathMethod pathMethods = GetLiveAccessPathMethodsHint(vehicle);
+            return (pathMethods & (PathMethod.Parking | PathMethod.SpecialParking)) != 0;
         }
 
         private static bool LaneAllowsSideAccess(CarLane lane)
