@@ -957,6 +957,8 @@ namespace Traffic_Law_Enforcement {
             EnforcementBudgetUIService.LoadPersistentData(fineIncomeEvents);
             MonthlyEnforcementChirperService.LoadPersistentData(trackingState,
                                                                 reports);
+            World.GetOrCreateSystemManaged<MonthlyEnforcementChirperSystem>()
+                ?.EnsureLoadTimePrefabsForPersistentData(reports);
             EnforcementPolicyImpactService.LoadPersistentData(
                 new EnforcementPolicyImpactService.PersistentDataSnapshot(
                     policyImpactTrackingState,

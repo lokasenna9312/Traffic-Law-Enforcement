@@ -27,7 +27,6 @@ namespace Traffic_Law_Enforcement
         public byte m_PendingBuildingServiceIngressCorridorFailsafeBudget;
         public Entity m_PendingBuildingServiceIngressRoadLane;
         public Entity m_PendingBuildingServiceIngressEntryLane;
-        public Entity m_PendingBuildingServiceIngressTarget;
         public byte m_PendingBuildingServiceEgressCorridorFailsafeBudget;
         public Entity m_PendingBuildingServiceEgressOriginLane;
         public byte m_PendingBuildingServiceEgressRequiresIntermediate;

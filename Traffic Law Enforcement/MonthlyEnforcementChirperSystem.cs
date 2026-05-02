@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Reflection;
 using System.Text;
 using Colossal.Localization;
 using Game;
@@ -23,6 +24,7 @@ namespace Traffic_Law_Enforcement
     {
         private const string kDefaultLocale = "en-US";
         private const string kSenderLocalizationId = "TrafficLawEnforcement.MonthlyChirperSender";
+        private const string kPreviewLocalizationId = "TrafficLawEnforcement.MonthlyChirperPreview";
         public const string kSenderTextLocaleId = "TrafficLawEnforcement.MonthlyChirper.Text.Sender";
         public const string kPeriodPointFormatLocaleId = "TrafficLawEnforcement.MonthlyChirper.Text.PeriodPointFormat";
         public const string kReportHeaderFormatLocaleId = "TrafficLawEnforcement.MonthlyChirper.Text.ReportHeaderFormat";
@@ -33,7 +35,15 @@ namespace Traffic_Law_Enforcement
         public const string kNoRateLocaleId = "TrafficLawEnforcement.MonthlyChirper.Text.NoRate";
         private const string kPrefabParentName = nameof(Traffic_Law_Enforcement);
         private const string kPrefabNamePrefix = "TrafficLawEnforcement.MonthlyChirper";
+        private const string kPreviewAssetKey = kPrefabNamePrefix + ".Preview";
         private const string kSenderIconPath = "Media/Game/Icons/TransportationOverview.svg";
+        private const string kPreviewFallbackMessage = "Traffic enforcement preview unavailable.";
+        private static readonly FieldInfo s_LoadedIndexDataField =
+            typeof(PrefabSystem).GetField("m_LoadedIndexData", BindingFlags.Instance | BindingFlags.NonPublic);
+        private static readonly FieldInfo s_LoadedObsoleteIDsField =
+            typeof(PrefabSystem).GetField("m_LoadedObsoleteIDs", BindingFlags.Instance | BindingFlags.NonPublic);
+        private static readonly BindingFlags s_LoadedIndexDataFieldFlags =
+            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
         private readonly Dictionary<long, Entity> m_ReportTriggerEntities = new Dictionary<long, Entity>();
         private readonly Dictionary<string, Dictionary<string, string>> m_LocalizedEntriesByLocale = new Dictionary<string, Dictionary<string, string>>(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, MemorySource> m_LocalizedSourcesByLocale = new Dictionary<string, MemorySource>(StringComparer.OrdinalIgnoreCase);
@@ -44,7 +54,8 @@ namespace Traffic_Law_Enforcement
         private ChirperAccount m_SenderAccountPrefab;
         private InfoviewPrefab m_SenderInfoViewPrefab;
         private Entity m_SenderAccountEntity;
-        private int m_ManualPreviewSequence;
+        private Entity m_PreviewTriggerEntity;
+        private Entity m_PreviewChirpEntity;
         private TimeSystem m_TimeSystem;
         private EntityQuery m_ChirperAccountQuery;
         private EntityQuery m_InfoviewPrefabQuery;
@@ -108,10 +119,52 @@ namespace Traffic_Law_Enforcement
             m_LocalizedEntriesByLocale.Clear();
             m_LocalizedSourcesByLocale.Clear();
             m_SenderAccountEntity = Entity.Null;
+            m_PreviewTriggerEntity = Entity.Null;
+            m_PreviewChirpEntity = Entity.Null;
             m_SenderAccountPrefab = null;
             m_SenderInfoViewPrefab = null;
 
             base.OnDestroy();
+        }
+
+        internal void EnsureLoadTimePrefabsForPersistentData(IEnumerable<MonthlyEnforcementReport> reports)
+        {
+            EnsureSenderAccount();
+            EnsurePreviewFallbackLocalizationEntries(
+                out bool addedLocalizationSource,
+                out bool requiresLocaleReload);
+            EnsurePreviewTriggerEntity();
+
+            int restoredReportCount = 0;
+            if (reports != null)
+            {
+                foreach (MonthlyEnforcementReport report in reports)
+                {
+                    bool rebuiltLocalization = EnsureReportLocalizationEntries(
+                        report,
+                        out bool reportAddedLocalizationSource,
+                        out bool reportRequiresLocaleReload);
+                    addedLocalizationSource |= reportAddedLocalizationSource;
+                    requiresLocaleReload |= reportRequiresLocaleReload || rebuiltLocalization;
+                    EnsureReportTriggerEntity(report.m_MonthIndex);
+                    restoredReportCount += 1;
+                }
+            }
+
+            int legacyPreviewAliasCount = RegisterLoadedLegacyPreviewPrefabAliases();
+            if (requiresLocaleReload && addedLocalizationSource)
+            {
+                ReloadActiveLocale();
+            }
+
+            if (legacyPreviewAliasCount > 0 ||
+                EnforcementLoggingPolicy.ShouldLogChirperDiagnostics())
+            {
+                Mod.log.Info(
+                    "[ENFORCEMENT_CHIRPER_PREFABS] " +
+                    $"phase=EnsureLoadTimePrefabs, reports={restoredReportCount}, " +
+                    $"legacyPreviewAliases={legacyPreviewAliasCount}");
+            }
         }
 
         protected override void OnUpdate()
@@ -427,12 +480,10 @@ namespace Traffic_Law_Enforcement
                 long periodStart = MonthlyEnforcementChirperService.GetCurrentPeriodStartMonthTicks(currentTimestampMonthTicks);
                 long periodEnd = currentTimestampMonthTicks;
 
-                int previewSequence = ++m_ManualPreviewSequence;
                 bool updatedLocalization = EnsurePreviewLocalizationEntries(
                     previewReport,
                     periodStart,
                     periodEnd,
-                    previewSequence,
                     out bool addedLocalizationSource,
                     out bool requiresLocaleReload);
 
@@ -442,7 +493,7 @@ namespace Traffic_Law_Enforcement
                     ReloadActiveLocale();
                 }
 
-                Entity triggerEntity = CreatePreviewTriggerEntity(periodEnd, previewSequence);
+                Entity triggerEntity = EnsurePreviewTriggerEntity();
 
                 if (EnqueueChirp(triggerEntity, out double _))
                 {
@@ -491,7 +542,10 @@ namespace Traffic_Law_Enforcement
             }
 
             string localizationId = GetReportLocalizationId(monthIndex);
-            triggerEntity = CreateTriggerEntityForLocalizedChirp($"{kPrefabNamePrefix}.Report.{monthIndex}", localizationId);
+            triggerEntity = CreateTriggerEntityForLocalizedChirp(
+                $"{kPrefabNamePrefix}.Report.{monthIndex}",
+                localizationId,
+                out _);
             m_ReportTriggerEntities[monthIndex] = triggerEntity;
             return triggerEntity;
         }
@@ -500,13 +554,11 @@ namespace Traffic_Law_Enforcement
             MonthlyEnforcementReport report,
             long periodStart,
             long periodEnd,
-            int previewSequence,
             out bool addedLocalizationSource,
             out bool requiresLocaleReload)
         {
-            string localizationId = GetPreviewLocalizationId(periodEnd, previewSequence);
             return EnsureLocalizationEntriesForLocales(
-                localizationId,
+                kPreviewLocalizationId,
                 report,
                 periodStart,
                 periodEnd,
@@ -514,16 +566,30 @@ namespace Traffic_Law_Enforcement
                 out requiresLocaleReload);
         }
 
-        private Entity CreatePreviewTriggerEntity(long periodEnd, int previewSequence)
+        private Entity EnsurePreviewTriggerEntity()
         {
             EnsureSenderAccount();
 
-            string assetKey = $"{kPrefabNamePrefix}.Preview.{periodEnd}.{previewSequence}";
-            string localizationId = GetPreviewLocalizationId(periodEnd, previewSequence);
-            return CreateTriggerEntityForLocalizedChirp(assetKey, localizationId);
+            if (m_PreviewTriggerEntity != Entity.Null &&
+                EntityManager.Exists(m_PreviewTriggerEntity) &&
+                m_PreviewChirpEntity != Entity.Null &&
+                EntityManager.Exists(m_PreviewChirpEntity))
+            {
+                return m_PreviewTriggerEntity;
+            }
+
+            m_PreviewTriggerEntity = CreateTriggerEntityForLocalizedChirp(
+                kPreviewAssetKey,
+                kPreviewLocalizationId,
+                out m_PreviewChirpEntity);
+
+            return m_PreviewTriggerEntity;
         }
 
-        private Entity CreateTriggerEntityForLocalizedChirp(string assetKey, string localizationId)
+        private Entity CreateTriggerEntityForLocalizedChirp(
+            string assetKey,
+            string localizationId,
+            out Entity chirpEntity)
         {
             ServiceChirpPrefab chirpPrefab = ScriptableObject.CreateInstance<ServiceChirpPrefab>();
             chirpPrefab.name = $"{assetKey}.Chirp";
@@ -533,7 +599,7 @@ namespace Traffic_Law_Enforcement
             randomLocalization.m_LocalizationID = localizationId;
 
             m_PrefabSystem.AddPrefab(chirpPrefab, kPrefabParentName, null, null);
-            Entity chirpEntity = m_PrefabSystem.GetEntity(chirpPrefab);
+            chirpEntity = m_PrefabSystem.GetEntity(chirpPrefab);
 
             TriggerPrefab triggerPrefab = ScriptableObject.CreateInstance<TriggerPrefab>();
             triggerPrefab.name = $"{assetKey}.Trigger";
@@ -553,6 +619,166 @@ namespace Traffic_Law_Enforcement
             });
 
             return triggerEntity;
+        }
+
+        private int RegisterLoadedLegacyPreviewPrefabAliases()
+        {
+            if (m_PrefabSystem == null ||
+                m_PreviewTriggerEntity == Entity.Null ||
+                m_PreviewChirpEntity == Entity.Null)
+            {
+                return 0;
+            }
+
+            if (!(s_LoadedIndexDataField?.GetValue(m_PrefabSystem) is System.Collections.IList loadedIndexData) ||
+                !(s_LoadedObsoleteIDsField?.GetValue(m_PrefabSystem) is System.Collections.IDictionary loadedObsoleteIDs))
+            {
+                return 0;
+            }
+
+            HashSet<int> existingLoadedIndexes = GetExistingLoadedIndexes(loadedIndexData);
+            int aliasCount = 0;
+            foreach (System.Collections.DictionaryEntry entry in loadedObsoleteIDs)
+            {
+                if (!(entry.Key is int loadedIndex) ||
+                    !(entry.Value is PrefabID loadedPrefabID))
+                {
+                    continue;
+                }
+
+                if (!TryGetLegacyPreviewAliasTarget(loadedPrefabID, out Entity aliasTarget))
+                {
+                    continue;
+                }
+
+                string prefabIdText = loadedPrefabID.ToString();
+                if (!existingLoadedIndexes.Add(loadedIndex))
+                {
+                    continue;
+                }
+
+                if (!TryAddLoadedIndexData(loadedIndexData, aliasTarget, loadedIndex))
+                {
+                    Mod.log.Info(
+                        "[ENFORCEMENT_CHIRPER_PREFABS] " +
+                        $"phase=RegisterLegacyPreviewAliasFailed, legacyId={prefabIdText}, " +
+                        "error=unable to append loaded index data");
+                    continue;
+                }
+
+                aliasCount += 1;
+                if (EnforcementLoggingPolicy.ShouldLogChirperDiagnostics())
+                {
+                    Mod.log.Info(
+                        "[ENFORCEMENT_CHIRPER_PREFABS] " +
+                        $"phase=RegisterLegacyPreviewAlias, legacyId={prefabIdText}, " +
+                        $"loadedIndex={loadedIndex}, target={aliasTarget}");
+                }
+            }
+
+            return aliasCount;
+        }
+
+        private static HashSet<int> GetExistingLoadedIndexes(System.Collections.IList loadedIndexData)
+        {
+            HashSet<int> existingIndexes = new HashSet<int>();
+            foreach (object loadedIndexItem in loadedIndexData)
+            {
+                if (TryGetLoadedIndex(loadedIndexItem, out int loadedIndex))
+                {
+                    existingIndexes.Add(loadedIndex);
+                }
+            }
+
+            return existingIndexes;
+        }
+
+        private static bool TryGetLoadedIndex(object loadedIndexItem, out int loadedIndex)
+        {
+            loadedIndex = default;
+            if (loadedIndexItem == null)
+            {
+                return false;
+            }
+
+            FieldInfo indexField = loadedIndexItem.GetType().GetField("m_Index", s_LoadedIndexDataFieldFlags);
+            if (indexField == null)
+            {
+                return false;
+            }
+
+            try
+            {
+                object indexValue = indexField.GetValue(loadedIndexItem);
+                if (!(indexValue is int loadedIndexValue))
+                {
+                    return false;
+                }
+
+                loadedIndex = loadedIndexValue;
+                return true;
+            }
+            catch
+            {
+                loadedIndex = default;
+                return false;
+            }
+        }
+
+        private static bool TryAddLoadedIndexData(
+            System.Collections.IList loadedIndexData,
+            Entity entity,
+            int loadedIndex)
+        {
+            try
+            {
+                Type loadedIndexDataType = loadedIndexData.GetType().GetGenericArguments()[0];
+                object item = Activator.CreateInstance(loadedIndexDataType);
+                FieldInfo entityField = loadedIndexDataType.GetField("m_Entity", s_LoadedIndexDataFieldFlags);
+                FieldInfo indexField = loadedIndexDataType.GetField("m_Index", s_LoadedIndexDataFieldFlags);
+                if (entityField == null || indexField == null)
+                {
+                    return false;
+                }
+
+                entityField.SetValue(item, entity);
+                indexField.SetValue(item, loadedIndex);
+                loadedIndexData.Add(item);
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private bool TryGetLegacyPreviewAliasTarget(PrefabID prefabID, out Entity aliasTarget)
+        {
+            aliasTarget = Entity.Null;
+
+            string prefabIdText = prefabID.ToString();
+            if (string.IsNullOrWhiteSpace(prefabIdText))
+            {
+                return false;
+            }
+
+            string legacyChirpPrefix = $"ServiceChirpPrefab:{kPrefabNamePrefix}.Preview.";
+            if (prefabIdText.StartsWith(legacyChirpPrefix, StringComparison.Ordinal) &&
+                prefabIdText.EndsWith(".Chirp", StringComparison.Ordinal))
+            {
+                aliasTarget = m_PreviewChirpEntity;
+                return true;
+            }
+
+            string legacyTriggerPrefix = $"TriggerPrefab:{kPrefabNamePrefix}.Preview.";
+            if (prefabIdText.StartsWith(legacyTriggerPrefix, StringComparison.Ordinal) &&
+                prefabIdText.EndsWith(".Trigger", StringComparison.Ordinal))
+            {
+                aliasTarget = m_PreviewTriggerEntity;
+                return true;
+            }
+
+            return false;
         }
 
         private IEnumerable<string> GetLocalizationBuildLocales()
@@ -715,7 +941,43 @@ namespace Traffic_Law_Enforcement
                     localeId,
                     ref addedLocalizationSource,
                     ref requiresLocaleReload);
+                _ = EnsurePreviewFallbackLocalizationEntry(
+                    localeId,
+                    ref addedLocalizationSource,
+                    ref requiresLocaleReload);
             }
+        }
+
+        private bool EnsurePreviewFallbackLocalizationEntries(
+            out bool addedLocalizationSource,
+            out bool requiresLocaleReload)
+        {
+            bool changed = false;
+            bool addedSource = false;
+            bool shouldReload = false;
+
+            foreach (string localeId in GetLocalizationBuildLocales())
+            {
+                changed |= EnsureSenderLocalizationEntry(localeId, ref addedSource, ref shouldReload);
+                changed |= EnsurePreviewFallbackLocalizationEntry(localeId, ref addedSource, ref shouldReload);
+            }
+
+            addedLocalizationSource = addedSource;
+            requiresLocaleReload = shouldReload;
+            return changed;
+        }
+
+        private bool EnsurePreviewFallbackLocalizationEntry(
+            string localeId,
+            ref bool addedLocalizationSource,
+            ref bool requiresLocaleReload)
+        {
+            return EnsureLocalizationEntryForLocale(
+                localeId,
+                kPreviewLocalizationId,
+                kPreviewFallbackMessage,
+                ref addedLocalizationSource,
+                ref requiresLocaleReload);
         }
 
         private bool EnqueueChirp(Entity triggerEntity, out double queueWaitMilliseconds)
@@ -881,11 +1143,6 @@ namespace Traffic_Law_Enforcement
         private static string GetReportLocalizationId(long monthIndex)
         {
             return $"TrafficLawEnforcement.MonthlyChirperReport_{monthIndex}";
-        }
-
-        private static string GetPreviewLocalizationId(long periodEndMonthTicks, int previewSequence)
-        {
-            return $"TrafficLawEnforcement.MonthlyChirperPreview_{periodEndMonthTicks}_{previewSequence}";
         }
 
         private static string FormatEnglishPeriodPoint(long monthTicks)

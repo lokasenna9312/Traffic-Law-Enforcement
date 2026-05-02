@@ -1104,27 +1104,17 @@ namespace Traffic_Law_Enforcement
                 return false;
             }
 
-            Entity pendingTarget = analysisState.m_PendingBuildingServiceIngressTarget;
-            if (HasActiveIllegalIngressCluster(analysisState, pendingTarget))
-            {
-                ClearPendingBuildingServiceIngress(ref analysisState);
-                return false;
-            }
-
-            bool currentMatchesPendingTarget =
-                IsBuildingServiceIngressBoundaryLane(
+            if (TryResolveIngressBoundaryClusterTarget(
                     vehicle,
-                    history.m_CurrentLane,
-                    pendingTarget);
-            bool previousMatchesPendingTarget =
-                IsBuildingServiceIngressBoundaryLane(
-                    vehicle,
-                    history.m_PreviousLane,
-                    pendingTarget);
-
-            if (currentMatchesPendingTarget &&
-                !previousMatchesPendingTarget)
+                    history,
+                    out Entity boundaryTarget))
             {
+                if (HasActiveIllegalIngressCluster(analysisState, boundaryTarget))
+                {
+                    ClearPendingBuildingServiceIngress(ref analysisState);
+                    return false;
+                }
+
                 // Ordinary-road departure is the ingress boundary. When a later seam
                 // finally proves that the earlier generic departure was into the
                 // target cluster, attribute the ingress back to that stored departure.
@@ -1158,7 +1148,10 @@ namespace Traffic_Law_Enforcement
                 return false;
             }
 
-            if (!TryGetResolvedBuildingServiceIntentTarget(vehicle, out Entity targetEntity))
+            if (!TryResolveLaneOwnedIngressBoundaryTarget(
+                    vehicle,
+                    history.m_CurrentLane,
+                    out Entity targetEntity))
             {
                 return false;
             }
@@ -1168,19 +1161,11 @@ namespace Traffic_Law_Enforcement
                 return false;
             }
 
-            bool currentMatchesTarget =
-                IsBuildingServiceIngressBoundaryLane(
-                    vehicle,
-                    history.m_CurrentLane,
-                    targetEntity);
-            bool previousMatchesTarget =
-                IsBuildingServiceIngressBoundaryLane(
+            if (TryResolveLaneOwnedIngressBoundaryTarget(
                     vehicle,
                     history.m_PreviousLane,
-                    targetEntity);
-
-            if (!currentMatchesTarget ||
-                previousMatchesTarget)
+                    out Entity previousTarget) &&
+                previousTarget == targetEntity)
             {
                 return false;
             }
@@ -1630,14 +1615,16 @@ namespace Traffic_Law_Enforcement
                 return;
             }
 
-            if (!IsPotentialBuildingServiceIngressSeed(vehicle, history) ||
-                !TryGetResolvedBuildingServiceIntentTarget(vehicle, out Entity targetEntity))
+            if (!IsPotentialBuildingServiceIngressSeed(vehicle, history))
             {
                 ClearPendingBuildingServiceIngress(ref analysisState);
                 return;
             }
 
-            if (HasActiveIllegalIngressCluster(analysisState, targetEntity))
+            if (TryResolveIllegalIngressClusterTarget(
+                    history.m_CurrentLane,
+                    out Entity currentTarget) &&
+                HasActiveIllegalIngressCluster(analysisState, currentTarget))
             {
                 ClearPendingBuildingServiceIngress(ref analysisState);
                 return;
@@ -1647,8 +1634,6 @@ namespace Traffic_Law_Enforcement
                 history.m_PreviousLane;
             analysisState.m_PendingBuildingServiceIngressEntryLane =
                 history.m_CurrentLane;
-            analysisState.m_PendingBuildingServiceIngressTarget =
-                targetEntity;
             analysisState.m_PendingBuildingServiceIngressCorridorFailsafeBudget =
                 PendingBuildingServiceIngressCorridorFailsafeBudget;
         }
@@ -1761,8 +1746,7 @@ namespace Traffic_Law_Enforcement
         {
             return analysisState.m_PendingBuildingServiceIngressCorridorFailsafeBudget > 0 &&
                 analysisState.m_PendingBuildingServiceIngressRoadLane != Entity.Null &&
-                analysisState.m_PendingBuildingServiceIngressEntryLane != Entity.Null &&
-                analysisState.m_PendingBuildingServiceIngressTarget != Entity.Null;
+                analysisState.m_PendingBuildingServiceIngressEntryLane != Entity.Null;
         }
 
         private bool HasPendingBuildingServiceEgress(
@@ -1801,7 +1785,6 @@ namespace Traffic_Law_Enforcement
         {
             return MidBlockCrossingPolicy.IsAccessIngressReason(reasonCode) &&
                 TryResolveIllegalIngressClusterTarget(
-                    vehicle,
                     currentLane,
                     out Entity targetEntity) &&
                 HasActiveIllegalIngressCluster(analysisState, targetEntity);
@@ -1819,7 +1802,6 @@ namespace Traffic_Law_Enforcement
             analysisState.m_PendingBuildingServiceIngressCorridorFailsafeBudget = 0;
             analysisState.m_PendingBuildingServiceIngressRoadLane = Entity.Null;
             analysisState.m_PendingBuildingServiceIngressEntryLane = Entity.Null;
-            analysisState.m_PendingBuildingServiceIngressTarget = Entity.Null;
         }
 
         private void ClearPendingBuildingServiceEgress(
@@ -1897,7 +1879,10 @@ namespace Traffic_Law_Enforcement
             Entity vehicle,
             VehicleLaneHistory history)
         {
-            if (!TryGetRoadCarLane(history.m_PreviousLane, out CarLane previousRoadLane) ||
+            if (!MidBlockCrossingPolicy.IsOrdinaryRoadLane(
+                    EntityManager,
+                    history.m_PreviousLane) ||
+                !TryGetRoadCarLane(history.m_PreviousLane, out CarLane previousRoadLane) ||
                 m_ConnectionLaneData.HasComponent(history.m_CurrentLane) ||
                 m_ParkingLaneData.HasComponent(history.m_CurrentLane) ||
                 m_GarageLaneData.HasComponent(history.m_CurrentLane) ||
@@ -2063,21 +2048,83 @@ namespace Traffic_Law_Enforcement
         }
 
         private bool TryResolveIllegalIngressClusterTarget(
-            Entity vehicle,
             Entity currentLane,
             out Entity targetEntity)
         {
-            if (TryGetResolvedBuildingServiceIntentTarget(vehicle, out targetEntity))
+            if (TryResolveLaneOwnedBuildingServiceClusterTarget(
+                    currentLane,
+                    out targetEntity))
             {
                 return true;
             }
 
-            if (currentLane != Entity.Null &&
-                m_OwnerData.TryGetComponent(currentLane, out Owner currentOwner) &&
-                currentOwner.m_Owner != Entity.Null)
+            targetEntity = Entity.Null;
+            return false;
+        }
+
+        private bool TryResolveIngressBoundaryClusterTarget(
+            Entity vehicle,
+            VehicleLaneHistory history,
+            out Entity targetEntity)
+        {
+            if (TryResolveLaneOwnedBuildingServiceClusterTarget(
+                    history.m_CurrentLane,
+                    out targetEntity) &&
+                IsBuildingServiceIngressBoundaryLane(
+                    vehicle,
+                    history.m_CurrentLane,
+                    targetEntity))
             {
-                targetEntity = ResolveBuildingServiceClusterTarget(currentOwner.m_Owner);
-                return targetEntity != Entity.Null;
+                return true;
+            }
+
+            if (TryResolveLaneOwnedBuildingServiceClusterTarget(
+                    history.m_PreviousLane,
+                    out targetEntity) &&
+                IsBuildingServiceIngressBoundaryLane(
+                    vehicle,
+                    history.m_PreviousLane,
+                    targetEntity))
+            {
+                return true;
+            }
+
+            targetEntity = Entity.Null;
+            return false;
+        }
+
+        private bool TryResolveLaneOwnedBuildingServiceClusterTarget(
+            Entity lane,
+            out Entity targetEntity)
+        {
+            if (lane != Entity.Null &&
+                m_OwnerData.TryGetComponent(lane, out Owner laneOwner) &&
+                laneOwner.m_Owner != Entity.Null)
+            {
+                targetEntity = ResolveBuildingServiceClusterTarget(laneOwner.m_Owner);
+                return targetEntity != Entity.Null &&
+                    (EntityManager.HasComponent<Building>(targetEntity) ||
+                        EntityManager.HasComponent<ServiceUpgrade>(targetEntity));
+            }
+
+            targetEntity = Entity.Null;
+            return false;
+        }
+
+        private bool TryResolveLaneOwnedIngressBoundaryTarget(
+            Entity vehicle,
+            Entity lane,
+            out Entity targetEntity)
+        {
+            if (TryResolveLaneOwnedBuildingServiceClusterTarget(
+                    lane,
+                    out targetEntity) &&
+                IsBuildingServiceIngressBoundaryLane(
+                    vehicle,
+                    lane,
+                    targetEntity))
+            {
+                return true;
             }
 
             targetEntity = Entity.Null;
@@ -2096,7 +2143,6 @@ namespace Traffic_Law_Enforcement
             }
 
             if (TryResolveIllegalIngressClusterTarget(
-                    vehicle,
                     currentLane,
                     out Entity targetEntity))
             {
